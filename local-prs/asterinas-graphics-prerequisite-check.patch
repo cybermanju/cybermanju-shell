@@ -1,0 +1,562 @@
+diff --git a/tools/graphics/README.md b/tools/graphics/README.md
+new file mode 100644
+index 0000000..3402921
+--- /dev/null
++++ b/tools/graphics/README.md
+@@ -0,0 +1,25 @@
++# GPUI graphics readiness diagnostic
++
++Run from the repository root (or invoke by absolute path):
++
++```sh
++python3 tools/graphics/check_graphics.py
++```
++
++It uses only the Python standard library plus the host tools `vulkaninfo` and `wayland-info`. Exit status is **0 only when all three required checks pass**; a failed or unavailable check produces an actionable message and a nonzero exit status.
++
++## Checks and limits
++
++- **DRM nodes:** looks only for accessible character-device nodes named `/dev/dri/cardN` (primary) and `/dev/dri/renderDNNN` (render), and requires at least one of each. It does not create, emulate, or infer devices. Node presence/access is not proof of a real GPU, active driver, working display path, or successful GPUI rendering.
++- **Vulkan device:** runs `vulkaninfo --summary` to enumerate device indices, then runs `vulkaninfo --json=<index>` per device and inspects the generated Vulkan Profiles JSON at `capabilities.device.properties.VkPhysicalDeviceProperties.deviceType` and `deviceName`. CPU devices (including software implementations such as llvmpipe) do not satisfy this check. Integrated, discrete, and virtual GPU enum values are reported as non-CPU candidates; unknown `OTHER` values are not treated as confirmed candidates. The Vulkan specification says this type is informational, so this cannot certify physical hardware or hardware acceleration. The JSON command's per-device output behavior follows [`vulkaninfo` documentation](https://vulkan.lunarg.com/doc/view/latest/windows/vulkaninfo.html); type meanings and their limitation follow [`VkPhysicalDeviceType`](https://docs.vulkan.org/refpages/latest/refpages/source/VkPhysicalDeviceType.html).
++- **Wayland layer-shell:** connects with `wayland-info` and requires its compositor-global listing to include `zwlr_layer_shell_v1`. This checks advertised protocol availability in the active session; it does not create a surface or test the protocol's runtime behavior. See the upstream [wlr layer-shell protocol definition](https://github.com/swaywm/wlr-protocols/blob/master/unstable/wlr-layer-shell-unstable-v1.xml).
++
++The diagnostic is a staged prerequisite probe, not a substitute for GPUI build, boot, session, or end-to-end rendering acceptance tests. Run it as the same user and inside the intended graphical session; missing device permissions or session variables are reported as failures rather than inferred from another user's environment.
++
++## Tests
++
++Run the standard-library unit tests with temporary test-only fixtures and mocked subprocess responses:
++
++```sh
++python3 -m unittest discover -s tools/graphics -v
++```
+diff --git a/tools/graphics/check_graphics.py b/tools/graphics/check_graphics.py
+new file mode 100755
+index 0000000..d1c507e
+--- /dev/null
++++ b/tools/graphics/check_graphics.py
+@@ -0,0 +1,317 @@
++#!/usr/bin/env python3
++"""Report GPUI shell graphics prerequisites visible to this process."""
++
++from __future__ import annotations
++
++import json
++import os
++import re
++import shutil
++import stat
++import subprocess
++import sys
++import tempfile
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Any
++
++
++DRM_DIRECTORY = Path("/dev/dri")
++LAYER_SHELL_INTERFACE = "zwlr_layer_shell_v1"
++NON_CPU_GPU_TYPES = {
++    "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU",
++    "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU",
++    "VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU",
++}
++COMMAND_TIMEOUT_SECONDS = 60
++
++
++@dataclass(frozen=True)
++class Check:
++    name: str
++    passed: bool
++    detail: str
++    action: str = ""
++
++
++def _command_error(command: list[str], error: OSError | subprocess.TimeoutExpired) -> str:
++    rendered = " ".join(command)
++    if isinstance(error, FileNotFoundError):
++        return f"{command[0]} is not installed or not on PATH."
++    if isinstance(error, subprocess.TimeoutExpired):
++        return f"{rendered} timed out after {COMMAND_TIMEOUT_SECONDS} seconds."
++    return f"Could not run {rendered}: {error}."
++
++
++def _run(command: list[str], *, cwd: str | None = None) -> subprocess.CompletedProcess[str]:
++    return subprocess.run(
++        command,
++        check=False,
++        capture_output=True,
++        text=True,
++        timeout=COMMAND_TIMEOUT_SECONDS,
++        cwd=cwd,
++    )
++
++
++def check_drm_nodes() -> Check:
++    """Require accessible character-device primary and render nodes."""
++    if not DRM_DIRECTORY.is_dir():
++        return Check(
++            "DRM nodes",
++            False,
++            f"{DRM_DIRECTORY} is absent or not a directory.",
++            "Expose the host's real DRM device nodes (usually /dev/dri/cardN and renderDNNN) to this session.",
++        )
++
++    primary: list[str] = []
++    render: list[str] = []
++    try:
++        entries = sorted(DRM_DIRECTORY.iterdir(), key=lambda path: path.name)
++    except OSError as error:
++        return Check(
++            "DRM nodes",
++            False,
++            f"Cannot inspect {DRM_DIRECTORY}: {error}.",
++            "Check device-directory permissions and whether the DRM devices are exposed.",
++        )
++
++    for path in entries:
++        if re.fullmatch(r"card\d+", path.name):
++            destination = primary
++        elif re.fullmatch(r"renderD\d+", path.name):
++            destination = render
++        else:
++            continue
++        try:
++            mode = path.stat(follow_symlinks=False).st_mode
++        except OSError:
++            continue
++        if stat.S_ISCHR(mode) and os.access(path, os.R_OK | os.W_OK):
++            destination.append(str(path))
++
++    missing = []
++    if not primary:
++        missing.append("an accessible primary cardN node")
++    if not render:
++        missing.append("an accessible renderDNNN node")
++    if missing:
++        found = []
++        if primary:
++            found.append("primary: " + ", ".join(primary))
++        if render:
++            found.append("render: " + ", ".join(render))
++        detail = "; ".join(found) if found else "No accessible DRM character-device nodes found."
++        return Check(
++            "DRM nodes",
++            False,
++            detail + "; missing " + " and ".join(missing) + ".",
++            "Expose the real DRM nodes to this session and grant the user read/write access (commonly via the video/render groups).",
++        )
++
++    return Check(
++        "DRM nodes",
++        True,
++        f"primary: {', '.join(primary)}; render: {', '.join(render)}.",
++    )
++
++
++def _physical_device_properties(document: Any) -> tuple[str, str]:
++    """Extract VkPhysicalDeviceProperties from vulkaninfo's Profiles JSON."""
++    try:
++        properties = document["capabilities"]["device"]["properties"][
++            "VkPhysicalDeviceProperties"
++        ]
++        device_type = properties["deviceType"]
++        device_name = properties["deviceName"]
++    except (KeyError, TypeError) as error:
++        raise ValueError(
++            "missing capabilities.device.properties.VkPhysicalDeviceProperties fields"
++        ) from error
++    if not isinstance(device_type, str) or not isinstance(device_name, str):
++        raise ValueError("deviceType and deviceName must be strings")
++    return device_type, device_name
++
++
++def _inspect_vulkan_json(device_index: int) -> tuple[str, str, str]:
++    """Ask vulkaninfo for one indexed device and parse its documented JSON file."""
++    command = ["vulkaninfo", f"--json={device_index}"]
++    with tempfile.TemporaryDirectory(prefix="gpui-vulkaninfo-") as output_directory:
++        try:
++            completed = _run(command, cwd=output_directory)
++        except (OSError, subprocess.TimeoutExpired) as error:
++            return "", "", _command_error(command, error)
++        if completed.returncode != 0:
++            message = (completed.stderr or completed.stdout).strip().replace("\n", " ")
++            return "", "", f"vulkaninfo --json={device_index} exited {completed.returncode}: {message[:300]}"
++        outputs = list(Path(output_directory).glob("*.json"))
++        if len(outputs) != 1:
++            return "", "", (
++                f"vulkaninfo --json={device_index} exited successfully but produced "
++                f"{len(outputs)} JSON files (expected one)."
++            )
++        try:
++            document = json.loads(outputs[0].read_text(encoding="utf-8"))
++            device_type, device_name = _physical_device_properties(document)
++        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
++            return "", "", f"Cannot read device {device_index} Vulkan Profiles JSON: {error}."
++        return device_type, device_name, ""
++
++
++def check_vulkan() -> Check:
++    """Require an enumerated non-CPU GPU device type in actual vulkaninfo JSON."""
++    command = ["vulkaninfo", "--summary"]
++    try:
++        completed = _run(command)
++    except (OSError, subprocess.TimeoutExpired) as error:
++        return Check(
++            "Vulkan device",
++            False,
++            _command_error(command, error),
++            "Install the Vulkan loader utilities (vulkaninfo) and a working Vulkan ICD, then retry.",
++        )
++    if completed.returncode != 0:
++        message = (completed.stderr or completed.stdout).strip().replace("\n", " ")
++        return Check(
++            "Vulkan device",
++            False,
++            f"vulkaninfo --summary exited {completed.returncode}: {message[:300] or 'no diagnostic output'}.",
++            "Install/configure a Vulkan ICD and ensure this user can access it; then rerun vulkaninfo --summary.",
++        )
++
++    indices = [int(match.group(1)) for match in re.finditer(r"^\s*GPU(\d+)\s*:\s*$", completed.stdout, re.MULTILINE)]
++    if not indices:
++        return Check(
++            "Vulkan device",
++            False,
++            "vulkaninfo --summary reported no indexed physical devices.",
++            "Install/configure a Vulkan ICD and verify it with vulkaninfo --summary.",
++        )
++
++    devices: list[tuple[int, str, str]] = []
++    problems: list[str] = []
++    for index in indices:
++        device_type, name, error = _inspect_vulkan_json(index)
++        if error:
++            problems.append(error)
++        else:
++            if not name:
++                problems.append(f"Cannot retrieve device name for Vulkan device {index}.")
++            else:
++                devices.append((index, device_type, name))
++
++    candidates = [device for device in devices if device[1] in NON_CPU_GPU_TYPES]
++    cpu_devices = [device for device in devices if device[1] == "VK_PHYSICAL_DEVICE_TYPE_CPU"]
++    unknown_devices = [device for device in devices if device[1] not in NON_CPU_GPU_TYPES and device[1] != "VK_PHYSICAL_DEVICE_TYPE_CPU"]
++    if candidates:
++        descriptions = [f"GPU{index} {name} ({device_type})" for index, device_type, name in candidates]
++        detail = "Non-CPU Vulkan device type observed in JSON: " + "; ".join(descriptions) + "."
++        if cpu_devices:
++            detail += " CPU/software Vulkan device(s) also present: " + "; ".join(
++                f"GPU{index} {name}" for index, _, name in cpu_devices
++            ) + "."
++        if problems:
++            detail += " Some enumerated device JSON could not be inspected: " + " ".join(problems)
++        detail += " This is a device-type observation, not certification of hardware acceleration."
++        return Check("Vulkan device", True, detail)
++
++    if cpu_devices:
++        detail = "Only CPU-type Vulkan device(s) were confirmed: " + "; ".join(
++            f"GPU{index} {name}" for index, _, name in cpu_devices
++        ) + "."
++        detail += " A software Vulkan implementation (for example, llvmpipe) is not a non-CPU GPU candidate."
++    elif unknown_devices:
++        detail = "No recognized non-CPU GPU type was confirmed; reported device type(s): " + "; ".join(
++            f"GPU{index} {name} ({device_type})" for index, device_type, name in unknown_devices
++        ) + "."
++    else:
++        detail = "No Vulkan device JSON could be inspected."
++    if problems:
++        detail += " Inspection errors: " + " ".join(problems)
++    return Check(
++        "Vulkan device",
++        False,
++        detail,
++        "Check all device records with vulkaninfo --summary, install/configure the intended non-CPU Vulkan ICD, and rerun this diagnostic.",
++    )
++
++
++def parse_layer_shell_version(output: str) -> int | None:
++    """Return the advertised global version from a wayland-info listing."""
++    line_pattern = re.compile(
++        rf"^\s*interface:\s*['\"]{re.escape(LAYER_SHELL_INTERFACE)}['\"]\s*,"
++        r"\s*version:\s*(\d+)\s*,\s*name:\s*\d+\s*$",
++        re.MULTILINE,
++    )
++    match = line_pattern.search(output)
++    return int(match.group(1)) if match else None
++
++
++def check_layer_shell() -> Check:
++    """Connect with wayland-info and require the wlr layer-shell global."""
++    if not os.environ.get("XDG_RUNTIME_DIR"):
++        return Check(
++            "Wayland layer-shell",
++            False,
++            "XDG_RUNTIME_DIR is unset; no active Wayland session can be identified.",
++            "Run this check from the GPUI user's active Wayland login session (with XDG_RUNTIME_DIR set).",
++        )
++    if not shutil.which("wayland-info"):
++        return Check(
++            "Wayland layer-shell",
++            False,
++            "wayland-info is not installed or not on PATH.",
++            "Install wayland-utils, enter an active Wayland session, and rerun this diagnostic.",
++        )
++
++    command = ["wayland-info"]
++    try:
++        completed = _run(command)
++    except (OSError, subprocess.TimeoutExpired) as error:
++        return Check(
++            "Wayland layer-shell",
++            False,
++            _command_error(command, error),
++            "Check the Wayland socket and session environment (WAYLAND_DISPLAY and XDG_RUNTIME_DIR), then retry.",
++        )
++    if completed.returncode != 0:
++        message = (completed.stderr or completed.stdout).strip().replace("\n", " ")
++        return Check(
++            "Wayland layer-shell",
++            False,
++            f"wayland-info could not query the compositor (exit {completed.returncode}): {message[:300] or 'no diagnostic output'}.",
++            "Run inside the target user's active Wayland session and check WAYLAND_DISPLAY/XDG_RUNTIME_DIR and socket permissions.",
++        )
++
++    version = parse_layer_shell_version(completed.stdout)
++    if version is None:
++        return Check(
++            "Wayland layer-shell",
++            False,
++            f"wayland-info connected, but did not report the {LAYER_SHELL_INTERFACE} global.",
++            "Use a compositor configured with the wlr layer-shell protocol; a working Wayland connection alone is insufficient.",
++        )
++    return Check(
++        "Wayland layer-shell",
++        True,
++        f"Compositor advertises {LAYER_SHELL_INTERFACE} version {version} in wayland-info output.",
++    )
++
++
++def main() -> int:
++    checks = [check_drm_nodes(), check_vulkan(), check_layer_shell()]
++    print("GPUI graphics readiness (prerequisite probe; not integration certification)")
++    for check in checks:
++        print(f"{'PASS' if check.passed else 'FAIL'}  {check.name}: {check.detail}")
++        if not check.passed and check.action:
++            print(f"      Action: {check.action}")
++    failed = [check for check in checks if not check.passed]
++    if failed:
++        print(f"\nNot ready: {len(failed)} required check(s) failed.")
++        return 1
++    print("\nAll required prerequisite checks passed. This does not prove GPUI integration or hardware acceleration.")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tools/graphics/test_check_graphics.py b/tools/graphics/test_check_graphics.py
+new file mode 100644
+index 0000000..b52561c
+--- /dev/null
++++ b/tools/graphics/test_check_graphics.py
+@@ -0,0 +1,202 @@
++"""Unit tests use temporary test-only fixtures; no host devices are fabricated."""
++
++from __future__ import annotations
++
++import json
++import os
++import stat
++import subprocess
++import tempfile
++import unittest
++from types import SimpleNamespace
++from pathlib import Path
++from unittest import mock
++
++import check_graphics
++
++
++def vulkan_profiles_fixture(device_type: str, device_name: str) -> dict[str, object]:
++    """Build the minimal shape found in vulkaninfo's Vulkan Profiles JSON."""
++    return {
++        "$schema": "https://schema.khronos.org/vulkan/profiles-0.8-latest.json",
++        "capabilities": {
++            "device": {
++                "properties": {
++                    "VkPhysicalDeviceProperties": {
++                        "deviceType": device_type,
++                        "deviceName": device_name,
++                    }
++                }
++            }
++        },
++        "profiles": {},
++    }
++
++
++class GraphicsDiagnosticTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.temporary_directory = tempfile.TemporaryDirectory(prefix="graphics-test-")
++        self.addCleanup(self.temporary_directory.cleanup)
++        self.fixture_directory = Path(self.temporary_directory.name)
++        # These are explicit fixture files, consumed only by mocked command runners.
++        self.cpu_json_fixture = self.fixture_directory / "cpu-vulkan-profiles-fixture.json"
++        self.cpu_json_fixture.write_text(
++            json.dumps(vulkan_profiles_fixture("VK_PHYSICAL_DEVICE_TYPE_CPU", "fixture llvmpipe")),
++            encoding="utf-8",
++        )
++        self.gpu_json_fixture = self.fixture_directory / "gpu-vulkan-profiles-fixture.json"
++        self.gpu_json_fixture.write_text(
++            json.dumps(vulkan_profiles_fixture("VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU", "fixture GPU")),
++            encoding="utf-8",
++        )
++        self.wayland_fixture = self.fixture_directory / "wayland-info-output-fixture.txt"
++        self.wayland_fixture.write_text(
++            "interface: 'wl_compositor', version: 6, name: 1\n"
++            "interface: 'zwlr_layer_shell_v1', version: 4, name: 23\n",
++            encoding="utf-8",
++        )
++
++    def _vulkan_runner(self, indices: str, fixture_for_index: dict[int, Path]):
++        def run(command: list[str], *, cwd: str | None = None):
++            if command == ["vulkaninfo", "--summary"]:
++                summary = "Devices:\n========\n" + "".join(
++                    f"GPU{index}:\napiVersion = 1.3\n" for index in map(int, indices.split(","))
++                )
++                return subprocess.CompletedProcess(command, 0, summary, "")
++            index = int(command[1].split("=", 1)[1])
++            source = fixture_for_index[index]
++            (Path(cwd) / f"vulkan-device-{index}-fixture.json").write_text(
++                source.read_text(encoding="utf-8"), encoding="utf-8"
++            )
++            return subprocess.CompletedProcess(command, 0, "", "")
++
++        return run
++
++    def test_vulkan_inspects_each_indexed_json_device(self) -> None:
++        with mock.patch.object(
++            check_graphics,
++            "_run",
++            side_effect=self._vulkan_runner("0,1", {0: self.cpu_json_fixture, 1: self.gpu_json_fixture}),
++        ) as runner:
++            result = check_graphics.check_vulkan()
++        self.assertTrue(result.passed, result.detail)
++        self.assertIn("fixture GPU", result.detail)
++        self.assertIn("fixture llvmpipe", result.detail)
++        self.assertEqual(runner.call_count, 3)
++
++    def test_cpu_only_vulkan_does_not_pass(self) -> None:
++        with mock.patch.object(
++            check_graphics,
++            "_run",
++            side_effect=self._vulkan_runner("0", {0: self.cpu_json_fixture}),
++        ):
++            result = check_graphics.check_vulkan()
++        self.assertFalse(result.passed)
++        self.assertIn("Only CPU-type", result.detail)
++        self.assertIn("llvmpipe", result.detail)
++
++    def test_unrecognized_device_type_does_not_pass(self) -> None:
++        other_fixture = self.fixture_directory / "other-vulkan-profiles-fixture.json"
++        other_fixture.write_text(
++            json.dumps(vulkan_profiles_fixture("VK_PHYSICAL_DEVICE_TYPE_OTHER", "fixture unknown")),
++            encoding="utf-8",
++        )
++        with mock.patch.object(
++            check_graphics,
++            "_run",
++            side_effect=self._vulkan_runner("0", {0: other_fixture}),
++        ):
++            result = check_graphics.check_vulkan()
++        self.assertFalse(result.passed)
++        self.assertIn("No recognized non-CPU GPU type", result.detail)
++
++    def test_vulkan_missing_command_fails_actionably(self) -> None:
++        with mock.patch.object(check_graphics, "_run", side_effect=FileNotFoundError()):
++            result = check_graphics.check_vulkan()
++        self.assertFalse(result.passed)
++        self.assertIn("vulkaninfo is not installed", result.detail)
++        self.assertIn("Install", result.action)
++
++    def test_drm_requires_accessible_character_node_fixtures_of_each_kind(self) -> None:
++        drm_fixture_directory = self.fixture_directory / "dri-fixture"
++        drm_fixture_directory.mkdir()
++        primary_fixture = drm_fixture_directory / "card3"
++        render_fixture = drm_fixture_directory / "renderD129"
++        ignored_fixture = drm_fixture_directory / "controlD64"
++        for fixture in (primary_fixture, render_fixture, ignored_fixture):
++            fixture.touch()
++
++        original_stat = Path.stat
++
++        def fixture_stat(path: Path, *args, **kwargs):
++            result = original_stat(path, *args, **kwargs)
++            if path in (primary_fixture, render_fixture):
++                return SimpleNamespace(st_mode=stat.S_IFCHR | 0o660)
++            return result
++
++        with (
++            mock.patch.object(check_graphics, "DRM_DIRECTORY", drm_fixture_directory),
++            mock.patch.object(Path, "stat", autospec=True, side_effect=fixture_stat),
++            mock.patch.object(check_graphics.os, "access", return_value=True),
++        ):
++            result = check_graphics.check_drm_nodes()
++        self.assertTrue(result.passed, result.detail)
++        self.assertIn("card3", result.detail)
++        self.assertIn("renderD129", result.detail)
++        self.assertNotIn("controlD64", result.detail)
++
++    def test_drm_regular_file_is_not_a_device_node(self) -> None:
++        drm_fixture_directory = self.fixture_directory / "dri-regular-fixture"
++        drm_fixture_directory.mkdir()
++        (drm_fixture_directory / "card0").touch()
++        (drm_fixture_directory / "renderD128").touch()
++        with mock.patch.object(check_graphics, "DRM_DIRECTORY", drm_fixture_directory):
++            result = check_graphics.check_drm_nodes()
++        self.assertFalse(result.passed)
++        self.assertIn("No accessible DRM character-device nodes", result.detail)
++
++    def test_wayland_global_is_parsed_from_mocked_real_format_output(self) -> None:
++        output = self.wayland_fixture.read_text(encoding="utf-8")
++        with (
++            mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(self.fixture_directory), "WAYLAND_DISPLAY": "fixture-wayland"}),
++            mock.patch.object(check_graphics.shutil, "which", return_value="/usr/bin/wayland-info"),
++            mock.patch.object(
++                check_graphics,
++                "_run",
++                return_value=subprocess.CompletedProcess(["wayland-info"], 0, output, ""),
++            ) as runner,
++        ):
++            result = check_graphics.check_layer_shell()
++        self.assertTrue(result.passed, result.detail)
++        self.assertIn("version 4", result.detail)
++        runner.assert_called_once_with(["wayland-info"])
++
++    def test_wayland_connection_without_layer_shell_fails(self) -> None:
++        with (
++            mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(self.fixture_directory)}),
++            mock.patch.object(check_graphics.shutil, "which", return_value="/usr/bin/wayland-info"),
++            mock.patch.object(
++                check_graphics,
++                "_run",
++                return_value=subprocess.CompletedProcess(
++                    ["wayland-info"], 0, "interface: 'wl_compositor', version: 6, name: 1\n", ""
++                ),
++            ),
++        ):
++            result = check_graphics.check_layer_shell()
++        self.assertFalse(result.passed)
++        self.assertIn("did not report the zwlr_layer_shell_v1", result.detail)
++
++    def test_main_returns_nonzero_when_a_required_check_fails(self) -> None:
++        passed = check_graphics.Check("ok", True, "fixture")
++        failed = check_graphics.Check("required", False, "fixture failure", "fixture action")
++        with (
++            mock.patch.object(check_graphics, "check_drm_nodes", return_value=passed),
++            mock.patch.object(check_graphics, "check_vulkan", return_value=failed),
++            mock.patch.object(check_graphics, "check_layer_shell", return_value=passed),
++        ):
++            self.assertEqual(check_graphics.main(), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()

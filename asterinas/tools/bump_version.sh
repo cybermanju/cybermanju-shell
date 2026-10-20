@@ -1,0 +1,256 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: MPL-2.0
+
+set -e
+
+# This script is used to update Asterinas version numbers in all relevant files in the repository.
+# Usage: ./tools/bump_version.sh command [options]
+# Commands:
+#   --docker_version_file [major|minor|patch|date]   Bump the Docker image version in the DOCKER_IMAGE_VERSION file under the project root
+#   --docker_version_refs                            Update all references to the Docker image version throughout the codebase
+#   --version_file                                   Bump the project version to match the Docker image version
+#   --api_doc_hyperlinks_in_book                     Update all API doc hyperlinks in the Book to match VERSION
+#   --help, -h                                       Show this help message
+# Options:
+#   major, minor, patch, date                        The version part to increment when bumping the Docker image version
+
+# TODO: we may remove the VERSION file in the future,
+# and retrieve the current version from git tag.
+
+# Update the package version (`version = "{version}"`) in file $1
+update_package_version() {
+    echo "Updating file $1"
+    # Package version is usually the first version in Cargo.toml,
+    # so only the first matched version is updated.
+    pattern="^version = \"[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\"$"
+    sed -i "0,/${pattern}/s/${pattern}/version = \"${new_version}\"/1" $1
+}
+
+# Update the version of the $2 dependency in a single-line inline table in file $1.
+update_dep_version() {
+    local file="$1" dependency="$2"
+    local dep_pattern="^[[:space:]]*${dependency}[[:space:]]*=[[:space:]]*\\{"
+    local version_pattern='([,{][[:space:]]*version[[:space:]]*=[[:space:]]*")[0-9]+\.[0-9]+\.[0-9]+(")'
+
+    if ! sed -nE "/${dep_pattern}/p" "$file" | grep -Eq "$version_pattern"; then
+        echo "Error: Cannot find version for ${dependency} in ${file}" >&2
+        return 1
+    fi
+
+    echo "Updating the version of ${dependency} in file ${file}"
+    sed -Ei "/${dep_pattern}/s/${version_pattern}/\\1${new_version}\\2/" "$file"
+}
+
+# Update Docker image versions in file $1
+update_image_versions() {
+    echo "Updating file $1"
+    # Update the version of OSDK development container
+    sed -i "s/asterinas\/osdk-dev:[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\(-[[:digit:]]\+\)\?/asterinas\/osdk-dev:${new_version}/g" $1
+    # Update the version of kernel development container
+    sed -i "s/asterinas\/kernel-dev:[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\(-[[:digit:]]\+\)\?/asterinas\/kernel-dev:${new_version}/g" $1
+    # Update the version of the Asterinas development container
+    sed -i "s/asterinas\/dev:[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\(-[[:digit:]]\+\)\?/asterinas\/dev:${new_version}/g" $1
+}
+
+# Print the help message
+print_help() {
+    echo "Usage: $0 <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  --docker_version_file [major|minor|patch|date]   Bump the Docker image version in the DOCKER_IMAGE_VERSION file under the project root"
+    echo "  --docker_version_refs                            Update all references to the Docker image version throughout the codebase"
+    echo "  --version_file                                   Bump the project version to match the Docker image version"
+    echo "  --api_doc_hyperlinks_in_book                     Update all API doc hyperlinks in the Book to match VERSION"
+    echo "  --help, -h                                       Show this help message"
+    echo ""
+    echo "The [major|minor|patch|date] options for --docker_version_file specify which part of the"
+    echo "Docker image version to increment. The 'date' option updates the date part of the version."
+}
+
+# Add the number $1 by 1
+# Bash cannot deal with 0 by using `$((num + 1))`,
+# So this function is defined to specially deal with 0.
+add_one() {
+    local num=$1
+    if [ "$num" == "0" ]; then
+        echo "1"
+    else
+        local bumped=$((num + 1))
+        echo "$bumped"
+    fi
+}
+
+# Update Docker image version in DOCKER_IMAGE_VERSION file
+update_docker_image_version() {
+    local IFS="-"
+    local docker_version_parts=($(cat "${DOCKER_IMAGE_VERSION_PATH}"))
+    local version_part=$1
+
+    if [[ -z "$version_part" ]]; then
+        echo "Error: A version part (major, minor, patch, or date) must be specified."
+        print_help
+        exit 1
+    fi
+
+    case "$version_part" in
+        "major" | "minor" | "patch")
+            local IFS="."
+            local semantic_version_parts=(${docker_version_parts[0]})
+            if [ "$version_part" == "major" ]; then
+                semantic_version_parts[0]=$(add_one "${semantic_version_parts[0]}")
+                semantic_version_parts[1]=0
+                semantic_version_parts[2]=0
+            elif [ "$version_part" == "minor" ]; then
+                semantic_version_parts[1]=$(add_one "${semantic_version_parts[1]}")
+                semantic_version_parts[2]=0
+            else # patch
+                semantic_version_parts[2]=$(add_one "${semantic_version_parts[2]}")
+            fi
+            docker_version_parts[0]="${semantic_version_parts[*]}"
+            docker_version_parts[1]=$(date +%Y%m%d)
+            ;;
+        "date")
+            docker_version_parts[1]=$(date +%Y%m%d)
+            ;;
+        *)
+            echo "Error: Invalid version part. Allowed values are: major, minor, patch, or date."
+            print_help
+            exit 1
+            ;;
+    esac
+
+    local IFS="+"
+    new_docker_version="${docker_version_parts[0]}-${docker_version_parts[1]}"
+    echo -n "${new_docker_version}" > ${DOCKER_IMAGE_VERSION_PATH}
+    echo "Bumped Docker image version to $new_docker_version"
+}
+
+# Update all Docker version references (except VERSION)
+update_all_docker_version_refs() {
+    new_version=$(cat ${DOCKER_IMAGE_VERSION_PATH})
+
+    # Update Docker image versions in devcontainer.json, README files, and AGENTS.md
+    update_image_versions ${ASTER_SRC_DIR}/.devcontainer/devcontainer.json
+    update_image_versions ${ASTER_SRC_DIR}/README.md
+    update_image_versions ${ASTER_SRC_DIR}/AGENTS.md
+    update_image_versions ${SCRIPT_DIR}/dev_env/docker/README.md
+
+    # Update Docker image versions in the Book
+    update_image_versions ${BOOK_DIR}/src/kernel/intel-tdx.md
+    update_image_versions ${BOOK_DIR}/src/kernel/README.md
+    update_image_versions ${BOOK_DIR}/src/osdk/guide/intel-tdx.md
+
+    # Update Docker image versions in workflows
+    ALL_WORKFLOWS=$(find "${ASTER_SRC_DIR}/.github/workflows/" -type f -name "*.yml")
+    EXCLUDED_WORKFLOWS=(
+        "${ASTER_SRC_DIR}/.github/workflows/push_git_tag.yml"
+        "${ASTER_SRC_DIR}/.github/workflows/check_licenses.yml"
+        "${ASTER_SRC_DIR}/.github/workflows/publish_docker_images.yml"
+    )
+
+    for workflow in $ALL_WORKFLOWS; do
+        if ! [[ " ${EXCLUDED_WORKFLOWS[*]} " =~ " ${workflow} " ]]; then
+            update_image_versions "$workflow"
+        fi
+    done
+}
+
+update_api_doc_hyperlinks_in_book() {
+    new_version=$(cat ${VERSION_PATH})
+
+    # This matches 'asterinas.github.io/api-docs/' followed by any X.Y.Z version.
+    SEARCH_PATTERN="asterinas\.github\.io/api-docs/[[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+"
+    REPLACE_STR="asterinas\.github\.io/api-docs/${new_version}"
+
+    grep -rl "asterinas.github.io/api-docs/" "$BOOK_SRC_DIR" | while read -r file; do
+        # We use '|' as a delimiter for sed to avoid escaping the slashes in the URL.
+        sed -i "s|$SEARCH_PATTERN|$REPLACE_STR|g" "$file"
+    done
+
+    echo "Updated Book API doc hyperlinks to ${new_version}"
+}
+
+# Update project dependencies (Cargo.toml and Cargo.lock)
+update_project_dependencies() {
+    # Update the versions in Cargo.toml
+    update_package_version ${WORKSPACE_CARGO_TOML_PATH}
+    update_package_version ${OSDK_CARGO_TOML_PATH}
+    update_package_version ${SCTRACE_CARGO_TOML_PATH}
+
+    update_dep_version ${WORKSPACE_CARGO_TOML_PATH} linux-boot-params
+    update_dep_version ${WORKSPACE_CARGO_TOML_PATH} ostd
+    update_dep_version ${WORKSPACE_CARGO_TOML_PATH} ostd-test
+    update_dep_version ${WORKSPACE_CARGO_TOML_PATH} ostd-macros
+    update_dep_version ${OSDK_CARGO_TOML_PATH} linux-bzimage-builder
+
+    # Automatically bump Cargo.lock files
+    cargo update -p asterinas --precise $new_version # For Cargo.lock
+    cd ${OSDK_DIR} && cargo update -p cargo-osdk --precise $new_version # For osdk/Cargo.lock
+    cd ${SCTRACE_DIR} && cargo update -p sctrace --precise $new_version # For tools/sctrace/Cargo.lock
+}
+
+# Synchronize project version to Docker version (update VERSION)
+sync_project_version() {
+    new_version=$(cat ${DOCKER_IMAGE_VERSION_PATH} | cut -d'-' -f1)
+    current_version=$(cat ${VERSION_PATH})
+    if [ -z "$new_version" ] || [ -z "$current_version" ]; then
+        echo "Error: Version string is empty."
+        exit 1
+    fi
+
+    # Check if versions are equal
+    if [ "$new_version" = "$current_version" ]; then
+        echo "Versions are equal. No action needed."
+        exit 0
+    fi
+
+    # Compare semantic versions
+    lower_version=$(printf '%s\n' "$new_version" "$current_version" | sort -V | head -n1)
+    if [ "$lower_version" = "$new_version" ]; then
+        echo "Error: New version ($new_version) must be greater than current version ($current_version)."
+        exit 1
+    fi
+
+    update_project_dependencies
+
+    echo -n "${new_version}" > ${VERSION_PATH}
+    echo "Bumped Asterinas OSTD & OSDK version to $new_version"
+}
+
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+ASTER_SRC_DIR=${SCRIPT_DIR}/..
+BOOK_DIR=${ASTER_SRC_DIR}/book
+WORKSPACE_CARGO_TOML_PATH=${ASTER_SRC_DIR}/Cargo.toml
+OSDK_DIR=${ASTER_SRC_DIR}/osdk
+OSDK_CARGO_TOML_PATH=${OSDK_DIR}/Cargo.toml
+SCTRACE_DIR=${ASTER_SRC_DIR}/tools/sctrace
+SCTRACE_CARGO_TOML_PATH=${SCTRACE_DIR}/Cargo.toml
+BOOK_SRC_DIR=${ASTER_SRC_DIR}/book/src
+VERSION_PATH=${ASTER_SRC_DIR}/VERSION
+DOCKER_IMAGE_VERSION_PATH=${ASTER_SRC_DIR}/DOCKER_IMAGE_VERSION
+
+command=$1
+
+if [[ "$command" == "--help" || "$command" == "-h" ]]; then
+  print_help
+  exit 0
+fi
+
+case "$command" in
+    "--docker_version_file")
+        update_docker_image_version "$2"
+        ;;
+    "--docker_version_refs")
+        update_all_docker_version_refs
+        ;;
+    "--version_file")
+        sync_project_version
+        ;;
+    "--api_doc_hyperlinks_in_book")
+        update_api_doc_hyperlinks_in_book
+        ;;
+    *)
+        echo "Warning: Using --docker_version_file, --docker_version_refs, --version_file, or --api_doc_hyperlinks_in_book instead."
+        ;;
+esac

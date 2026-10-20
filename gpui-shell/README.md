@@ -1,0 +1,108 @@
+![Trailer](./docs/public/trailer.gif)
+
+<!--![Banner](./docs/public/banner-dark.png)-->
+
+A Wayland desktop shell built with GPUI (Zed's UI framework) in Rust. Provides a
+system bar, command launcher, and control center for Hyprland, Mango and Niri
+compositors.
+
+> [!WARNING]
+> **Early Development Notice**
+> This project is in early development and contains a significant amount of AI-generated code. It started as an experiment to test the latest AI models' capabilities and went much further than expected in a surprisingly short time. I'm actively working on fixing bugs and optimizing the codebase, but as I'm still learning Rust, there may be rough edges. Contributions and feedback are welcome!
+
+## Scope
+
+GPUi Shell aims to be a lightweight, modular desktop shell replacing components
+like waybar, swaync, rofi/walker, and wlogout. It integrates deeply with Linux
+desktop ecosystems via D-Bus while providing a modern, GPU-accelerated UI.
+
+## Showcase
+
+![Bar](./docs/public/bar.png)
+
+https://github.com/user-attachments/assets/71003c4b-8b02-4585-8ddb-17560c27b389
+
+## Features
+
+### Bar & Widgets
+
+- **Wayland layer-shell** status bar (top/bottom/left/right)
+- **Workspaces** — workspace switcher with click to switch
+- **Active Window** — shows focused window title
+- **System Tray** — D-Bus system tray integration (libtray)
+- **Clock** — configurable datetime display
+- **Keyboard Layout** — current keyboard layout indicator
+- **Battery** — battery percentage and charging status
+- **SysInfo** — CPU/memory overview widget
+
+### Launcher
+
+- **Command launcher** with prefix-based view routing
+- **Apps** — application search and launcher (freedesktop desktop files)
+- **Shell** — run shell commands
+- **Workspaces** — workspace management
+- **Theme** — switch between light/dark and accent colors
+- **Wallpaper** — set desktop wallpaper
+- **Web** — quick web search
+- **Help** — keyboard shortcuts reference
+
+### Control Center
+
+- **Audio** — volume control with PulseAudio (libpulse-binding)
+- **Brightness** — screen brightness control
+- **Network** — WiFi/Bluetooth toggle via NetworkManager (libnm)
+- **Bluetooth** — device pairing and connection (bluez)
+- **Power** — battery status and session power actions (UPower)
+- **Notifications** — notification center with Do Not Disturb
+- **Media** — MPRIS media player controls
+
+### OSD (On-Screen Display)
+
+- Volume and brightness indicators on key press
+
+### System Integration
+
+- **Compositor abstraction** — auto-detects Hyprland, Mango or Niri
+- **Single-instance** — running again opens launcher (via socket)
+- **Privacy mode** — temporarily disable screenshare/camera indicators
+- **Applications** — desktop file parsing and icon loading
+
+## Quick Start
+
+Try GPUi Shell without installing:
+
+```bash
+nix run github:andre-brandao/gpui-shell
+```
+
+## Documentation
+
+Full documentation is available at **https://andre-brandao.github.io/gpui-shell/**
+
+- [Installation](https://andre-brandao.github.io/gpui-shell/guides/installation/)
+- [Configuration](https://andre-brandao.github.io/gpui-shell/reference/configuration/)
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the plan to 1.0, and the
+[open design discussions](https://github.com/andre-brandao/gpui-shell/issues?q=is%3Aissue%20state%3Aopen%20label%3Adesign)
+to vote and share ideas.
+
+## Thanks
+
+- [zed](https://github.com/zed-industries/zed): rendering and ui design (gpui).
+- [gpui-component](https://github.com/longbridge/gpui-component): ui code copied
+  from here.
+- [mgs](https://github.com/wuliuqii/mgs): For the initial idea and inspiration.
+- [ashell](https://github.com/MalpenZibo/ashell): For the initial idea and
+  inspiration.
+
+## My other attempts
+
+- [iced-shell](https://github.com/andre-brandao/icedshell): A shell written in
+  Rust using the iced framework. (i did not like iced that much)
+- [svelte-shell](https://github.com/andre-brandao/tauri-shell): A shell written
+  using Tauri + Svelte. (Too slow)
+
+And some others that are not on github using [ags](https://aylur.github.io/ags/)
+or [quickshell](https://github.com/quickshell-mirror/quickshell)

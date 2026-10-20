@@ -1,0 +1,12 @@
+# TODO: Support the `recvmmsg` system call
+AllUnixDomainSockets/UnixSocketPairTest.RecvmmsgTimeoutAfterRecv/*
+
+# TODO: Support socket queue-length ioctls
+AllUnixDomainSockets/UnixSocketPairTest.TIOCINQSucceeds/*
+AllUnixDomainSockets/UnixSocketPairTest.TIOCOUTQSucceeds/*
+
+# TODO: Support `MSG_CMSG_CLOEXEC`
+AllUnixDomainSockets/UnixSocketPairCmsgTest.CloexecRecvFDPass/*
+
+AllUnixDomainSockets/UnixSocketPeerCredTest.PeerCredAcrossPIDNamespace/0
+AllUnixDomainSockets/UnixSocketPeerCredTest.PeerCredAcrossPIDNamespace/6

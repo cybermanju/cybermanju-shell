@@ -1,0 +1,20 @@
+# Builds e caches locais
+**/target/
+**/__pycache__/
+**/*.py[cod]
+**/node_modules/
+**/.direnv/
+/result
+/result-*
+
+# Evidências e dependências externas não integram o snapshot
+/evidence/
+/vendor-drivers/
+/installed/
+/toolchain/
+
+# Credenciais locais; .envrc original do shell é preservado
+.env
+.env.*
+!.env.example
+!.env.sample

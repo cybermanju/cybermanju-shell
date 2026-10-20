@@ -1,0 +1,164 @@
+diff --git a/ostd/src/irq/top_half.rs b/ostd/src/irq/top_half.rs
+--- a/ostd/src/irq/top_half.rs
++++ b/ostd/src/irq/top_half.rs
+@@ -79,16 +79,16 @@
+     where
+         F: Fn(&TrapFrame) + Sync + Send + 'static,
+     {
++        // Arc owns a distinct allocation even for zero-sized closures. Their Box data
++        // pointers, in contrast, may all be the same dangling pointer.
++        let callback: Arc<IrqCallbackFunction> = Arc::new(callback);
+         let callback_handle = {
+-            let callback_box = Box::new(callback);
+-            let callback_addr = core::ptr::from_ref(&*callback_box).addr();
+-
+             let mut callbacks = self.inner.callbacks.write();
+-            callbacks.push(callback_box);
++            callbacks.push(callback.clone());
+ 
+             CallbackHandle {
+                 irq_index: self.inner.index,
+-                callback_addr,
++                callback,
+             }
+         };
+ 
+@@ -129,7 +129,7 @@
+ }
+ 
+ struct Inner {
+-    callbacks: RwLock<Vec<Box<IrqCallbackFunction>>, WriteIrqDisabled>,
++    callbacks: RwLock<Vec<Arc<IrqCallbackFunction>>, WriteIrqDisabled>,
+     remapping: IrqRemapping,
+ }
+ 
+@@ -178,20 +178,34 @@
+ ///
+ /// When the handle is dropped, the callback will be unregistered automatically.
+ #[must_use]
+-#[derive(Debug)]
+ struct CallbackHandle {
+     irq_index: u8,
+-    callback_addr: usize,
++    callback: Arc<IrqCallbackFunction>,
++}
++
++impl Debug for CallbackHandle {
++    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
++        f.debug_struct("CallbackHandle")
++            .field("irq_index", &self.irq_index)
++            .finish_non_exhaustive()
++    }
+ }
+ 
+ impl Drop for CallbackHandle {
+     fn drop(&mut self) {
+-        let mut callbacks = INNERS[self.irq_index as usize].callbacks.write();
+-
+-        let pos = callbacks
+-            .iter()
+-            .position(|element| core::ptr::from_ref(&**element).addr() == self.callback_addr);
+-        let _ = callbacks.swap_remove(pos.unwrap());
++        let removed = {
++            // Wait for in-flight dispatch readers before removing the registration.
++            let mut callbacks = INNERS[self.irq_index as usize].callbacks.write();
++            let pos = callbacks
++                .iter()
++                .position(|element| Arc::ptr_eq(element, &self.callback))
++                .unwrap();
++            callbacks.swap_remove(pos)
++        };
++        // User-owned captures can have destructors that acquire IRQ registry locks.
++        // Release both references outside the writer lock; `self.callback` is dropped
++        // after this method returns, while IrqLine still owns the IRQ number.
++        drop(removed);
+     }
+ }
+ 
+@@ -295,4 +309,85 @@
+         assert_eq!(second_probe_result.load(Ordering::SeqCst), 1);
+         assert!(IrqLine::alloc_specific(irq_num).is_ok());
+     }
+-}
++
++    #[ktest]
++    fn zero_sized_callbacks_keep_registration_identity() {
++        static FIRST_DROPPED: AtomicU8 = AtomicU8::new(0);
++        static SECOND_DROPPED: AtomicU8 = AtomicU8::new(0);
++        struct First;
++        struct Second;
++        impl Drop for First {
++            fn drop(&mut self) {
++                FIRST_DROPPED.fetch_add(1, Ordering::SeqCst);
++            }
++        }
++        impl Drop for Second {
++            fn drop(&mut self) {
++                SECOND_DROPPED.fetch_add(1, Ordering::SeqCst);
++            }
++        }
++
++        FIRST_DROPPED.store(0, Ordering::SeqCst);
++        SECOND_DROPPED.store(0, Ordering::SeqCst);
++        let mut first_line = IrqLine::alloc().unwrap();
++        let irq_num = first_line.num();
++        let index = (irq_num - IRQ_NUM_MIN) as usize;
++        let mut second_line = first_line.clone();
++        let first = First;
++        let first_callback = move |_: &TrapFrame| {
++            let _ = &first;
++        };
++        let second = Second;
++        let second_callback = move |_: &TrapFrame| {
++            let _ = &second;
++        };
++        assert_eq!(core::mem::size_of_val(&first_callback), 0);
++        assert_eq!(core::mem::size_of_val(&second_callback), 0);
++        first_line.on_active(first_callback);
++        second_line.on_active(second_callback);
++        assert_eq!(INNERS[index].callbacks.read().len(), 2);
++
++        // Remove the second registration first: equal dangling Box pointers would
++        // incorrectly remove and destroy First instead, leaving Second registered.
++        drop(second_line);
++        assert_eq!(FIRST_DROPPED.load(Ordering::SeqCst), 0);
++        assert_eq!(SECOND_DROPPED.load(Ordering::SeqCst), 1);
++        assert_eq!(INNERS[index].callbacks.read().len(), 1);
++        assert!(IrqLine::alloc_specific(irq_num).is_err());
++        drop(first_line);
++        assert_eq!(FIRST_DROPPED.load(Ordering::SeqCst), 1);
++        assert_eq!(SECOND_DROPPED.load(Ordering::SeqCst), 1);
++        assert!(INNERS[index].callbacks.read().is_empty());
++        assert!(IrqLine::alloc_specific(irq_num).is_ok());
++    }
++
++    #[ktest]
++    fn callback_captures_drop_outside_registry_lock() {
++        struct RegistryProbe {
++            index: usize,
++            result: Arc<AtomicU8>,
++        }
++        impl Drop for RegistryProbe {
++            fn drop(&mut self) {
++                // A non-blocking real lock acquisition exposes the old deadlock
++                // without hanging the runner when executing the negative baseline.
++                let unlocked = INNERS[self.index].callbacks.try_read().is_some();
++                self.result.store(u8::from(unlocked), Ordering::SeqCst);
++            }
++        }
++
++        let mut line = IrqLine::alloc().unwrap();
++        let irq_num = line.num();
++        let result = Arc::new(AtomicU8::new(2));
++        let probe = RegistryProbe {
++            index: (irq_num - IRQ_NUM_MIN) as usize,
++            result: result.clone(),
++        };
++        line.on_active(move |_| {
++            let _ = &probe;
++        });
++        drop(line);
++        assert_eq!(result.load(Ordering::SeqCst), 1);
++        assert!(IrqLine::alloc_specific(irq_num).is_ok());
++    }
++}

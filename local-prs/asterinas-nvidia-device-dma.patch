@@ -1,0 +1,1372 @@
+diff --git a/.github/workflows/graphics_gpu.yml b/.github/workflows/graphics_gpu.yml
+--- a/.github/workflows/graphics_gpu.yml
++++ b/.github/workflows/graphics_gpu.yml
+@@ -90,7 +90,7 @@
+           set -euo pipefail
+           bash tools/graphics/run_nvport_format_tests.sh \
+             2>&1 | tee "$NVPORT_OUTPUT/formatter-host-tests.log"
+-      - name: Execute NVport, NVIDIA platform, PCI resource lifecycle and OSTD suites inside Asterinas
++      - name: Execute NVport, platform, PCI/EDU DMA, IOMMU rejection and OSTD inside Asterinas
+         run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
+       - name: Build grub-rescue multiboot2 ISO with serial console
+         shell: bash
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -85,10 +85,81 @@
+ before `rm_init_adapter`; GSP reaches `kgspInitRm_IMPL`/`_kgspBootGspRm`. Last close/removal
+ requires genuine `nv_stop_device`/`rm_shutdown_adapter` and ordered task/IRQ/DMA teardown.
+ 
+-Current OSTD `DmaCoherent`/`DmaStream` constructors still receive no PCI identity, device DMA
+-mask or per-device IOMMU domain. Wrapping their allocation would not establish those semantics,
+-so this adapter cannot enable bus mastering or start RM/GSP. Full acceptance also requires the
+-RM ioctl/mmap ABI, allocation/submission/fences/reset, accelerated DRM sharing/synchronization/
+-display and native Vulkan/Wayland/GPUI execution. The sandbox has no usable NVIDIA device or KVM.
+-Previously extracted firmware remains unverified CPU-test-only data; this resource path never
+-loads or executes it. Full driver and GPU benchmark acceptance remain unmet.
++## Device-bound DMA: explicit direct mode, not an IOMMU substitute
++
++The new OSTD `DirectDmaContext` allocates actual zeroed, physically contiguous untyped frames
++independently of the legacy global `DmaCoherent`/`DmaStream` mapping path. It carries a validated
++segment/BDF and an inclusive device address mask. `PciMmioGuard::dma_context` derives identity
++from the real enumerated function; `NvidiaDeviceResources::dma_context` uses that same service.
++Buffers borrow the context, which borrows the MMIO owner/reservation. There is no clone/split
++or physical-address escape through this buffer API. Production acquisition never enables bus
++mastering, starts transfers or installs an interrupt handler. NVIDIA's initial mask must be
++32 bits until real RM negotiation establishes otherwise.
++
++This mode deliberately has **no hardware isolation**: DMA address equals physical address on
++the supported coherent x86 platform. A requester tag alone cannot enforce access control.
++IOMMU/CVM configurations and unsupported/unknown platforms fail explicitly, not via a wrapper
++that pretends the existing global mappings are device-specific. Every allocation validates its
++last byte against the supplied mask, rejects arithmetic overflow/zero size, and frees on mask
++failure. There is currently no constrained low-memory allocator, bounce buffering, streaming
++pin/map API or maximum-segment/boundary negotiation; an unreachable allocation returns an error.
++Completion/device-specific quiescence must precede buffer destruction. Lifetimes keep owners
++alive but cannot infer that hardware finished DMA. Hot removal remains unsupported.
++
++The absence check does not use `acpi::AcpiTables::headers()`: that iterator silently omits
++invalid SDTs and could mistake corrupt DMAR/IVRS for absence. The new bounded strict root
++inventory validates the RSDP/root and every immediate SDT child, including its full checksum,
++returning an error instead of skipping malformed entries. Missing ACPI and any such error deny
++direct DMA. As in the existing OSTD ACPI backend, firmware pointers must still refer to readable,
++immutable, linearly mapped firmware memory; numerical bounds are not proof that arbitrary
++corrupt physical pointers are mapped. This is a trusted-firmware boundary, not hostile-firmware
++containment, and only the currently supported TDX runtime detects confidential guests.
++
++The PCI test suite uses the genuine [QEMU EDU DMA controller](https://www.qemu.org/docs/master/specs/edu.html)
++(`1234:11e8`, configured with a 32-bit hardware mask), not a mocked callback or NVIDIA identity.
++It programs actual RAM-to-device and device-to-RAM transfers with poisoned destination pages,
++checks every byte, disables bus mastering before releasing completed buffers, and repeats
++reserve/allocate/transfer/release. A timeout quarantines both allocations instead of freeing
++potentially active DMA memory. Register writes and BME enabling exist only in the EDU test;
++the production pre-RM adapter still exposes neither. A second boot with QEMU Intel IOMMU must
++reject direct DMA without issuing a transfer. The ordinary local/Actions CPU entrypoint requires
++both the actual transfer marker and the separate IOMMU rejection marker.
++
++That second boot exposed an existing VT-d MMIO fault: register construction used
++`paddr_to_vaddr(0xfed90000)` without mapping the MMIO aperture. The backend now owns a sensitive,
++uncacheable `IoMem` mapping for its register views instead of assuming a linear RAM alias.
++Capability-selected fault-record and IOTLB windows must fit that measured one-page mapping
++before their pointers are constructed; larger layouts are explicitly unsupported. Fixing this
++register access does not supply isolated translation domains or completed IOTLB invalidation.
++
++### Exact IOMMU blockers, before safe RM/GSP initialization
++
++The legacy x86 implementation cannot yet supply a device-isolated domain:
++
++1. `ostd/src/arch/x86/iommu/dma_remapping/mod.rs` maps via BDF zero and initializes every BDF
++   with a shallow copy of one shared translation root; its identity lacks PCI segment.
++2. `dma_remapping/context_table.rs` installs entries without assigning distinct Domain IDs.
++   `registers/mod.rs` selects one DRHD rather than resolving segment/device scopes across units.
++3. DMAR RMRR structures are parsed but their required mappings and requester associations are
++   not enforced. PCI bridge requester aliases/ACS groups and ATS/device-TLB handling also need
++   explicit policy; a BDF-only domain must not be advertised as isolation around a bridge.
++4. `ostd/src/mm/dma/util.rs::unmap_dma_remap` explicitly lacks completed IOTLB invalidation.
++   Context/IOTLB/device-TLB invalidations, completion ordering and domain/IOVA reclamation must
++   precede freeing frames. Existing queued invalidation for interrupt entries is not this work.
++
++The safe next remapping implementation needs resolved DRHD/scopes, owned domain IDs and page
++tables, mask-constrained IOVA allocation, transactional page mappings, completed invalidation
++and device-specific stop/reset before memory/domain reuse. Enabling NVIDIA DMA on the present
++shared/unrevoked translations would not meet that contract. Direct-mode tests do not validate
++IOMMU map/unmap and must never be described as doing so.
++
++Full RM/GSP initialization still needs supported-chip/BAR-firewall checks, private adapter
++state, real power/IRQ/worker lifetimes and a reviewed foreign-code/unsafe boundary before
++`nv_start_device`/`rm_init_adapter`. There is no authenticated matching firmware here and no
++NVIDIA GPU to perform the real bootstrap/upload/handshake or ordered shutdown. No fake probe
++success or GSP callback is supplied to bypass those missing contracts. Full display additionally
++requires the RM ioctl/mmap ABI, GPU memory/submission/fences/reset, GPU-backed GEM, sharing and
++syncobj/timeline/atomic KMS integration, then native Vulkan/Wayland/GPUI presentation. A Linux
++host compute pass or an Asterinas EDU transfer supplies none of those hardware acceptances.
++Previously extracted firmware remains unverified CPU-test-only data and is not loaded/executed
++by this path. Full NVIDIA driver and GPU benchmark acceptance remain unmet.
+diff --git a/kernel/comps/nvidia-platform/src/device.rs b/kernel/comps/nvidia-platform/src/device.rs
+--- a/kernel/comps/nvidia-platform/src/device.rs
++++ b/kernel/comps/nvidia-platform/src/device.rs
+@@ -70,6 +70,20 @@
+         &self.snapshot
+     }
+ 
++    /// Prepare explicitly non-isolated direct DMA for this actual PCI requester.
++    ///
++    /// NVIDIA probe initially requires a 32-bit mask; callers must supply that mask
++    /// until real RM capability negotiation changes it. This does not start RM/GSP,
++    /// enable bus mastering, authenticate firmware or provide an IOMMU domain.
++    /// IOMMU/CVM and unreachable physical allocations fail rather than falling back
++    /// to OSTD's global shared DMA mappings. Buffers cannot outlive this resource owner.
++    pub fn dma_context(
++        &self,
++        mask: ostd::mm::dma::DmaMask,
++    ) -> Result<aster_pci::dma::PciDmaContext<'_>, ostd::mm::dma::DeviceDmaError> {
++        self.registers.dma_context(mask)
++    }
++
+     /// Read a register via the real bounded MMIO mapping.
+     ///
+     /// Do not call until NVIDIA's BAR firewall/power prerequisites have been satisfied.
+diff --git a/kernel/core/comps/pci/src/dma.rs b/kernel/core/comps/pci/src/dma.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/dma.rs
+@@ -0,0 +1,48 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Device-bound direct DMA. This is explicitly NOT an isolated IOMMU domain.
++use core::marker::PhantomData;
++
++use ostd::mm::dma::{DeviceDmaError, DirectDmaBuffer, DirectDmaContext, DmaMask, PciDmaRequester};
++
++use crate::mmio::PciMmioGuard;
++
++/// Direct DMA context borrowed from an exclusively owned, prepared PCI function.
++///
++/// Buffers borrow this context; the context borrows the MMIO guard, which in turn
++/// borrows the function/reservation. None can outlive its owner. No bus mastering
++/// is enabled here. Requester identity is taken from the real enumerator, not a
++/// caller-provided BDF. Direct DMA has no hardware isolation against other devices.
++/// Driver-specific DMA completion/quiescence is still required before freeing buffers.
++/// There is no hot-unplug support, low-memory bounce allocator or streaming mapping.
++pub struct PciDmaContext<'a> {
++    inner: DirectDmaContext,
++    _owner: PhantomData<&'a ()>,
++}
++
++impl<'a> PciDmaContext<'a> {
++    pub(crate) fn new(owner: &'a PciMmioGuard<'_>, mask: DmaMask) -> Result<Self, DeviceDmaError> {
++        let loc = owner.location();
++        // The current PCI enumerator is segment zero only. Do not invent segment routing.
++        let requester = PciDmaRequester::new(0, loc.bus, loc.device, loc.function)?;
++        Ok(Self {
++            inner: DirectDmaContext::new(requester, mask)?,
++            _owner: PhantomData,
++        })
++    }
++
++    /// Actual enumerated requester. This metadata does not establish IOMMU isolation.
++    pub fn requester(&self) -> PciDmaRequester {
++        *self.inner.requester()
++    }
++
++    /// Inclusive DMA address mask checked on every allocation, including the last byte.
++    pub fn mask(&self) -> DmaMask {
++        *self.inner.mask()
++    }
++
++    /// Allocate zeroed, contiguous, coherent memory in this explicit direct-DMA mode.
++    /// Allocation outside the mask fails and frees the memory; addresses are never truncated.
++    pub fn alloc_coherent(&self, nframes: usize) -> Result<DirectDmaBuffer<'_>, DeviceDmaError> {
++        self.inner.alloc_coherent(nframes)
++    }
++}
+diff --git a/kernel/core/comps/pci/src/lib.rs b/kernel/core/comps/pci/src/lib.rs
+--- a/kernel/core/comps/pci/src/lib.rs
++++ b/kernel/core/comps/pci/src/lib.rs
+@@ -73,6 +73,7 @@
+ pub mod cfg_space;
+ pub mod common_device;
+ mod device_info;
++pub mod dma;
+ #[cfg(ktest)]
+ mod lifecycle_tests;
+ pub mod mmio;
+diff --git a/kernel/core/comps/pci/src/lifecycle_tests.rs b/kernel/core/comps/pci/src/lifecycle_tests.rs
+--- a/kernel/core/comps/pci/src/lifecycle_tests.rs
++++ b/kernel/core/comps/pci/src/lifecycle_tests.rs
+@@ -103,4 +103,160 @@
+     ostd::early_println!(
+         "PCI resource lifecycle passed: 8 real QEMU pci-testdev reserve/map/read/rollback/reacquire cycles; not NVIDIA/GPU proof"
+     );
+-}
++    qemu_edu_dma_round_trip(&mut bus);
++}
++
++/// Actual DMA controller, not a CPU memcpy masquerading as device completion.
++/// https://www.qemu.org/docs/master/specs/edu.html (1234:11e8).
++fn qemu_edu_dma_round_trip(bus: &mut crate::bus::PciBus) {
++    use core::sync::atomic::{Ordering, fence};
++
++    use ostd::mm::{
++        HasDaddr, HasSize, PAGE_SIZE, VmIo,
++        dma::{DeviceDmaError, DmaMask},
++    };
++
++    let location = *bus
++        .unclaimed_devices()
++        .find(|device| {
++            let id = device.device_id();
++            id.vendor_id == 0x1234 && id.device_id == 0x11e8
++        })
++        .expect("PCI DMA suite requires -device edu,dma_mask=4294967295")
++        .location();
++    let before_count = bus.unclaimed_devices().count();
++    for cycle in 0..8 {
++        let mut reserved = bus.reserve_unclaimed(location).expect("reserve real EDU");
++        let original = location.read16(4);
++        {
++            let registers = reserved.prepare_mmio(0).expect("map real EDU BAR0");
++            let prepared = location.read16(4);
++            assert_eq!(prepared & Command::BUS_MASTER.bits(), 0);
++            let mask = DmaMask::new(32).unwrap();
++            let context = match registers.dma_context(mask) {
++                Ok(context) => context,
++                Err(DeviceDmaError::UnsupportedPlatform) => {
++                    assert_eq!(location.read16(4), prepared);
++                    ostd::early_println!(
++                        "PCI device DMA correctly rejected unsupported IOMMU/CVM platform; zero DMA issued"
++                    );
++                    return;
++                }
++                Err(error) => panic!("unexpected device DMA preparation failure: {error:?}"),
++            };
++            let expected_requester = ostd::mm::dma::PciDmaRequester::new(
++                0,
++                location.bus,
++                location.device,
++                location.function,
++            )
++            .unwrap();
++            assert_eq!(context.requester(), expected_requester);
++            assert_eq!(context.mask(), mask);
++            assert_eq!(location.read16(4), prepared, "context cannot enable BME");
++            // Deliberately impossible physical mask: allocations must fail/free rather than
++            // truncating the address or falling back to a global IOMMU mapping.
++            let tiny = registers.dma_context(DmaMask::new(1).unwrap()).unwrap();
++            for _ in 0..8 {
++                assert!(matches!(
++                    tiny.alloc_coherent(1),
++                    Err(DeviceDmaError::AddressOutOfRange)
++                ));
++            }
++            assert_eq!(
++                location.read16(4),
++                prepared,
++                "failed allocation cannot mutate command"
++            );
++            let source = context.alloc_coherent(1).expect("32-bit source allocation");
++            let destination = context
++                .alloc_coherent(1)
++                .expect("32-bit destination allocation");
++            assert_eq!(source.size(), PAGE_SIZE);
++            assert!(mask.contains_range(source.daddr() as u64, PAGE_SIZE));
++            assert!(mask.contains_range(destination.daddr() as u64, PAGE_SIZE));
++            let mut pattern = alloc::vec![0u8; PAGE_SIZE];
++            let mut actual = alloc::vec![0u8; PAGE_SIZE];
++            destination.read_bytes(0, &mut actual).unwrap();
++            assert!(actual.iter().all(|byte| *byte == 0));
++            for (index, byte) in pattern.iter_mut().enumerate() {
++                *byte = (index.wrapping_mul(73) ^ (index >> 3) ^ (cycle * 31)) as u8;
++            }
++            source.write_bytes(0, &pattern).unwrap();
++            destination
++                .write_bytes(0, &alloc::vec![0xa5u8; PAGE_SIZE])
++                .unwrap();
++            // Only this known educational controller is enabled, AFTER both allocations.
++            // The production resource/NVIDIA API deliberately has no BME enable operation.
++            let master = EduBusMaster { location, prepared };
++            location.write32(4, u32::from(prepared | Command::BUS_MASTER.bits()));
++            assert_ne!(location.read16(4) & Command::BUS_MASTER.bits(), 0);
++            fence(Ordering::SeqCst);
++            let sent = edu_transfer(&registers, source.daddr() as u64, 0x40000, PAGE_SIZE, 1);
++            let received = sent
++                && edu_transfer(
++                    &registers,
++                    0x40000,
++                    destination.daddr() as u64,
++                    PAGE_SIZE,
++                    3,
++                );
++            fence(Ordering::SeqCst);
++            // A timeout is not quiescence. Keep both physical allocations permanently alive
++            // before failing; merely clearing BME must not justify reusing in-flight memory.
++            if !received {
++                core::mem::forget(source);
++                core::mem::forget(destination);
++                drop(master);
++                let command = location.read16(4);
++                let bme_disabled = command != 0xffff && command & Command::BUS_MASTER.bits() == 0;
++                panic!(
++                    "real EDU DMA timed out; buffers quarantined, not freed; BME disabled readback={bme_disabled}"
++                );
++            }
++            drop(master);
++            assert_eq!(location.read16(4), prepared);
++            destination.read_bytes(0, &mut actual).unwrap();
++            assert_eq!(actual, pattern, "EDU DMA full-page readback mismatch");
++            // Completed controller transfers, then BME off, then buffers/context/MMIO drop.
++        }
++        assert_eq!(location.read16(4), original);
++        drop(reserved);
++        assert_eq!(bus.unclaimed_devices().count(), before_count);
++    }
++    ostd::early_println!(
++        "PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles; requester/mask/cleanup verified; no NVIDIA or IOMMU isolation proof"
++    );
++}
++
++struct EduBusMaster {
++    location: crate::PciDeviceLocation,
++    prepared: u16,
++}
++
++impl Drop for EduBusMaster {
++    fn drop(&mut self) {
++        self.location.write32(4, u32::from(self.prepared));
++        let _ = self.location.read16(4);
++    }
++}
++
++fn edu_transfer(
++    registers: &crate::mmio::PciMmioGuard<'_>,
++    source: u64,
++    destination: u64,
++    size: usize,
++    command: u32,
++) -> bool {
++    for (offset, value) in [(0x80, source), (0x88, destination), (0x90, size as u64)] {
++        registers.test_write64(offset, value).unwrap();
++    }
++    registers.test_write32(0x98, command).unwrap();
++    for _ in 0..50_000_000 {
++        if registers.read32(0x98).unwrap() & 1 == 0 {
++            return true;
++        }
++        core::hint::spin_loop();
++    }
++    false
++}
+diff --git a/kernel/core/comps/pci/src/mmio.rs b/kernel/core/comps/pci/src/mmio.rs
+--- a/kernel/core/comps/pci/src/mmio.rs
++++ b/kernel/core/comps/pci/src/mmio.rs
+@@ -105,6 +105,37 @@
+         }
+         self.mapping.as_ref().unwrap().read_once(offset)
+     }
++
++    /// Prepare device-bound direct DMA without enabling bus mastering or interrupts.
++    /// Rejects IOMMU/CVM configurations that cannot provide this direct-address contract.
++    pub fn dma_context(
++        &self,
++        mask: ostd::mm::dma::DmaMask,
++    ) -> Result<crate::dma::PciDmaContext<'_>, ostd::mm::dma::DeviceDmaError> {
++        crate::dma::PciDmaContext::new(self, mask)
++    }
++
++    pub(crate) fn location(&self) -> crate::PciDeviceLocation {
++        *self.device.location()
++    }
++
++    // Only the QEMU EDU lifecycle test can issue device commands through this guard.
++    // No public NVIDIA register-write or bus-master enable interface is added.
++    #[cfg(ktest)]
++    pub(crate) fn test_write32(&self, offset: usize, value: u32) -> Result<(), Error> {
++        if !offset.is_multiple_of(4) {
++            return Err(Error::InvalidArgs);
++        }
++        self.mapping.as_ref().unwrap().write_once(offset, &value)
++    }
++
++    #[cfg(ktest)]
++    pub(crate) fn test_write64(&self, offset: usize, value: u64) -> Result<(), Error> {
++        if !offset.is_multiple_of(8) {
++            return Err(Error::InvalidArgs);
++        }
++        self.mapping.as_ref().unwrap().write_once(offset, &value)
++    }
+ }
+ 
+ impl Drop for PciMmioGuard<'_> {
+diff --git a/ostd/src/arch/x86/iommu/mod.rs b/ostd/src/arch/x86/iommu/mod.rs
+--- a/ostd/src/arch/x86/iommu/mod.rs
++++ b/ostd/src/arch/x86/iommu/mod.rs
+@@ -39,3 +39,17 @@
+     interrupt_remapping::init();
+     Ok(())
+ }
++
++/// Returns whether direct DMA is safe with respect to the currently known
++/// IOMMU configuration. Missing ACPI state, an initialized IOMMU, or any
++/// malformed/unreadable ACPI root or child table is treated as unsupported.
++/// The DMAR/IVRS bodies are not parsed here.
++pub(crate) fn direct_dma_supported() -> bool {
++    if has_dma_remapping() || registers::IOMMU_REGS.get().is_some() {
++        return false;
++    }
++    matches!(
++        crate::arch::kernel::acpi::dma_policy::has_no_dma_remapping_tables(),
++        Ok(true)
++    )
++}
+diff --git a/ostd/src/arch/x86/iommu/registers/mod.rs b/ostd/src/arch/x86/iommu/registers/mod.rs
+--- a/ostd/src/arch/x86/iommu/registers/mod.rs
++++ b/ostd/src/arch/x86/iommu/registers/mod.rs
+@@ -39,8 +39,8 @@
+         kernel::acpi::dmar::{Dmar, Remapping},
+     },
+     debug,
+-    io::IoMemAllocatorBuilder,
+-    mm::{PAGE_SIZE, paddr_to_vaddr},
++    io::{IoMem, IoMemAllocatorBuilder, Sensitive},
++    mm::{CachePolicy, PAGE_SIZE},
+     sync::{LocalIrqDisabled, SpinLock},
+ };
+ 
+@@ -67,6 +67,8 @@
+ /// Important registers used by IOMMU.
+ #[derive(Debug)]
+ pub(super) struct IommuRegisters {
++    // All VolatileRef register views below borrow this permanent owned mapping.
++    _mmio: IoMem<Sensitive>,
+     version: VolatileRef<'static, u32, ReadOnly>,
+     capability: VolatileRef<'static, u64, ReadOnly>,
+     extended_capability: VolatileRef<'static, u64, ReadOnly>,
+@@ -286,18 +288,54 @@
+         assert_ne!(base_address, 0, "IOMMU address should not be zero");
+         debug!("base address: {:#x?}", base_address);
+ 
+-        io_mem_builder.remove(base_address as usize..(base_address as usize + PAGE_SIZE));
+-        let base = NonNull::new(paddr_to_vaddr(base_address as usize) as *mut u8).unwrap();
++        let base_address = usize::try_from(base_address).ok()?;
++        if !base_address.is_multiple_of(PAGE_SIZE) {
++            crate::warn!("IOMMU register base is not page aligned");
++            return None;
++        }
++        let end = base_address.checked_add(PAGE_SIZE)?;
++        let mmio = io_mem_builder.reserve(base_address..end, CachePolicy::Uncacheable);
++        let base = NonNull::new(mmio.base() as *mut u8).unwrap();
++
++        // SAFETY: CAP/ECAP are within the first mapped page of the trusted DRHD MMIO
++        // aperture. The mapping is owned here and retained with all register views.
++        let (capability, extended) = unsafe {
++            (
++                Capability::new(
++                    VolatileRef::new_read_only(base.add(0x08).cast::<u64>())
++                        .as_ptr()
++                        .read(),
++                ),
++                ExtendedCapability::new(
++                    VolatileRef::new_read_only(base.add(0x10).cast::<u64>())
++                        .as_ptr()
++                        .read(),
++                ),
++            )
++        };
++        // The present backend owns one page, not an arbitrary capability-selected
++        // aperture. Reject unsupported layouts BEFORE constructing dereferenceable
++        // fault/IOTLB views. Supporting larger register windows requires a separate
++        // measured reservation; do not walk beyond this real MMIO mapping.
++        if !register_window_fits(
++            capability.fault_recording_register_offset() as usize,
++            capability.fault_recording_number() as usize + 1,
++            extended.iotlb_register_offset() as usize,
++        ) {
++            crate::warn!("IOMMU fault/IOTLB register layout exceeds supported MMIO window");
++            return None;
++        }
+ 
+         // SAFETY:
+         // - We trust the ACPI tables (as well as the DRHD in them), from which the base address is
+         //   obtained, so it is a valid IOMMU base address.
+-        // - `io_mem_builder.remove()` guarantees that we have exclusive ownership of all the IOMMU
+-        //   registers.
++        // - The sensitive reservation owns the actual uncacheable virtual mapping.
++        // - All dynamically selected register offsets were checked against its size.
+         let iommu_regs = unsafe {
+             fault::init(base);
+ 
+             Self {
++                _mmio: mmio,
+                 version: VolatileRef::new_read_only(base.cast::<u32>()),
+                 capability: VolatileRef::new_read_only(base.add(0x08).cast::<u64>()),
+                 extended_capability: VolatileRef::new_read_only(base.add(0x10).cast::<u64>()),
+@@ -333,3 +371,39 @@
+     IOMMU_REGS.call_once(|| SpinLock::new(iommu_regs));
+     Ok(())
+ }
++
++fn register_window_fits(
++    fault_offset_units: usize,
++    fault_count: usize,
++    iotlb_offset_units: usize,
++) -> bool {
++    let fault_end = fault_offset_units.checked_mul(16).and_then(|offset| {
++        fault_count
++            .checked_mul(16)
++            .and_then(|size| offset.checked_add(size))
++    });
++    let iotlb_end = iotlb_offset_units
++        .checked_mul(16)
++        .and_then(|offset| offset.checked_add(16));
++    fault_count != 0
++        && fault_end.is_some_and(|end| end <= PAGE_SIZE)
++        && iotlb_end.is_some_and(|end| end <= PAGE_SIZE)
++}
++
++#[cfg(ktest)]
++mod tests {
++    use super::register_window_fits;
++    use crate::prelude::ktest;
++
++    #[ktest]
++    fn register_window_rejects_overflow_and_out_of_mapping_views() {
++        assert!(register_window_fits(0x20, 1, 0xf));
++        assert!(register_window_fits(255, 1, 255));
++        assert!(!register_window_fits(255, 2, 255));
++        assert!(!register_window_fits(0x20, 1, 256));
++        assert!(!register_window_fits(0x20, 0, 0xf));
++        assert!(!register_window_fits(usize::MAX, 1, 0xf));
++        assert!(!register_window_fits(0x20, usize::MAX, 0xf));
++        assert!(!register_window_fits(0x20, 1, usize::MAX));
++    }
++}
+diff --git a/ostd/src/arch/x86/kernel/acpi/dma_policy.rs b/ostd/src/arch/x86/kernel/acpi/dma_policy.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/src/arch/x86/kernel/acpi/dma_policy.rs
+@@ -0,0 +1,387 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Strict ACPI table inventory for the direct-DMA safety decision.
++//!
++//! This only inventories the immediate RSDT/XSDT children; it intentionally
++//! does not parse DMAR/IVRS bodies. Limits are conservative denial-of-service
++//! bounds: root tables are at most 64 KiB (at most 8,187 XSDT entries), child
++//! SDTs and extended RSDPs at most 1 MiB and 4 KiB respectively. On x86, ACPI
++//! physical addresses are required to fit in the architectural 52-bit range.
++//!
++//! The firmware-provided physical addresses still rely on OSTD's existing
++//! trusted-firmware/TLB linear-map assumption: `AcpiMemoryHandler` maps physical
++//! memory through `paddr_to_vaddr`; the bounds below prevent unchecked length
++//! and arithmetic use but cannot prove that firmware pointers refer to mapped
++//! RAM.
++
++use acpi::{AcpiHandler, rsdp::Rsdp};
++
++use super::AcpiMemoryHandler;
++use crate::{
++    boot::{self, BootloaderAcpiArg},
++    mm::paddr_to_vaddr,
++};
++
++const SDT_HEADER_LENGTH: usize = 36;
++const RSDP_V1_LENGTH: usize = 20;
++const RSDP_V2_MIN_LENGTH: usize = 36;
++const MAX_RSDP_LENGTH: usize = 4 * 1024;
++const MAX_ROOT_TABLE_LENGTH: usize = 64 * 1024;
++const MAX_CHILD_TABLE_LENGTH: usize = 1024 * 1024;
++const MAX_ROOT_ENTRIES: usize = 8 * 1024;
++const MAX_ACPI_PHYSICAL_ADDRESS: usize = 1 << 52;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum RootKind {
++    Rsdt,
++    Xsdt,
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++struct RootAddress {
++    kind: RootKind,
++    address: usize,
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++struct SdtHeaderInfo {
++    signature: [u8; 4],
++    length: usize,
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(in crate::arch) enum DmaPolicyError {
++    MissingAcpiRoot,
++    InvalidRsdp,
++    InvalidSignature,
++    InvalidHeaderFields,
++    InvalidLength,
++    InvalidChecksum,
++    InvalidRootEntries,
++    InvalidPhysicalAddress,
++    AddressOverflow,
++}
++
++/// Returns whether no DMAR or IVRS signature exists in a fully validated ACPI
++/// root and all of its immediate child tables. Any unavailable or malformed
++/// structure is an error, never evidence that direct DMA is safe.
++pub(in crate::arch) fn has_no_dma_remapping_tables() -> Result<bool, DmaPolicyError> {
++    let early_info = boot::EARLY_INFO
++        .get()
++        .ok_or(DmaPolicyError::MissingAcpiRoot)?;
++    let root = match early_info.acpi_arg {
++        BootloaderAcpiArg::NotProvided => return Err(DmaPolicyError::MissingAcpiRoot),
++        BootloaderAcpiArg::Rsdp(address) => root_from_rsdp(address)?,
++        BootloaderAcpiArg::Rsdt(address) => RootAddress {
++            kind: RootKind::Rsdt,
++            address,
++        },
++        BootloaderAcpiArg::Xsdt(address) => RootAddress {
++            kind: RootKind::Xsdt,
++            address,
++        },
++        BootloaderAcpiArg::ScanBios => {
++            // SAFETY: This boot argument explicitly permits the legacy BIOS
++            // RSDP scan; the ACPI crate validates the located RSDP.
++            let mapping = unsafe { Rsdp::search_for_on_bios(AcpiMemoryHandler {}) }
++                .map_err(|_| DmaPolicyError::MissingAcpiRoot)?;
++            let physical_start = mapping.physical_start();
++            drop(mapping);
++            root_from_rsdp(physical_start)?
++        }
++    };
++    inventory_root(root)
++}
++
++fn root_from_rsdp(address: usize) -> Result<RootAddress, DmaPolicyError> {
++    let v1 = read_physical_array::<RSDP_V1_LENGTH>(address)?;
++    if &v1[0..8] != b"RSD PTR " {
++        return Err(DmaPolicyError::InvalidRsdp);
++    }
++    if core::str::from_utf8(&v1[9..15]).is_err() {
++        return Err(DmaPolicyError::InvalidRsdp);
++    }
++    if checksum(&v1) != 0 {
++        return Err(DmaPolicyError::InvalidChecksum);
++    }
++    let revision = v1[15];
++    if revision == 0 {
++        let rsdt_address = u32::from_le_bytes(v1[16..20].try_into().unwrap()) as usize;
++        return checked_root_address(RootKind::Rsdt, rsdt_address);
++    }
++
++    let prefix = read_physical_array::<RSDP_V2_MIN_LENGTH>(address)?;
++    let length = u32::from_le_bytes(prefix[20..24].try_into().unwrap()) as usize;
++    if !(RSDP_V2_MIN_LENGTH..=MAX_RSDP_LENGTH).contains(&length) {
++        return Err(DmaPolicyError::InvalidLength);
++    }
++    let bytes = read_physical_slice(address, length)?;
++    if checksum(&bytes[..RSDP_V1_LENGTH]) != 0 || checksum(bytes) != 0 {
++        return Err(DmaPolicyError::InvalidChecksum);
++    }
++    let xsdt_address = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
++    let xsdt_address =
++        usize::try_from(xsdt_address).map_err(|_| DmaPolicyError::InvalidPhysicalAddress)?;
++    checked_root_address(RootKind::Xsdt, xsdt_address)
++}
++
++fn checked_root_address(kind: RootKind, address: usize) -> Result<RootAddress, DmaPolicyError> {
++    validate_physical_region(address, SDT_HEADER_LENGTH)?;
++    Ok(RootAddress { kind, address })
++}
++
++fn inventory_root(root: RootAddress) -> Result<bool, DmaPolicyError> {
++    let header_bytes = read_physical_slice(root.address, SDT_HEADER_LENGTH)?;
++    let expected_signature = match root.kind {
++        RootKind::Rsdt => *b"RSDT",
++        RootKind::Xsdt => *b"XSDT",
++    };
++    let header = parse_sdt_header(header_bytes, Some(expected_signature))?;
++    if header.length > MAX_ROOT_TABLE_LENGTH {
++        return Err(DmaPolicyError::InvalidLength);
++    }
++    let root_bytes = read_physical_slice(root.address, header.length)?;
++    let root_header =
++        validate_sdt_table(root_bytes, Some(expected_signature), MAX_ROOT_TABLE_LENGTH)?;
++    let entry_size = match root.kind {
++        RootKind::Rsdt => 4,
++        RootKind::Xsdt => 8,
++    };
++    let entry_count = root_entry_count(root_header.length, entry_size)?;
++
++    let mut found_dma_remapping = false;
++    for index in 0..entry_count {
++        let offset = SDT_HEADER_LENGTH
++            .checked_add(
++                index
++                    .checked_mul(entry_size)
++                    .ok_or(DmaPolicyError::AddressOverflow)?,
++            )
++            .ok_or(DmaPolicyError::AddressOverflow)?;
++        let address = parse_root_pointer(&root_bytes[offset..offset + entry_size])?;
++        validate_physical_region(address, SDT_HEADER_LENGTH)?;
++        let child_header_bytes = read_physical_slice(address, SDT_HEADER_LENGTH)?;
++        let child_header = parse_sdt_header(child_header_bytes, None)?;
++        if child_header.length > MAX_CHILD_TABLE_LENGTH {
++            return Err(DmaPolicyError::InvalidLength);
++        }
++        let child_bytes = read_physical_slice(address, child_header.length)?;
++        let child = validate_sdt_table(
++            child_bytes,
++            Some(child_header.signature),
++            MAX_CHILD_TABLE_LENGTH,
++        )?;
++        found_dma_remapping |= child.signature == *b"DMAR" || child.signature == *b"IVRS";
++    }
++    Ok(!found_dma_remapping)
++}
++
++/// Parses and validates a fixed-size SDT header before any table-sized mapping.
++fn parse_sdt_header(
++    bytes: &[u8],
++    expected_signature: Option<[u8; 4]>,
++) -> Result<SdtHeaderInfo, DmaPolicyError> {
++    if bytes.len() < SDT_HEADER_LENGTH {
++        return Err(DmaPolicyError::InvalidLength);
++    }
++    let signature: [u8; 4] = bytes[..4].try_into().unwrap();
++    if !signature.iter().all(u8::is_ascii)
++        || expected_signature.is_some_and(|expected| expected != signature)
++    {
++        return Err(DmaPolicyError::InvalidSignature);
++    }
++    if core::str::from_utf8(&bytes[10..16]).is_err()
++        || core::str::from_utf8(&bytes[16..24]).is_err()
++    {
++        return Err(DmaPolicyError::InvalidHeaderFields);
++    }
++    let length = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
++    if !(SDT_HEADER_LENGTH..=MAX_CHILD_TABLE_LENGTH).contains(&length) {
++        return Err(DmaPolicyError::InvalidLength);
++    }
++    Ok(SdtHeaderInfo { signature, length })
++}
++
++/// Validates signature, declared length, and the checksum of a complete SDT.
++fn validate_sdt_table(
++    bytes: &[u8],
++    expected_signature: Option<[u8; 4]>,
++    max_length: usize,
++) -> Result<SdtHeaderInfo, DmaPolicyError> {
++    let header = parse_sdt_header(bytes, expected_signature)?;
++    if header.length > max_length || bytes.len() < header.length {
++        return Err(DmaPolicyError::InvalidLength);
++    }
++    if checksum(&bytes[..header.length]) != 0 {
++        return Err(DmaPolicyError::InvalidChecksum);
++    }
++    Ok(header)
++}
++
++fn root_entry_count(root_length: usize, entry_size: usize) -> Result<usize, DmaPolicyError> {
++    if root_length < SDT_HEADER_LENGTH || ![4, 8].contains(&entry_size) {
++        return Err(DmaPolicyError::InvalidRootEntries);
++    }
++    let entries_length = root_length - SDT_HEADER_LENGTH;
++    if entries_length % entry_size != 0 {
++        return Err(DmaPolicyError::InvalidRootEntries);
++    }
++    let entry_count = entries_length / entry_size;
++    if entry_count > MAX_ROOT_ENTRIES {
++        return Err(DmaPolicyError::InvalidLength);
++    }
++    Ok(entry_count)
++}
++
++/// Decodes an RSDT/XSDT child address and rejects zero, truncated and oversized
++/// physical pointers before they are used for a physical mapping.
++fn parse_root_pointer(bytes: &[u8]) -> Result<usize, DmaPolicyError> {
++    let address = match bytes.len() {
++        4 => u32::from_le_bytes(bytes.try_into().unwrap()) as u64,
++        8 => u64::from_le_bytes(bytes.try_into().unwrap()),
++        _ => return Err(DmaPolicyError::InvalidRootEntries),
++    };
++    let address = usize::try_from(address).map_err(|_| DmaPolicyError::InvalidPhysicalAddress)?;
++    validate_physical_region(address, SDT_HEADER_LENGTH)?;
++    Ok(address)
++}
++
++fn validate_physical_region(address: usize, length: usize) -> Result<(), DmaPolicyError> {
++    let linear_map_size = crate::mm::kspace::LINEAR_MAPPING_VADDR_RANGE
++        .end
++        .checked_sub(crate::mm::kspace::LINEAR_MAPPING_VADDR_RANGE.start)
++        .ok_or(DmaPolicyError::AddressOverflow)?;
++    let max_address = core::cmp::min(MAX_ACPI_PHYSICAL_ADDRESS, linear_map_size);
++    if address == 0 || address >= max_address {
++        return Err(DmaPolicyError::InvalidPhysicalAddress);
++    }
++    let end = address
++        .checked_add(length)
++        .ok_or(DmaPolicyError::AddressOverflow)?;
++    if end > max_address {
++        return Err(DmaPolicyError::InvalidPhysicalAddress);
++    }
++    Ok(())
++}
++
++fn checksum(bytes: &[u8]) -> u8 {
++    bytes.iter().fold(0u8, |sum, byte| sum.wrapping_add(*byte))
++}
++
++fn read_physical_array<const N: usize>(address: usize) -> Result<[u8; N], DmaPolicyError> {
++    let bytes = read_physical_slice(address, N)?;
++    let mut result = [0u8; N];
++    result.copy_from_slice(bytes);
++    Ok(result)
++}
++
++fn read_physical_slice(address: usize, length: usize) -> Result<&'static [u8], DmaPolicyError> {
++    validate_physical_region(address, length)?;
++    let virtual_address = paddr_to_vaddr(address);
++    virtual_address
++        .checked_add(length)
++        .ok_or(DmaPolicyError::AddressOverflow)?;
++    // SAFETY: The addresses originate in trusted boot firmware/root tables, as
++    // required by AcpiMemoryHandler. Arithmetic/length bounds were checked above;
++    // readable, immutable backing is the existing OSTD firmware trust assumption.
++    let mapping = unsafe { AcpiMemoryHandler {}.map_physical_region::<u8>(address, length) };
++    // SAFETY: Under that same assumption the complete region is readable and
++    // immutable; the OSTD linear map remains alive for the kernel lifetime.
++    let bytes = unsafe { core::slice::from_raw_parts(mapping.virtual_start().as_ptr(), length) };
++    // The existing linear ACPI mapping is immutable and remains mapped for the
++    // kernel lifetime; do not retain the temporary mapping object itself.
++    core::mem::forget(mapping);
++    Ok(bytes)
++}
++
++#[cfg(ktest)]
++mod tests {
++    use super::*;
++    use crate::prelude::ktest;
++
++    fn synthetic_sdt(signature: [u8; 4], payload: &[u8]) -> alloc::vec::Vec<u8> {
++        let mut table = alloc::vec![0u8; SDT_HEADER_LENGTH];
++        table[..4].copy_from_slice(&signature);
++        table[4..8].copy_from_slice(&((SDT_HEADER_LENGTH + payload.len()) as u32).to_le_bytes());
++        table.extend_from_slice(payload);
++        let sum = checksum(&table);
++        table[9] = 0u8.wrapping_sub(sum);
++        table
++    }
++
++    #[ktest]
++    fn sdt_parser_rejects_signature_length_and_checksum_errors() {
++        let valid = synthetic_sdt(*b"TEST", &[1, 2, 3]);
++        assert_eq!(
++            validate_sdt_table(&valid, Some(*b"TEST"), MAX_CHILD_TABLE_LENGTH)
++                .unwrap()
++                .signature,
++            *b"TEST"
++        );
++        assert_eq!(
++            validate_sdt_table(&valid, Some(*b"NOPE"), MAX_CHILD_TABLE_LENGTH),
++            Err(DmaPolicyError::InvalidSignature)
++        );
++
++        let mut bad_checksum = valid.clone();
++        bad_checksum[SDT_HEADER_LENGTH] ^= 0x80;
++        assert_eq!(
++            validate_sdt_table(&bad_checksum, None, MAX_CHILD_TABLE_LENGTH),
++            Err(DmaPolicyError::InvalidChecksum)
++        );
++
++        let mut short_length = valid.clone();
++        short_length[4..8].copy_from_slice(&((SDT_HEADER_LENGTH - 1) as u32).to_le_bytes());
++        assert_eq!(
++            parse_sdt_header(&short_length, None),
++            Err(DmaPolicyError::InvalidLength)
++        );
++
++        let mut excessive_length = valid;
++        excessive_length[4..8]
++            .copy_from_slice(&((MAX_CHILD_TABLE_LENGTH + 1) as u32).to_le_bytes());
++        assert_eq!(
++            parse_sdt_header(&excessive_length, None),
++            Err(DmaPolicyError::InvalidLength)
++        );
++
++        let mut invalid_oem = synthetic_sdt(*b"TEST", &[]);
++        invalid_oem[10] = 0xff;
++        assert_eq!(
++            parse_sdt_header(&invalid_oem, None),
++            Err(DmaPolicyError::InvalidHeaderFields)
++        );
++    }
++
++    #[ktest]
++    fn root_pointer_parser_checks_width_and_address_bounds() {
++        assert_eq!(parse_root_pointer(&0x1234u32.to_le_bytes()), Ok(0x1234));
++        assert_eq!(parse_root_pointer(&0x1234u64.to_le_bytes()), Ok(0x1234));
++        assert_eq!(
++            parse_root_pointer(&[1, 2]),
++            Err(DmaPolicyError::InvalidRootEntries)
++        );
++        assert_eq!(
++            parse_root_pointer(&0u64.to_le_bytes()),
++            Err(DmaPolicyError::InvalidPhysicalAddress)
++        );
++        assert_eq!(
++            parse_root_pointer(&(MAX_ACPI_PHYSICAL_ADDRESS as u64).to_le_bytes()),
++            Err(DmaPolicyError::InvalidPhysicalAddress)
++        );
++    }
++
++    #[ktest]
++    fn root_inventory_shape_requires_integral_pointer_entries() {
++        let root = synthetic_sdt(*b"RSDT", &[1, 2, 3]);
++        let header = validate_sdt_table(&root, Some(*b"RSDT"), MAX_ROOT_TABLE_LENGTH).unwrap();
++        assert_eq!(
++            root_entry_count(header.length, 4),
++            Err(DmaPolicyError::InvalidRootEntries)
++        );
++        assert_eq!(
++            root_entry_count(header.length, 8),
++            Err(DmaPolicyError::InvalidRootEntries)
++        );
++        assert_eq!(root_entry_count(SDT_HEADER_LENGTH + 8, 8), Ok(1));
++    }
++}
+diff --git a/ostd/src/arch/x86/kernel/acpi/mod.rs b/ostd/src/arch/x86/kernel/acpi/mod.rs
+--- a/ostd/src/arch/x86/kernel/acpi/mod.rs
++++ b/ostd/src/arch/x86/kernel/acpi/mod.rs
+@@ -7,6 +7,7 @@
+     };
+ }
+ 
++pub(in crate::arch) mod dma_policy;
+ pub(in crate::arch) mod dmar;
+ pub(in crate::arch) mod remapping;
+ 
+diff --git a/ostd/src/io/io_mem/mod.rs b/ostd/src/io/io_mem/mod.rs
+--- a/ostd/src/io/io_mem/mod.rs
++++ b/ostd/src/io/io_mem/mod.rs
+@@ -172,7 +172,8 @@
+     }
+ 
+     /// Returns the base virtual address of the MMIO range.
+-    fn base(&self) -> usize {
++    /// Raw internal register views must retain this mapping for their entire lifetime.
++    pub(crate) fn base(&self) -> usize {
+         self.inner.kvirt_area.start() + self.offset
+     }
+ 
+diff --git a/ostd/src/mm/dma/device.rs b/ostd/src/mm/dma/device.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/src/mm/dma/device.rs
+@@ -0,0 +1,338 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Direct DMA for a PCI requester, restricted to coherent x86-64 systems with
++//! no detected IOMMU. This mode does not provide requester isolation: the PCI
++//! layer must bind the metadata to a live device borrow, and callers must
++//! quiesce all DMA before dropping a buffer.
++use crate::{
++    Error, irq,
++    mm::{
++        FrameAllocOptions, HasDaddr, HasPaddr, HasSize, Infallible, PAGE_SIZE, Segment, VmReader,
++        VmWriter,
++        io::util::{HasVmReaderWriter, VmReaderWriterIdentity},
++    },
++};
++
++/// Errors returned by direct device-DMA APIs.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum DeviceDmaError {
++    /// Physical memory allocation failed.
++    Memory(Error),
++    /// Creating a context or buffer requires IRQs enabled and non-interrupt context.
++    InvalidContext,
++    /// The platform is not a supported coherent, non-IOMMU x86-64 system.
++    UnsupportedPlatform,
++    /// The PCI requester coordinates are not supported or valid.
++    InvalidRequester,
++    /// The DMA address mask is invalid.
++    InvalidMask,
++    /// The allocated physical range exceeds the device address mask.
++    AddressOutOfRange,
++    /// The requested buffer size is zero or cannot be represented.
++    InvalidSize,
++}
++
++/// A PCI requester identity. It is metadata, not an isolation or authorization
++/// mechanism; the PCI layer is responsible for tying it to a device borrow.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct PciDmaRequester {
++    segment: u16,
++    bus: u8,
++    device: u8,
++    function: u8,
++}
++impl PciDmaRequester {
++    /// Creates a requester identity. PCI segment groups are currently unsupported.
++    pub fn new(segment: u16, bus: u8, device: u8, function: u8) -> Result<Self, DeviceDmaError> {
++        if segment != 0 || device > 31 || function > 7 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        Ok(Self {
++            segment,
++            bus,
++            device,
++            function,
++        })
++    }
++    /// Returns the PCI segment group (always zero on supported systems).
++    pub const fn segment(&self) -> u16 {
++        self.segment
++    }
++    /// Returns the PCI bus number.
++    pub const fn bus(&self) -> u8 {
++        self.bus
++    }
++    /// Returns the PCI device number.
++    pub const fn device(&self) -> u8 {
++        self.device
++    }
++    /// Returns the PCI function number.
++    pub const fn function(&self) -> u8 {
++        self.function
++    }
++}
++
++/// The inclusive maximum DMA address permitted by a device's address width.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct DmaMask {
++    bits: u8,
++    max_address: u64,
++}
++impl DmaMask {
++    /// Creates an address mask from a supported width in the range 1..=64.
++    pub fn new(bits: u8) -> Result<Self, DeviceDmaError> {
++        if !(1..=64).contains(&bits) {
++            return Err(DeviceDmaError::InvalidMask);
++        }
++        let max_address = if bits == 64 {
++            u64::MAX
++        } else {
++            (1u64 << bits) - 1
++        };
++        Ok(Self { bits, max_address })
++    }
++    /// Returns the number of address bits.
++    pub const fn bits(&self) -> u8 {
++        self.bits
++    }
++    /// Returns the largest representable DMA address.
++    pub const fn max_address(&self) -> u64 {
++        self.max_address
++    }
++    /// Returns whether the non-empty address range fits this mask.
++    ///
++    /// The end is inclusive. Zero-sized ranges and overflowing ranges are
++    /// rejected, including the `u64::MAX` boundary case unless the final byte
++    /// itself is representable.
++    pub fn contains_range(&self, start: u64, size: usize) -> bool {
++        if size == 0 {
++            return false;
++        }
++        let Some(last) = start.checked_add((size - 1) as u64) else {
++            return false;
++        };
++        last <= self.max_address
++    }
++}
++
++/// A direct-DMA context. It does not create an IOMMU domain or isolate devices.
++pub struct DirectDmaContext {
++    requester: PciDmaRequester,
++    mask: DmaMask,
++}
++impl DirectDmaContext {
++    /// Creates a context only when the platform has no detected IOMMU/remapping.
++    pub fn new(requester: PciDmaRequester, mask: DmaMask) -> Result<Self, DeviceDmaError> {
++        if !irq::is_local_enabled() || irq::InterruptLevel::current().is_interrupt_context() {
++            return Err(DeviceDmaError::InvalidContext);
++        }
++        if requester.segment != 0 || requester.device > 31 || requester.function > 7 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        if !direct_mode_supported() {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++        Ok(Self { requester, mask })
++    }
++    /// Returns the requester metadata associated with this context.
++    pub const fn requester(&self) -> &PciDmaRequester {
++        &self.requester
++    }
++    /// Returns the DMA address mask associated with this context.
++    pub const fn mask(&self) -> &DmaMask {
++        &self.mask
++    }
++    /// Allocates zeroed, contiguous, coherent memory usable for direct DMA.
++    ///
++    /// The caller must stop/quiesce device DMA before dropping the returned buffer.
++    pub fn alloc_coherent(&self, nframes: usize) -> Result<DirectDmaBuffer<'_>, DeviceDmaError> {
++        if !irq::is_local_enabled() || irq::InterruptLevel::current().is_interrupt_context() {
++            return Err(DeviceDmaError::InvalidContext);
++        }
++        if nframes == 0 {
++            return Err(DeviceDmaError::InvalidSize);
++        }
++        let size = nframes
++            .checked_mul(PAGE_SIZE)
++            .ok_or(DeviceDmaError::InvalidSize)?;
++        if !direct_mode_supported() {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++        let segment = FrameAllocOptions::new()
++            .alloc_segment(nframes)
++            .map_err(DeviceDmaError::Memory)?;
++        if !self.mask.contains_range(segment.paddr() as u64, size) {
++            // `segment` is dropped here, returning the allocation to the frame allocator.
++            return Err(DeviceDmaError::AddressOutOfRange);
++        }
++        Ok(DirectDmaBuffer {
++            segment,
++            _context: self,
++        })
++    }
++}
++
++/// An owned DMA buffer. `daddr()` equals the physical address only because this
++/// API is enabled solely for coherent direct-DMA mode without an IOMMU.
++pub struct DirectDmaBuffer<'a> {
++    segment: Segment<()>,
++    _context: &'a DirectDmaContext,
++}
++impl HasDaddr for DirectDmaBuffer<'_> {
++    fn daddr(&self) -> usize {
++        self.segment.paddr()
++    }
++}
++impl HasSize for DirectDmaBuffer<'_> {
++    fn size(&self) -> usize {
++        self.segment.size()
++    }
++}
++impl HasVmReaderWriter for DirectDmaBuffer<'_> {
++    type Types = VmReaderWriterIdentity;
++    fn reader(&self) -> VmReader<'_, Infallible> {
++        <Segment<()> as HasVmReaderWriter>::reader(&self.segment)
++    }
++    fn writer(&self) -> VmWriter<'_, Infallible> {
++        <Segment<()> as HasVmReaderWriter>::writer(&self.segment)
++    }
++}
++
++fn direct_mode_supported() -> bool {
++    #[cfg(target_arch = "x86_64")]
++    {
++        // TDX is the CVM implementation currently supported by this OSTD.
++        let is_cvm = crate::arch::if_tdx_enabled!({ true } else { false });
++        !is_cvm && crate::arch::iommu::direct_dma_supported()
++    }
++    #[cfg(not(target_arch = "x86_64"))]
++    {
++        false
++    }
++}
++
++#[cfg(ktest)]
++mod test {
++    use super::*;
++    use crate::prelude::ktest;
++
++    #[ktest]
++    fn requester_identity_and_validation() {
++        let requester = PciDmaRequester::new(0, 0x12, 3, 7).unwrap();
++        assert_eq!(
++            (
++                requester.segment(),
++                requester.bus(),
++                requester.device(),
++                requester.function()
++            ),
++            (0, 0x12, 3, 7)
++        );
++        assert_eq!(
++            PciDmaRequester::new(1, 0, 0, 0),
++            Err(DeviceDmaError::InvalidRequester)
++        );
++        assert_eq!(
++            PciDmaRequester::new(0, 0, 32, 0),
++            Err(DeviceDmaError::InvalidRequester)
++        );
++        assert_eq!(
++            PciDmaRequester::new(0, 0, 0, 8),
++            Err(DeviceDmaError::InvalidRequester)
++        );
++    }
++
++    #[ktest]
++    fn masks_cover_boundaries_and_overflow() {
++        assert_eq!(DmaMask::new(0), Err(DeviceDmaError::InvalidMask));
++        assert_eq!(DmaMask::new(65), Err(DeviceDmaError::InvalidMask));
++        let mask = DmaMask::new(64).unwrap();
++        assert_eq!(mask.bits(), 64);
++        assert_eq!(mask.max_address(), u64::MAX);
++        assert!(mask.contains_range(u64::MAX, 1));
++        assert!(!mask.contains_range(u64::MAX, 2));
++        assert!(!mask.contains_range(u64::MAX - 4, 6));
++        assert!(!mask.contains_range(0, 0));
++        assert!(
++            DmaMask::new(32)
++                .unwrap()
++                .contains_range(u32::MAX as u64 - 3, 4)
++        );
++        assert!(
++            !DmaMask::new(32)
++                .unwrap()
++                .contains_range(u32::MAX as u64 - 3, 5)
++        );
++    }
++
++    #[ktest]
++    fn allocation_requires_enabled_interrupts_and_supported_platform() {
++        let requester = PciDmaRequester::new(0, 0, 0, 0).unwrap();
++        let mask = DmaMask::new(64).unwrap();
++        if !direct_mode_supported() {
++            assert_eq!(
++                DirectDmaContext::new(requester, mask).err(),
++                Some(DeviceDmaError::UnsupportedPlatform)
++            );
++            return;
++        }
++        let context = DirectDmaContext::new(requester, mask).unwrap();
++        assert_eq!(
++            context.alloc_coherent(0).err(),
++            Some(DeviceDmaError::InvalidSize)
++        );
++        assert_eq!(
++            context.alloc_coherent(usize::MAX).err(),
++            Some(DeviceDmaError::InvalidSize)
++        );
++        let irq_guard = irq::disable_local();
++        assert_eq!(
++            DirectDmaContext::new(requester, mask).err(),
++            Some(DeviceDmaError::InvalidContext)
++        );
++        assert_eq!(
++            context.alloc_coherent(1).err(),
++            Some(DeviceDmaError::InvalidContext)
++        );
++        drop(irq_guard);
++        let buffer = context.alloc_coherent(1).unwrap();
++        assert_eq!(buffer.size(), PAGE_SIZE);
++        let mut bytes = alloc::vec![0xA5; PAGE_SIZE];
++        let mut reader = <DirectDmaBuffer<'_> as HasVmReaderWriter>::reader(&buffer);
++        assert_eq!(
++            reader.read(&mut VmWriter::from(bytes.as_mut_slice())),
++            PAGE_SIZE
++        );
++        assert!(bytes.iter().all(|byte| *byte == 0));
++        let source = alloc::vec![0x5A; PAGE_SIZE];
++        let mut writer = <DirectDmaBuffer<'_> as HasVmReaderWriter>::writer(&buffer);
++        assert_eq!(
++            writer.write(&mut VmReader::from(source.as_slice())),
++            PAGE_SIZE
++        );
++        let mut result = alloc::vec![0; PAGE_SIZE];
++        let mut reader = <DirectDmaBuffer<'_> as HasVmReaderWriter>::reader(&buffer);
++        assert_eq!(
++            reader.read(&mut VmWriter::from(result.as_mut_slice())),
++            PAGE_SIZE
++        );
++        assert!(result.iter().all(|byte| *byte == 0x5A));
++    }
++
++    #[ktest]
++    fn tiny_mask_rejection_releases_allocations() {
++        if !direct_mode_supported() {
++            return;
++        }
++        let context = DirectDmaContext::new(
++            PciDmaRequester::new(0, 0, 0, 0).unwrap(),
++            DmaMask::new(1).unwrap(),
++        )
++        .unwrap();
++        for _ in 0..8 {
++            assert_eq!(
++                context.alloc_coherent(1).err(),
++                Some(DeviceDmaError::AddressOutOfRange)
++            );
++        }
++    }
++}
+diff --git a/ostd/src/mm/dma/mod.rs b/ostd/src/mm/dma/mod.rs
+--- a/ostd/src/mm/dma/mod.rs
++++ b/ostd/src/mm/dma/mod.rs
+@@ -20,9 +20,11 @@
+ #[cfg(ktest)]
+ mod test;
+ 
++mod device;
+ mod dma_coherent;
+ mod dma_stream;
+ mod util;
+ 
++pub use device::{DeviceDmaError, DirectDmaBuffer, DirectDmaContext, DmaMask, PciDmaRequester};
+ pub use dma_coherent::DmaCoherent;
+ pub use dma_stream::{DmaDirection, DmaStream, FromAndToDevice, FromDevice, ToDevice};
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -6,8 +6,13 @@
+ mkdir -p "$OUTPUT"
+ OUTPUT=$(cd -- "$OUTPUT" && pwd)
+ 
+-for package in ostd/libs/nvidia-nvport kernel/comps/nvidia-platform kernel/core/comps/pci ostd; do
+-    name=${package##*/}
++for suite in nvport platform pci pci-iommu ostd; do
++    case "$suite" in
++        nvport) package=ostd/libs/nvidia-nvport; name=nvidia-nvport ;;
++        platform) package=kernel/comps/nvidia-platform; name=nvidia-platform ;;
++        pci|pci-iommu) package=kernel/core/comps/pci; name=$suite ;;
++        ostd) package=ostd; name=ostd ;;
++    esac
+     log="$OUTPUT/native-$name-tests.log"
+     (
+         cd "$ROOT/$package"
+@@ -15,8 +20,11 @@
+         # closes the race with another local process creating this file.
+         set -o noclobber
+         pci_test_device=""
+-        if [[ "$name" == pci ]]; then
+-            pci_test_device=" -device pci-testdev,membar=4096"
++        if [[ "$suite" == pci || "$suite" == pci-iommu ]]; then
++            pci_test_device=" -device pci-testdev,membar=4096 -device edu,dma_mask=4294967295"
++        fi
++        if [[ "$suite" == pci-iommu ]]; then
++            pci_test_device+=" -device intel-iommu,intremap=on"
+         fi
+         printf '%s\n' \
+             '[boot]' \
+@@ -31,7 +39,7 @@
+         # No guest input is needed. Detach stdin so QEMU never attempts to
+         # read the controlling terminal from this pipeline/background group.
+         features=()
+-        if [[ "$name" == nvidia-platform ]]; then
++        if [[ "$suite" == platform ]]; then
+             features=(--features nvport-runtime)
+         fi
+         timeout --signal=TERM --kill-after=5 600s cargo osdk test --strip-elf "${features[@]}" </dev/null
+@@ -49,4 +57,14 @@
+ if "[ktest runner] All crates tested." not in text:
+     raise SystemExit("Missing final kernel runner marker in " + sys.argv[1])
+ PY
++    if [[ "$suite" == pci ]]; then
++        grep -Fq 'PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles;' "$log"
++    elif [[ "$suite" == pci-iommu ]]; then
++        grep -Fq 'DMA remapping enabled' "$log"
++        grep -Fq 'PCI device DMA correctly rejected unsupported IOMMU/CVM platform; zero DMA issued' "$log"
++        if grep -Fq 'PCI device DMA passed:' "$log"; then
++            echo 'Unexpected direct-DMA success with IOMMU present' >&2
++            exit 1
++        fi
++    fi
+ done

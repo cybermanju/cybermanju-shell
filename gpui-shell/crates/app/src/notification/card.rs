@@ -1,0 +1,242 @@
+use gpui::prelude::*;
+use gpui::{Context, MouseButton, div, img, px};
+use services::{Notification, NotificationCommand, NotificationSubscriber};
+use ui::{ActiveTheme, Radius, Spacing, TextSize};
+
+use super::dispatch_notification_command;
+
+pub(super) fn notification_card_body<V>(
+    notification: &Notification,
+    cx: &Context<V>,
+    show_image: bool,
+    subscriber: &NotificationSubscriber,
+) -> gpui::AnyElement {
+    let theme = cx.theme();
+    let app_name = notification.app_name.clone();
+    let app_icon_name = notification.app_icon.clone();
+    let icon_source = notification.app_icon_path.as_ref().map(|p| {
+        tracing::debug!(
+            "Loading icon for {}: {} -> {:?}",
+            app_name,
+            notification.app_icon,
+            p
+        );
+        p.clone()
+    });
+    let image_source = notification.image_path.clone();
+    let summary = notification.summary.clone();
+    let body = notification.body.clone();
+    let actions = notification.actions.clone();
+    let timestamp = format_notification_time(notification.timestamp_ms);
+    let urgency_color = urgency_color(notification.urgency, cx);
+
+    div()
+        .w_full()
+        .flex()
+        .items_start()
+        .gap(Spacing::Medium.pixels())
+        .child(
+            div()
+                .w(px(3.0))
+                .flex_shrink_0()
+                .rounded(Radius::Small.pixels())
+                .bg(urgency_color)
+                .h_full(),
+        )
+        .child(
+            // Icon/Image area: Show image if available, otherwise show app icon or fallback
+            match (&icon_source, &image_source, show_image) {
+                // If we have both icon and image, show a larger image with small icon overlay
+                (Some(icon), Some(img_src), true) => div()
+                    .w(px(64.0))
+                    .h(px(64.0))
+                    .flex_shrink_0()
+                    .rounded(Radius::Medium.pixels())
+                    .overflow_hidden()
+                    .relative()
+                    .child(
+                        img(img_src.clone())
+                            .size_full()
+                            .object_fit(gpui::ObjectFit::Cover),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .bottom(px(4.0))
+                            .right(px(4.0))
+                            .size(px(24.0))
+                            .rounded(Radius::Medium.pixels())
+                            .bg(theme.colors.background)
+                            .border_1()
+                            .border_color(theme.colors.border)
+                            .shadow_md()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(
+                                img(icon.clone())
+                                    .size(px(16.0))
+                                    .object_fit(gpui::ObjectFit::Contain),
+                            ),
+                    )
+                    .into_any_element(),
+                // If only image, show larger image
+                (_, Some(img_src), true) => div()
+                    .w(px(64.0))
+                    .h(px(64.0))
+                    .flex_shrink_0()
+                    .rounded(Radius::Medium.pixels())
+                    .overflow_hidden()
+                    .child(
+                        img(img_src.clone())
+                            .size_full()
+                            .object_fit(gpui::ObjectFit::Cover),
+                    )
+                    .into_any_element(),
+                // Otherwise show app icon or fallback in 64x64px container
+                _ => div()
+                    .size(px(64.0))
+                    .flex_shrink_0()
+                    .rounded(Radius::Medium.pixels())
+                    .bg(theme.colors.surface_background)
+                    .border_1()
+                    .border_color(theme.colors.border_variant)
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        icon_source
+                            .map(|src| {
+                                img(src)
+                                    .size(px(28.0))
+                                    .object_fit(gpui::ObjectFit::Contain)
+                                    .into_any_element()
+                            })
+                            .unwrap_or_else(|| {
+                                div()
+                                    .text_size(TextSize::Medium.rems())
+                                    .text_color(theme.colors.text)
+                                    .child(icon_fallback(&app_name, &app_icon_name))
+                                    .into_any_element()
+                            }),
+                    )
+                    .into_any_element(),
+            },
+        )
+        .child(
+            div()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap(px(4.0))
+                .overflow_hidden()
+                .when(show_image, |el| el.pr(Spacing::XXXLarge.pixels()))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(Spacing::Medium.pixels())
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_size(TextSize::XSmall.rems())
+                                .text_color(theme.colors.text)
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .whitespace_nowrap()
+                                .child(app_name),
+                        )
+                        .child(
+                            div()
+                                .text_size(TextSize::XSmall.rems())
+                                .text_color(theme.colors.text)
+                                .flex_shrink_0()
+                                .child(timestamp),
+                        ),
+                )
+                .child(
+                    div()
+                        .text_size(TextSize::Small.rems())
+                        .text_color(theme.colors.text)
+                        .line_height(px(18.0))
+                        .child(summary),
+                )
+                .when(!body.is_empty(), |el| {
+                    el.child(
+                        div()
+                            .text_size(TextSize::XSmall.rems())
+                            .text_color(theme.colors.text_muted)
+                            .line_height(px(16.0))
+                            .child(body),
+                    )
+                })
+                .when(!actions.is_empty(), |el| {
+                    el.child(
+                        div()
+                            .mt(px(4.0))
+                            .flex()
+                            .flex_wrap()
+                            .gap(Spacing::XSmall.pixels())
+                            .children(actions.into_iter().map(|(key, label)| {
+                                let sub = subscriber.clone();
+                                let notification_id = notification.id;
+                                div()
+                                    .px(Spacing::Medium.pixels())
+                                    .py(px(2.0))
+                                    .rounded(Radius::Small.pixels())
+                                    .bg(theme.colors.elevated_surface_background)
+                                    .border_1()
+                                    .border_color(theme.colors.border_variant)
+                                    .text_size(TextSize::XSmall.rems())
+                                    .text_color(theme.colors.text)
+                                    .cursor_pointer()
+                                    .hover(move |el| {
+                                        el.bg(theme.colors.element_hover)
+                                            .text_color(theme.colors.text)
+                                    })
+                                    .on_mouse_down(MouseButton::Left, move |_, _, _| {
+                                        dispatch_notification_command(
+                                            sub.clone(),
+                                            NotificationCommand::InvokeAction(
+                                                notification_id,
+                                                key.clone(),
+                                            ),
+                                        );
+                                    })
+                                    .child(label)
+                            })),
+                    )
+                }),
+        )
+        .into_any_element()
+}
+
+fn icon_fallback(app_name: &str, app_icon_name: &str) -> String {
+    if !app_icon_name.is_empty() {
+        return app_icon_name.chars().take(2).collect();
+    }
+    app_name
+        .chars()
+        .find(|c| c.is_alphanumeric())
+        .map(|c| c.to_ascii_uppercase().to_string())
+        .unwrap_or_else(|| "?".to_string())
+}
+
+fn format_notification_time(timestamp_ms: i64) -> String {
+    use chrono::{Local, TimeZone};
+
+    Local
+        .timestamp_millis_opt(timestamp_ms)
+        .single()
+        .map(|dt| dt.format("%H:%M").to_string())
+        .unwrap_or_default()
+}
+
+fn urgency_color<V>(urgency: u8, cx: &Context<V>) -> gpui::Hsla {
+    let theme = cx.theme();
+    match urgency {
+        2 => theme.colors.status.error,
+        0 => theme.colors.text_muted,
+        _ => theme.colors.accent,
+    }
+}

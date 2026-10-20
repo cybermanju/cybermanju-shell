@@ -1,0 +1,460 @@
+# Version 0.19.0 (2026-10-13)
+
+The headline of this release is **graphics**. A new **DRM subsystem** provides the DRM core, the `/dev/dri` device nodes, **GEM dumb buffers**, and **KMS**. With it, Asterinas NixOS runs **Xorg** on its standard `modesetting` driver, with Mesa's software OpenGL on top, instead of the legacy fbdev interface. Two 3D games, **OpenArena** and **SuperTuxKart**, now run on Asterinas NixOS.
+
+Asterinas also adds its fourth CPU architecture, **AArch64**. The port is minimal but usable: on QEMU's `virt` machine, it runs a BusyBox shell with the **GICv3** interrupt controller, basic peripherals, and a vDSO. AArch64 enters as a **Tier 2** platform, and Arm machines now work as development hosts too.
+
+This release also removes several limits on using Asterinas as the guest kernel of VM-based containers such as Kata Containers and Confidential Containers. **Overlayfs has been reimplemented**, the VFS gains **mount propagation** and the **new mount API**, and **virtio-fs** gains `mmap`, `O_DIRECT`, and faster I/O. Asterinas can also boot via **PVH** into **Firecracker** microVMs, and Intel TDX guests boot faster by accepting memory on all vCPUs in parallel.
+
+**OSTD gains hypervisor support**, as designed in **[RFC-0003](https://asterinas.github.io/book/rfcs/0003-hypervisor-support.html)**. OSTD provides the Intel VMX foundation, so a hypervisor built on top of it can be written entirely in safe Rust. The Book shows one in about 100 lines. For device drivers, the new **Rust-native device model**, `aster-device`, uses typed abstractions so that the type system enforces what Linux's driver core enforces by convention.
+
+Finally, **`aster-code-review`** is a skill for Claude Code and Codex that reviews code like a maintainer, flagging both bugs and violations of our Coding Guidelines. And Asterinas is now **self-hosting**: Asterinas NixOS can build and boot Asterinas with the new **Nix development shell**.
+
+## Asterinas NixOS
+
+We have made the following key changes to Asterinas NixOS:
+
+* [Upgrade Asterinas NixOS to NixOS 26.05](https://github.com/asterinas/asterinas/pull/3653)
+* [Support building Asterinas on Asterinas](https://github.com/asterinas/asterinas/pull/3749)
+
+## Asterinas Kernel
+
+We have made the following key changes to the Asterinas kernel:
+
+* Process management
+    * [Implement `ksoftirqd`](https://github.com/asterinas/asterinas/pull/3744)
+    * [Fix shebang argument and `execveat` handling](https://github.com/asterinas/asterinas/pull/3689)
+    * Fix [interval timer signal delivery](https://github.com/asterinas/asterinas/pull/3719) and [`__vdso_time`](https://github.com/asterinas/asterinas/pull/3468)
+* Memory management
+    * [Add reverse mappings for file-backed memory mappings](https://github.com/asterinas/asterinas/pull/3421)
+    * [Make `VmMapping` own its `FileLike`](https://github.com/asterinas/asterinas/pull/3399) and [let files define their own mapping logic](https://github.com/asterinas/asterinas/pull/3853)
+    * Support [`MAP_32BIT`](https://github.com/asterinas/asterinas/pull/3533) and [`MREMAP_DONTUNMAP`](https://github.com/asterinas/asterinas/pull/3541)
+* File systems
+    * VFS
+        * Implement [mount propagation](https://github.com/asterinas/asterinas/pull/3639) and [the new mount API](https://github.com/asterinas/asterinas/pull/3492), and [fix `fsconfig` after `fsmount`](https://github.com/asterinas/asterinas/pull/3599)
+        * [Introduce `FileCommon` for all `FileLike`s](https://github.com/asterinas/asterinas/pull/3577)
+        * [Add birth time support to inode metadata](https://github.com/asterinas/asterinas/pull/3394)
+        * [Overhaul mount ID allocation](https://github.com/asterinas/asterinas/pull/3263) and [add a global lock for the mount tree topology](https://github.com/asterinas/asterinas/pull/3402)
+        * [Fix `rename`/`renameat2`](https://github.com/asterinas/asterinas/pull/3148) and [VFS permission checks](https://github.com/asterinas/asterinas/pull/3153)
+        * [Fix the owner model of range locks](https://github.com/asterinas/asterinas/pull/3654)
+    * Overlayfs
+        * [Reimplement overlayfs](https://github.com/asterinas/asterinas/pull/3795)
+    * virtio-fs
+        * Support [`mmap`](https://github.com/asterinas/asterinas/pull/3730), [`O_DIRECT`](https://github.com/asterinas/asterinas/pull/3509), [rename](https://github.com/asterinas/asterinas/pull/3334), and [symbolic links](https://github.com/asterinas/asterinas/pull/3812), and [add an inode cache](https://github.com/asterinas/asterinas/pull/3327)
+        * Improve performance with [multi-page I/O](https://github.com/asterinas/asterinas/pull/3886) and [reusable DMA arenas](https://github.com/asterinas/asterinas/pull/3605)
+        * Fix [request queue descriptor exhaustion](https://github.com/asterinas/asterinas/pull/3315) and [short-read handling](https://github.com/asterinas/asterinas/pull/3582)
+    * Ext2
+        * [Atomically allocate and zero data blocks](https://github.com/asterinas/asterinas/pull/3405) and [fix and optimize file creation](https://github.com/asterinas/asterinas/pull/3311)
+    * Procfs
+        * [Complete `/proc/[pid]/stat` for `ps`](https://github.com/asterinas/asterinas/pull/3290), and add [more `/proc/sys/kernel` files](https://github.com/asterinas/asterinas/pull/3522), [`/proc/sys/fs/nr_open`](https://github.com/asterinas/asterinas/pull/3462), [`/proc/sys/vm/mmap_min_addr`](https://github.com/asterinas/asterinas/pull/3543), and [the `Slab` field in `/proc/meminfo`](https://github.com/asterinas/asterinas/pull/3624)
+* Sockets and networking
+    * [Support a unified routing table](https://github.com/asterinas/asterinas/pull/3701)
+    * [Support socket `ioctl`s](https://github.com/asterinas/asterinas/pull/3662)
+    * [Move TCP/IP parsing to `aster-bigtcp`](https://github.com/asterinas/asterinas/pull/3702)
+    * Support [`MSG_PEEK`](https://github.com/asterinas/asterinas/pull/3347) and [`MSG_TRUNC`](https://github.com/asterinas/asterinas/pull/3600) for all sockets
+    * Support [socket timeout options](https://github.com/asterinas/asterinas/pull/3494), [`SO_TYPE`](https://github.com/asterinas/asterinas/pull/3486), and [`TCP_KEEPINTVL`](https://github.com/asterinas/asterinas/pull/3303)
+    * [Support broadcast in TCP and UDP sockets](https://github.com/asterinas/asterinas/pull/3811)
+    * [Support `ip addr` on Asterinas NixOS](https://github.com/asterinas/asterinas/pull/3633)
+* Security
+    * Implement [file capabilities for `execve`](https://github.com/asterinas/asterinas/pull/3365), [ambient capabilities (`PR_CAP_AMBIENT`)](https://github.com/asterinas/asterinas/pull/3510), and [the capability LSM module](https://github.com/asterinas/asterinas/pull/3131)
+    * [Support `PR_SET_NO_NEW_PRIVS`](https://github.com/asterinas/asterinas/pull/3552)
+    * [Clear IOPL in `RFLAGS` before returning to user space](https://github.com/asterinas/asterinas/pull/3785)
+* Namespaces
+    * [Improve `setns` conformance for supported namespaces](https://github.com/asterinas/asterinas/pull/3532)
+* Devices
+    * Device model
+        * [Add a Rust-native device model](https://github.com/asterinas/asterinas/pull/3889) and [prepare systree and sysfs for it](https://github.com/asterinas/asterinas/pull/3861)
+        * [Add devtmpfs](https://github.com/asterinas/asterinas/pull/3621)
+        * [Split the kernel into `asterinas` and `aster-core`](https://github.com/asterinas/asterinas/pull/3637)
+    * Graphics (DRM)
+        * Add the DRM subsystem: [the DRM core and SimpleDRM](https://github.com/asterinas/asterinas/pull/3787), [GEM dumb buffers](https://github.com/asterinas/asterinas/pull/3925), [KMS objects](https://github.com/asterinas/asterinas/pull/3888), and [modesetting for Xorg](https://github.com/asterinas/asterinas/pull/3941)
+    * Block and NVMe
+        * Improve the NVMe driver with [PRP lists for multi-page I/O](https://github.com/asterinas/asterinas/pull/3350), [concurrent I/O commands](https://github.com/asterinas/asterinas/pull/3755), and [partitions](https://github.com/asterinas/asterinas/pull/3771)
+        * [Support unaligned block device I/O](https://github.com/asterinas/asterinas/pull/3230)
+    * TTY and console
+        * Support the [`TCGETS2`/`TCSETS2`](https://github.com/asterinas/asterinas/pull/3521) and [`TCSETSW2`/`TCSETSF2`](https://github.com/asterinas/asterinas/pull/3646) ioctls
+        * [Support the SiFive UART console](https://github.com/asterinas/asterinas/pull/3426)
+        * [Fix signal characters in the TTY line discipline](https://github.com/asterinas/asterinas/pull/3695)
+        * [Open PTY peers through the correct devpts mount](https://github.com/asterinas/asterinas/pull/3659)
+    * VirtIO
+        * Fix [the device initialization sequence](https://github.com/asterinas/asterinas/pull/3465), [the virtio-blk DMA sync for writes](https://github.com/asterinas/asterinas/pull/3291), and [virtio-pci queue address access widths](https://github.com/asterinas/asterinas/pull/3839)
+    * Firecracker
+        * [Support i8042 reboot for Firecracker shutdown](https://github.com/asterinas/asterinas/pull/3568)
+    * Misc
+        * [Add utilities for working with device trees](https://github.com/asterinas/asterinas/pull/3821)
+* Tests
+    * [Run xfstests on multiple file systems](https://github.com/asterinas/asterinas/pull/3298), [including virtio-fs](https://github.com/asterinas/asterinas/pull/3747)
+    * [Update LTP to 20260529](https://github.com/asterinas/asterinas/pull/3578)
+    * [Support running selected conformance tests](https://github.com/asterinas/asterinas/pull/3598)
+    * Add benchmarks for [boot time](https://github.com/asterinas/asterinas/pull/3592), [virtio-fs fio](https://github.com/asterinas/asterinas/pull/3419), [iperf3 UDP](https://github.com/asterinas/asterinas/pull/3727), and [NVMe fio](https://github.com/asterinas/asterinas/pull/3932)
+* Misc
+    * [Introduce short subsystem-scoped visibility paths](https://github.com/asterinas/asterinas/pull/3247) and [restrict `pub` items to narrow visibility](https://github.com/asterinas/asterinas/pull/3724)
+    * [Support the `root` boot parameter](https://github.com/asterinas/asterinas/pull/3425)
+
+## Asterinas OSTD & OSDK
+
+We have made the following key changes to OSTD and/or OSDK:
+
+* Hypervisor
+    * Add the Intel VMX foundation: [the VMX lifecycle](https://github.com/asterinas/asterinas/pull/3675), [the VMCS](https://github.com/asterinas/asterinas/pull/3833), [EPT-backed guest memory](https://github.com/asterinas/asterinas/pull/3825), [the guest CPU state](https://github.com/asterinas/asterinas/pull/3697), and [guest execution](https://github.com/asterinas/asterinas/pull/3860)
+* Architectures and boot
+    * Add AArch64 as the fourth architecture, with [minimal support](https://github.com/asterinas/asterinas/pull/3737), [the GICv3 interrupt controller and basic peripherals](https://github.com/asterinas/asterinas/pull/3884), [the vDSO](https://github.com/asterinas/asterinas/pull/3933), and [Tier 2 status with LTP in CI](https://github.com/asterinas/asterinas/pull/3953)
+    * [Support booting via PVH](https://github.com/asterinas/asterinas/pull/3765) and [running in Firecracker microVMs](https://github.com/asterinas/asterinas/pull/3461)
+    * Fix RISC-V [TLB invalidation](https://github.com/asterinas/asterinas/pull/3673), [BSS initialization](https://github.com/asterinas/asterinas/pull/3880), and [device tree memory reservation](https://github.com/asterinas/asterinas/pull/3923)
+    * [Accept TDX guest memory on all vCPUs in parallel at boot](https://github.com/asterinas/asterinas/pull/3640), and fix TDX [`MapGPA` retry handling](https://github.com/asterinas/asterinas/pull/3339) and [another retry issue](https://github.com/asterinas/asterinas/pull/3845)
+* OSTD
+    * [Introduce `UserModeHooks`](https://github.com/asterinas/asterinas/pull/3325)
+* Misc
+    * [Add a Nix development shell](https://github.com/asterinas/asterinas/pull/3548) with [dependencies cached on Cachix](https://github.com/asterinas/asterinas/pull/3852)
+    * [Add the `aster-code-review` skill](https://github.com/asterinas/asterinas/pull/3483)
+
+## Asterinas Book
+
+We have made the following key changes to the Book:
+
+* [Add RFC-0003: hypervisor support](https://github.com/asterinas/asterinas/pull/3418)
+* [Reorganize the Coding Guidelines around reviewer personas](https://github.com/asterinas/asterinas/pull/3416)
+
+# Version 0.18.0 (2026-06-04)
+
+The headline of this release is a major step toward running Asterinas as the guest OS for VM-based **[Kata Containers](https://katacontainers.io/)** and **[Confidential Containers (CoCo)](https://confidentialcontainers.org/)**. Getting there requires a host of new building blocks, and this release delivers many of them: **namespaces** (the IPC and cgroup namespaces, plus nsfs at `/proc/[pid]/ns`), **cgroups** (the PID sub-controller and a partial CPU sub-controller), **virtio-fs** for sharing a filesystem with the host, **virtio-rng** (`/dev/hwrng`) for hardware entropy, and a fully **reimplemented vsock** for host–guest communication.
+
+Userspace debugging comes to Asterinas in this release. We implement the **`ptrace`** syscall along with its core operations—`PTRACE_SETOPTIONS`, `PTRACE_SYSCALL`, and `PTRACE_PEEK`/`POKE`—which together enable popular debugging tools such as **GDB** and **strace** to run on Asterinas, complete with verified-usage documentation and CI coverage.
+
+This release also substantially modernizes the storage stack. The **ext2 filesystem has been reimplemented**, a new **NVMe driver** joins the block layer, and the VFS gains a new **`Dentry` revalidate mechanism** alongside a **refactored page cache**. The result is a more reliable and capable storage stack.
+
+Finally, Asterinas NixOS dramatically expands its coverage of real-world software, with **over 100 popular packages now verified**—including **Codex**, **QEMU**, and **Firefox**. To keep this growing catalog working, we have integrated a range of new test suites, including **kselftest**, **xfstests**, and the standard unit-test suites of **Go**, **Python**, and **JDK**.
+
+## Asterinas NixOS
+
+We have made the following key changes to Asterinas NixOS:
+
+* [Add a framework for Asterinas NixOS test suites](https://github.com/asterinas/asterinas/pull/2771)
+* [Add documentation for more verified applications](https://github.com/asterinas/asterinas/pull/2956)
+* [Add tests for popular applications](https://github.com/asterinas/asterinas/pull/3187)
+* [Add Go std test on Asterinas NixOS](https://github.com/asterinas/asterinas/pull/2943)
+* [Add JDK test on Asterinas NixOS](https://github.com/asterinas/asterinas/pull/3017)
+* [Add Python regression tests on Asterinas NixOS](https://github.com/asterinas/asterinas/pull/2944)
+* [Add QEMU test for virtualization applications](https://github.com/asterinas/asterinas/pull/3245)
+* [Support `ARCH_GET_GS`/`ARCH_SET_GS` to enable Firefox](https://github.com/asterinas/asterinas/pull/3286)
+
+## Asterinas Kernel
+
+We have made the following key changes to the Asterinas kernel:
+
+* Process management
+    * [Refactor `PidFile` and add the `pidfd_getfd` syscall](https://github.com/asterinas/asterinas/pull/2877), [add the `pidfd_send_signal` syscall](https://github.com/asterinas/asterinas/pull/2912), and [align `PidFile` semantics with POSIX](https://github.com/asterinas/asterinas/pull/2922)
+    * [Fix buggy behavior when loading corrupted ELF files](https://github.com/asterinas/asterinas/pull/2777)
+* Ptrace
+    * [Add the `ptrace` syscall](https://github.com/asterinas/asterinas/pull/2984)
+    * [Support debugging with `ptrace`](https://github.com/asterinas/asterinas/pull/3065)
+    * Add [`PTRACE_SETOPTIONS`](https://github.com/asterinas/asterinas/pull/3061), [`PTRACE_SYSCALL`](https://github.com/asterinas/asterinas/pull/3241), and [`PTRACE_PEEK/POKE_TEXT/DATA`](https://github.com/asterinas/asterinas/pull/3242)
+    * Add (kernel-side) patches, verified-usage docs, and CI for [GDB](https://github.com/asterinas/asterinas/pull/3254) and [strace](https://github.com/asterinas/asterinas/pull/3266)
+    * [Support force-write via `/proc/[pid]/mem`](https://github.com/asterinas/asterinas/pull/2855)
+    * [Add the Yama ptrace scope](https://github.com/asterinas/asterinas/pull/3018)
+* Signals and IPC
+    * [Correct `sigsuspend` and fix various other signal behaviors](https://github.com/asterinas/asterinas/pull/3050)
+    * [Fix lots of bugs in System V semaphores](https://github.com/asterinas/asterinas/pull/3199)
+* Memory management
+    * [Respect `mmap` address hints](https://github.com/asterinas/asterinas/pull/3012)
+    * [Fix many wrong error codes and other buggy behavior in various MM syscalls](https://github.com/asterinas/asterinas/pull/2766)
+* File systems
+    * VFS
+        * [Add the pseudo `Path`](https://github.com/asterinas/asterinas/pull/2798)
+        * [Introduce the `Dentry` revalidate mechanism](https://github.com/asterinas/asterinas/pull/3048)
+        * [Refactor the page cache implementation](https://github.com/asterinas/asterinas/pull/2953) and [fix a page cache bug that leaks uninitialized memory to userspace](https://github.com/asterinas/asterinas/pull/3256)
+        * [Implement the `pivot_root` syscall](https://github.com/asterinas/asterinas/pull/2445)
+        * [Implement `O_TMPFILE` support for `open`/`openat`](https://github.com/asterinas/asterinas/pull/3185)
+        * [Refactor `Metadata`'s fields and fix pseudo-filesystems' Device ID](https://github.com/asterinas/asterinas/pull/2887)
+    * virtio-fs
+        * [Support virtio-fs in Asterinas](https://github.com/asterinas/asterinas/pull/3084)
+    * Ext2
+        * [Rewrite the ext2 filesystem](https://github.com/asterinas/asterinas/pull/3171)
+    * Procfs
+        * Add [`/proc/mounts`](https://github.com/asterinas/asterinas/pull/2929), [`/proc/[pid]/auxv`](https://github.com/asterinas/asterinas/pull/3073), [`/proc/[tid]`](https://github.com/asterinas/asterinas/pull/3125), [more entries in `/proc/[pid]/maps`](https://github.com/asterinas/asterinas/pull/2925), and [`mountstats`](https://github.com/asterinas/asterinas/pull/3054)
+* Sockets and networking
+    * [Rewrite vsock](https://github.com/asterinas/asterinas/pull/3122)
+    * [Add initial IPv6 support](https://github.com/asterinas/asterinas/pull/3129)
+    * [Reject binding to privileged ports without `CAP_NET_BIND_SERVICE`](https://github.com/asterinas/asterinas/pull/3141)
+    * [Fix some UDP problems](https://github.com/asterinas/asterinas/pull/3282)
+* Namespaces and cgroups
+    * [Support nsfs (`/proc/[pid]/ns`)](https://github.com/asterinas/asterinas/pull/2966)
+    * [Support the IPC namespace](https://github.com/asterinas/asterinas/pull/2988)
+    * [Support the cgroup namespace](https://github.com/asterinas/asterinas/pull/3109)
+    * [Implement the cgroup PID sub-controller](https://github.com/asterinas/asterinas/pull/2987)
+    * Add a partial cgroup CPU sub-controller, providing [`cpu.stat` statistics](https://github.com/asterinas/asterinas/pull/3116) and [dummy `cpu.weight`/`cpu.max` limit files](https://github.com/asterinas/asterinas/pull/3175)
+    * [Bind mount namespace files](https://github.com/asterinas/asterinas/pull/3082)
+* Security
+    * [Implement capabilities and execution of programs by root](https://github.com/asterinas/asterinas/pull/2978)
+    * [Implement capability bounding set support](https://github.com/asterinas/asterinas/pull/3092)
+    * [Fix credentials-related system calls and clean them up](https://github.com/asterinas/asterinas/pull/2952)
+    * [Add the initial LSM framework](https://github.com/asterinas/asterinas/pull/3078)
+* Devices
+    * Block and NVMe
+        * [Add the NVMe driver](https://github.com/asterinas/asterinas/pull/1984)
+    * PCI
+        * [Improve PCI device enumeration and detection](https://github.com/asterinas/asterinas/pull/2680)
+        * [Get the PCI bus range from FDT/ACPI and add support for PCI ECAM on x86](https://github.com/asterinas/asterinas/pull/2914)
+    * TTY and console
+        * [Support multiple TTYs](https://github.com/asterinas/asterinas/pull/3049)
+        * [Support the NS16550A UART console, `/dev/ttyS0`, and `console=ttyS0`](https://github.com/asterinas/asterinas/pull/2837)
+        * [Keyboard enhancements](https://github.com/asterinas/asterinas/pull/3000)
+    * VirtIO
+        * [Support `virtio-rng` and expose it as `/dev/hwrng`](https://github.com/asterinas/asterinas/pull/2951)
+        * [Model `virtqueue` as untrusted and use fallible allocation in `aster-virtio`](https://github.com/asterinas/asterinas/pull/3160)
+    * TDX
+        * [Add TSM-MR (measurement register) sysfs support](https://github.com/asterinas/asterinas/pull/2891)
+* Tests
+    * [Add Linux kselftest test suite](https://github.com/asterinas/asterinas/pull/2900)
+    * [Add the xfstests test suite](https://github.com/asterinas/asterinas/pull/2945)
+* Misc
+    * [Add a generic syscall table](https://github.com/asterinas/asterinas/pull/2819)
+    * [Introduce the kernel parameter framework](https://github.com/asterinas/asterinas/pull/3010)
+
+## Asterinas OSTD & OSDK
+
+We have made the following key changes to OSTD and/or OSDK:
+
+* OSTD
+    * [Replace the `log` crate with OSTD's own logging API](https://github.com/asterinas/asterinas/pull/3080)
+    * [Refactor `Pod` with zerocopy](https://github.com/asterinas/asterinas/pull/2898)
+    * [Refactor the DMA APIs](https://github.com/asterinas/asterinas/pull/2351)
+    * [Add a Memcpy/Memset trait framework for typed memory copies](https://github.com/asterinas/asterinas/pull/3022)
+* Misc
+    * [Add a Docker development environment on ARM (aarch64)](https://github.com/asterinas/asterinas/pull/2691)
+
+## Asterinas Book
+
+We have made the following key changes to the Book:
+
+* [Add coding guidelines](https://github.com/asterinas/asterinas/pull/2974)
+* [Add OSTD soundness analysis](https://github.com/asterinas/asterinas/pull/3042)
+* [Add Kata Containers documentation](https://github.com/asterinas/asterinas/pull/3170)
+* [Add Confidential Containers (CoCo) documentation](https://github.com/asterinas/asterinas/pull/3192)
+
+# Version 0.17.0 (2025-12-17)
+
+This release marks a significant milestone in the evolution of Asterinas as we transition from "just a kernel" to a more complete, usable system. The headline of this release is the introduction of **Asterinas NixOS**, our first distribution that integrates the Asterinas kernel with the NixOS userspace, and enables real applications and services out of the box—including **XFCE**, **Podman**, and **systemd**. To support this growth, we are also strengthening our governance by establishing **the formal RFC (Request for Comments) process**, ensuring that major architectural decisions—starting with Asterinas NixOS itself—are designed transparently and collaboratively.
+
+On the architecture front, **RISC-V support** has improved dramatically, with support for SMP (Symmetric Multiprocessing), FPU (Floating-Point Unit), VirtIO, and the SiFive HiFive Unleashed QEMU machine type. The kernel has also expanded with a new **input subsystem** (supporting keyboards and mice) and initial support for **namespaces and cgroups**. For filesystem developers, the big news is the addition of an **FS event notification mechanism (`inotify`)**, a new **ioctl infrastructure**, and a new filesystem type, **ConfigFS**. Finally, we are introducing **`sctrace`**—a dedicated tool for tracing and debugging syscall compatibility—now published on [crates.io](https://crates.io/crates/sctrace).
+
+## Asterinas NixOS
+
+We have made the following key changes to Asterinas NixOS:
+
+* [Add NixOS as a distribution for Asterinas](https://github.com/asterinas/asterinas/pull/2621)
+* [Add the XFCE Nix module](https://github.com/asterinas/asterinas/pull/2670)
+* [Add the Podman Nix module](https://github.com/asterinas/asterinas/pull/2683)
+* [Enable systemd](https://github.com/asterinas/asterinas/pull/2687)
+* [Add Asterinas NixOS ISO installer](https://github.com/asterinas/asterinas/pull/2652)
+* [Add Cachix as a source for pre-built binaries](https://github.com/asterinas/asterinas/pull/2685)
+* [Add GitHub workflows to publish ISO images](https://github.com/asterinas/asterinas/pull/2743)
+
+## Asterinas Kernel
+
+We have made the following key changes to the Asterinas kernel:
+
+* CPU architectures:
+    * x86
+        * [Add TSM-based attestation support for TDX via ConfigFS](https://github.com/asterinas/asterinas/pull/2505)
+    * RISC-V
+        * [Implement arch-aware vDSO](https://github.com/asterinas/asterinas/pull/2319)
+        * [Add VirtIO support for RISC-V platforms](https://github.com/asterinas/asterinas/pull/2299)
+* Memory management
+    * [Support sealing memfd files](https://github.com/asterinas/asterinas/pull/2408)
+    * [Support executing memfd files and then `open("/proc/self/exe")`](https://github.com/asterinas/asterinas/pull/2521)
+* Process management
+    * [Support `CLONE_PARENT` flag](https://github.com/asterinas/asterinas/pull/2447)
+    * [Support `execve` in multithreaded process](https://github.com/asterinas/asterinas/pull/2459)
+    * [Support `PR_SET`/`GET_SECUREBITS`](https://github.com/asterinas/asterinas/pull/2551)
+    * [Fix some `kill`-related behavior](https://github.com/asterinas/asterinas/pull/2516)
+* IPC
+    * [Add `rt_sigtimedwait` syscall](https://github.com/asterinas/asterinas/pull/2705)
+    * [Enqueue ignored signals if the signals are blocked](https://github.com/asterinas/asterinas/pull/2503)
+    * [Refactor `NamedPipe` to correct its opening and blocking behaviors](https://github.com/asterinas/asterinas/pull/2434)
+    * [Support reopening anonymous pipes from `/proc`](https://github.com/asterinas/asterinas/pull/2694)
+    * [Fix or clarify some futexes bugs](https://github.com/asterinas/asterinas/pull/2515)
+* File systems
+    * VFS
+        * [Add `inotify`-related syscalls](https://github.com/asterinas/asterinas/pull/2083)
+        * [Add new ioctl infrastructure](https://github.com/asterinas/asterinas/pull/2686)
+        * [Add `chmod` and `mkmod` macros](https://github.com/asterinas/asterinas/pull/2440)
+        * [Add `syncfs` syscall](https://github.com/asterinas/asterinas/pull/2682)
+        * [Add `fchmodat2` syscall](https://github.com/asterinas/asterinas/pull/2666)
+        * [Support mount bind with a file](https://github.com/asterinas/asterinas/pull/2418)
+        * [Support `MS_REMOUNT` flag](https://github.com/asterinas/asterinas/pull/2432)
+        * [Ensure that every `FileLike` is associated with a `dyn Inode`](https://github.com/asterinas/asterinas/pull/2555)
+    * Devtmpfs
+        * [Add `/dev/full` device](https://github.com/asterinas/asterinas/pull/2439)
+        * [Support registering char devices](https://github.com/asterinas/asterinas/pull/2598)
+        * [Support registering block device (and their partitions)](https://github.com/asterinas/asterinas/pull/2560)
+    * Procfs
+        * Add [`/proc/cmdline`](https://github.com/asterinas/asterinas/pull/2420), [`/proc/stat`, `/proc/uptime`](https://github.com/asterinas/asterinas/pull/2370), [`/proc/version`](https://github.com/asterinas/asterinas/pull/2679), [`/proc/[pid]/environ`](https://github.com/asterinas/asterinas/pull/2371), [`/proc/[pid]/oom_score_adj`](https://github.com/asterinas/asterinas/pull/2410), [`/proc/[pid]/cmdline`, `/proc/[pid]/mem`](https://github.com/asterinas/asterinas/pull/2449), [`/proc/[pid]/mountinfo`](https://github.com/asterinas/asterinas/pull/2399), [`/proc/[pid]/fdinfo`](https://github.com/asterinas/asterinas/pull/2526), and [`/proc/[pid]/maps`](https://github.com/asterinas/asterinas/pull/2725)
+        * [Support the sleeping and stopping states in `/proc/[pid]/stat`](https://github.com/asterinas/asterinas/pull/2491)
+        * [Introduce `VmPrinter`](https://github.com/asterinas/asterinas/pull/2414) and [refactor procfs with `VmPrinter`](https://github.com/asterinas/asterinas/pull/2583)
+        * [Fix a lot of bugs in procfs](https://github.com/asterinas/asterinas/pull/2553)
+    * Ext2
+        * [Support Ext2 handling of FIFO and devices](https://github.com/asterinas/asterinas/pull/2658)
+        * [Fix Ext2 directory entry iteration](https://github.com/asterinas/asterinas/pull/2624)
+        * [Fix the behavior of syncing BlockGroup metadata in Ext2](https://github.com/asterinas/asterinas/pull/2611)
+        * [Fix some bugs in Ext2 superblock](https://github.com/asterinas/asterinas/pull/2675)
+    * Configfs
+        * [Add basic configfs implementation](https://github.com/asterinas/asterinas/pull/2186)
+* Sockets and networking
+    * [Support UNIX datagram sockets](https://github.com/asterinas/asterinas/pull/2412)
+    * [Add `sendmmsg` syscall](https://github.com/asterinas/asterinas/pull/2676)
+    * [Add `sethostname` and `setdomainname` syscalls](https://github.com/asterinas/asterinas/pull/2442)
+    * [Support `SO_BROADCAST` and `IP_RECVERR`](https://github.com/asterinas/asterinas/pull/2572)
+* Namespace and cgroups
+    * [Add the namespace framework (along with `unshare` and `setns` syscalls)](https://github.com/asterinas/asterinas/pull/2312)
+    * [Add the mount namespace](https://github.com/asterinas/asterinas/pull/2379)
+    * [Support `/proc/[pid]/uid_map` and `/proc/[pid]/gid_map`](https://github.com/asterinas/asterinas/pull/2454)
+    * [Implement controller framework for cgroup subsystem](https://github.com/asterinas/asterinas/pull/2282)
+    * [Enable process management for cgroups](https://github.com/asterinas/asterinas/pull/2160)
+* Devices
+    * Input devices
+        * [Add the input subsystem](https://github.com/asterinas/asterinas/pull/2364)
+        * [Map the I/O memory to the userspace](https://github.com/asterinas/asterinas/pull/2099)
+        * [Add the input devices `/dev/input/eventX`](https://github.com/asterinas/asterinas/pull/2561)
+        * [Add the framebuffer device `/dev/fb0`](https://github.com/asterinas/asterinas/pull/2216)
+        * [Add i8042 mouse](https://github.com/asterinas/asterinas/pull/2479)
+        * [Make i8042 initialization stable on real hardware](https://github.com/asterinas/asterinas/pull/2646)
+    * TTY and PTY
+        * [Add `KDSETMODE`/`KDSKBMODE` ioctls](https://github.com/asterinas/asterinas/pull/2525)
+        * [Fix PTY closing behavior](https://github.com/asterinas/asterinas/pull/2550)
+        * [Make PTY master reads block if no PTY slave is open](https://github.com/asterinas/asterinas/pull/2581)
+        * [Make the semantics of TTY-related devices correct](https://github.com/asterinas/asterinas/pull/2566)
+        * [Support PTY packet mode](https://github.com/asterinas/asterinas/pull/2594)
+* System management
+    * [Add `reboot` syscall](https://github.com/asterinas/asterinas/pull/2552)
+    * [Make `reboot -f` work on real hardware](https://github.com/asterinas/asterinas/pull/2636)
+    * [Support `RUSAGE_CHILDREN` for `getrusage`](https://github.com/asterinas/asterinas/pull/2438)
+* Misc
+    * [Upgrade to Rust 2024 edition and the 20251208 nightly toolchain](https://github.com/asterinas/asterinas/pull/2701)
+    * [Introduce the ASCII art of Asterinas logo in gradient colors](https://github.com/asterinas/asterinas/pull/2427)
+    * [Add stage support for `init_component` macro](https://github.com/asterinas/asterinas/pull/2415)
+    * [Add a new tool called Syscall Compatibility Tracer (`sctrace`)](https://github.com/asterinas/asterinas/pull/2456)
+
+## Asterinas OSTD & OSDK
+
+We have made the following key changes to OSTD and/or OSDK:
+
+* CPU architectures
+    * Common
+        * [Reorganize `ostd::arch::irq`](https://github.com/asterinas/asterinas/pull/2504)
+    * x86
+        * [Better x86 CPU feature detection by rewriting all CPUID-related code](https://github.com/asterinas/asterinas/pull/2395)
+        * [Set `CR0.WP/NE/MP` explicitly to fix AP behavior](https://github.com/asterinas/asterinas/pull/2422)
+        * [Extend cache policies for the x86 Architecture](https://github.com/asterinas/asterinas/pull/2570)
+    * RISC-V
+        * [Add support for RISC-V PLIC](https://github.com/asterinas/asterinas/pull/2106)
+        * [Refactor RISC-V trap handling](https://github.com/asterinas/asterinas/pull/2318)
+        * [Add RISC-V FPU support](https://github.com/asterinas/asterinas/pull/2320)
+        * [Implement fallible memory operations on RISC-V platform](https://github.com/asterinas/asterinas/pull/2462)
+        * [Support bootup on SiFive HiFive Unleashed](https://github.com/asterinas/asterinas/pull/2481)
+        * [RISC-V SMP boot](https://github.com/asterinas/asterinas/pull/2368)
+        * [Full (<=32) RISC-V SMP support](https://github.com/asterinas/asterinas/pull/2547)
+* CPU
+    * [Extract `CpuId` into a dedicated sub-module](https://github.com/asterinas/asterinas/pull/2514)
+* Memory management
+    * [Make `UniqueFrame::repurpose` sound](https://github.com/asterinas/asterinas/pull/2441)
+* Interrupt handling
+    * [Refactor OSTD's `irq` module for improved clarity](https://github.com/asterinas/asterinas/pull/2429)
+* Misc
+    * [Move PCI bus out of OSTD](https://github.com/asterinas/asterinas/pull/2027)
+
+## Asterinas Book
+
+We have made the following key changes to the Book:
+
+* [Add the first RFC: "Establish the RFC process"](https://github.com/asterinas/asterinas/pull/2365)
+* [Add the second RFC: "Asterinas NixOS"](https://github.com/asterinas/asterinas/pull/2584)
+* [Add a new "Limitations on System Calls" section to the book](https://github.com/asterinas/asterinas/pull/2314)
+* [Add the Asterinas NixOS volume](https://github.com/asterinas/asterinas/pull/2750)
+
+# Version 0.16.0 (2025-08-04)
+
+This release introduces initial support for the **LoongArch CPU architecture**, a major milestone for the project. Version 0.16.0 also significantly expands our Linux ABI compatibility with the addition of **nine new system calls** such as `memfd_create` and `pidfd_open`.
+
+Key enhancements include expanded functionality for **UNIX sockets (file descriptor passing and the `SOCK_SEQPACKET` socket type)**, partial support for **netlink sockets of the `NETLINK_KOBJECT_UEVENT` type**, the initial implementation of **CgroupFS**, and a major testing improvement with the integration of system call tests from the **Linux Test Project (LTP)**. We've also adopted **[Nix](https://nix.dev/manual/nix/2.28/introduction)** for building the initramfs, streamlining our cross-compilation and testing workflow.
+
+## Asterinas Kernel
+
+We have made the following key changes to the Asterinas kernel:
+
+* New system calls or features:
+    * Memory:
+        * [Add the `mremap` system call](https://github.com/asterinas/asterinas/pull/2162)
+        * [Add the `msync` system call based on an inefficient implementation](https://github.com/asterinas/asterinas/pull/2154)
+        * [Add the `memfd_create` system call](https://github.com/asterinas/asterinas/pull/2149)
+    * Processes and IPC:
+        * [Add the `pidfd_open` system call along with the `CLONE_PIDFD` flag](https://github.com/asterinas/asterinas/pull/2151)
+    * File systems and I/O in general:
+        * [Add the `close_range` system call](https://github.com/asterinas/asterinas/pull/2128)
+        * [Add the `fadvise64` system call (dummy implementation)](https://github.com/asterinas/asterinas/pull/2125)
+        * [Add the `ioprio_get` and `ioprio_set` system calls (dummy implementation)](https://github.com/asterinas/asterinas/pull/2126)
+        * [Add the `epoll_pwait2` system call](https://github.com/asterinas/asterinas/pull/2123)
+* Enhanced system calls or features:
+    * Processes:
+        * [Add `FUTEX_WAKE_OP` support for the `futex` system call](https://github.com/asterinas/asterinas/pull/2146)
+        * [Add `WSTOPPED` and `WCONTINUED` support to the `wait4` and `waitpid` system calls](https://github.com/asterinas/asterinas/pull/2166)
+        * [Add more fields in `/proc/*/stat` and `/proc/*/status`](https://github.com/asterinas/asterinas/pull/2215)
+    * File systems and I/O in general:
+        * [Add a few more features for the `statx` system call](https://github.com/asterinas/asterinas/pull/2127)
+        * [Fix partial writes and reads in writev and readv](https://github.com/asterinas/asterinas/pull/2230)
+        * [Introduce `FsType` and `FsRegistry`](https://github.com/asterinas/asterinas/pull/2267)
+    * Sockets and network:
+        * [Enable UNIX sockets to send and receive file descriptors](https://github.com/asterinas/asterinas/pull/2176)
+        * [Support `SO_PASSCRED` & `SCM_CREDENTIALS` & `SOCK_SEQPACKET` for UNIX sockets](https://github.com/asterinas/asterinas/pull/2268)
+        * [Add `NETLINK_KOBJECT_UEVENT` support for netlink sockets (a partial implementation)](https://github.com/asterinas/asterinas/pull/2109)
+        * [Support some missing socket options for UNIX stream sockets](https://github.com/asterinas/asterinas/pull/2192)
+        * [Truncate netlink messages when the user-space buffer is full](https://github.com/asterinas/asterinas/pull/2155)
+        * [Fix the networking address reusing behavior (`SO_REUSEADDR`)](https://github.com/asterinas/asterinas/pull/2277)
+    * Security:
+        * [Add basic cgroupfs implementation](https://github.com/asterinas/asterinas/pull/2121)
+* New device support:
+    * [Add basic i8042 keyboard support](https://github.com/asterinas/asterinas/pull/2054)
+* Enhanced device support:
+    * TTY
+        * [Refactor the TTY abstraction to support multiple I/O devices correctly](https://github.com/asterinas/asterinas/pull/2108)
+        * [Enhance the framebuffer console to support ANSI escape sequences](https://github.com/asterinas/asterinas/pull/2210)
+* Test infrastructure:
+    * [Introduce the system call tests from LTP](https://github.com/asterinas/asterinas/pull/2053)
+    * [Use Nix to build initramfs](https://github.com/asterinas/asterinas/pull/2101)
+
+## Asterinas OSTD & OSDK
+
+We have made the following key changes to OSTD:
+
+* CPU architectures:
+    * x86-64:
+        * [Refactor floating-point context management in context switching and signal handling](https://github.com/asterinas/asterinas/pull/2219)
+        * [Use iret instead of sysret if the context is not clean](https://github.com/asterinas/asterinas/pull/2271)
+        * [Don't treat APIC IDs as CPU IDs](https://github.com/asterinas/asterinas/pull/2091)
+        * [Fix some CPUID problems and add support for AMD CPUs](https://github.com/asterinas/asterinas/pull/2273)
+    * RISC-V:
+        * [Add RISC-V timer support](https://github.com/asterinas/asterinas/pull/2044)
+        * [Parse device tree for RISC-V ISA extensions](https://github.com/asterinas/asterinas/pull/2113)
+    * LoongArch:
+        * [Add the initial LoongArch support](https://github.com/asterinas/asterinas/pull/2260)
+* CPU:
+    * [Add support for dynamicall-allocated CPU-local objects](https://github.com/asterinas/asterinas/pull/2036)
+    * [Require `T: Send` for `CpuLocal<T, S>`](https://github.com/asterinas/asterinas/pull/2171)
+* Memory management:
+    * [Adopt a two-phase locking scheme for page tables](https://github.com/asterinas/asterinas/pull/1948)
+* Trap handling:
+    * [Create `IrqChip` abstraction](https://github.com/asterinas/asterinas/pull/2107)
+* Task and scheduling:
+    * [Rewrite the Rust doc of OSTD's scheduling module](https://github.com/asterinas/asterinas/pull/2284)
+    * [Fix the race between enabling IRQs and halting CPU](https://github.com/asterinas/asterinas/pull/2052)
+* Test infrastructure:
+    * [Add CI to check documentation and publish API documentation to a self-host website](https://github.com/asterinas/asterinas/pull/2218)
+
+We have made the following key changes to OSDK:
+
+* [Add OSDK's code coverage feature](https://github.com/asterinas/asterinas/pull/2203)
+* [Support `cargo osdk test` for RISC-V](https://github.com/asterinas/asterinas/pull/2168)
+
+# Before 0.16.0
+
+Release notes were not kept for versions prior to 0.16.0.

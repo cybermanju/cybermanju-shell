@@ -1,0 +1,1411 @@
+diff --git a/kernel/core/comps/pci/src/bus.rs b/kernel/core/comps/pci/src/bus.rs
+--- a/kernel/core/comps/pci/src/bus.rs
++++ b/kernel/core/comps/pci/src/bus.rs
+@@ -64,6 +64,41 @@
+ 
+     pub(crate) fn return_reserved(&mut self, device: PciCommonDevice) {
+         self.common_devices.push_back(device);
++    }
++
++    /// Reserves every physically present function of one slot, or none.
++    /// A missing/unowned enumerated sibling is a hard error. The bus remains
++    /// mutably borrowed for the entire group lifetime; no probing can interleave.
++    /// This read-only operation never stops hardware or clears bus mastering.
++    pub fn reserve_unclaimed_group(
++        &mut self,
++        location: super::PciDeviceLocation,
++    ) -> Result<super::reservation::PciGroupReservation<'_>, ostd::mm::dma::DeviceDmaError> {
++        use ostd::mm::dma::DeviceDmaError;
++        let locations = super::topology::present_slot_functions(location)?;
++        for loc in &locations {
++            if !self.common_devices.iter().any(|d| d.location() == loc) {
++                return Err(DeviceDmaError::InvalidContext);
++            }
++        }
++        let mut devices = Vec::with_capacity(locations.len());
++        for loc in &locations {
++            let index = self
++                .common_devices
++                .iter()
++                .position(|d| d.location() == loc)
++                .unwrap();
++            devices.push(self.common_devices.remove(index).unwrap());
++        }
++        // Recheck presence and BME after taking ownership; rollback the whole
++        // group if configuration changed. Hotplug is deliberately unsupported.
++        if super::topology::present_slot_functions(location).as_ref() != Ok(&locations) {
++            for device in devices {
++                self.return_reserved(device);
++            }
++            return Err(DeviceDmaError::InvalidContext);
++        }
++        Ok(super::reservation::PciGroupReservation::new(self, devices))
+     }
+ 
+     /// Removes an unclaimed function for lifecycle tests that need simultaneous ownership.
+diff --git a/kernel/core/comps/pci/src/reservation.rs b/kernel/core/comps/pci/src/reservation.rs
+--- a/kernel/core/comps/pci/src/reservation.rs
++++ b/kernel/core/comps/pci/src/reservation.rs
+@@ -47,3 +47,49 @@
+         self.bus.return_reserved(self.device.take().unwrap());
+     }
+ }
++
++/// Exclusive ownership of every present function in one conventional PCI slot.
++/// No mutable device escapes this guard. Hotplug/configuration changes are not supported.
++/// Callers must stop every controller before reservation; BME-off alone does not
++/// establish device-specific quiescence or drain already issued transactions.
++pub struct PciGroupReservation<'a> {
++    bus: &'a mut PciBus,
++    devices: alloc::vec::Vec<PciCommonDevice>,
++}
++
++impl<'a> PciGroupReservation<'a> {
++    pub(crate) fn new(bus: &'a mut PciBus, devices: alloc::vec::Vec<PciCommonDevice>) -> Self {
++        Self { bus, devices }
++    }
++
++    /// All owned functions, in increasing function-number order, including zero.
++    pub fn locations(&self) -> impl Iterator<Item = crate::PciDeviceLocation> + '_ {
++        self.devices.iter().map(|device| *device.location())
++    }
++
++    /// Maps one BAR per function transactionally. Any failure drops all earlier
++    /// mappings and restores their command words; the reservation remains owned.
++    /// Functions without a usable selected MMIO BAR are conservatively rejected.
++    pub fn prepare_mmio(
++        &mut self,
++        bar_indices: &[u8],
++    ) -> Result<crate::mmio::PciGroupMmioGuard<'_>, crate::mmio::MmioPrepareError> {
++        use crate::mmio::{MmioPrepareError, PciGroupMmioGuard, PciMmioGuard};
++        if bar_indices.len() != self.devices.len() {
++            return Err(MmioPrepareError::Mapping(ostd::Error::InvalidArgs));
++        }
++        let mut guards = alloc::vec::Vec::with_capacity(self.devices.len());
++        for (device, index) in self.devices.iter_mut().zip(bar_indices) {
++            guards.push(PciMmioGuard::prepare(device, *index)?);
++        }
++        Ok(PciGroupMmioGuard::new(guards))
++    }
++}
++
++impl Drop for PciGroupReservation<'_> {
++    fn drop(&mut self) {
++        for device in self.devices.drain(..) {
++            self.bus.return_reserved(device);
++        }
++    }
++}
+diff --git a/kernel/core/comps/pci/src/mmio.rs b/kernel/core/comps/pci/src/mmio.rs
+--- a/kernel/core/comps/pci/src/mmio.rs
++++ b/kernel/core/comps/pci/src/mmio.rs
+@@ -287,3 +287,36 @@
+         );
+     }
+ }
++
++/// All prepared MMIO functions borrowed from an exclusive slot reservation.
++/// This does not enable interrupts/BME or imply that any controller is initialized.
++pub struct PciGroupMmioGuard<'a> {
++    functions: alloc::vec::Vec<PciMmioGuard<'a>>,
++}
++
++impl<'a> PciGroupMmioGuard<'a> {
++    pub(crate) fn new(functions: alloc::vec::Vec<PciMmioGuard<'a>>) -> Self {
++        Self { functions }
++    }
++
++    /// The prepared function at its index in the reservation's ordered list.
++    pub fn function(&self, index: usize) -> Option<&PciMmioGuard<'a>> {
++        self.functions.get(index)
++    }
++
++    pub(crate) fn locations(&self) -> alloc::vec::Vec<crate::PciDeviceLocation> {
++        self.functions.iter().map(PciMmioGuard::location).collect()
++    }
++
++    /// Binds all owned functions to a single shared isolated translation domain.
++    /// Every function must be quiescent, BME-off and remain so until mappings
++    /// are ready. Internal function-to-function routing is inside this ownership
++    /// boundary, not an isolation boundary. Route changes/hotplug are unsupported.
++    #[cfg(target_arch = "x86_64")]
++    pub fn isolated_dma_context(
++        &self,
++        mask: ostd::mm::dma::DmaMask,
++    ) -> Result<crate::dma::PciIsolatedDmaGroupContext<'_>, ostd::mm::dma::DeviceDmaError> {
++        crate::dma::PciIsolatedDmaGroupContext::new(self, mask)
++    }
++}
+diff --git a/kernel/core/comps/pci/src/topology.rs b/kernel/core/comps/pci/src/topology.rs
+--- a/kernel/core/comps/pci/src/topology.rs
++++ b/kernel/core/comps/pci/src/topology.rs
+@@ -1,8 +1,8 @@
+ // SPDX-License-Identifier: MPL-2.0
+ //! Read-only, fail-closed PCI requester/topology admission for isolated DMA.
+ //!
+-//! Supported PCIe topology is intentionally limited to one segment-zero type-0
+-//! endpoint at device/function 0/0 immediately below one genuine PCIe root port
++//! Supported PCIe topology is intentionally limited to segment-zero type-0
++//! endpoints in slot zero immediately below one genuine PCIe root port
+ //! on bus zero. Switches, nested bridges, ambiguous bus ranges, ARI/SR-IOV and
+ //! device translation services are not admitted. This module never writes config.
+ use ostd::mm::dma::DeviceDmaError;
+@@ -30,6 +30,71 @@
+ /// `Some(path)` is a PCIe root-port-to-endpoint path whose elements are
+ /// `(device, function)` and are passed unchanged to the IOMMU domain constructor.
+ pub(crate) fn admit(location: PciDeviceLocation) -> Result<Option<[(u8, u8); 2]>, DeviceDmaError> {
++    admit_function(location, false)
++}
++
++/// Enumerates all eight function numbers, independent of the multifunction bit.
++/// Presence, header and BME checks are read-only; this is not device shutdown.
++pub(crate) fn present_slot_functions(
++    location: PciDeviceLocation,
++) -> Result<alloc::vec::Vec<PciDeviceLocation>, DeviceDmaError> {
++    if location.device > 31 || location.function != 0 || read_u16(location, 0)? == 0xffff {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    let mut present = alloc::vec::Vec::new();
++    for function in 0..=7 {
++        let loc = PciDeviceLocation {
++            function,
++            ..location
++        };
++        if read_u16(loc, 0)? == 0xffff {
++            continue;
++        }
++        if read_u8(loc, 0x0e)? & 0x7f != 0 || read_u8(loc, 0x0b)? == PCI_CLASS_BRIDGE {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++        if read_u16(loc, 4)? & crate::cfg_space::Command::BUS_MASTER.bits() != 0 {
++            return Err(DeviceDmaError::InvalidContext);
++        }
++        present.push(loc);
++    }
++    if present.len() > 1 && read_u8(location, 0x0e)? & PCI_HEADER_MULTIFUNCTION == 0 {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    Ok(present)
++}
++
++/// The owner supplies the complete, exclusively reserved slot, not a subset.
++/// Each function independently passes PCIe/ACS validation. Internal peer routing
++/// is permitted only because all functions share one domain and one owner.
++pub(crate) fn admit_group(
++    locations: &[PciDeviceLocation],
++) -> Result<alloc::vec::Vec<[(u8, u8); 2]>, DeviceDmaError> {
++    let first = *locations.first().ok_or(DeviceDmaError::InvalidRequester)?;
++    if present_slot_functions(first)?.as_slice() != locations {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    let mut routes = alloc::vec::Vec::with_capacity(locations.len());
++    for loc in locations {
++        let route = admit_function(*loc, true)?.ok_or(DeviceDmaError::UnsupportedPlatform)?;
++        if routes
++            .first()
++            .is_some_and(|previous: &[(u8, u8); 2]| previous[0] != route[0])
++        {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        routes.push(route);
++    }
++    if present_slot_functions(first)?.as_slice() != locations {
++        return Err(DeviceDmaError::InvalidContext);
++    }
++    Ok(routes)
++}
++
++fn admit_function(
++    location: PciDeviceLocation,
++    grouped: bool,
++) -> Result<Option<[(u8, u8); 2]>, DeviceDmaError> {
+     if read_u16(location, 0)? == 0xffff {
+         return Err(DeviceDmaError::InvalidRequester);
+     }
+@@ -41,19 +106,21 @@
+     }
+ 
+     let header = read_u8(location, 0x0e)?;
+-    if header & 0x7f != 0 || location.function != 0 {
++    if header & 0x7f != 0 || (!grouped && location.function != 0) {
+         return Err(DeviceDmaError::UnsupportedPlatform);
+     }
+     if read_u8(location, 0x0b)? == PCI_CLASS_BRIDGE {
+         return Err(DeviceDmaError::UnsupportedPlatform);
+     }
+-    reject_function_aliases(location)?;
++    if !grouped {
++        reject_function_aliases(location)?;
++    }
+ 
+     let pcie_cap = conventional_pcie_capability(location)?;
+     match pcie_cap {
+         None => {
+             // Preserve only the existing conventional EDU-like root-bus case.
+-            if location.bus != 0 {
++            if location.bus != 0 || grouped {
+                 return Err(DeviceDmaError::UnsupportedPlatform);
+             }
+             // Legacy CF8/CFC systems cannot address extended configuration
+@@ -83,7 +150,9 @@
+             }
+             let pcie_header = read_u16(location, cap + 2)?;
+             let port_type = ((pcie_header >> 4) & 0xf) as u8;
+-            if port_type != PCI_EXP_TYPE_ENDPOINT || location.device != 0 || location.function != 0
++            if port_type != PCI_EXP_TYPE_ENDPOINT
++                || location.device != 0
++                || (!grouped && location.function != 0)
+             {
+                 // Reject legacy endpoints, integrated endpoints, root complexes,
+                 // multifunction-like aliases, and all bridge/device port types.
+@@ -328,19 +397,21 @@
+     {
+         return Err(DeviceDmaError::InvalidContext);
+     }
+-    // The endpoint bus may contain peers, but it must not contain another bridge
+-    // that could create a nested/ambiguous forwarding route.
++    // No unowned downstream slots or bridge aliases. Probe all functions even
++    // when function zero is absent or omits its multifunction header bit.
+     for device in 0..=31 {
+-        let fn0 = PciDeviceLocation {
+-            bus: endpoint.bus,
+-            device,
+-            function: 0,
+-        };
+-        if read_u16(fn0, 0)? == 0xffff {
+-            continue;
+-        }
+-        if device != 0 || read_u8(fn0, 0x0b)? == PCI_CLASS_BRIDGE {
+-            return Err(DeviceDmaError::UnsupportedPlatform);
++        for function in 0..=7 {
++            let loc = PciDeviceLocation {
++                bus: endpoint.bus,
++                device,
++                function,
++            };
++            if read_u16(loc, 0)? == 0xffff {
++                continue;
++            }
++            if device != 0 || read_u8(loc, 0x0b)? == PCI_CLASS_BRIDGE {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
+         }
+     }
+     Ok(Some([
+diff --git a/kernel/core/comps/pci/src/dma.rs b/kernel/core/comps/pci/src/dma.rs
+--- a/kernel/core/comps/pci/src/dma.rs
++++ b/kernel/core/comps/pci/src/dma.rs
+@@ -107,3 +107,53 @@
+         self.inner.domain_id()
+     }
+ }
++
++/// A single isolated domain shared by all exclusively owned functions of a slot.
++/// No sibling may be independently probed while this context or a buffer lives.
++/// This does not establish isolation *between* functions in the group.
++#[cfg(target_arch = "x86_64")]
++pub struct PciIsolatedDmaGroupContext<'a> {
++    inner: IsolatedDmaContext,
++    requesters: alloc::vec::Vec<PciDmaRequester>,
++    _owner: PhantomData<&'a ()>,
++}
++
++#[cfg(target_arch = "x86_64")]
++impl<'a> PciIsolatedDmaGroupContext<'a> {
++    pub(crate) fn new(
++        owner: &'a crate::mmio::PciGroupMmioGuard<'_>,
++        mask: DmaMask,
++    ) -> Result<Self, DeviceDmaError> {
++        let locations = owner.locations();
++        let routes = crate::topology::admit_group(&locations)?;
++        let mut members = alloc::vec::Vec::with_capacity(locations.len());
++        let mut requesters = alloc::vec::Vec::with_capacity(locations.len());
++        for (loc, path) in locations.iter().zip(routes) {
++            let requester = PciDmaRequester::new(0, loc.bus, loc.device, loc.function)?;
++            members.push((requester, path));
++            requesters.push(requester);
++        }
++        let inner = IsolatedDmaContext::new_group_with_paths(&members, mask)?;
++        // A config change during publication invalidates admission. Drop detaches
++        // every member transactionally; no function was enabled in this path.
++        crate::topology::admit_group(&locations)?;
++        Ok(Self {
++            inner,
++            requesters,
++            _owner: PhantomData,
++        })
++    }
++
++    /// All real requester identities attached to this one hardware domain.
++    pub fn requesters(&self) -> &[PciDmaRequester] {
++        &self.requesters
++    }
++    /// Shared hardware domain identifier (not one domain per function).
++    pub fn domain_id(&self) -> u16 {
++        self.inner.domain_id()
++    }
++    /// Allocate coherent owned memory visible to every function of this group.
++    pub fn alloc_coherent(&self, nframes: usize) -> Result<IsolatedDmaBuffer<'_>, DeviceDmaError> {
++        self.inner.alloc_coherent(nframes)
++    }
++}
+diff --git a/kernel/core/comps/pci/src/lib.rs b/kernel/core/comps/pci/src/lib.rs
+--- a/kernel/core/comps/pci/src/lib.rs
++++ b/kernel/core/comps/pci/src/lib.rs
+@@ -79,6 +79,8 @@
+ #[cfg(ktest)]
+ mod pcie_tests;
+ pub mod mmio;
++#[cfg(ktest)]
++mod multifunction_tests;
+ mod topology;
+ pub mod reservation;
+ 
+diff --git a/kernel/core/comps/pci/src/multifunction_tests.rs b/kernel/core/comps/pci/src/multifunction_tests.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/multifunction_tests.rs
+@@ -0,0 +1,539 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Real QEMU multifunction PCIe/NVMe tests. This is not NVIDIA/GPU validation.
++use core::sync::atomic::{Ordering, fence};
++
++#[cfg(target_arch = "x86_64")]
++use ostd::mm::dma::IsolatedDmaContext;
++use ostd::{
++    mm::{
++        HasDaddr, PAGE_SIZE, VmIo, VmIoOnce,
++        dma::{DeviceDmaError, DmaMask},
++    },
++    prelude::ktest,
++};
++
++use crate::{
++    PCI_BUS, PciDeviceLocation,
++    cfg_space::{Bar, Command},
++    pcie_tests::init_pci_for_tests,
++};
++
++const NVME_VENDOR: u16 = 0x1b36;
++const CONTROLLER_MODEL: &[u8] = b"QEMU NVMe Ctrl";
++
++// Only this fixture programs ACS. Production requires it already configured.
++struct AcsFixture {
++    port: PciDeviceLocation,
++    control_offset: u16,
++    original: u16,
++}
++
++impl AcsFixture {
++    fn enable(port: PciDeviceLocation) -> Self {
++        let mut at = 0x100u16;
++        let mut visited = [false; 1024];
++        loop {
++            assert!((0x100..=0xffc).contains(&at) && at & 3 == 0);
++            assert!(!visited[at as usize / 4]);
++            visited[at as usize / 4] = true;
++            let header = crate::arch::read32(&port, u32::from(at)).unwrap();
++            assert_ne!(header, 0, "root port must genuinely support ACS");
++            assert_ne!(header, u32::MAX);
++            if header as u16 == 0x0d {
++                assert_eq!(port.read16(at + 4) & 0x1d, 0x1d);
++                let original = port.read16(at + 6);
++                port.write16(at + 6, original | 0x1d);
++                assert_eq!(port.read16(at + 6) & 0x1d, 0x1d);
++                return Self {
++                    port,
++                    control_offset: at + 6,
++                    original,
++                };
++            }
++            at = (header >> 20) as u16;
++        }
++    }
++}
++
++impl Drop for AcsFixture {
++    fn drop(&mut self) {
++        self.port.write16(self.control_offset, self.original);
++    }
++}
++
++fn function(bus: u8, device: u8, function: u8) -> PciDeviceLocation {
++    PciDeviceLocation {
++        bus,
++        device,
++        function,
++    }
++}
++
++fn quiesce_qemu_nvme_for_test(bus: &mut crate::bus::PciBus, loc: PciDeviceLocation) {
++    let mut device = bus
++        .test_take_unclaimed(loc)
++        .expect("own real NVMe function before stop");
++    assert_eq!(device.device_id().vendor_id, NVME_VENDOR);
++    assert_eq!(device.device_id().class, 1);
++    assert_eq!(device.device_id().subclass, 8);
++    let command = loc.read16(4);
++    assert_ne!(
++        command & Command::MEMORY_SPACE.bits(),
++        0,
++        "firmware must decode NVMe BAR"
++    );
++    let Bar::Memory(bar) = device.bar_manager_mut().bar_mut(0).unwrap() else {
++        panic!("NVMe BAR0 must be memory");
++    };
++    let registers = bar.acquire_owned().expect("test-only NVMe stop mapping");
++
++    // Firmware may leave BME on. Reset the actual controller and wait until it
++    // stops before disabling BME; clearing BME alone is not DMA quiescence.
++    registers.write_once(0x14, &0u32).unwrap();
++    let mut stopped = false;
++    for _ in 0..20_000_000 {
++        let status: u32 = registers.read_once(0x1c).unwrap();
++        if status & 1 == 0 {
++            stopped = true;
++            break;
++        }
++        core::hint::spin_loop();
++    }
++    assert!(
++        stopped,
++        "firmware NVMe function did not stop; no group DMA context created"
++    );
++    device.write_command_raw(command & !Command::BUS_MASTER.bits());
++    assert_eq!(loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++    drop(registers);
++    bus.return_reserved(device);
++}
++
++fn wait(regs: &crate::mmio::PciMmioGuard<'_>, offset: usize, mask: u32, value: u32) -> bool {
++    for _ in 0..20_000_000 {
++        if regs.read32(offset).expect("NVMe MMIO poll") & mask == value {
++            return true;
++        }
++        core::hint::spin_loop();
++    }
++    false
++}
++
++/// Run a real Identify Controller command and return the shared domain for the
++/// next function. If completion or shutdown times out, leak the buffers and
++/// context: the device may still be DMA-capable, so reclaiming RAM is unsafe.
++fn identify_with_shared_context<'a>(
++    regs: &crate::mmio::PciMmioGuard<'_>,
++    loc: PciDeviceLocation,
++    expected_serial: &[u8],
++    context: crate::dma::PciIsolatedDmaGroupContext<'a>,
++) -> crate::dma::PciIsolatedDmaGroupContext<'a> {
++    let sq = context.alloc_coherent(1).expect("private NVMe admin SQ");
++    let cq = context.alloc_coherent(1).expect("private NVMe admin CQ");
++    let identify = context
++        .alloc_coherent(1)
++        .expect("private NVMe Identify page");
++    assert_ne!(sq.daddr(), cq.daddr());
++    assert_ne!(sq.daddr(), identify.daddr());
++    assert_ne!(cq.daddr(), identify.daddr());
++
++    assert_eq!(
++        regs.read32(0x14).unwrap() & 1,
++        0,
++        "controller starts disabled"
++    );
++    let cap = u64::from(regs.read32(0).unwrap()) | (u64::from(regs.read32(4).unwrap()) << 32);
++    assert!(
++        cap & 0xffff >= 7,
++        "controller must support 8-entry admin queues"
++    );
++    assert_eq!(
++        (cap >> 48) & 15,
++        0,
++        "4096-byte minimum memory page required"
++    );
++    assert_ne!(cap & (1 << 37), 0, "NVM command set required");
++
++    let mut command = [0u8; 64];
++    command[0] = 6; // Identify
++    command[2..4].copy_from_slice(&1u16.to_le_bytes()); // CID
++    command[24..32].copy_from_slice(&(identify.daddr() as u64).to_le_bytes());
++    command[40..44].copy_from_slice(&1u32.to_le_bytes()); // CNS=Identify Controller
++    sq.write_bytes(0, &command).unwrap();
++    regs.test_write32(0x24, (7 << 16) | 7).unwrap(); // AQA
++    regs.test_write64(0x28, sq.daddr() as u64).unwrap(); // ASQ
++    regs.test_write64(0x30, cq.daddr() as u64).unwrap(); // ACQ
++
++    let prepared_command = loc.read16(4);
++    assert_eq!(prepared_command & Command::BUS_MASTER.bits(), 0);
++    loc.write32(4, u32::from(prepared_command | Command::BUS_MASTER.bits()));
++    regs.test_write32(0x14, (6 << 16) | (4 << 20) | 1).unwrap(); // CC: IOSQES=6, IOCQES=4, EN
++    let mut success = wait(regs, 0x1c, 3, 1);
++    let mut completion = [0u8; 16];
++    if success {
++        fence(Ordering::SeqCst);
++        regs.test_write32(0x1000, 1).unwrap(); // Admin SQ tail
++        success = false;
++        for _ in 0..20_000_000 {
++            cq.read_bytes(0, &mut completion).unwrap();
++            if completion[14] & 1 != 0 {
++                success = true;
++                break;
++            }
++            core::hint::spin_loop();
++        }
++    }
++    fence(Ordering::SeqCst);
++
++    // Stop the controller before clearing BME and before releasing any DMA RAM.
++    regs.test_write32(0x14, 0).unwrap();
++    let stopped = wait(regs, 0x1c, 1, 0);
++    loc.write32(4, u32::from(prepared_command));
++    if !success || !stopped {
++        core::mem::forget(sq);
++        core::mem::forget(cq);
++        core::mem::forget(identify);
++        core::mem::forget(context);
++        panic!(
++            "multifunction NVMe timeout; DMA storage/domain quarantined; completed={success} stopped={stopped}"
++        );
++    }
++
++    assert_eq!(loc.read16(4), prepared_command);
++    assert_eq!(
++        u16::from_le_bytes(completion[12..14].try_into().unwrap()),
++        1,
++        "real CID"
++    );
++    assert_eq!(
++        u16::from_le_bytes(completion[14..16].try_into().unwrap()),
++        1,
++        "real success status/phase"
++    );
++    assert_eq!(
++        u16::from_le_bytes(completion[8..10].try_into().unwrap()),
++        1,
++        "SQ head"
++    );
++    assert_eq!(
++        u16::from_le_bytes(completion[10..12].try_into().unwrap()),
++        0,
++        "admin SQ ID"
++    );
++    let mut data = [0u8; PAGE_SIZE];
++    identify.read_bytes(0, &mut data).unwrap();
++    assert_eq!(
++        u16::from_le_bytes(data[..2].try_into().unwrap()),
++        NVME_VENDOR
++    );
++    assert!(
++        data[4..24].starts_with(expected_serial),
++        "actual controller serial"
++    );
++    assert!(
++        data[24..64].starts_with(CONTROLLER_MODEL),
++        "actual controller model"
++    );
++
++    drop(identify);
++    drop(cq);
++    drop(sq);
++    context
++}
++
++#[ktest]
++fn qemu_multifunction_nvme_group_reservation_and_shared_dma() {
++    init_pci_for_tests();
++    let mut bus = PCI_BUS.lock();
++    let root_port = function(0, 10, 0);
++    let _group_acs = AcsFixture::enable(root_port);
++    assert_ne!(
++        root_port.read16(0),
++        0xffff,
++        "real QEMU multifunction root port required"
++    );
++    assert_eq!(root_port.read8(0x0b), 6);
++    assert_eq!(root_port.read8(0x0a), 4);
++    assert_eq!(root_port.read8(0x0e) & 0x7f, 1);
++    let downstream_bus = root_port.read8(0x19);
++    assert_ne!(downstream_bus, 0, "root port must route to a secondary bus");
++    let fn0 = function(downstream_bus, 0, 0);
++    let fn1 = function(downstream_bus, 0, 1);
++    assert_ne!(fn0.read16(0), 0xffff, "real NVMe function zero required");
++    assert_ne!(fn1.read16(0), 0xffff, "real NVMe function one required");
++    assert_eq!(fn0.read16(0), NVME_VENDOR);
++    assert_eq!(fn1.read16(0), NVME_VENDOR);
++    assert_ne!(
++        fn0.read8(0x0e) & 0x80,
++        0,
++        "QEMU function zero must advertise multifunction"
++    );
++    assert_eq!(
++        fn1.read8(0x0e) & 0x7f,
++        0,
++        "function one must be an endpoint"
++    );
++
++    // Firmware is permitted to leave either NVMe controller active. Establish
++    // device-specific quiescence first, then exercise the production ownership API.
++    quiesce_qemu_nvme_for_test(&mut bus, fn0);
++    quiesce_qemu_nvme_for_test(&mut bus, fn1);
++    assert_eq!(fn0.read16(4) & Command::BUS_MASTER.bits(), 0);
++    assert_eq!(fn1.read16(4) & Command::BUS_MASTER.bits(), 0);
++
++    // A genuine conventional-PCI EDU sibling must not be admitted as PCIe just
++    // because function zero is a PCIe NVMe endpoint. Keep EDU idle with BME off.
++    let bad_root_port = function(0, 11, 0);
++    assert_ne!(
++        bad_root_port.read16(0),
++        0xffff,
++        "real bad-group root port required"
++    );
++    assert_eq!(bad_root_port.read16(0), root_port.read16(0));
++    assert_eq!(bad_root_port.read16(2), root_port.read16(2));
++    assert_eq!(bad_root_port.read8(0x0b), 6);
++    assert_eq!(bad_root_port.read8(0x0a), 4);
++    assert_eq!(bad_root_port.read8(0x0e) & 0x7f, 1);
++    let _bad_group_acs = AcsFixture::enable(bad_root_port);
++    let bad_downstream_bus = bad_root_port.read8(0x19);
++    assert_ne!(bad_downstream_bus, 0);
++    let bad_fn0 = function(bad_downstream_bus, 0, 0);
++    let bad_fn1 = function(bad_downstream_bus, 0, 1);
++    assert_eq!(bad_fn0.read16(0), NVME_VENDOR);
++    assert_eq!(bad_fn0.read16(2), fn0.read16(2));
++    assert_eq!(bad_fn1.read16(0), 0x1234, "genuine QEMU EDU vendor");
++    assert_eq!(bad_fn1.read16(2), 0x11e8, "genuine QEMU EDU device");
++    assert_ne!(
++        bad_fn0.read8(0x0e) & 0x80,
++        0,
++        "NVMe function zero is multifunction"
++    );
++    assert_eq!(
++        bad_fn1.read8(0x0e) & 0x7f,
++        0,
++        "EDU function one is an endpoint"
++    );
++    quiesce_qemu_nvme_for_test(&mut bus, bad_fn0);
++    assert_eq!(
++        bad_fn1.read16(4) & Command::BUS_MASTER.bits(),
++        0,
++        "idle EDU BME off"
++    );
++    assert!(
++        matches!(
++            crate::topology::admit_group(&[bad_fn0]),
++            Err(DeviceDmaError::InvalidRequester)
++        ),
++        "same-slot incomplete group rejected while real function one is present"
++    );
++    assert!(
++        matches!(
++            crate::topology::admit_group(&[bad_fn0, bad_fn1]),
++            Err(DeviceDmaError::UnsupportedPlatform)
++        ),
++        "complete group rejected because the genuine EDU sibling lacks PCIe"
++    );
++    {
++        let mut bad_group = bus
++            .reserve_unclaimed_group(bad_fn0)
++            .expect("reserve NVMe and actual EDU sibling together");
++        let locations: alloc::vec::Vec<_> = bad_group.locations().collect();
++        assert_eq!(locations.as_slice(), &[bad_fn0, bad_fn1]);
++        assert_eq!(bad_fn0.read16(4) & Command::BUS_MASTER.bits(), 0);
++        assert_eq!(bad_fn1.read16(4) & Command::BUS_MASTER.bits(), 0);
++        let bad_mmio = bad_group
++            .prepare_mmio(&[0, 0])
++            .expect("map BAR0 of real NVMe and EDU functions");
++        assert!(bad_mmio.function(0).is_some());
++        assert!(bad_mmio.function(1).is_some());
++        assert!(
++            matches!(
++                bad_mmio.isolated_dma_context(DmaMask::new(32).unwrap()),
++                Err(DeviceDmaError::UnsupportedPlatform)
++            ),
++            "conventional PCI EDU sibling must fail closed as unsupported"
++        );
++        drop(bad_mmio);
++    }
++    ostd::early_println!(
++        "PCI multifunction unsupported sibling correctly rejected: real conventional PCI EDU function one lacks PCIe"
++    );
++
++    // All physically present siblings must be available before reservation.
++    let missing = bus
++        .test_take_unclaimed(fn1)
++        .expect("unowned sibling fixture");
++    assert!(bus.reserve_unclaimed_group(fn0).is_err());
++    bus.return_reserved(missing);
++
++    // A live BME bit on one sibling rejects the whole group and is never
++    // cleared by production code; the fixture clears it only after observing it.
++    fn1.write32(4, u32::from(fn1.read16(4) | Command::BUS_MASTER.bits()));
++    let active_command = fn1.read16(4);
++    assert_ne!(active_command & Command::BUS_MASTER.bits(), 0);
++    assert!(
++        bus.reserve_unclaimed_group(fn0).is_err(),
++        "active sibling must reject group"
++    );
++    assert_eq!(
++        fn1.read16(4) & Command::BUS_MASTER.bits(),
++        Command::BUS_MASTER.bits()
++    );
++    fn1.write32(4, u32::from(active_command & !Command::BUS_MASTER.bits()));
++
++    // Repeated whole-slot ownership cycles must return both functions without
++    // probing or leaving the slot partially reserved.
++    for _ in 0..2 {
++        let group = bus
++            .reserve_unclaimed_group(fn0)
++            .expect("repeat full-slot reservation");
++        let locations: alloc::vec::Vec<_> = group.locations().collect();
++        assert_eq!(locations.as_slice(), &[fn0, fn1]);
++        drop(group);
++    }
++
++    // The one-function path cannot silently collapse a multifunction slot into
++    // one requester/domain. This is tested before taking the whole group.
++    {
++        let mut one = bus
++            .reserve_unclaimed(fn0)
++            .expect("reserve function zero for negative case");
++        let regs = one
++            .prepare_mmio(0)
++            .expect("prepare real NVMe function zero");
++        assert!(
++            regs.isolated_dma_context(DmaMask::new(32).unwrap())
++                .is_err(),
++            "single-function isolated DMA must reject a multifunction slot"
++        );
++        assert_eq!(fn0.read16(4) & Command::BUS_MASTER.bits(), 0);
++    }
++
++    {
++        let mut group = bus
++            .reserve_unclaimed_group(fn0)
++            .expect("reserve every present slot function");
++        let locations: alloc::vec::Vec<_> = group.locations().collect();
++        assert_eq!(
++            locations.as_slice(),
++            &[fn0, fn1],
++            "complete ordered function set"
++        );
++        for loc in [fn0, fn1] {
++            assert_eq!(
++                loc.read16(4) & Command::BUS_MASTER.bits(),
++                0,
++                "all group BMEs off"
++            );
++        }
++
++        let before = [fn0.read16(4), fn1.read16(4)];
++        assert!(
++            group.prepare_mmio(&[0, 6]).is_err(),
++            "invalid sibling BAR must fail transactionally"
++        );
++        assert_eq!(
++            [fn0.read16(4), fn1.read16(4)],
++            before,
++            "failed mapping restores both command words"
++        );
++
++        let mmio = group
++            .prepare_mmio(&[0, 0])
++            .expect("prepare both genuine NVMe BARs");
++        for (index, loc) in [fn0, fn1].into_iter().enumerate() {
++            assert_eq!(loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++            assert!(mmio.function(index).is_some());
++        }
++        assert!(mmio.function(2).is_none());
++
++        crate::topology::admit_group(&locations)
++            .expect("every real NVMe function must pass the trusted ACS route");
++        let direct_platform = mmio
++            .function(0)
++            .unwrap()
++            .dma_context(DmaMask::new(32).unwrap())
++            .is_ok();
++        let context = match mmio.isolated_dma_context(DmaMask::new(32).unwrap()) {
++            Ok(context) => context,
++            Err(DeviceDmaError::UnsupportedPlatform) if direct_platform => {
++                drop(mmio);
++                drop(group);
++                ostd::early_println!(
++                    "PCI multifunction group correctly rejected without IOMMU; no group DMA issued"
++                );
++                ostd::early_println!(
++                    "PCI multifunction group reservation passed: missing sibling, active BME preserved, invalid-BAR rollback, and single-function rejection verified"
++                );
++                return;
++            }
++            Err(error) => panic!("trusted multifunction group isolated context failed: {error:?}"),
++        };
++        assert_eq!(
++            context.requesters().len(),
++            2,
++            "one requester for each real function"
++        );
++        for (requester, expected_function) in context.requesters().iter().zip([0, 1]) {
++            assert_eq!(requester.segment(), 0);
++            assert_eq!(requester.bus(), downstream_bus);
++            assert_eq!(requester.device(), 0);
++            assert_eq!(requester.function(), expected_function);
++        }
++        let mut context = Some(context);
++        let mut domain_id = None;
++        for _ in 0..2 {
++            let context = match context.take() {
++                Some(context) => context,
++                None => mmio
++                    .isolated_dma_context(DmaMask::new(32).unwrap())
++                    .expect("reacquire complete NVMe requester group"),
++            };
++            assert_eq!(context.requesters().len(), 2);
++            let current_domain = context.domain_id();
++            assert_ne!(current_domain, 0, "real shared IOMMU domain ID");
++            if let Some(previous_domain) = domain_id {
++                assert_eq!(
++                    current_domain, previous_domain,
++                    "domain ID reclaimed after drop"
++                );
++            }
++            domain_id = Some(current_domain);
++
++            // A raw OSTD attempt with the identical live requesters and reviewed
++            // routes must collide with the complete reservation, not just fn0.
++            let routes = crate::topology::admit_group(&locations)
++                .expect("live group retains both validated PCIe routes");
++            let raw_members: alloc::vec::Vec<_> =
++                context.requesters().iter().copied().zip(routes).collect();
++            assert!(
++                matches!(
++                    IsolatedDmaContext::new_group_with_paths(
++                        &raw_members,
++                        DmaMask::new(32).unwrap()
++                    ),
++                    Err(DeviceDmaError::DomainBusy)
++                ),
++                "raw OSTD constructor must observe every live group requester"
++            );
++
++            let regs0 = mmio.function(0).unwrap();
++            let context = identify_with_shared_context(regs0, fn0, b"ASTER-GROUP-F0", context);
++            let regs1 = mmio.function(1).unwrap();
++            let context = identify_with_shared_context(regs1, fn1, b"ASTER-GROUP-F1", context);
++            assert_eq!(context.domain_id(), current_domain);
++            assert_eq!(fn0.read16(4) & Command::BUS_MASTER.bits(), 0);
++            assert_eq!(fn1.read16(4) & Command::BUS_MASTER.bits(), 0);
++            drop(context);
++        }
++        drop(mmio);
++        drop(group);
++    }
++
++    ostd::early_println!(
++        "PCI multifunction group reservation passed: missing sibling, active BME preserved, invalid-BAR rollback, and single-function rejection verified"
++    );
++    ostd::early_println!(
++        "PCI multifunction isolated DMA passed: two real NVMe functions, shared requester domain, actual Identify CID/status/vendor/serial/model verified; both controllers stopped and BME off"
++    );
++}
+diff --git a/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs b/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
+--- a/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
++++ b/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
+@@ -1,8 +1,9 @@
+ // SPDX-License-Identifier: MPL-2.0
+-//! Bounded legacy VT-d domains. Only segment-zero root-bus, non-PCIe endpoints
+-//! are admitted by the PCI owner. No ATS, PASID, bridges, RMRR or hot unplug.
++//! Bounded legacy VT-d translation domains, including shared multifunction groups.
++//! The PCI owner authenticates segment-zero routes and exclusive slot ownership;
++//! firmware policy authorizes every requester. No ATS/PASID, RMRR or hot unplug.
+ //! Table pages remain owned until context/IOTLB invalidation has completed.
+-use alloc::collections::BTreeMap;
++use alloc::{collections::BTreeMap, vec::Vec};
+ use core::sync::atomic::{Ordering, fence};
+ 
+ use spin::Once;
+@@ -26,7 +27,8 @@
+     next_iova: usize,
+ }
+ struct Domains {
+-    devices: BTreeMap<PciDeviceLocation, Domain>,
++    groups: BTreeMap<PciDeviceLocation, Domain>,
++    members: BTreeMap<PciDeviceLocation, PciDeviceLocation>,
+     ids: u16,
+     poisoned: bool,
+ }
+@@ -34,6 +36,7 @@
+ 
+ pub(crate) struct DomainHandle {
+     location: PciDeviceLocation,
++    members: Vec<PciDeviceLocation>,
+     did: u16,
+ }
+ 
+@@ -95,18 +98,30 @@
+     /// The PCI caller must establish that this exact route belongs to the
+     /// exclusively owned, quiescent endpoint before invoking this constructor.
+     pub(crate) fn new_with_path(requester: PciDmaRequester, path: &[(u8, u8)]) -> Result<Self, E> {
+-        let loc = location(requester)?;
++        Self::new_group_with_paths(&[(requester, path)])
++    }
++
++    /// Creates one domain for a bounded set of multifunction requesters. The
++    /// PCI owner must prove exclusive/quiescent ownership of every member and
++    /// keep BME disabled until the complete group is installed.
++    pub(crate) fn new_group_with_paths(
++        requesters: &[(PciDmaRequester, &[(u8, u8)])],
++    ) -> Result<Self, E> {
++        let members = validate_group(requesters)?;
++        let location = members[0];
+         if PAGE_TABLE.get().is_none() {
+             return Err(E::UnsupportedPlatform);
+         }
+-        if !crate::arch::kernel::acpi::vtd_policy::requester_allowed_with_path(
+-            requester.segment(),
+-            requester.bus(),
+-            requester.device(),
+-            requester.function(),
+-            path,
+-        ) {
+-            return Err(E::UnsupportedPlatform);
++        for (requester, path) in requesters {
++            if !crate::arch::kernel::acpi::vtd_policy::requester_allowed_with_path(
++                requester.segment(),
++                requester.bus(),
++                requester.device(),
++                requester.function(),
++                path,
++            ) {
++                return Err(E::UnsupportedPlatform);
++            }
+         }
+         // SAFETY: CPUID is available on x86-64 and has no memory side effects.
+         if core::arch::x86_64::__cpuid(1).edx & (1 << 19) == 0 {
+@@ -120,7 +135,8 @@
+         }
+         let registry = DOMAINS.call_once(|| {
+             SpinLock::new(Domains {
+-                devices: BTreeMap::new(),
++                groups: BTreeMap::new(),
++                members: BTreeMap::new(),
+                 ids: 1,
+                 poisoned: false,
+             })
+@@ -129,7 +145,10 @@
+         if domains.poisoned {
+             return Err(E::InvalidationFailed);
+         }
+-        if domains.devices.contains_key(&loc) {
++        if members
++            .iter()
++            .any(|member| domains.members.contains_key(member))
++        {
+             return Err(E::DomainBusy);
+         }
+         let did = (1..16)
+@@ -141,21 +160,35 @@
+             next_iova: PAGE_SIZE,
+         };
+         let root = domain.root.paddr();
++        // Reserve every BDF and the DID before changing a hardware context.
++        // Holding the registry lock makes the reservation visible atomically.
+         domains.ids |= 1 << did;
+-        domains.devices.insert(loc, domain);
+-        // Revoke the former shared context before publishing this private root.
++        domains.groups.insert(location, domain);
++        for member in &members {
++            domains.members.insert(*member, location);
++        }
++        // Revoke all former shared contexts as one group operation before
++        // publishing any member's private context.
+         let mut roots = PAGE_TABLE.get().unwrap().lock();
+-        roots.clear_device_context(loc);
++        for member in &members {
++            roots.clear_device_context(*member);
++        }
+         if !IOMMU_REGS.get().unwrap().lock().invalidate_dma_sync() {
+             domains.poisoned = true;
+-            return Err(E::InvalidationFailed); // all table ownership retained
+-        }
+-        roots.install_isolated_context(loc, root, did);
++            return Err(E::InvalidationFailed); // reservations and tables quarantined
++        }
++        for member in &members {
++            roots.install_isolated_context(*member, root, did);
++        }
+         if !IOMMU_REGS.get().unwrap().lock().invalidate_dma_sync() {
+             domains.poisoned = true;
+             return Err(E::InvalidationFailed);
+         }
+-        Ok(Self { location: loc, did })
++        Ok(Self {
++            location,
++            members,
++            did,
++        })
+     }
+     pub(crate) fn id(&self) -> u16 {
+         self.did
+@@ -166,7 +199,7 @@
+             return Err(E::InvalidationFailed);
+         }
+         let domain = domains
+-            .devices
++            .groups
+             .get_mut(&self.location)
+             .ok_or(E::MappingFailed)?;
+         let iova = domain.next_iova;
+@@ -223,7 +256,7 @@
+             return Err(E::InvalidationFailed);
+         }
+         let domain = domains
+-            .devices
++            .groups
+             .get_mut(&self.location)
+             .ok_or(E::MappingFailed)?;
+         domain.clear(iova, size);
+@@ -234,6 +267,44 @@
+         Ok(())
+     }
+ }
++/// Validates group shape independently of firmware policy and hardware state.
++/// All members must be distinct functions of one slot, include function zero,
++/// and share a route prefix (the endpoint hop is necessarily different).
++fn validate_group(
++    requesters: &[(PciDmaRequester, &[(u8, u8)])],
++) -> Result<Vec<PciDeviceLocation>, E> {
++    if requesters.is_empty() || requesters.len() > 8 {
++        return Err(E::InvalidRequester);
++    }
++    let mut members = Vec::with_capacity(requesters.len());
++    let mut route_prefix: Option<&[(u8, u8)]> = None;
++    let first = requesters[0].0;
++    for (requester, path) in requesters {
++        let member = location(*requester)?;
++        if member.bus != first.bus()
++            || member.device != first.device()
++            || path.is_empty()
++            || path.len() > 8
++            || path.last() != Some(&(member.device, member.function))
++        {
++            return Err(E::InvalidRequester);
++        }
++        let prefix = &path[..path.len() - 1];
++        if route_prefix.is_some_and(|expected| expected != prefix) {
++            return Err(E::InvalidRequester);
++        }
++        route_prefix = Some(prefix);
++        if members.contains(&member) {
++            return Err(E::InvalidRequester);
++        }
++        members.push(member);
++    }
++    if !members.iter().any(|member| member.function == 0) {
++        return Err(E::InvalidRequester);
++    }
++    Ok(members)
++}
++
+ impl Domain {
+     fn clear(&self, iova: usize, size: usize) {
+         for offset in (0..size).step_by(PAGE_SIZE) {
+@@ -255,13 +326,18 @@
+             return;
+         }
+         let mut roots = PAGE_TABLE.get().unwrap().lock();
+-        roots.clear_device_context(self.location);
++        for member in &self.members {
++            roots.clear_device_context(*member);
++        }
+         if !IOMMU_REGS.get().unwrap().lock().invalidate_dma_sync() {
+             domains.poisoned = true;
+             return; // quarantined tables, DID and requester, never silently reclaimed
+         }
+         // Detached context remains absent. The legacy shared mapper is NOT restored.
+-        domains.devices.remove(&self.location);
++        domains.groups.remove(&self.location);
++        for member in &self.members {
++            domains.members.remove(member);
++        }
+         domains.ids &= !(1 << self.did);
+     }
+ }
+@@ -282,6 +358,68 @@
+             Some(E::InvalidRequester)
+         );
+         assert!(location(PciDmaRequester::new(0, 0, 31, 0).unwrap()).is_ok());
++    }
++
++    #[ktest]
++    fn multifunction_groups_validate_shape_and_common_route() {
++        let function_zero = PciDmaRequester::new(0, 1, 3, 0).unwrap();
++        let function_one = PciDmaRequester::new(0, 1, 3, 1).unwrap();
++        let route_zero = [(2, 0), (3, 0)];
++        let route_one = [(2, 0), (3, 1)];
++        assert_eq!(
++            validate_group(&[(function_zero, &route_zero), (function_one, &route_one),])
++                .unwrap()
++                .len(),
++            2
++        );
++        assert_eq!(
++            validate_group(&[(function_one, &route_one)]).err(),
++            Some(E::InvalidRequester),
++            "function zero is mandatory"
++        );
++        assert_eq!(
++            validate_group(&[(function_zero, &route_zero), (function_zero, &route_zero),]).err(),
++            Some(E::InvalidRequester),
++            "duplicate BDFs are forbidden"
++        );
++        let other_slot = PciDmaRequester::new(0, 1, 4, 1).unwrap();
++        let other_slot_route = [(2, 0), (4, 1)];
++        assert_eq!(
++            validate_group(&[
++                (function_zero, &route_zero),
++                (other_slot, &other_slot_route),
++            ])
++            .err(),
++            Some(E::InvalidRequester),
++            "all functions must belong to one slot"
++        );
++        let other_bus = PciDmaRequester::new(0, 2, 3, 1).unwrap();
++        assert_eq!(
++            validate_group(&[(function_zero, &route_zero), (other_bus, &route_one)]).err(),
++            Some(E::InvalidRequester),
++            "all functions must belong to one bus"
++        );
++        let wrong_prefix = [(5, 0), (3, 1)];
++        assert_eq!(
++            validate_group(&[(function_zero, &route_zero), (function_one, &wrong_prefix),]).err(),
++            Some(E::InvalidRequester),
++            "members must share the same upstream route"
++        );
++        let wrong_endpoint = [(2, 0), (3, 2)];
++        assert_eq!(
++            validate_group(&[(function_zero, &wrong_endpoint)]).err(),
++            Some(E::InvalidRequester),
++            "route must terminate at the exact requester"
++        );
++        let too_many: Vec<_> = (0..9)
++            .map(|function| {
++                (
++                    PciDmaRequester::new(0, 1, 3, function % 8).unwrap(),
++                    &route_zero[..],
++                )
++            })
++            .collect();
++        assert_eq!(validate_group(&too_many).err(), Some(E::InvalidRequester));
+     }
+ 
+     #[ktest]
+diff --git a/ostd/src/mm/dma/isolated.rs b/ostd/src/mm/dma/isolated.rs
+--- a/ostd/src/mm/dma/isolated.rs
++++ b/ostd/src/mm/dma/isolated.rs
+@@ -1,5 +1,7 @@
+ // SPDX-License-Identifier: MPL-2.0
+ //! Owned coherent DMA buffers in a bounded Intel VT-d requester domain.
++use alloc::vec::Vec;
++
+ use super::{DeviceDmaError, DmaMask, PciDmaRequester};
+ use crate::{
+     irq,
+@@ -24,6 +26,7 @@
+ pub struct IsolatedDmaContext {
+     handle: crate::arch::iommu::DomainHandle,
+     requester: PciDmaRequester,
++    requesters: Vec<PciDmaRequester>,
+     mask: DmaMask,
+ }
+ #[cfg(target_arch = "x86_64")]
+@@ -47,6 +50,45 @@
+         Ok(Self {
+             handle,
+             requester,
++            requesters: alloc::vec![requester],
++            mask,
++        })
++    }
++
++    /// Creates one private domain shared by a bounded multifunction requester
++    /// group. Each tuple contains an endpoint and its two-hop root-port-to-
++    /// endpoint route resolved by the PCI owner. All requesters must be distinct
++    /// functions of the same slot, include function zero, and share the same
++    /// route prefix. Every member is checked against DMAR policy before any
++    /// context is changed. The PCI owner must exclusively own and quiesce every
++    /// function, keep BME disabled until this returns, prevent aliases and
++    /// topology changes, and keep ownership alive for this context's lifetime.
++    /// OSTD does not enable or verify BME.
++    pub fn new_group_with_paths(
++        requesters: &[(PciDmaRequester, [(u8, u8); 2])],
++        mask: DmaMask,
++    ) -> Result<Self, DeviceDmaError> {
++        check_context()?;
++        if crate::arch::if_tdx_enabled!({ true } else { false }) {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++        if requesters.is_empty() || requesters.len() > 8 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        let paths: Vec<_> = requesters
++            .iter()
++            .map(|(requester, path)| (*requester, path.as_slice()))
++            .collect();
++        let handle = crate::arch::iommu::DomainHandle::new_group_with_paths(&paths)?;
++        let requester = requesters
++            .first()
++            .map(|(requester, _)| *requester)
++            .ok_or(DeviceDmaError::InvalidRequester)?;
++        let requesters = requesters.iter().map(|(requester, _)| *requester).collect();
++        Ok(Self {
++            handle,
++            requester,
++            requesters,
+             mask,
+         })
+     }
+@@ -74,12 +116,17 @@
+         Ok(Self {
+             handle,
+             requester,
++            requesters: alloc::vec![requester],
+             mask,
+         })
+     }
+-    /// Actual requester; its binding is established by the constructor's owner.
++    /// Actual requester; for a group this is the first member supplied.
+     pub fn requester(&self) -> &PciDmaRequester {
+         &self.requester
++    }
++    /// Every requester bound to this shared private domain, in constructor order.
++    pub fn requesters(&self) -> &[PciDmaRequester] {
++        &self.requesters
+     }
+     /// Inclusive maximum IOVA address.
+     pub fn mask(&self) -> &DmaMask {
+diff --git a/ostd/src/irq/top_half.rs b/ostd/src/irq/top_half.rs
+--- a/ostd/src/irq/top_half.rs
++++ b/ostd/src/irq/top_half.rs
+@@ -118,6 +118,16 @@
+     }
+ }
+ 
++impl Drop for IrqLine {
++    fn drop(&mut self) {
++        // Unregister callbacks before the last InnerHandle can return this IRQ number to the
++        // allocator. Taking the callbacks write lock also waits for any in-flight `process`
++        // readers to finish. Do not drop an IrqLine from an IRQ callback: that callback runs
++        // under the read lock and would deadlock while waiting for the writer.
++        self.callbacks.clear();
++    }
++}
++
+ struct Inner {
+     callbacks: RwLock<Vec<Box<IrqCallbackFunction>>, WriteIrqDisabled>,
+     remapping: IrqRemapping,
+@@ -195,6 +205,8 @@
+ 
+ #[cfg(ktest)]
+ mod test {
++    use core::sync::atomic::{AtomicU8, Ordering};
++
+     use super::*;
+ 
+     const IRQ_NUM: u8 = 64;
+@@ -237,4 +249,50 @@
+         drop(irq_line_cloned);
+         assert_eq!(INNERS[IRQ_INDEX].callbacks.read().len(), 0);
+     }
+-}
++
++    #[ktest]
++    fn callbacks_are_dropped_before_irq_is_released() {
++        struct AllocationProbe {
++            irq_num: u8,
++            result: Arc<AtomicU8>,
++        }
++
++        impl Drop for AllocationProbe {
++            fn drop(&mut self) {
++                let allocation = IrqLine::alloc_specific(self.irq_num);
++                self.result
++                    .store(if allocation.is_err() { 1 } else { 2 }, Ordering::SeqCst);
++                drop(allocation);
++            }
++        }
++
++        let mut irq_line = IrqLine::alloc().unwrap();
++        let irq_num = irq_line.num();
++        let mut irq_line_cloned = irq_line.clone();
++        let first_probe_result = Arc::new(AtomicU8::new(0));
++        let second_probe_result = Arc::new(AtomicU8::new(0));
++
++        let first_probe = AllocationProbe {
++            irq_num,
++            result: first_probe_result.clone(),
++        };
++        irq_line.on_active(move |_| {
++            let _ = &first_probe;
++        });
++        let second_probe = AllocationProbe {
++            irq_num,
++            result: second_probe_result.clone(),
++        };
++        irq_line_cloned.on_active(move |_| {
++            let _ = &second_probe;
++        });
++
++        drop(irq_line);
++        assert_eq!(first_probe_result.load(Ordering::SeqCst), 1);
++        assert!(IrqLine::alloc_specific(irq_num).is_err());
++
++        drop(irq_line_cloned);
++        assert_eq!(second_probe_result.load(Ordering::SeqCst), 1);
++        assert!(IrqLine::alloc_specific(irq_num).is_ok());
++    }
++}
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -25,6 +25,8 @@
+             pci_test_device+=" -device pcie-root-port,id=rp-good,addr=07.0,chassis=7,hotplug=off -device nvme,bus=rp-good,addr=00.0,serial=ASTER-PCIE-DMA"
+             pci_test_device+=" -device pcie-root-port,id=rp-noacs,addr=08.0,chassis=8,hotplug=off,disable-acs=on -device nvme,bus=rp-noacs,addr=00.0,serial=ASTER-NO-ACS"
+             pci_test_device+=" -device pci-bridge,id=legacy,addr=09.0,chassis_nr=9,shpc=off -device edu,bus=legacy,addr=01.0,dma_mask=4294967295"
++            pci_test_device+=" -device pcie-root-port,id=rp-group,addr=0a.0,chassis=10,hotplug=off -device nvme,bus=rp-group,addr=00.0,multifunction=on,serial=ASTER-GROUP-F0 -device nvme,bus=rp-group,addr=00.1,serial=ASTER-GROUP-F1"
++            pci_test_device+=" -device pcie-root-port,id=rp-group-bad,addr=0b.0,chassis=11,hotplug=off -device nvme,bus=rp-group-bad,addr=00.0,multifunction=on,serial=ASTER-GROUP-BAD -device edu,bus=rp-group-bad,addr=00.1,dma_mask=4294967295"
+         fi
+         if [[ "$suite" == pci-iommu ]]; then
+             pci_test_device+=" -device intel-iommu,intremap=on"
+@@ -63,6 +65,9 @@
+     if [[ "$suite" == pci ]]; then
+         grep -Fq 'PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles;' "$log"
+         grep -Fq 'PCIe topology negative cases passed without IOMMU; no PCIe DMA issued' "$log"
++        grep -Fq 'PCI multifunction unsupported sibling correctly rejected: real conventional PCI EDU function one lacks PCIe' "$log"
++        grep -Fq 'PCI multifunction group correctly rejected without IOMMU; no group DMA issued' "$log"
++        grep -Fq 'PCI multifunction group reservation passed:' "$log"
+     elif [[ "$suite" == pci-iommu ]]; then
+         grep -Fq 'DMA remapping enabled' "$log"
+         grep -Fq 'PCI device DMA correctly rejected unsupported IOMMU/CVM platform; zero DMA issued' "$log"
+@@ -71,6 +76,9 @@
+         grep -Fq 'PCI isolated DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles;' "$log"
+         grep -Fq 'PCI isolated DMA revocation passed:' "$log"
+         grep -Fq 'PCI isolated DMA simultaneous requester isolation passed:' "$log"
++        grep -Fq 'PCI multifunction unsupported sibling correctly rejected: real conventional PCI EDU function one lacks PCIe' "$log"
++        grep -Fq 'PCI multifunction group reservation passed:' "$log"
++        grep -Fq 'PCI multifunction isolated DMA passed: two real NVMe functions, shared requester domain, actual Identify CID/status/vendor/serial/model verified; both controllers stopped and BME off' "$log"
+         # Eight actual write-permission faults at the revoked 0x2000 IOVA,
+         # from EDU 00:05.0. A marker alone cannot establish DMA revocation.
+         python3 - "$log" <<'PYFAULT'
+diff --git a/tools/graphics/NATIVE_NVIDIA.md b/tools/graphics/NATIVE_NVIDIA.md
+--- a/tools/graphics/NATIVE_NVIDIA.md
++++ b/tools/graphics/NATIVE_NVIDIA.md
+@@ -62,3 +62,11 @@
+ Ordinary PR/push CI runs `bash tools/graphics/run_cpu_kernel_tests.sh OUTPUT_DIRECTORY` for the NVport, PCI platform and OSTD suites with TCG, no networking and no GPU passthrough. Each run is bounded, uses an exclusive temporary package manifest, retains logs, and rejects a zero-tests result. The kernel build then enables NVport plus PCI diagnostics and `run_nvport_smoke.py` requires the exact data-checking NVport success line. That smoke ends at the CPU marker and deliberately does not certify subsequent full boot or GPU activity. These commands were exercised locally, but no Actions workflow was uploaded or run remotely.
+ 
+ `validate_native_gpu_evidence.py` continues to identify a possible future hardware compute result as compute-only, with `full_gpui_wayland_vulkan_acceptance = false`. Missing hardware/GSP/ABI is a failure, not a skip-pass; neither the CPU smoke nor a Linux-host result can satisfy the native GPU requirement.
++
++## Bounded multifunction prerequisite tests
++
++The CPU runner also creates genuine QEMU PCIe root ports and a two-function NVMe slot, without changing vendor/device IDs. The PCI group API probes all eight function numbers, requires every present function to be unclaimed and BME-off, and holds the whole slot against probing. MMIO preparation rolls back earlier function mappings on a later failure. Each function must independently pass the same stable root-port/ACS route and DMAR authorization; the complete group receives one owned VT-d root and DID. Partial reservation, function-zero omissions, unsupported siblings, translation/alias services, switches and unsupported firmware fail closed. No production path enables bus mastering or starts NVIDIA RM/GSP.
++
++The `pci-iommu` run requires real Identify Controller DMA from both NVMe functions across repeated group attach/detach cycles, actual CID/status/vendor/serial/model verification, live duplicate-domain rejection, controller shutdown and BME-off checks. Both PCI runs require missing-sibling, active-BME, invalid-sibling-BAR rollback and single-function/subset rejection checks. A second real NVMe-plus-conventional-EDU slot must be rejected as an unsupported group. The no-IOMMU run must reject group DMA; it is not a passing isolated-DMA test. The OSTD suite also tests that IRQ callbacks are removed before an interrupt number can be recycled; this is a teardown-order prerequisite, not NVIDIA IRQ integration.
++
++This is a deliberately narrow group contract: slot zero directly below one segment-zero ACS-verified root port, with all functions exclusively owned and each selected MMIO BAR usable. Device-specific quiescence is still the caller's obligation; BME-off is not proof of completion. Hotplug and route reconfiguration are unsupported. All functions share one trust boundary—there is no isolation between siblings. These tests do not establish support for any actual NVIDIA GPU, RM/GSP, firmware authentication, the NVIDIA ioctl/mmap ABI, Vulkan userspace, Wayland, display or GPUI. The protected native-GPU job remains a separate failing-until-implemented gate and cannot be satisfied by these QEMU devices or a host-Linux benchmark.

@@ -1,0 +1,1631 @@
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -171,11 +171,24 @@
+ compartilhado quando uma validação falha. Os bloqueios anteriores continuam válidos para
+ o port completo, mas o subconjunto abaixo já possui implementação separada do mapper legado.
+ 
+-O backend inicial exige um único DRHD Intel no segmento zero e associação explícita de
+-endpoint no barramento zero. `INCLUDE_PCI_ALL` não concede autorização implícita ao novo
+-caminho. RMRR, múltiplos DRHDs, bridges, escopos com múltiplos saltos, funções multifunção,
+-PCIe e ATS/PRI/PASID ficam fora do subconjunto. **GPUs NVIDIA PCIe modernas ainda são
+-rejeitadas**; resolver essas topologias é requisito anterior a qualquer inicialização GPU.
++O backend exige um único DRHD Intel no segmento zero e associação por escopo DMAR explícito.
++Escopos de endpoint correspondem ao caminho completo ou ao BDF/barramento final; escopos de
++bridge enraizados no bus zero autorizam apenas descendentes estritos. `INCLUDE_PCI_ALL` não
++concede autorização implícita. Havendo MCFG, a política exige uma única região válida no
++segmento zero, iniciando no bus zero, sem tabelas duplicadas. RMRR, ATSR e múltiplos DRHDs
++continuam recusados.
++
++PCIe agora tem um subconjunto conservador: endpoint tipo zero, devfn 00.0, função única,
++imediatamente abaixo de um root port PCIe verdadeiro, rota única com secondary=subordinate,
++sem peers adicionais. ACS Source Validation, P2P Request/Completion Redirect e Upstream
++Forwarding precisam existir e estar ativos; Direct Translated P2P ativo é recusado.
++ATS/PRI/PASID, ARI/SR-IOV, funções múltiplas, switches, bridges legadas e rotas ambíguas são
++recusados antes de BME. Translation Blocking opcional não é exigido: serviços de tradução do
++endpoint são recusados e VT-d TT=00 rejeita pedidos traduzidos. A produção só lê configuração;
++o driver/firmware confiável não pode mudar a rota/ACS durante a vida do domínio, e hotplug não
++é suportado. A associação não transforma BAR0 em região segura antes do firewall/power NVIDIA.
++**Isso não é suporte NVIDIA**: adapters multifunção comuns permanecem fora do subconjunto,
++e supported-chip/firewall, IRQ/workers, o port RM e a inicialização GSP ainda faltam.
+ 
+ Cada domínio tem DID próprio (1–15; zero permanece com o mapper legado), raiz e páginas
+ de tradução próprias. IOVAs obedecem à máscara inclusiva e não são reutilizados durante a
+@@ -191,6 +204,10 @@
+ 
+ O runner local/Actions exige transferências EDU reais com comparação integral, separação
+ entre dois requesters com IOVAs iguais, escritas negadas após revogação com a RAM ainda
+-possuída, rejeição de contexto duplicado/máscara impossível e detach/reaquisição. EDU/QEMU
+-não é NVIDIA: nenhum desses marcadores é benchmark GPU, inicialização RM/GSP ou aceitação
+-Vulkan/Wayland/GPUI. O workflow permanece preparação local, sem execução remota implícita.
++possuída, rejeição de contexto duplicado/máscara impossível e detach/reaquisição. Também exige
++um controlador NVMe PCIe verdadeiro atrás de root port real: filas SQ/CQ privadas e Identify
++por DMA, CID/status/vendor/serial/model conferidos, controller parado antes de liberar memória.
++Casos negativos cobrem ACS ausente/desligado e EDU atrás de bridge legada. Escritas ACS e BME
++do NVMe existem apenas no teste QEMU, não no caminho de produção. EDU/NVMe/QEMU não são NVIDIA:
++nenhum desses marcadores é benchmark GPU, inicialização RM/GSP ou aceitação Vulkan/Wayland/GPUI.
++O workflow permanece preparação local, sem execução remota implícita.
+diff --git a/kernel/comps/nvidia-platform/src/device.rs b/kernel/comps/nvidia-platform/src/device.rs
+--- a/kernel/comps/nvidia-platform/src/device.rs
++++ b/kernel/comps/nvidia-platform/src/device.rs
+@@ -86,9 +86,11 @@
+ 
+     /// Request bounded per-requester VT-d memory without enabling bus mastering.
+     ///
+-    /// The initial backend rejects PCIe and multifunction/bridge paths, so modern
+-    /// NVIDIA hardware deliberately returns unsupported here. It is not a bypass
+-    /// for RM/GSP initialization and does not fall back to the shared mapper.
++    /// PCIe requires a single-function endpoint immediately below one segment-zero
++    /// root port with verified ACS/routing and no ATS/PRI/PASID or aliases. Common
++    /// multifunction NVIDIA adapters, switches and unsupported firmware fail closed.
++    /// This does not establish supported-chip/BAR-firewall checks or RM/GSP startup,
++    /// and it never falls back to the shared mapper or enables bus mastering.
+     #[cfg(target_arch = "x86_64")]
+     pub fn isolated_dma_context(
+         &self,
+diff --git a/kernel/core/comps/pci/src/dma.rs b/kernel/core/comps/pci/src/dma.rs
+--- a/kernel/core/comps/pci/src/dma.rs
++++ b/kernel/core/comps/pci/src/dma.rs
+@@ -53,10 +53,9 @@
+ ///
+ /// The context borrows the MMIO guard, which borrows the PCI reservation, so a
+ /// requester cannot be returned to enumeration while the DMA domain or any of
+-/// its buffers remain live. This deliberately bounded implementation accepts
+-/// only bus-zero type-0 headers and rejects every PCI Express capability: PCIe
+-/// extended capabilities (including ATS/PRI/PASID) have not been reviewed.
+-/// Consequently this implementation will not admit modern NVIDIA PCIe GPUs.
++/// its buffers remain live. It retains the conventional bus-zero type-0 path
++/// and admits only PCIe type-0 endpoints behind one validated, ACS-protected
++/// root port. Switches, nested bridges, aliases, and ATS/PRI/PASID are rejected.
+ #[cfg(target_arch = "x86_64")]
+ pub struct PciIsolatedDmaContext<'a> {
+     inner: IsolatedDmaContext,
+@@ -70,23 +69,18 @@
+     /// Device lifetime and completion
+     /// The caller must exclusively own this requester, keep bus mastering
+     /// disabled until all buffers are ready, and ensure the device is quiescent.
+-    /// The caller must also ensure there are no aliases/bridges or active
+-    /// ATS/PRI/PASID paths. The PCI checks below reject known unsupported
+-    /// topologies but cannot establish device-specific quiescence.
++    /// PCI topology is read-only validated before constructing the domain. The
++    /// caller must keep the route/configuration stable (there is no hotplug or
++    /// bridge-reconfiguration protection) and ensure device-specific quiescence
++    /// and completion; topology checks cannot prove driver-level ownership.
+     pub(crate) fn new(owner: &'a PciMmioGuard<'_>, mask: DmaMask) -> Result<Self, DeviceDmaError> {
+         let loc = owner.location();
+-        if loc.read16(0) == 0xffff {
+-            return Err(DeviceDmaError::InvalidRequester);
+-        }
+-        if loc.bus != 0 || loc.function != 0 || loc.read8(0x0e) != 0 || loc.read8(0x0b) == 0x06 {
+-            return Err(DeviceDmaError::UnsupportedPlatform);
+-        }
+-        if loc.read16(4) & crate::cfg_space::Command::BUS_MASTER.bits() != 0 {
+-            return Err(DeviceDmaError::InvalidContext);
+-        }
+-        validate_conventional_capabilities(loc)?;
++        let route = crate::topology::admit(loc)?;
+         let requester = PciDmaRequester::new(0, loc.bus, loc.device, loc.function)?;
+-        let inner = IsolatedDmaContext::new(requester, mask)?;
++        let inner = match route {
++            Some(path) => IsolatedDmaContext::new_with_path(requester, mask, &path)?,
++            None => IsolatedDmaContext::new(requester, mask)?,
++        };
+         Ok(Self {
+             inner,
+             _owner: PhantomData,
+@@ -113,33 +107,3 @@
+         self.inner.domain_id()
+     }
+ }
+-
+-/// Reject malformed conventional capability chains and PCIe functions.
+-/// PCIe is conservatively excluded because its extended capability list has
+-/// not been audited for requester aliases or translation services.
+-#[cfg(target_arch = "x86_64")]
+-fn validate_conventional_capabilities(loc: crate::PciDeviceLocation) -> Result<(), DeviceDmaError> {
+-    if loc.read16(6) & crate::cfg_space::Status::CAPABILITIES_LIST.bits() == 0 {
+-        return Ok(());
+-    }
+-    let mut pointer = loc.read8(0x34);
+-    if pointer == 0 {
+-        return Err(DeviceDmaError::InvalidRequester);
+-    }
+-    let mut visited = 0u64;
+-    while pointer != 0 {
+-        if !(0x40..=0xfc).contains(&pointer) || pointer & 3 != 0 {
+-            return Err(DeviceDmaError::InvalidRequester);
+-        }
+-        let bit = 1u64 << (pointer / 4);
+-        if visited & bit != 0 {
+-            return Err(DeviceDmaError::InvalidRequester);
+-        }
+-        visited |= bit;
+-        if loc.read8(u16::from(pointer)) == 0x10 {
+-            return Err(DeviceDmaError::UnsupportedPlatform);
+-        }
+-        pointer = loc.read8(u16::from(pointer) + 1);
+-    }
+-    Ok(())
+-}
+diff --git a/kernel/core/comps/pci/src/lib.rs b/kernel/core/comps/pci/src/lib.rs
+--- a/kernel/core/comps/pci/src/lib.rs
++++ b/kernel/core/comps/pci/src/lib.rs
+@@ -76,7 +76,10 @@
+ pub mod dma;
+ #[cfg(ktest)]
+ mod lifecycle_tests;
++#[cfg(ktest)]
++mod pcie_tests;
+ pub mod mmio;
++mod topology;
+ pub mod reservation;
+ 
+ extern crate alloc;
+diff --git a/kernel/core/comps/pci/src/lifecycle_tests.rs b/kernel/core/comps/pci/src/lifecycle_tests.rs
+--- a/kernel/core/comps/pci/src/lifecycle_tests.rs
++++ b/kernel/core/comps/pci/src/lifecycle_tests.rs
+@@ -12,7 +12,7 @@
+ fn qemu_pci_testdev_reservation_mmio_rollback_and_reacquisition() {
+     // This suite requires QEMU's genuine pci-testdev (1b36:0005), never a spoofed NVIDIA ID.
+     // Component initialization does not run in an OSDK unit-test kernel, so enumerate here.
+-    crate::init();
++    crate::pcie_tests::init_pci_for_tests();
+     let mut bus = PCI_BUS.lock();
+     let before_count = bus.unclaimed_devices().count();
+     let location = *bus
+diff --git a/kernel/core/comps/pci/src/mmio.rs b/kernel/core/comps/pci/src/mmio.rs
+--- a/kernel/core/comps/pci/src/mmio.rs
++++ b/kernel/core/comps/pci/src/mmio.rs
+@@ -116,13 +116,15 @@
+     }
+ 
+     /// Creates an isolated IOMMU context for this exclusively prepared function.
+-    /// The bounded implementation rejects PCIe-capable functions and nonzero buses.
++    /// Admits conventional bus-zero type-0 endpoints or PCIe type-0 endpoints
++    /// behind one validated PCIe root port with required ACS redirects enabled.
++    /// Other bridge topologies, aliases, ATS/PRI/PASID and non-ECAM PCIe access
++    /// are rejected; no config-space registers are programmed by this method.
+     ///
+     /// Device completion
+-    /// The caller must ensure exclusive requester ownership and device quiescence,
+-    /// with bus mastering disabled, and must rule out aliases/bridges and active
+-    /// ATS/PRI/PASID paths. The returned context ties the domain and buffers to
+-    /// this MMIO/reservation lifetime, but cannot itself stop device activity.
++    /// The caller must ensure exclusive requester ownership, a stable bridge route,
++    /// and device quiescence with bus mastering disabled. This does not protect
++    /// against hotplug or bridge reconfiguration and cannot stop device activity.
+     #[cfg(target_arch = "x86_64")]
+     pub fn isolated_dma_context(
+         &self,
+diff --git a/kernel/core/comps/pci/src/pcie_tests.rs b/kernel/core/comps/pci/src/pcie_tests.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/pcie_tests.rs
+@@ -0,0 +1,302 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Real QEMU PCIe topology and NVMe DMA. This is not NVIDIA/GPU validation.
++use core::sync::atomic::{Ordering, fence};
++
++use ostd::{
++    mm::{
++        HasDaddr, PAGE_SIZE, VmIo,
++        dma::{DeviceDmaError, DmaMask},
++    },
++    prelude::ktest,
++};
++
++use crate::{PCI_BUS, PciDeviceLocation, cfg_space::Command, mmio::PciMmioGuard};
++
++pub(crate) fn init_pci_for_tests() {
++    static INIT: spin::Once<()> = spin::Once::new();
++    INIT.call_once(crate::init);
++}
++
++fn ext_cap(loc: PciDeviceLocation, id: u16) -> Option<u16> {
++    let mut at = 0x100u16;
++    let mut visited = [false; 1024];
++    loop {
++        assert!((0x100..=0xffc).contains(&at) && at & 3 == 0);
++        assert!(!visited[at as usize / 4]);
++        visited[at as usize / 4] = true;
++        let h = crate::arch::read32(&loc, u32::from(at)).expect("ECAM test read");
++        if h == 0 || h == u32::MAX {
++            return None;
++        }
++        if h as u16 == id {
++            return Some(at);
++        }
++        at = (h >> 20) as u16;
++        if at == 0 {
++            return None;
++        }
++    }
++}
++
++fn wait(registers: &PciMmioGuard<'_>, offset: usize, mask: u32, value: u32) -> bool {
++    for _ in 0..20_000_000 {
++        let status = registers.read32(offset).expect("NVMe MMIO poll");
++        if status & mask == value {
++            return true;
++        }
++        core::hint::spin_loop();
++    }
++    false
++}
++
++fn quiesce_qemu_nvme_for_test(bus: &mut crate::bus::PciBus, loc: PciDeviceLocation) {
++    use ostd::mm::VmIoOnce;
++    let mut device = bus
++        .test_take_unclaimed(loc)
++        .expect("own real NVMe before stop");
++    assert_eq!(device.device_id().vendor_id, 0x1b36);
++    assert_eq!(device.device_id().class, 1);
++    assert_eq!(device.device_id().subclass, 8);
++    let command = loc.read16(4);
++    assert_ne!(
++        command & Command::MEMORY_SPACE.bits(),
++        0,
++        "firmware must decode NVMe BAR"
++    );
++    let crate::cfg_space::Bar::Memory(bar) = device.bar_manager_mut().bar_mut(0).unwrap() else {
++        panic!("NVMe BAR0 must be memory");
++    };
++    let registers = bar.acquire_owned().expect("test-only NVMe stop mapping");
++    // Firmware may leave BME enabled. Clearing it alone is NOT quiescence:
++    // perform the actual NVMe controller reset and wait for CSTS.RDY=0 first.
++    registers.write_once(0x14, &0u32).unwrap();
++    let mut stopped = false;
++    for _ in 0..20_000_000 {
++        let status: u32 = registers.read_once(0x1c).unwrap();
++        if status & 1 == 0 {
++            stopped = true;
++            break;
++        }
++        core::hint::spin_loop();
++    }
++    assert!(
++        stopped,
++        "firmware NVMe controller did not stop; no DMA context created"
++    );
++    device.write_command_raw(command & !Command::BUS_MASTER.bits());
++    assert_eq!(loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++    drop(registers);
++    bus.return_reserved(device);
++}
++
++#[ktest]
++fn qemu_real_pcie_topology_and_nvme_identify_dma() {
++    init_pci_for_tests();
++    let mut bus = PCI_BUS.lock();
++    let port = PciDeviceLocation {
++        bus: 0,
++        device: 7,
++        function: 0,
++    };
++    let no_acs_port = PciDeviceLocation {
++        bus: 0,
++        device: 8,
++        function: 0,
++    };
++    let legacy_bridge = PciDeviceLocation {
++        bus: 0,
++        device: 9,
++        function: 0,
++    };
++    for p in [port, no_acs_port, legacy_bridge] {
++        assert_ne!(p.read16(0), 0xffff, "real QEMU bridge required");
++        assert_eq!(p.read8(0x0b), 6);
++        assert_eq!(p.read8(0x0a), 4);
++        assert_eq!(p.read8(0x0e) & 0x7f, 1);
++        assert_eq!(p.read8(0x18), 0);
++        assert_ne!(p.read8(0x19), 0);
++    }
++    assert!(
++        ext_cap(no_acs_port, 0x0d).is_none(),
++        "negative root port must genuinely lack ACS"
++    );
++    let acs = ext_cap(port, 0x0d).expect("real root-port ACS");
++    let original_acs = port.read16(acs + 6);
++    let capabilities = port.read16(acs + 4);
++    assert_eq!(capabilities & 0x1d, 0x1d);
++    let mask = DmaMask::new(32).unwrap();
++    // A conventional PCI endpoint behind a real PCI bridge is an unsupported alias path.
++    let legacy_loc = *bus
++        .unclaimed_devices()
++        .find(|d| {
++            d.location().bus == legacy_bridge.read8(0x19)
++                && d.device_id().vendor_id == 0x1234
++                && d.device_id().device_id == 0x11e8
++        })
++        .expect("real EDU behind legacy bridge")
++        .location();
++    {
++        let mut reserved = bus.reserve_unclaimed(legacy_loc).unwrap();
++        let regs = reserved.prepare_mmio(0).unwrap();
++        assert_eq!(
++            regs.isolated_dma_context(mask).err().unwrap(),
++            DeviceDmaError::UnsupportedPlatform
++        );
++        assert_eq!(legacy_loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++    }
++    // Genuine PCIe NVMe behind an ACS-disabled root port must fail before any DMA.
++    let bad_loc = *bus
++        .unclaimed_devices()
++        .find(|d| {
++            d.location().bus == no_acs_port.read8(0x19)
++                && d.device_id().class == 1
++                && d.device_id().subclass == 8
++        })
++        .expect("negative real NVMe endpoint")
++        .location();
++    quiesce_qemu_nvme_for_test(&mut bus, bad_loc);
++    {
++        let mut reserved = bus.reserve_unclaimed(bad_loc).unwrap();
++        let regs = reserved.prepare_mmio(0).unwrap();
++        assert_eq!(
++            regs.isolated_dma_context(mask).err().unwrap(),
++            DeviceDmaError::UnsupportedPlatform
++        );
++        assert_eq!(bad_loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++    }
++    let loc = *bus
++        .unclaimed_devices()
++        .find(|d| {
++            d.location().bus == port.read8(0x19)
++                && d.device_id().class == 1
++                && d.device_id().subclass == 8
++        })
++        .expect("real NVMe behind root port")
++        .location();
++    quiesce_qemu_nvme_for_test(&mut bus, loc);
++    let mut reserved = bus.reserve_unclaimed(loc).unwrap();
++    let regs = reserved.prepare_mmio(0).unwrap();
++    let prepared = loc.read16(4);
++    assert_eq!(prepared & Command::BUS_MASTER.bits(), 0);
++    assert_eq!(
++        regs.read32(0x14).unwrap() & 1,
++        0,
++        "controller must start disabled"
++    );
++    let cap = u64::from(regs.read32(0).unwrap()) | (u64::from(regs.read32(4).unwrap()) << 32);
++    assert!(
++        cap & 0xffff >= 7,
++        "controller must support 8-entry admin queues"
++    );
++    assert_eq!(
++        (cap >> 48) & 15,
++        0,
++        "4096-byte minimum memory page required"
++    );
++    assert_ne!(cap & (1 << 37), 0, "NVM command set required");
++    // Test-fixture-only ACS writes: production never changes root-port controls.
++    port.write16(acs + 6, original_acs & !0x1d);
++    assert_eq!(
++        regs.isolated_dma_context(mask).err().unwrap(),
++        DeviceDmaError::UnsupportedPlatform
++    );
++    port.write16(acs + 6, original_acs | 0x1d);
++    assert_eq!(port.read16(acs + 6) & 0x1d, 0x1d);
++    let direct_platform = regs.dma_context(mask).is_ok();
++    let context = match regs.isolated_dma_context(mask) {
++        Ok(context) => context,
++        Err(DeviceDmaError::UnsupportedPlatform) if direct_platform => {
++            port.write16(acs + 6, original_acs);
++            ostd::early_println!(
++                "PCIe topology negative cases passed without IOMMU; no PCIe DMA issued"
++            );
++            return;
++        }
++        Err(error) => panic!("PCIe isolated context failed: {error:?}"),
++    };
++    assert_eq!(context.requester().bus(), loc.bus);
++    let sq = context.alloc_coherent(1).expect("NVMe private admin SQ");
++    let cq = context.alloc_coherent(1).expect("NVMe private admin CQ");
++    let identify = context
++        .alloc_coherent(1)
++        .expect("NVMe private identify page");
++    assert_eq!(sq.daddr(), PAGE_SIZE);
++    assert_eq!(cq.daddr(), 2 * PAGE_SIZE);
++    assert_eq!(identify.daddr(), 3 * PAGE_SIZE);
++    let mut command = [0u8; 64];
++    command[0] = 6; // Identify, not a fabricated successful completion.
++    command[2..4].copy_from_slice(&1u16.to_le_bytes());
++    command[24..32].copy_from_slice(&(identify.daddr() as u64).to_le_bytes());
++    command[40..44].copy_from_slice(&1u32.to_le_bytes()); // CNS Identify Controller
++    sq.write_bytes(0, &command).unwrap();
++    regs.test_write32(0x24, (7 << 16) | 7).unwrap();
++    regs.test_write64(0x28, sq.daddr() as u64).unwrap();
++    regs.test_write64(0x30, cq.daddr() as u64).unwrap();
++    loc.write32(4, u32::from(prepared | Command::BUS_MASTER.bits()));
++    regs.test_write32(0x14, (6 << 16) | (4 << 20) | 1).unwrap();
++    let mut success = wait(&regs, 0x1c, 3, 1);
++    let mut completion = [0u8; 16];
++    if success {
++        fence(Ordering::SeqCst);
++        regs.test_write32(0x1000, 1).unwrap(); // Admin SQ tail
++        success = false;
++        for _ in 0..20_000_000 {
++            cq.read_bytes(0, &mut completion).unwrap();
++            if completion[14] & 1 != 0 {
++                success = true;
++                break;
++            }
++            core::hint::spin_loop();
++        }
++    }
++    fence(Ordering::SeqCst);
++    // Disable/ack controller before reclaiming ANY queue or payload RAM.
++    regs.test_write32(0x14, 0).unwrap();
++    let stopped = wait(&regs, 0x1c, 1, 0);
++    loc.write32(4, u32::from(prepared));
++    if !success || !stopped {
++        core::mem::forget(sq);
++        core::mem::forget(cq);
++        core::mem::forget(identify);
++        core::mem::forget(context);
++        panic!(
++            "NVMe timeout; DMA storage/domain quarantined; completed={success} stopped={stopped}"
++        );
++    }
++    assert_eq!(loc.read16(4), prepared);
++    assert_eq!(
++        u16::from_le_bytes(completion[12..14].try_into().unwrap()),
++        1
++    );
++    assert_eq!(
++        u16::from_le_bytes(completion[14..16].try_into().unwrap()),
++        1,
++        "real NVMe status/phase"
++    );
++    assert_eq!(
++        u16::from_le_bytes(completion[8..10].try_into().unwrap()),
++        1,
++        "SQ head"
++    );
++    assert_eq!(
++        u16::from_le_bytes(completion[10..12].try_into().unwrap()),
++        0,
++        "admin SQ ID"
++    );
++    let mut data = [0u8; PAGE_SIZE];
++    identify.read_bytes(0, &mut data).unwrap();
++    assert_eq!(u16::from_le_bytes(data[..2].try_into().unwrap()), 0x1b36);
++    assert!(data[4..24].starts_with(b"ASTER-PCIE-DMA"));
++    assert!(data[24..64].starts_with(b"QEMU NVMe Ctrl"));
++    drop(identify);
++    drop(cq);
++    drop(sq);
++    drop(context);
++    port.write16(acs + 6, original_acs);
++    ostd::early_println!(
++        "PCIe NVMe isolated DMA passed: real root-port route, private SQ/CQ/Identify DMA, actual CID/status/vendor/serial/model verified; controller stopped and BME off; NOT NVIDIA/GPU proof"
++    );
++    ostd::early_println!(
++        "PCIe topology negative cases passed: ACS controls off, ACS absent, legacy bridge alias rejected before BME; no spoofed PCI IDs"
++    );
++}
+diff --git a/kernel/core/comps/pci/src/topology.rs b/kernel/core/comps/pci/src/topology.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/topology.rs
+@@ -0,0 +1,404 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Read-only, fail-closed PCI requester/topology admission for isolated DMA.
++//!
++//! Supported PCIe topology is intentionally limited to one segment-zero type-0
++//! endpoint at device/function 0/0 immediately below one genuine PCIe root port
++//! on bus zero. Switches, nested bridges, ambiguous bus ranges, ARI/SR-IOV and
++//! device translation services are not admitted. This module never writes config.
++use ostd::mm::dma::DeviceDmaError;
++
++use crate::PciDeviceLocation;
++
++const PCI_STATUS_CAPABILITIES: u16 = 1 << 4;
++const PCI_HEADER_MULTIFUNCTION: u8 = 1 << 7;
++const PCI_CAP_ID_EXPRESS: u8 = 0x10;
++const PCI_CLASS_BRIDGE: u8 = 0x06;
++const PCI_SUBCLASS_PCI_BRIDGE: u8 = 0x04;
++const PCI_EXP_TYPE_ENDPOINT: u8 = 0;
++const PCI_EXP_TYPE_ROOT_PORT: u8 = 4;
++const PCI_EXT_CAP_ID_ACS: u16 = 0x000d;
++const PCI_EXT_CAP_ID_ARI: u16 = 0x000e;
++const PCI_EXT_CAP_ID_SRIOV: u16 = 0x0010;
++const PCI_EXT_CAP_ID_ATS: u16 = 0x000f;
++const PCI_EXT_CAP_ID_PRI: u16 = 0x0013;
++const PCI_EXT_CAP_ID_PASID: u16 = 0x001b;
++const MAX_EXT_CAPS: usize = 960;
++
++/// Validates a DMA requester and returns its reviewed PCIe isolation path.
++///
++/// `None` means the narrowly retained conventional bus-zero endpoint path;
++/// `Some(path)` is a PCIe root-port-to-endpoint path whose elements are
++/// `(device, function)` and are passed unchanged to the IOMMU domain constructor.
++pub(crate) fn admit(location: PciDeviceLocation) -> Result<Option<[(u8, u8); 2]>, DeviceDmaError> {
++    if read_u16(location, 0)? == 0xffff {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    if location.device > 31 || location.function > 7 {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    if read_u16(location, 4)? & crate::cfg_space::Command::BUS_MASTER.bits() != 0 {
++        return Err(DeviceDmaError::InvalidContext);
++    }
++
++    let header = read_u8(location, 0x0e)?;
++    if header & 0x7f != 0 || location.function != 0 {
++        return Err(DeviceDmaError::UnsupportedPlatform);
++    }
++    if read_u8(location, 0x0b)? == PCI_CLASS_BRIDGE {
++        return Err(DeviceDmaError::UnsupportedPlatform);
++    }
++    reject_function_aliases(location)?;
++
++    let pcie_cap = conventional_pcie_capability(location)?;
++    match pcie_cap {
++        None => {
++            // Preserve only the existing conventional EDU-like root-bus case.
++            if location.bus != 0 {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            // Legacy CF8/CFC systems cannot address extended configuration
++            // space; the absent PCIe capability is then the applicable limit.
++            // If ECAM does expose it, validate any advertised list rather than
++            // treating inaccessible or malformed PCIe metadata as safe.
++            if let Ok(header) = read_u32(location, 0x100)
++                && header != 0
++                && header != u32::MAX
++            {
++                validate_extended_capabilities(location, false)?;
++            }
++            Ok(None)
++        }
++        Some(cap) => {
++            if location.bus == 0 {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            let ecam = ostd::arch::kernel::ACPI_INFO
++                .get()
++                .and_then(|info| info.pci_ecam_region.as_ref())
++                .ok_or(DeviceDmaError::UnsupportedPlatform)?;
++            // VT-d's complete ACPI inventory separately requires one segment-zero
++            // MCFG allocation; the PCI backend currently exposes only that region.
++            if ecam.bus_start != 0 || location.bus > ecam.bus_end {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            let pcie_header = read_u16(location, cap + 2)?;
++            let port_type = ((pcie_header >> 4) & 0xf) as u8;
++            if port_type != PCI_EXP_TYPE_ENDPOINT || location.device != 0 || location.function != 0
++            {
++                // Reject legacy endpoints, integrated endpoints, root complexes,
++                // multifunction-like aliases, and all bridge/device port types.
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            validate_extended_capabilities(location, false)?;
++            find_unique_root_port_route(location)
++        }
++    }
++}
++
++fn read_u8(location: PciDeviceLocation, offset: u16) -> Result<u8, DeviceDmaError> {
++    let dword = read_u32(location, offset & !3)?;
++    Ok((dword >> ((offset as u32 & 3) * 8)) as u8)
++}
++
++fn read_u16(location: PciDeviceLocation, offset: u16) -> Result<u16, DeviceDmaError> {
++    let dword = read_u32(location, offset & !3)?;
++    Ok((dword >> ((offset as u32 & 2) * 8)) as u16)
++}
++
++/// Unlike `PciDeviceLocation::read32`, this returns inaccessible ECAM errors
++/// rather than unwrapping them. Offsets above 0xff are therefore fail-closed on
++/// CF8/CFC-only systems, while x86 ECAM can safely expose the full 4 KiB space.
++fn read_u32(location: PciDeviceLocation, offset: u16) -> Result<u32, DeviceDmaError> {
++    crate::arch::read32(&location, u32::from(offset))
++        .map(u32::from_le)
++        .map_err(|_| DeviceDmaError::UnsupportedPlatform)
++}
++
++fn conventional_pcie_capability(
++    location: PciDeviceLocation,
++) -> Result<Option<u16>, DeviceDmaError> {
++    if read_u16(location, 6)? & PCI_STATUS_CAPABILITIES == 0 {
++        return Ok(None);
++    }
++    let mut pointer = read_u8(location, 0x34)?;
++    if pointer == 0 {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    let mut visited = 0u64;
++    let mut pcie = None;
++    while pointer != 0 {
++        if !(0x40..=0xfc).contains(&pointer) || pointer & 3 != 0 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        let bit = 1u64 << (pointer / 4);
++        if visited & bit != 0 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        visited |= bit;
++        let id = read_u8(location, u16::from(pointer))?;
++        if id == PCI_CAP_ID_EXPRESS {
++            if pointer > 0xc4 {
++                return Err(DeviceDmaError::InvalidRequester);
++            }
++            if pcie.replace(u16::from(pointer)).is_some() {
++                return Err(DeviceDmaError::InvalidRequester);
++            }
++        }
++        pointer = read_u8(location, u16::from(pointer) + 1)?;
++    }
++    Ok(pcie)
++}
++
++fn reject_function_aliases(location: PciDeviceLocation) -> Result<(), DeviceDmaError> {
++    // Function-number aliases are unsafe even when function zero forgot to set
++    // the multifunction header bit. Probe all functions rather than trusting it.
++    for function in 1..=7 {
++        let other = PciDeviceLocation {
++            function,
++            ..location
++        };
++        if read_u16(other, 0)? != 0xffff {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++    }
++    if read_u8(location, 0x0e)? & PCI_HEADER_MULTIFUNCTION != 0 {
++        return Err(DeviceDmaError::UnsupportedPlatform);
++    }
++    Ok(())
++}
++
++/// Walk a complete 4-KiB PCIe extended-capability list. Any broken pointer,
++/// cycle, inaccessible config space, or requester-translation/alias service is
++/// a hard rejection; absence of an ECAM mapping is never interpreted as absence
++/// of such a capability.
++fn validate_extended_capabilities(
++    location: PciDeviceLocation,
++    is_root_port: bool,
++) -> Result<Option<(u16, u32, u32)>, DeviceDmaError> {
++    let mut offset = 0x100u16;
++    let mut visited = [0u64; 15]; // 960 dword slots in 0x100..=0xffc.
++    let mut acs = None;
++    for _ in 0..MAX_EXT_CAPS {
++        let header = read_u32(location, offset)?;
++        if header == 0 {
++            return if offset == 0x100 {
++                Ok(acs)
++            } else {
++                Err(DeviceDmaError::InvalidRequester)
++            };
++        }
++        let id = header as u16;
++        let version = (header >> 16) & 15;
++        if id == 0 || id == 0xffff || version == 0 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        let next = ((header >> 20) & 0xfff) as u16;
++        let slot = usize::from((offset - 0x100) / 4);
++        let bit = 1u64 << (slot % 64);
++        let word = slot / 64;
++        if visited[word] & bit != 0 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        visited[word] |= bit;
++        if matches!(
++            id,
++            PCI_EXT_CAP_ID_ATS
++                | PCI_EXT_CAP_ID_PRI
++                | PCI_EXT_CAP_ID_PASID
++                | PCI_EXT_CAP_ID_ARI
++                | PCI_EXT_CAP_ID_SRIOV
++        ) {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++        if id == PCI_EXT_CAP_ID_ACS {
++            if !is_root_port || acs.is_some() || version != 1 {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            let capability = read_u16(location, offset + 4)?;
++            let control = read_u16(location, offset + 6)?;
++            acs = Some((offset, u32::from(capability), u32::from(control)));
++        }
++        if next == 0 {
++            return Ok(acs);
++        }
++        if next < 0x100 || next > 0xffc || next & 3 != 0 {
++            return Err(DeviceDmaError::InvalidRequester);
++        }
++        offset = next;
++    }
++    Err(DeviceDmaError::InvalidRequester)
++}
++
++#[derive(Clone, Copy)]
++struct RootPort {
++    location: PciDeviceLocation,
++    secondary: u8,
++    subordinate: u8,
++}
++
++fn find_unique_root_port_route(
++    endpoint: PciDeviceLocation,
++) -> Result<Option<[(u8, u8); 2]>, DeviceDmaError> {
++    let mut candidate = None;
++    for device in 0..=31 {
++        let fn0 = PciDeviceLocation {
++            bus: 0,
++            device,
++            function: 0,
++        };
++        let vendor = read_u16(fn0, 0)?;
++        if vendor == 0xffff {
++            continue;
++        }
++        let header0 = read_u8(fn0, 0x0e)?;
++        for function in 0..=7 {
++            if function > 0 && header0 & PCI_HEADER_MULTIFUNCTION == 0 {
++                let other = PciDeviceLocation { function, ..fn0 };
++                if read_u16(other, 0)? != 0xffff {
++                    return Err(DeviceDmaError::InvalidRequester);
++                }
++                continue;
++            }
++            let bridge = PciDeviceLocation { function, ..fn0 };
++            if read_u16(bridge, 0)? == 0xffff {
++                continue;
++            }
++            let hdr = read_u8(bridge, 0x0e)?;
++            let class = read_u8(bridge, 0x0b)?;
++            let subclass = read_u8(bridge, 0x0a)?;
++            if class == PCI_CLASS_BRIDGE && subclass == PCI_SUBCLASS_PCI_BRIDGE && hdr & 0x7f != 1 {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            if class != PCI_CLASS_BRIDGE || subclass != PCI_SUBCLASS_PCI_BRIDGE || hdr & 0x7f != 1 {
++                continue;
++            }
++            let buses = read_u32(bridge, 0x18)?;
++            let primary = buses as u8;
++            let secondary = (buses >> 8) as u8;
++            let subordinate = (buses >> 16) as u8;
++            if primary != 0 || secondary == 0 || secondary > subordinate {
++                return Err(DeviceDmaError::InvalidRequester);
++            }
++            if endpoint.bus < secondary || endpoint.bus > subordinate {
++                continue;
++            }
++            if secondary != endpoint.bus || subordinate != endpoint.bus {
++                // No nested bridges, overlapping bus-number windows or switches.
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            let pcie =
++                conventional_pcie_capability(bridge)?.ok_or(DeviceDmaError::UnsupportedPlatform)?;
++            let pcie_header = read_u16(bridge, pcie + 2)?;
++            if ((pcie_header >> 4) & 0xf) as u8 != PCI_EXP_TYPE_ROOT_PORT {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            validate_extended_capabilities(bridge, true)?;
++            validate_acs(bridge)?;
++            // ARI forwarding can add requester aliases beyond ordinary devfn.
++            if read_u16(bridge, pcie + 0x28)? & (1 << 5) != 0 {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            if hdr & PCI_HEADER_MULTIFUNCTION != 0 {
++                return Err(DeviceDmaError::UnsupportedPlatform);
++            }
++            let port = RootPort {
++                location: bridge,
++                secondary,
++                subordinate,
++            };
++            if candidate.replace(port).is_some() {
++                return Err(DeviceDmaError::InvalidRequester);
++            }
++        }
++    }
++    let root = candidate.ok_or(DeviceDmaError::UnsupportedPlatform)?;
++    if root.secondary != endpoint.bus || root.subordinate != endpoint.bus {
++        return Err(DeviceDmaError::UnsupportedPlatform);
++    }
++    // Best-effort stability check: firmware/driver configuration must remain
++    // unchanged while the domain is created; this is not hotplug protection.
++    let buses = read_u32(root.location, 0x18)?;
++    if buses as u8 != 0 || (buses >> 8) as u8 != endpoint.bus || (buses >> 16) as u8 != endpoint.bus
++    {
++        return Err(DeviceDmaError::InvalidRequester);
++    }
++    validate_acs(root.location)?;
++    if read_u16(endpoint, 0)? == 0xffff
++        || read_u16(endpoint, 4)? & crate::cfg_space::Command::BUS_MASTER.bits() != 0
++    {
++        return Err(DeviceDmaError::InvalidContext);
++    }
++    // The endpoint bus may contain peers, but it must not contain another bridge
++    // that could create a nested/ambiguous forwarding route.
++    for device in 0..=31 {
++        let fn0 = PciDeviceLocation {
++            bus: endpoint.bus,
++            device,
++            function: 0,
++        };
++        if read_u16(fn0, 0)? == 0xffff {
++            continue;
++        }
++        if device != 0 || read_u8(fn0, 0x0b)? == PCI_CLASS_BRIDGE {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++    }
++    Ok(Some([
++        (root.location.device, root.location.function),
++        (endpoint.device, endpoint.function),
++    ]))
++}
++
++fn validate_acs(root_port: PciDeviceLocation) -> Result<(), DeviceDmaError> {
++    let (offset, cap, ctl) = validate_extended_capabilities(root_port, true)?
++        .ok_or(DeviceDmaError::UnsupportedPlatform)?;
++    let _ = offset;
++    validate_acs_bits(cap as u16, ctl as u16)
++}
++
++fn validate_acs_bits(capability: u16, control: u16) -> Result<(), DeviceDmaError> {
++    // Source Validation, P2P Request Redirect, P2P Completion Redirect and
++    // Upstream Forwarding must both exist and be enabled. We intentionally do
++    // not require ACS Translation Blocking: this isolation path rejects ATS,
++    // PRI and PASID on the endpoint and VT-d TT=00 denies translated requests.
++    const REQUIRED: u16 = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4);
++    const DIRECT_TRANSLATED_P2P: u16 = 1 << 6;
++    if capability & REQUIRED != REQUIRED
++        || control & REQUIRED != REQUIRED
++        || control & DIRECT_TRANSLATED_P2P != 0
++    {
++        return Err(DeviceDmaError::UnsupportedPlatform);
++    }
++    Ok(())
++}
++
++#[cfg(ktest)]
++mod tests {
++    use ostd::prelude::ktest;
++
++    use super::*;
++
++    #[ktest]
++    fn acs_requires_each_supported_and_enabled_isolation_control() {
++        assert_eq!(validate_acs_bits(0x1d, 0x1d), Ok(()));
++        for bit in [0, 2, 3, 4] {
++            assert_eq!(
++                validate_acs_bits(0x1d & !(1 << bit), 0x1d),
++                Err(DeviceDmaError::UnsupportedPlatform)
++            );
++            assert_eq!(
++                validate_acs_bits(0x1d, 0x1d & !(1 << bit)),
++                Err(DeviceDmaError::UnsupportedPlatform)
++            );
++        }
++    }
++
++    #[ktest]
++    fn direct_translated_peer_path_is_never_accepted() {
++        assert_eq!(
++            validate_acs_bits(0x7f, 0x5d),
++            Err(DeviceDmaError::UnsupportedPlatform)
++        );
++        assert_eq!(validate_acs_bits(0x7f, 0x1f), Ok(()));
++    }
++}
+diff --git a/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs b/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
+--- a/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
++++ b/ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
+@@ -66,10 +66,9 @@
+ }
+ fn location(r: PciDmaRequester) -> Result<PciDeviceLocation, E> {
+     if r.segment() != 0
+-        || r.bus() != 0
+         || r.device() > 31
+-        || r.function() != 0
+-        || (r.device() == 0 && r.function() == 0)
++        || r.function() > 7
++        || (r.bus() == 0 && r.device() == 0 && r.function() == 0)
+     {
+         return Err(E::InvalidRequester);
+     }
+@@ -83,15 +82,29 @@
+     /// Caller guarantees exclusive, quiescent endpoint ownership, no aliases,
+     /// no ATS/PRI/PASID, and BME disabled until this operation completes.
+     pub(crate) fn new(requester: PciDmaRequester) -> Result<Self, E> {
++        if requester.bus() != 0 {
++            return Err(E::InvalidRequester);
++        }
++        let path = [(requester.device(), requester.function())];
++        Self::new_with_path(requester, &path)
++    }
++
++    /// Creates a private domain for a requester whose actual route was resolved
++    /// by the PCI owner. `path` is root-bus-to-endpoint device/function metadata;
++    /// it is not independently authenticated against PCI configuration space.
++    /// The PCI caller must establish that this exact route belongs to the
++    /// exclusively owned, quiescent endpoint before invoking this constructor.
++    pub(crate) fn new_with_path(requester: PciDmaRequester, path: &[(u8, u8)]) -> Result<Self, E> {
+         let loc = location(requester)?;
+         if PAGE_TABLE.get().is_none() {
+             return Err(E::UnsupportedPlatform);
+         }
+-        if !crate::arch::kernel::acpi::vtd_policy::requester_allowed(
++        if !crate::arch::kernel::acpi::vtd_policy::requester_allowed_with_path(
+             requester.segment(),
+             requester.bus(),
+             requester.device(),
+             requester.function(),
++            path,
+         ) {
+             return Err(E::UnsupportedPlatform);
+         }
+@@ -259,13 +272,15 @@
+     use crate::prelude::ktest;
+ 
+     #[ktest]
+-    fn rejects_non_root_and_reserved_requesters() {
+-        for r in [
+-            PciDmaRequester::new(0, 1, 1, 0).unwrap(),
+-            PciDmaRequester::new(0, 0, 0, 0).unwrap(),
+-        ] {
+-            assert_eq!(location(r).err(), Some(E::InvalidRequester));
+-        }
++    fn rejects_reserved_root_and_requires_route_for_downstream_requesters() {
++        let host = PciDmaRequester::new(0, 0, 0, 0).unwrap();
++        assert_eq!(location(host).err(), Some(E::InvalidRequester));
++        let downstream = PciDmaRequester::new(0, 1, 0, 0).unwrap();
++        assert!(location(downstream).is_ok());
++        assert_eq!(
++            DomainHandle::new(downstream).err(),
++            Some(E::InvalidRequester)
++        );
+         assert!(location(PciDmaRequester::new(0, 0, 31, 0).unwrap()).is_ok());
+     }
+ 
+diff --git a/ostd/src/arch/x86/kernel/acpi/vtd_policy.rs b/ostd/src/arch/x86/kernel/acpi/vtd_policy.rs
+--- a/ostd/src/arch/x86/kernel/acpi/vtd_policy.rs
++++ b/ostd/src/arch/x86/kernel/acpi/vtd_policy.rs
+@@ -3,11 +3,12 @@
+ 
+ //! Strict initial Intel VT-d topology acceptance.
+ //!
+-//! This deliberately accepts only a single segment-zero DRHD with INCLUDE_PCI_ALL
+-//! clear, or a single include-all DRHD with no endpoint scopes. For the former,
+-//! requester membership is the exact set of validated endpoint scopes. The parser
+-//! inventories and validates the complete ACPI root and every immediate child;
+-//! malformed input and unsupported remapping structures fail closed.
++//! This deliberately accepts only one segment-zero DRHD and never treats
++//! INCLUDE_PCI_ALL as authorization. Validated type-1 endpoint scopes authorize
++//! exact paths; type-2 bridge scopes authorize strict descendants of their path,
++//! but not the bridge itself. Paths are metadata supplied by the PCI owner, not
++//! hardware-authenticated topology. The parser inventories and validates the
++//! complete ACPI root and every immediate child; unsupported structures fail closed.
+ 
+ use acpi::{AcpiHandler, rsdp::Rsdp};
+ use spin::Once;
+@@ -29,22 +30,99 @@
+ const DMAR_HEADER_LENGTH: usize = 48;
+ const DRHD_HEADER_LENGTH: usize = 16;
+ const DEVICE_SCOPE_HEADER_LENGTH: usize = 6;
+-const ENDPOINT_BITMAP_WORDS: usize = 8;
++const MAX_DEVICE_PATH_LENGTH: usize = 8;
++const MAX_DEVICE_SCOPES: usize = 128;
++const MCFG_HEADER_LENGTH: usize = SDT_HEADER_LENGTH + 8;
++const MCFG_ENTRY_LENGTH: usize = 16;
++const MCFG_LENGTH: usize = MCFG_HEADER_LENGTH + MCFG_ENTRY_LENGTH;
++const ECAM_BUS_SIZE: u64 = 1 << 20;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum ScopeKind {
++    Endpoint,
++    Bridge,
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++struct DeviceScope {
++    kind: ScopeKind,
++    start_bus: u8,
++    path: [(u8, u8); MAX_DEVICE_PATH_LENGTH],
++    length: usize,
++}
++
++impl DeviceScope {
++    const EMPTY: Self = Self {
++        kind: ScopeKind::Endpoint,
++        start_bus: 0,
++        path: [(0, 0); MAX_DEVICE_PATH_LENGTH],
++        length: 0,
++    };
++}
+ 
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ struct VtdPolicy {
+     register_base: u64,
+     include_all: bool,
+-    endpoint_bitmap: [u32; ENDPOINT_BITMAP_WORDS],
++    scopes: [DeviceScope; MAX_DEVICE_SCOPES],
++    scope_count: usize,
+ }
+ 
+ impl VtdPolicy {
+     fn allows_requester(&self, segment: u16, bus: u8, device: u8, function: u8) -> bool {
+-        if self.include_all || segment != 0 || bus != 0 || device > 31 || function > 7 {
++        self.allows_requester_with_path(segment, bus, device, function, &[(device, function)])
++    }
++
++    fn allows_requester_with_path(
++        &self,
++        segment: u16,
++        bus: u8,
++        device: u8,
++        function: u8,
++        path: &[(u8, u8)],
++    ) -> bool {
++        if self.include_all
++            || segment != 0
++            || device > 31
++            || function > 7
++            || path.is_empty()
++            || path.len() > MAX_DEVICE_PATH_LENGTH
++            || path.last() != Some(&(device, function))
++            // A one-element route is a root-bus endpoint. Nonzero requester
++            // buses require a genuine bridge chain from the root bus.
++            || (bus == 0 && path.len() != 1)
++            || (bus != 0 && path.len() < 2)
++            || path.iter().any(|(dev, fun)| *dev > 31 || *fun > 7)
++        {
+             return false;
+         }
+-        let index = device as usize * 8 + function as usize;
+-        self.endpoint_bitmap[index / 32] & (1 << (index % 32)) != 0
++
++        self.scopes[..self.scope_count]
++            .iter()
++            .any(|scope| match scope.kind {
++                ScopeKind::Endpoint => {
++                    // A root-start scope can describe the complete route. QEMU
++                    // also emits one-hop endpoint scopes whose start bus is the
++                    // endpoint's actual bus; match those only to the route's
++                    // final requester, never to an unrelated same-BDF device.
++                    (scope.start_bus == 0
++                        && scope.length == path.len()
++                        && scope.path[..scope.length] == path[..])
++                        || (scope.start_bus == bus
++                            && scope.length == 1
++                            && scope.path[0] == (device, function))
++                }
++                // A bridge scope applies only below the bridge, never to its own BDF.
++                ScopeKind::Bridge => {
++                    // The route API carries BDF hops but not intermediate bus
++                    // numbers, so only a scope rooted at bus zero can safely be
++                    // matched as a route prefix. Other bridge scopes are parsed
++                    // and retained but do not independently grant permission.
++                    scope.start_bus == 0
++                        && scope.length < path.len()
++                        && scope.path[..scope.length] == path[..scope.length]
++                }
++            })
+     }
+ }
+ 
+@@ -67,6 +145,8 @@
+     InvalidDmarHeader,
+     InvalidDrhd,
+     InvalidDeviceScope,
++    InvalidMcfg,
++    MultipleMcfg,
+ }
+ 
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -102,12 +182,27 @@
+     Ok(policy.register_base)
+ }
+ 
+-/// Returns true only for a requester explicitly listed by the validated DMAR.
+-/// An INCLUDE_PCI_ALL DRHD does not widen this software authorization policy.
++/// Returns true for an explicitly scoped root-bus endpoint only.
++/// An INCLUDE_PCI_ALL DRHD never widens software authorization.
+ pub(in crate::arch) fn requester_allowed(segment: u16, bus: u8, device: u8, function: u8) -> bool {
+     VALIDATED_POLICY
+         .get()
+         .is_some_and(|policy| policy.allows_requester(segment, bus, device, function))
++}
++
++/// Checks a caller-resolved root-bus-to-requester route against validated DMAR
++/// scopes. The PCI owner must supply the actual topology path; this function
++/// only checks route metadata and does not authenticate hardware topology.
++pub(in crate::arch) fn requester_allowed_with_path(
++    segment: u16,
++    bus: u8,
++    device: u8,
++    function: u8,
++    path: &[(u8, u8)],
++) -> bool {
++    VALIDATED_POLICY.get().is_some_and(|policy| {
++        policy.allows_requester_with_path(segment, bus, device, function, path)
++    })
+ }
+ 
+ fn root_from_rsdp(address: usize) -> Result<(RootKind, usize), VtdPolicyError> {
+@@ -166,6 +261,7 @@
+     }
+ 
+     let mut found_dmar = None;
++    let mut found_mcfg = false;
+     for index in 0..entry_count {
+         let offset = SDT_HEADER_LENGTH
+             .checked_add(
+@@ -195,8 +291,59 @@
+             }
+             found_dmar = Some(parse_dmar(child)?);
+         }
++        if signature == *b"MCFG" {
++            validate_mcfg_inventory(&mut found_mcfg, child)?;
++        }
+     }
+     found_dmar.ok_or(VtdPolicyError::MissingDmar)
++}
++
++/// MCFG is optional for conventional CF8 access, but when present only one
++/// segment-zero allocation covering buses 0..=N is accepted.
++fn validate_mcfg_inventory(found: &mut bool, bytes: &[u8]) -> Result<(), VtdPolicyError> {
++    if *found {
++        return Err(VtdPolicyError::MultipleMcfg);
++    }
++    parse_mcfg(bytes)?;
++    *found = true;
++    Ok(())
++}
++
++fn parse_mcfg(bytes: &[u8]) -> Result<(), VtdPolicyError> {
++    if bytes.len() != MCFG_LENGTH || &bytes[..4] != b"MCFG" {
++        return Err(VtdPolicyError::InvalidMcfg);
++    }
++    let declared_length = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
++    if declared_length != MCFG_LENGTH {
++        return Err(VtdPolicyError::InvalidMcfg);
++    }
++    if checksum(bytes) != 0 {
++        return Err(VtdPolicyError::InvalidChecksum);
++    }
++    let entry = &bytes[MCFG_HEADER_LENGTH..];
++    let base = u64::from_le_bytes(entry[..8].try_into().unwrap());
++    let segment = u16::from_le_bytes(entry[8..10].try_into().unwrap());
++    let bus_start = entry[10];
++    let bus_end = entry[11];
++    if bytes[SDT_HEADER_LENGTH..MCFG_HEADER_LENGTH]
++        .iter()
++        .any(|byte| *byte != 0)
++        || entry[12..].iter().any(|byte| *byte != 0)
++        || segment != 0
++        || bus_start != 0
++        || bus_start > bus_end
++        || base == 0
++        || !base.is_multiple_of(ECAM_BUS_SIZE)
++    {
++        return Err(VtdPolicyError::InvalidMcfg);
++    }
++    let end = base
++        .checked_add((u64::from(bus_end) + 1) * ECAM_BUS_SIZE)
++        .ok_or(VtdPolicyError::InvalidMcfg)?;
++    if end > MAX_ACPI_PHYSICAL_ADDRESS as u64 {
++        return Err(VtdPolicyError::InvalidMcfg);
++    }
++    Ok(())
+ }
+ 
+ fn parse_sdt_header(
+@@ -308,7 +455,8 @@
+     let mut policy = VtdPolicy {
+         register_base,
+         include_all: flags == 1,
+-        endpoint_bitmap: [0; ENDPOINT_BITMAP_WORDS],
++        scopes: [DeviceScope::EMPTY; MAX_DEVICE_SCOPES],
++        scope_count: 0,
+     };
+     let mut saw_ioapic = false;
+     let mut offset = DRHD_HEADER_LENGTH;
+@@ -322,16 +470,19 @@
+         }
+         let scope = &bytes[offset..offset + length];
+         match parse_device_scope(scope)? {
+-            Some((device, function)) => {
++            Some(device_scope) => {
+                 if policy.include_all {
+                     return Err(VtdPolicyError::InvalidDeviceScope);
+                 }
+-                let index = device as usize * 8 + function as usize;
+-                let bit = 1 << (index % 32);
+-                if policy.endpoint_bitmap[index / 32] & bit != 0 {
++                if policy.scope_count == MAX_DEVICE_SCOPES
++                    || policy.scopes[..policy.scope_count]
++                        .iter()
++                        .any(|previous| scopes_overlap(*previous, device_scope))
++                {
+                     return Err(VtdPolicyError::InvalidDeviceScope);
+                 }
+-                policy.endpoint_bitmap[index / 32] |= bit;
++                policy.scopes[policy.scope_count] = device_scope;
++                policy.scope_count += 1;
+             }
+             None => {
+                 if saw_ioapic {
+@@ -345,11 +496,13 @@
+     Ok(policy)
+ }
+ 
+-/// Endpoint scopes become explicit PCI requester membership. The one narrowly
+-/// supported non-endpoint scope is QEMU's canonical IOAPIC scope; it grants no
+-/// PCI requester permission.
+-fn parse_device_scope(bytes: &[u8]) -> Result<Option<(u8, u8)>, VtdPolicyError> {
+-    if bytes.len() != DEVICE_SCOPE_HEADER_LENGTH + 2 {
++/// Only standard endpoint and bridge scopes are retained, plus the canonical
++/// IOAPIC scope which grants no PCI permission. Nonzero start buses are accepted
++/// as metadata; authorization uses them only for an endpoint's exact requester
++/// bus. Nonzero-bus bridge scopes cannot authorize without per-hop bus metadata.
++/// Aliases and all other scope kinds remain unsupported.
++fn parse_device_scope(bytes: &[u8]) -> Result<Option<DeviceScope>, VtdPolicyError> {
++    if bytes.len() < DEVICE_SCOPE_HEADER_LENGTH {
+         return Err(VtdPolicyError::InvalidDeviceScope);
+     }
+     let typ = bytes[0];
+@@ -357,16 +510,65 @@
+     if length != bytes.len() || bytes[2] != 0 || bytes[3] != 0 || bytes[4] != 0 {
+         return Err(VtdPolicyError::InvalidDeviceScope);
+     }
+-    let bus = bytes[5];
+-    let device = bytes[6];
+-    let function = bytes[7];
+-    if device > 31 || function > 7 {
+-        return Err(VtdPolicyError::InvalidDeviceScope);
+-    }
+     match typ {
+-        1 if bus == 0 => Ok(Some((device, function))),
+-        3 if bus == 0xff && device == 0 && function == 0 => Ok(None),
++        1 | 2 => {
++            let path_bytes = bytes.len() - DEVICE_SCOPE_HEADER_LENGTH;
++            if path_bytes == 0
++                || !path_bytes.is_multiple_of(2)
++                || path_bytes / 2 > MAX_DEVICE_PATH_LENGTH
++            {
++                return Err(VtdPolicyError::InvalidDeviceScope);
++            }
++            let mut path = [(0, 0); MAX_DEVICE_PATH_LENGTH];
++            let length = path_bytes / 2;
++            for (index, pair) in bytes[DEVICE_SCOPE_HEADER_LENGTH..]
++                .chunks_exact(2)
++                .enumerate()
++            {
++                let device = pair[0];
++                let function = pair[1];
++                if device > 31 || function > 7 {
++                    return Err(VtdPolicyError::InvalidDeviceScope);
++                }
++                path[index] = (device, function);
++            }
++            Ok(Some(DeviceScope {
++                kind: if typ == 1 {
++                    ScopeKind::Endpoint
++                } else {
++                    ScopeKind::Bridge
++                },
++                start_bus: bytes[5],
++                path,
++                length,
++            }))
++        }
++        3 if bytes.len() == DEVICE_SCOPE_HEADER_LENGTH + 2
++            && bytes[5] == 0xff
++            && bytes[6] == 0
++            && bytes[7] == 0 =>
++        {
++            Ok(None)
++        }
+         _ => Err(VtdPolicyError::InvalidDeviceScope),
++    }
++}
++
++fn scopes_overlap(left: DeviceScope, right: DeviceScope) -> bool {
++    // Start-bus numbers identify the bus on which each scope's path begins;
++    // same BDF sequences rooted at different buses are distinct scope objects.
++    if left.start_bus != right.start_bus {
++        return false;
++    }
++    let common = core::cmp::min(left.length, right.length);
++    if left.path[..common] != right.path[..common] {
++        return false;
++    }
++    match (left.kind, right.kind) {
++        (ScopeKind::Endpoint, ScopeKind::Endpoint) => left.length == right.length,
++        (ScopeKind::Bridge, ScopeKind::Bridge) => true,
++        (ScopeKind::Bridge, ScopeKind::Endpoint) => left.length < right.length,
++        (ScopeKind::Endpoint, ScopeKind::Bridge) => right.length < left.length,
+     }
+ }
+ 
+@@ -440,6 +642,24 @@
+         table
+     }
+ 
++    fn synthetic_mcfg() -> alloc::vec::Vec<u8> {
++        let mut table = alloc::vec![0u8; MCFG_LENGTH];
++        table[..4].copy_from_slice(b"MCFG");
++        table[4..8].copy_from_slice(&(MCFG_LENGTH as u32).to_le_bytes());
++        let entry = &mut table[MCFG_HEADER_LENGTH..];
++        // Q35's common ECAM aperture: segment 0, buses 0 through 255.
++        entry[..8].copy_from_slice(&0xb000_0000u64.to_le_bytes());
++        entry[10] = 0;
++        entry[11] = 255;
++        reseal(&mut table);
++        table
++    }
++
++    fn reseal(table: &mut [u8]) {
++        table[9] = 0;
++        table[9] = 0u8.wrapping_sub(checksum(table));
++    }
++
+     fn synthetic_drhd(flags: u8, segment: u16, scopes: &[u8], base: u64) -> alloc::vec::Vec<u8> {
+         let mut drhd = alloc::vec![0u8; DRHD_HEADER_LENGTH];
+         drhd[2..4].copy_from_slice(&((DRHD_HEADER_LENGTH + scopes.len()) as u16).to_le_bytes());
+@@ -473,6 +693,67 @@
+             scopes,
+             0xfed9_0000,
+         )))
++    }
++
++    #[ktest]
++    fn accepts_only_one_strict_first_region_mcfg() {
++        let valid = synthetic_mcfg();
++        assert_eq!(parse_mcfg(&valid), Ok(()));
++        let mut found = false;
++        assert_eq!(validate_mcfg_inventory(&mut found, &valid), Ok(()));
++        assert!(found);
++        assert_eq!(
++            validate_mcfg_inventory(&mut found, &valid),
++            Err(VtdPolicyError::MultipleMcfg)
++        );
++
++        let mut multi_entry = valid.clone();
++        multi_entry.extend_from_slice(&[0; MCFG_ENTRY_LENGTH]);
++        let multi_entry_length = multi_entry.len() as u32;
++        multi_entry[4..8].copy_from_slice(&multi_entry_length.to_le_bytes());
++        reseal(&mut multi_entry);
++        assert_eq!(parse_mcfg(&multi_entry), Err(VtdPolicyError::InvalidMcfg));
++
++        for (offset, value) in [(52, 1), (54, 1), (36, 1), (56, 1)] {
++            let mut invalid = valid.clone();
++            invalid[offset] = value;
++            reseal(&mut invalid);
++            assert_eq!(parse_mcfg(&invalid), Err(VtdPolicyError::InvalidMcfg));
++        }
++
++        let mut invalid_range = valid.clone();
++        invalid_range[54] = 1;
++        invalid_range[55] = 0;
++        reseal(&mut invalid_range);
++        assert_eq!(parse_mcfg(&invalid_range), Err(VtdPolicyError::InvalidMcfg));
++
++        let mut unaligned = valid.clone();
++        unaligned[MCFG_HEADER_LENGTH] = 1;
++        reseal(&mut unaligned);
++        assert_eq!(parse_mcfg(&unaligned), Err(VtdPolicyError::InvalidMcfg));
++
++        let mut zero_base = valid.clone();
++        zero_base[MCFG_HEADER_LENGTH..MCFG_HEADER_LENGTH + 8].fill(0);
++        reseal(&mut zero_base);
++        assert_eq!(parse_mcfg(&zero_base), Err(VtdPolicyError::InvalidMcfg));
++
++        let mut out_of_bounds = valid.clone();
++        let base = MAX_ACPI_PHYSICAL_ADDRESS as u64 - ECAM_BUS_SIZE;
++        out_of_bounds[MCFG_HEADER_LENGTH..MCFG_HEADER_LENGTH + 8]
++            .copy_from_slice(&base.to_le_bytes());
++        out_of_bounds[55] = 1;
++        reseal(&mut out_of_bounds);
++        assert_eq!(parse_mcfg(&out_of_bounds), Err(VtdPolicyError::InvalidMcfg));
++
++        let mut overflowing = valid.clone();
++        overflowing[MCFG_HEADER_LENGTH..MCFG_HEADER_LENGTH + 8]
++            .copy_from_slice(&0xffff_ffff_fff0_0000u64.to_le_bytes());
++        reseal(&mut overflowing);
++        assert_eq!(parse_mcfg(&overflowing), Err(VtdPolicyError::InvalidMcfg));
++
++        let mut truncated = valid;
++        truncated.pop();
++        assert_eq!(parse_mcfg(&truncated), Err(VtdPolicyError::InvalidMcfg));
+     }
+ 
+     #[ktest]
+@@ -494,6 +775,45 @@
+     }
+ 
+     #[ktest]
++    fn endpoint_path_is_exact_and_bridge_scope_excludes_the_bridge_itself() {
++        let mut scopes = scope(1, 0, &[(2, 0), (4, 1)]);
++        scopes.extend_from_slice(&scope(2, 0, &[(5, 0)]));
++        let policy = policy(0, &scopes).unwrap();
++
++        assert!(policy.allows_requester_with_path(0, 2, 4, 1, &[(2, 0), (4, 1)]));
++        assert!(!policy.allows_requester_with_path(0, 2, 4, 0, &[(2, 0), (4, 1)]));
++        assert!(!policy.allows_requester_with_path(0, 2, 4, 1, &[(2, 0), (4, 1), (6, 0)]));
++        assert!(policy.allows_requester_with_path(0, 3, 7, 2, &[(5, 0), (7, 2)]));
++        assert!(!policy.allows_requester_with_path(0, 0, 5, 0, &[(5, 0)]));
++        assert!(!policy.allows_requester_with_path(0, 3, 7, 2, &[(6, 0), (7, 2)]));
++        assert!(!policy.allows_requester_with_path(1, 3, 7, 2, &[(5, 0), (7, 2)]));
++        assert!(!policy.allows_requester_with_path(0, 3, 7, 2, &[(5, 0)]));
++    }
++
++    #[ktest]
++    fn matches_qemu_one_hop_endpoint_scope_using_requester_bus() {
++        // QEMU 7.2 emits a bridge scope on its parent bus and a one-hop endpoint
++        // scope on the endpoint's own bus. The root bridge scope admits the
++        // subtree; the endpoint scope independently matches only its final BDF.
++        let mut scopes = scope(2, 0, &[(5, 0)]);
++        scopes.extend_from_slice(&scope(1, 2, &[(7, 1)]));
++        let combined = policy(0, &scopes).unwrap();
++        assert!(combined.allows_requester_with_path(0, 2, 7, 1, &[(5, 0), (7, 1)]));
++        // The bridge scope authorizes strict descendants. The PCI owner, not DMAR,
++        // verifies the live bus numbers along the supplied root-to-endpoint route.
++        assert!(combined.allows_requester_with_path(0, 3, 7, 1, &[(5, 0), (7, 1)]));
++        let endpoint = policy(0, &scope(1, 2, &[(7, 1)])).unwrap();
++        assert!(endpoint.allows_requester_with_path(0, 2, 7, 1, &[(5, 0), (7, 1)]));
++        assert!(!endpoint.allows_requester_with_path(0, 3, 7, 1, &[(5, 0), (7, 1)]));
++        assert!(!endpoint.allows_requester_with_path(0, 2, 7, 0, &[(5, 0), (7, 1)]));
++
++        // A nonzero-bus bridge scope is accepted, but cannot independently
++        // authorize because this API does not carry intermediate bus numbers.
++        let nonzero_bridge = policy(0, &scope(2, 2, &[(5, 0)])).unwrap();
++        assert!(!nonzero_bridge.allows_requester_with_path(0, 3, 7, 1, &[(5, 0), (7, 1)]));
++    }
++
++    #[ktest]
+     fn include_all_is_accepted_but_never_grants_implicit_requester_membership() {
+         let accepted = policy(1, &[]).unwrap();
+         assert!(accepted.include_all);
+@@ -533,13 +853,7 @@
+             parse_dmar(&synthetic_dmar(&synthetic_drhd(0, 1, &[], 0xfed9_0000))),
+             Err(VtdPolicyError::InvalidDrhd)
+         );
+-        for (typ, bus, path) in [
+-            (2, 0, &[(1, 0)][..]),
+-            (1, 0, &[(1, 0), (2, 0)][..]),
+-            (4, 0, &[(1, 0)][..]),
+-            (1, 1, &[(1, 0)][..]),
+-            (3, 0xff, &[(1, 0)][..]),
+-        ] {
++        for (typ, bus, path) in [(4, 0, &[(1, 0)][..]), (3, 0xff, &[(1, 0)][..])] {
+             let bytes = scope(typ, bus, path);
+             assert_eq!(policy(0, &bytes), Err(VtdPolicyError::InvalidDeviceScope));
+         }
+@@ -555,12 +869,38 @@
+             policy(0, &repeated_ioapic),
+             Err(VtdPolicyError::InvalidDeviceScope)
+         );
++        let mut duplicate_bridge = scope(2, 0, &[(1, 0)]);
++        duplicate_bridge.extend_from_slice(&scope(2, 0, &[(1, 0)]));
++        assert_eq!(
++            policy(0, &duplicate_bridge),
++            Err(VtdPolicyError::InvalidDeviceScope)
++        );
++        let mut nested_overlapping_bridges = scope(2, 0, &[(1, 0)]);
++        nested_overlapping_bridges.extend_from_slice(&scope(2, 0, &[(1, 0), (2, 0)]));
++        assert_eq!(
++            policy(0, &nested_overlapping_bridges),
++            Err(VtdPolicyError::InvalidDeviceScope)
++        );
++        let mut endpoint_inside_bridge = scope(2, 0, &[(1, 0)]);
++        endpoint_inside_bridge.extend_from_slice(&scope(1, 0, &[(1, 0), (2, 0)]));
++        assert_eq!(
++            policy(0, &endpoint_inside_bridge),
++            Err(VtdPolicyError::InvalidDeviceScope)
++        );
+         assert_eq!(
+             parse_device_scope(&scope(1, 0, &[(32, 0)])),
+             Err(VtdPolicyError::InvalidDeviceScope)
+         );
+         assert_eq!(
+             parse_device_scope(&scope(1, 0, &[(1, 8)])),
++            Err(VtdPolicyError::InvalidDeviceScope)
++        );
++        assert_eq!(
++            parse_device_scope(&scope(1, 0, &[(1, 0); MAX_DEVICE_PATH_LENGTH + 1])),
++            Err(VtdPolicyError::InvalidDeviceScope)
++        );
++        assert_eq!(
++            parse_device_scope(&scope(1, 0, &[])),
+             Err(VtdPolicyError::InvalidDeviceScope)
+         );
+     }
+diff --git a/ostd/src/mm/dma/isolated.rs b/ostd/src/mm/dma/isolated.rs
+--- a/ostd/src/mm/dma/isolated.rs
++++ b/ostd/src/mm/dma/isolated.rs
+@@ -16,9 +16,10 @@
+ /// mapped physical frame is owned untyped storage; no arbitrary PADDR is accepted.
+ /// Legacy TT=00 denies translated requests (device-TLB operation is not enabled).
+ ///
+-/// The initial implementation rejects unsupported firmware topology, bridges,
+-/// nonzero buses/segments and CVMs. The PCI wrapper additionally rejects PCIe
+-/// endpoints until extended-capability/ATS ownership has been implemented.
++/// Only explicit supported DMAR routes are accepted; unsupported firmware
++/// topology, nonzero segments and CVMs remain rejected. Use [`Self::new_with_path`]
++/// for a requester below a PCI bridge. This primitive does not discover or
++/// authenticate topology: its PCI owner must resolve and validate the route.
+ #[cfg(target_arch = "x86_64")]
+ pub struct IsolatedDmaContext {
+     handle: crate::arch::iommu::DomainHandle,
+@@ -32,16 +33,44 @@
+     /// Requester binding
+     /// The caller must exclusively own the actual enumerated PCI function and
+     /// keep it quiescent with BME disabled until this returns. There must be no
+-    /// requester aliases or bridges, and ATS, PRI and PASID must be absent or
+-    /// disabled throughout the domain lifetime. The function must be a normal
+-    /// root-bus endpoint, not a host/PCI bridge. Its ownership must outlive this
+-    /// context. No device DMA may be pending when buffers/context are dropped.
++    /// requester aliases, and ATS, PRI and PASID must be absent or disabled
++    /// throughout the domain lifetime. This compatibility constructor admits
++    /// only an explicitly scoped endpoint directly on root bus zero. Its
++    /// ownership must outlive this context. No device DMA may be pending when
++    /// buffers/context are dropped.
+     pub fn new(requester: PciDmaRequester, mask: DmaMask) -> Result<Self, DeviceDmaError> {
+         check_context()?;
+         if crate::arch::if_tdx_enabled!({ true } else { false }) {
+             return Err(DeviceDmaError::UnsupportedPlatform);
+         }
+         let handle = crate::arch::iommu::DomainHandle::new(requester)?;
++        Ok(Self {
++            handle,
++            requester,
++            mask,
++        })
++    }
++
++    /// Creates a private domain for an explicitly scoped endpoint at the end
++    /// of a route resolved by the PCI owner.
++    ///
++    /// `path` is the ordered `(device, function)` chain from root bus zero to
++    /// `requester`, with at most eight elements. A direct root-bus endpoint has
++    /// one element; a requester behind bridges has a multi-element chain. The
++    /// route is authorization metadata, not hardware authentication: the PCI
++    /// wrapper must resolve the actual topology and bind this path to the
++    /// exclusively owned endpoint. The caller must retain the same quiescence,
++    /// no-alias, ATS/PRI/PASID, and lifetime guarantees as for [`Self::new`].
++    pub fn new_with_path(
++        requester: PciDmaRequester,
++        mask: DmaMask,
++        path: &[(u8, u8)],
++    ) -> Result<Self, DeviceDmaError> {
++        check_context()?;
++        if crate::arch::if_tdx_enabled!({ true } else { false }) {
++            return Err(DeviceDmaError::UnsupportedPlatform);
++        }
++        let handle = crate::arch::iommu::DomainHandle::new_with_path(requester, path)?;
+         Ok(Self {
+             handle,
+             requester,
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -22,6 +22,9 @@
+         pci_test_device=""
+         if [[ "$suite" == pci || "$suite" == pci-iommu ]]; then
+             pci_test_device=" -device pci-testdev,membar=4096 -device edu,dma_mask=4294967295,addr=05.0 -device edu,dma_mask=4294967295,addr=06.0"
++            pci_test_device+=" -device pcie-root-port,id=rp-good,addr=07.0,chassis=7,hotplug=off -device nvme,bus=rp-good,addr=00.0,serial=ASTER-PCIE-DMA"
++            pci_test_device+=" -device pcie-root-port,id=rp-noacs,addr=08.0,chassis=8,hotplug=off,disable-acs=on -device nvme,bus=rp-noacs,addr=00.0,serial=ASTER-NO-ACS"
++            pci_test_device+=" -device pci-bridge,id=legacy,addr=09.0,chassis_nr=9,shpc=off -device edu,bus=legacy,addr=01.0,dma_mask=4294967295"
+         fi
+         if [[ "$suite" == pci-iommu ]]; then
+             pci_test_device+=" -device intel-iommu,intremap=on"
+@@ -59,9 +62,12 @@
+ PY
+     if [[ "$suite" == pci ]]; then
+         grep -Fq 'PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles;' "$log"
++        grep -Fq 'PCIe topology negative cases passed without IOMMU; no PCIe DMA issued' "$log"
+     elif [[ "$suite" == pci-iommu ]]; then
+         grep -Fq 'DMA remapping enabled' "$log"
+         grep -Fq 'PCI device DMA correctly rejected unsupported IOMMU/CVM platform; zero DMA issued' "$log"
++        grep -Fq 'PCIe NVMe isolated DMA passed:' "$log"
++        grep -Fq 'PCIe topology negative cases passed: ACS controls off, ACS absent, legacy bridge alias rejected before BME;' "$log"
+         grep -Fq 'PCI isolated DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles;' "$log"
+         grep -Fq 'PCI isolated DMA revocation passed:' "$log"
+         grep -Fq 'PCI isolated DMA simultaneous requester isolation passed:' "$log"

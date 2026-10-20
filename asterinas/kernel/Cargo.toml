@@ -1,0 +1,33 @@
+[package]
+name = "asterinas"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+aster-core.workspace = true
+ostd.workspace = true
+ostd-nvidia-nvport = { workspace = true, optional = true }
+aster-nvidia-platform = { path = "comps/nvidia-platform", optional = true }
+
+# High-level component crates.
+#
+# Keep this list in sync with the `extern crate` declarations in `src/lib.rs`.
+aster-drm.workspace = true
+aster-simpledrm.workspace = true
+aster-uart.workspace = true
+
+[target.x86_64-unknown-none.dependencies]
+aster-i8042.workspace = true
+
+[features]
+default = ["cvm_guest"]
+nvidia-nvport-selftest = ["dep:ostd-nvidia-nvport", "aster-nvidia-platform?/nvport-runtime"]
+nvidia-pci-diagnostics = ["dep:aster-nvidia-platform"]
+native-gpu-ci = ["nvidia-nvport-selftest", "nvidia-pci-diagnostics"]
+coverage = ["aster-core/coverage"]
+cvm_guest = ["aster-core/cvm_guest"]
+pvh_boot = ["aster-core/pvh_boot"]
+riscv_sv39_mode = ["aster-core/riscv_sv39_mode"]
+
+[lints]
+workspace = true

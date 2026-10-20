@@ -1,0 +1,49 @@
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+{
+  systemd.package = pkgs.aster_systemd;
+
+  # TODO: The following services currently do not work and
+  # may affect systemd startup or cause performance issues.
+  # Enable them after they can run successfully.
+  systemd.coredump.enable = false;
+  systemd.oomd.enable = false;
+  systemd.services.logrotate.enable = false;
+  systemd.services.network-setup.enable = false;
+  systemd.services.resolvconf.enable = false;
+  systemd.services.systemd-random-seed.enable = false;
+  services.timesyncd.enable = false;
+  services.udev.enable = false;
+
+  services.getty.autologinUser = "root";
+  services.getty.loginProgram = "${pkgs.util-linux.bin}/bin/login";
+  users.users.root = {
+    shell = "${pkgs.bash}/bin/bash";
+    hashedPassword = null;
+  };
+
+  systemd.targets.getty.wants =
+    # tty1: provide text login ONLY when X server is disabled.
+    # Other VTs: always provide text logins
+    (lib.optional (!config.services.xserver.enable) "autovt@tty1.service") ++ [
+      "autovt@hvc0.service"
+      "autovt@tty2.service"
+      "autovt@tty3.service"
+      "autovt@tty4.service"
+      "autovt@tty5.service"
+      "autovt@tty6.service"
+    ];
+
+  systemd.settings.Manager = {
+    LogLevel = "crit";
+    ShowStatus = "no";
+    # Login sessions inherit these limits. Nix needs far more file descriptors
+    # than the default limit of 1024 when it downloads a large closure.
+    DefaultLimitNOFILE = "1048576:1048576";
+  };
+}

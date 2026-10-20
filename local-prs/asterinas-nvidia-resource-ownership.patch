@@ -1,0 +1,1208 @@
+diff --git a/.github/workflows/graphics_gpu.yml b/.github/workflows/graphics_gpu.yml
+--- a/.github/workflows/graphics_gpu.yml
++++ b/.github/workflows/graphics_gpu.yml
+@@ -90,7 +90,7 @@
+           set -euo pipefail
+           bash tools/graphics/run_nvport_format_tests.sh \
+             2>&1 | tee "$NVPORT_OUTPUT/formatter-host-tests.log"
+-      - name: Execute NVport, PCI platform and OSTD suites inside Asterinas
++      - name: Execute NVport, NVIDIA platform, PCI resource lifecycle and OSTD suites inside Asterinas
+         run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
+       - name: Build grub-rescue multiboot2 ISO with serial console
+         shell: bash
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -35,3 +35,60 @@
+ Asterinas already provides `PciDriver`/`register_driver`, `Bar::acquire`, `IoMem`, IRQ, DMA and scheduler facilities; the work is to supply NVIDIA-specific ownership and correct device-bound semantics, not invent stub equivalents. Its PCI driver interface currently lacks a remove callback, which must be addressed or explicitly bounded to non-hot-unplug lifetime before claiming complete teardown.
+ 
+ DRM additionally needs a real `DrmDevice` and per-open RM state mapped to Asterinas' `DrmMinor`/`DrmFile` lifecycle, GPU-backed GEM, sharing/synchronization and display operations. A successful future compute dispatch still would not establish KMS scanout, Wayland rendering/presentation or full GPUI acceptance.
++
++## Reversible pre-RM resources (supersedes inventory-only API status)
++
++Default component initialization remains read-only. The explicit
++`device::NvidiaDeviceResources` API now connects measured NVIDIA BAR metadata to actual
++`aster-pci`/OSTD ownership. It is deliberately not a `PciDriver`: a successful probe advertises
++a working device, which this incomplete RM port cannot supply. There is no substitute RM crate
++or fake-success initialization callback.
++
++Obtain `PCI_BUS.lock().reserve_unclaimed(location)` and call
++`NvidiaDeviceResources::prepare_reserved(&mut reservation)`. This validates NVIDIA display
++identity, non-prefetchable BAR0 and measured ranges, then acquires real uncacheable MMIO through
++`PciMmioGuard`. The reservation returns the same unbound function to the queue on drop. A
++resource guard cannot outlive its reservation, and neither mutable device access nor a mapping
++clone is exposed through that path. A supported NVIDIA chip is NOT established by the identity
++check. No GPU register reads or firmware uploads occur automatically; explicit register reads
++must first satisfy NVIDIA's actual BAR firewall/power prerequisites.
++
++Preparation rejects pre-existing bus mastering, enabled MSI/MSI-X, non-D0 power states, invalid
++capability lists, unavailable mappings, and interrupt-context acquisition. It enables memory
++decode while keeping DMA and INTx disabled. Ordinary failures unwind acquired resources and
++restore the original command. Final release unmaps/recycles MMIO before command restoration.
++Restoration is best-effort on present, responsive hardware; native QEMU tests verify readback.
++This is boot-time/non-hotplug resource ownership, not GPU reset, DMA quiescence, ISR/worker
++shutdown or hot-unplug. Existing raw PCI configuration APIs remain available to trusted kernel
++code; callers must not use them to bypass the reservation's DMA/interrupt restrictions.
++
++Supporting core fixes remove enumeration's unconditional grant of bus mastering, preserve the
++firmware command across BAR sizing, and avoid clearing adjacent Status W1C flags during Command
++writes. Capability walking is bounded already during enumeration, rejecting cycles and short
++MSI-X headers. IoMem clones/slices share one backing reservation; only final-owner teardown
++unmaps and recycles the region. Sensitive/system-device reservations never return to the public
++allocator. Allocator operations exclude local IRQs to prevent final-drop IRQ reentrancy.
++
++The native CPU test entrypoint now also runs `aster-pci` with QEMU's genuine `pci-testdev`
++(`1b36:0005`, not a spoofed NVIDIA identity). Eight reserve/map/register-read/bounds-check/
++rollback/reacquire cycles exercise the same generic mechanism used by the NVIDIA adapter.
++A separate OSTD test checks clone/slice final-owner lifetime using a synthetic reservation and
++empty virtual area. Neither test executes NVIDIA hardware, RM, GSP, GPU DMA or a benchmark.
++The existing local Actions workflow invokes the expanded suite; no remote run is implied.
++
++The reviewed official NVIDIA tree remains 615.78.08 at
++`1a82fbfda8f321b056eb3568850f9316c5e465c5`. Its `kernel-open/nvidia/nv-pci.c`
++`nv_pci_probe_body` additionally needs `rm_wait_for_bar_firewall`,
++`rm_is_supported_pci_device`, per-device RM state, and an initial 32-bit DMA mask/max segment
++size. CXL ownership and ReBAR reassignment are separate, unimplemented cases. In
++`kernel-open/nvidia/nv.c`, `nv_start_device` establishes power, IRQ and worker prerequisites
++before `rm_init_adapter`; GSP reaches `kgspInitRm_IMPL`/`_kgspBootGspRm`. Last close/removal
++requires genuine `nv_stop_device`/`rm_shutdown_adapter` and ordered task/IRQ/DMA teardown.
++
++Current OSTD `DmaCoherent`/`DmaStream` constructors still receive no PCI identity, device DMA
++mask or per-device IOMMU domain. Wrapping their allocation would not establish those semantics,
++so this adapter cannot enable bus mastering or start RM/GSP. Full acceptance also requires the
++RM ioctl/mmap ABI, allocation/submission/fences/reset, accelerated DRM sharing/synchronization/
++display and native Vulkan/Wayland/GPUI execution. The sandbox has no usable NVIDIA device or KVM.
++Previously extracted firmware remains unverified CPU-test-only data; this resource path never
++loads or executes it. Full driver and GPU benchmark acceptance remain unmet.
+diff --git a/kernel/comps/nvidia-platform/src/device.rs b/kernel/comps/nvidia-platform/src/device.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/src/device.rs
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: MPL-2.0
++//! NVIDIA pre-RM resource ownership. This module deliberately does not implement PciDriver.
++use aster_pci::{
++    common_device::PciCommonDevice,
++    mmio::{MmioPrepareError, PciMmioGuard},
++};
++
++use crate::{ResourceSnapshot, SnapshotError};
++
++/// Failed validation or actual PCI/MMIO acquisition.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum PrepareError {
++    /// Enumerated identity/BAR metadata is invalid.
++    Resources(SnapshotError),
++    /// Real PCI/MMIO service rejected the request; no GPU success is inferred.
++    Pci(MmioPrepareError),
++    /// Prefetchable BAR0 cannot be used as the register aperture by this adapter.
++    PrefetchableRegisters,
++}
++
++/// Exclusive register aperture for a validated NVIDIA display-class function.
++///
++/// This borrows an owned PciCommonDevice (for example, from PciReservation) so its lifetime
++/// cannot exceed the reservation. NVIDIA's nv_pci_probe_body separately requires
++/// rm_wait_for_bar_firewall and rm_is_supported_pci_device; this class does NOT replace
++/// those checks, does not establish RM support and must not be returned as probe success.
++/// It does not start GSP, enable DMA, wire interrupts, issue GPU commands or map BAR1.
++/// Drop releases MMIO and restores the exact pre-acquisition command state.
++pub struct NvidiaDeviceResources<'a> {
++    snapshot: ResourceSnapshot,
++    registers: PciMmioGuard<'a>,
++}
++
++impl<'a> NvidiaDeviceResources<'a> {
++    /// Validates real enumerator metadata, then acquires the actual register BAR.
++    ///
++    /// Requires a non-hotremoved exclusively owned function, with IRQs enabled. GPUs
++    /// requiring CXL subrange ownership, ReBAR reassignment, or power transitions are not
++    /// supported by this pre-RM adapter. No firmware file is read or loaded by this path.
++    pub fn prepare(device: &'a mut PciCommonDevice) -> Result<Self, PrepareError> {
++        let snapshot = ResourceSnapshot::from_device(device).map_err(PrepareError::Resources)?;
++        if snapshot.bars[0].unwrap().prefetchable == Some(true) {
++            return Err(PrepareError::PrefetchableRegisters);
++        }
++        let registers = PciMmioGuard::prepare(device, 0).map_err(PrepareError::Pci)?;
++        Ok(Self {
++            snapshot,
++            registers,
++        })
++    }
++
++    /// Acquires through the bus reservation without exposing mutable device state.
++    pub fn prepare_reserved(
++        reservation: &'a mut aster_pci::reservation::PciReservation<'_>,
++    ) -> Result<Self, PrepareError> {
++        let snapshot =
++            ResourceSnapshot::from_device(reservation).map_err(PrepareError::Resources)?;
++        if snapshot.bars[0].unwrap().prefetchable == Some(true) {
++            return Err(PrepareError::PrefetchableRegisters);
++        }
++        let registers = reservation.prepare_mmio(0).map_err(PrepareError::Pci)?;
++        Ok(Self {
++            snapshot,
++            registers,
++        })
++    }
++
++    /// Validated metadata, not a supported-chip or initialized-GPU certificate.
++    pub fn snapshot(&self) -> &ResourceSnapshot {
++        &self.snapshot
++    }
++
++    /// Read a register via the real bounded MMIO mapping.
++    ///
++    /// Do not call until NVIDIA's BAR firewall/power prerequisites have been satisfied.
++    /// The adapter never interprets all-ones/zero/read success as successful GPU probe.
++    pub fn read_register32(&self, offset: usize) -> Result<u32, ostd::Error> {
++        self.registers.read32(offset)
++    }
++}
+diff --git a/kernel/comps/nvidia-platform/src/lib.rs b/kernel/comps/nvidia-platform/src/lib.rs
+--- a/kernel/comps/nvidia-platform/src/lib.rs
++++ b/kernel/comps/nvidia-platform/src/lib.rs
+@@ -1,12 +1,13 @@
+ // SPDX-License-Identifier: MPL-2.0
+ //! Read-only NVIDIA PCI resource inspection built on Asterinas' real `aster-pci` framework.
+ //!
+-//! This crate takes snapshots from BARs already parsed by `PciCommonDevice`. It does not probe
+-//! BAR sizes, map or claim resources, enable PCI decoding, initialize NVIDIA RM, or start GSP.
++//! Default initialization takes read-only snapshots. The explicit `device` API additionally
++//! provides reversible pre-RM register-aperture ownership, never working-driver probe success.
+ #![no_std]
+ #![deny(unsafe_code)]
+ 
+ extern crate alloc;
++pub mod device;
+ 
+ #[cfg(feature = "nvport-runtime")]
+ mod runtime;
+diff --git a/kernel/core/comps/pci/src/bus.rs b/kernel/core/comps/pci/src/bus.rs
+--- a/kernel/core/comps/pci/src/bus.rs
++++ b/kernel/core/comps/pci/src/bus.rs
+@@ -46,6 +46,26 @@
+ }
+ 
+ impl PciBus {
++    /// Temporarily reserves an unclaimed function without reporting a successful probe.
++    ///
++    /// The mutable bus borrow prevents concurrent probing. The returned guard puts the
++    /// function back on the unclaimed queue on drop. No driver remove/hotplug is implied.
++    pub fn reserve_unclaimed(
++        &mut self,
++        location: super::PciDeviceLocation,
++    ) -> Option<super::reservation::PciReservation<'_>> {
++        let index = self
++            .common_devices
++            .iter()
++            .position(|device| *device.location() == location)?;
++        let device = self.common_devices.remove(index).unwrap();
++        Some(super::reservation::PciReservation::new(self, device))
++    }
++
++    pub(crate) fn return_reserved(&mut self, device: PciCommonDevice) {
++        self.common_devices.push_back(device);
++    }
++
+     /// Borrows the enumerated functions that have not been claimed by a driver.
+     ///
+     /// The caller must retain the bus lock while using this iterator. Inspecting
+diff --git a/kernel/core/comps/pci/src/capability/mod.rs b/kernel/core/comps/pci/src/capability/mod.rs
+--- a/kernel/core/comps/pci/src/capability/mod.rs
++++ b/kernel/core/comps/pci/src/capability/mod.rs
+@@ -4,7 +4,6 @@
+ 
+ use alloc::vec::Vec;
+ 
+-use align_ext::AlignExt;
+ use int_to_c_enum::TryFromInt;
+ use ostd::Result;
+ 
+@@ -76,7 +75,7 @@
+ 
+ impl RawCapabilities {
+     /// The top of the capability position.
+-    const CAPABILITY_TOP: u16 = 0xFC;
++    const CAPABILITY_TOP: u16 = 0x100;
+ 
+     /// Parses the capabilities of the PCI device.
+     pub(super) fn parse(dev: &PciCommonDevice) -> Self {
+@@ -87,16 +86,17 @@
+         // The offset of the first capability pointer is the same for PCI general devices and PCI
+         // bridge devices.
+         const CAP_OFFSET: u16 = PciGeneralDeviceCfgOffset::CapabilitiesPointer as u16;
+-        let mut cap_ptr =
+-            (dev.location().read8(CAP_OFFSET) as u16).align_down(align_of::<u32>() as _);
+-        let mut cap_ptr_vec = Vec::new();
+-
+-        // Read all capability pointers so that it is easy for us to get the length of each
+-        // capability.
+-        while cap_ptr > 0 {
+-            cap_ptr_vec.push(cap_ptr);
+-            cap_ptr = (dev.location().read8(cap_ptr + 1) as u16).align_down(align_of::<u32>() as _);
+-        }
++        let Some(mut cap_ptr_vec) =
++            capability_offsets(dev.location().read8(CAP_OFFSET), |offset| {
++                dev.location().read8(offset)
++            })
++        else {
++            ostd::warn!(
++                "malformed PCI capability list at {:?}; ignoring all capabilities",
++                dev.location()
++            );
++            return Self::default();
++        };
+         cap_ptr_vec.sort();
+ 
+         // Push the top position so that we can calculate the length of the last capability.
+@@ -115,6 +115,11 @@
+             };
+             match cap_type {
+                 CapabilityType::Msix => {
++                    // The fixed MSI-X header is 12 bytes, wholly inside this capability.
++                    if next_ptr - cap_ptr < 12 {
++                        ostd::warn!("truncated MSI-X capability at {:?}", dev.location());
++                        continue;
++                    }
+                     // "More than one MSI-X Capability structure per Function is prohibited."
+                     if caps.msix.is_some() {
+                         ostd::warn!(
+@@ -159,3 +164,55 @@
+             .map(|raw_vndr| CapabilityVndrData::new(loc, raw_vndr))
+     }
+ }
++
++fn capability_offsets(mut pointer: u8, read8: impl Fn(u16) -> u8) -> Option<Vec<u16>> {
++    let mut result = Vec::new();
++    let mut visited = 0u64;
++    while pointer != 0 {
++        if !(0x40..=0xfc).contains(&pointer) || pointer & 3 != 0 {
++            return None;
++        }
++        let bit = 1u64 << (pointer / 4);
++        if visited & bit != 0 {
++            return None;
++        }
++        visited |= bit;
++        result.push(u16::from(pointer));
++        pointer = read8(u16::from(pointer) + 1);
++    }
++    Some(result)
++}
++
++#[cfg(ktest)]
++mod tests {
++    use ostd::prelude::ktest;
++
++    use super::*;
++    #[ktest]
++    fn enumeration_capability_walk_is_bounded_before_device_construction() {
++        let mut data = [0u8; 256];
++        assert!(
++            capability_offsets(0, |_| panic!("empty list must not read"))
++                .unwrap()
++                .is_empty()
++        );
++        for invalid in [1, 0x3c, 0x41, 0xff] {
++            assert!(
++                capability_offsets(invalid, |_| panic!("invalid pointer must not read")).is_none()
++            );
++        }
++        data[0x41] = 0x40;
++        assert!(capability_offsets(0x40, |o| data[o as usize]).is_none());
++        for ptr in (0x40..0xfc).step_by(4) {
++            data[ptr + 1] = (ptr + 4) as u8;
++        }
++        assert_eq!(
++            capability_offsets(0x40, |o| data[o as usize])
++                .unwrap()
++                .len(),
++            48
++        );
++        data[0xfd] = 0x40;
++        assert!(capability_offsets(0x40, |o| data[o as usize]).is_none());
++    }
++}
+diff --git a/kernel/core/comps/pci/src/cfg_space.rs b/kernel/core/comps/pci/src/cfg_space.rs
+--- a/kernel/core/comps/pci/src/cfg_space.rs
++++ b/kernel/core/comps/pci/src/cfg_space.rs
+@@ -352,12 +352,28 @@
+         if self.io_memory.is_none() {
+             // Use the `Uncacheable` cache policy for PCI device BARs by default.
+             // Device-specific drivers may remap with different cache policies if needed.
+-            self.io_memory = Some(IoMem::acquire(
+-                (self.base as usize)..((self.base + self.size) as usize),
+-            )?);
++            self.io_memory = Some(self.acquire_owned()?);
+         }
+ 
+         Ok(self.io_memory.as_ref().unwrap())
++    }
++
++    /// Acquires a mapping owned by the caller rather than cached in this BAR manager.
++    ///
++    /// The MMIO allocator enforces physical range exclusivity. A pre-existing cached
++    /// mapping is rejected; the caller must keep exclusive device ownership until the
++    /// returned mapping (including all its clones/slices) is dropped.
++    pub fn acquire_owned(&mut self) -> Result<IoMem> {
++        if self.io_memory.is_some() {
++            return Err(Error::AccessDenied);
++        }
++        let start = usize::try_from(self.base).map_err(|_| Error::Overflow)?;
++        let end = self.base.checked_add(self.size).ok_or(Error::Overflow)?;
++        let end = usize::try_from(end).map_err(|_| Error::Overflow)?;
++        if start == 0 || start >= end {
++            return Err(Error::InvalidArgs);
++        }
++        IoMem::acquire(start..end)
+     }
+ 
+     /// Returns access to the memory BAR.
+diff --git a/kernel/core/comps/pci/src/common_device.rs b/kernel/core/comps/pci/src/common_device.rs
+--- a/kernel/core/comps/pci/src/common_device.rs
++++ b/kernel/core/comps/pci/src/common_device.rs
+@@ -60,8 +60,17 @@
+ 
+     /// Writes the PCI command.
+     pub fn write_command(&self, command: Command) {
++        self.write_command_raw(command.bits());
++    }
++
++    /// Writes all command bits without clearing adjacent write-one-to-clear status flags.
++    ///
++    /// The generic location `write16` uses a read/modify/write dword operation, which would
++    /// write observed Status ones back and clear them. Writing zero to that half preserves
++    /// all W1C flags. Raw bits permit an exact rollback, including reserved command bits.
++    pub fn write_command_raw(&self, command: u16) {
+         self.location
+-            .write16(PciCommonCfgOffset::Command as u16, command.bits())
++            .write32(PciCommonCfgOffset::Command as u16, u32::from(command));
+     }
+ 
+     /// Reads the PCI status.
+@@ -128,10 +137,12 @@
+         // While setting up the BARs, we need to ensure that
+         // "Decode (I/O or memory) of the appropriate address space is disabled via the Command
+         // Register before sizing a Base Address register."
+-        let command_val = device.read_command() | Command::BUS_MASTER;
+-        device.write_command(command_val - (Command::MEMORY_SPACE | Command::IO_SPACE));
++        // Enumeration must not grant bus mastering to an unbound function. Preserve all
++        // firmware command bits; the actual driver is responsible for enabling DMA.
++        let command_val = location.read16(PciCommonCfgOffset::Command as u16);
++        device.write_command_raw(command_val & !(Command::MEMORY_SPACE | Command::IO_SPACE).bits());
+         device.bar_manager = BarManager::new(device.header_type.device_type(), location);
+-        device.write_command(command_val | (Command::MEMORY_SPACE | Command::IO_SPACE));
++        device.write_command_raw(command_val);
+ 
+         device.capabilities = RawCapabilities::parse(&device);
+ 
+diff --git a/kernel/core/comps/pci/src/lib.rs b/kernel/core/comps/pci/src/lib.rs
+--- a/kernel/core/comps/pci/src/lib.rs
++++ b/kernel/core/comps/pci/src/lib.rs
+@@ -73,6 +73,10 @@
+ pub mod cfg_space;
+ pub mod common_device;
+ mod device_info;
++#[cfg(ktest)]
++mod lifecycle_tests;
++pub mod mmio;
++pub mod reservation;
+ 
+ extern crate alloc;
+ 
+diff --git a/kernel/core/comps/pci/src/lifecycle_tests.rs b/kernel/core/comps/pci/src/lifecycle_tests.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/lifecycle_tests.rs
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Executes real PCI config transactions and MMIO mappings, not NVIDIA emulation.
++use ostd::{Error, io::IoMem, prelude::ktest};
++
++use crate::{
++    PCI_BUS,
++    cfg_space::{Bar, Command},
++    mmio::MmioPrepareError,
++};
++
++#[ktest]
++fn qemu_pci_testdev_reservation_mmio_rollback_and_reacquisition() {
++    // This suite requires QEMU's genuine pci-testdev (1b36:0005), never a spoofed NVIDIA ID.
++    // Component initialization does not run in an OSDK unit-test kernel, so enumerate here.
++    crate::init();
++    let mut bus = PCI_BUS.lock();
++    let before_count = bus.unclaimed_devices().count();
++    let location = *bus
++        .unclaimed_devices()
++        .find(|d| {
++            let id = d.device_id();
++            id.vendor_id == 0x1b36 && id.device_id == 0x0005
++        })
++        .expect("native PCI lifecycle suite requires -device pci-testdev,membar=4096")
++        .location();
++    for _ in 0..8 {
++        {
++            let mut reserved = bus
++                .reserve_unclaimed(location)
++                .expect("test device not available");
++            let loc = *reserved.location();
++            let original = loc.read16(4);
++            let (base, size) = match reserved.bar_manager().bar(0).unwrap() {
++                Bar::Memory(bar) => (bar.base() as usize, bar.size() as usize),
++                _ => panic!("pci-testdev BAR0 must be MMIO"),
++            };
++            {
++                let registers = reserved.prepare_mmio(0).expect("real BAR0 acquire");
++                let command = loc.read16(4);
++                assert_eq!(command & Command::BUS_MASTER.bits(), 0);
++                assert_ne!(command & Command::MEMORY_SPACE.bits(), 0);
++                assert_ne!(command & Command::INTERRUPT_DISABLE.bits(), 0);
++                assert!(
++                    IoMem::acquire(base..base + size).is_err(),
++                    "MMIO reservation overlaps live mapping"
++                );
++                let _value = registers.read32(0).expect("real pci-testdev register read");
++                assert_eq!(registers.read32(1), Err(Error::InvalidArgs));
++                assert_eq!(registers.read32(size), Err(Error::InvalidArgs));
++                assert_eq!(registers.read32(usize::MAX - 3), Err(Error::InvalidArgs));
++            }
++            assert_eq!(loc.read16(4), original, "command rollback after mapping");
++            assert!(matches!(
++                reserved.prepare_mmio(5),
++                Err(MmioPrepareError::Mapping(Error::InvalidArgs))
++            ));
++            assert_eq!(
++                loc.read16(4),
++                original,
++                "command rollback after missing BAR"
++            );
++            // This requires real allocator recycling, not just dropping a virtual mapping.
++            let blocker =
++                IoMem::acquire(base..base + size).expect("released MMIO range must be available");
++            assert_eq!(
++                reserved.prepare_mmio(0).err(),
++                Some(MmioPrepareError::Mapping(Error::AccessDenied))
++            );
++            assert_eq!(
++                loc.read16(4),
++                original,
++                "command rollback after occupied MMIO range"
++            );
++            let slice = blocker.slice(0..4);
++            let last_owner = slice.clone();
++            drop(blocker);
++            drop(slice);
++            assert!(
++                IoMem::acquire(base..base + size).is_err(),
++                "surviving slice clone owns the whole reservation"
++            );
++            drop(last_owner);
++            drop(
++                IoMem::acquire(base..base + size)
++                    .expect("last real mapping owner must recycle BAR"),
++            );
++            {
++                let _irq_guard = ostd::irq::disable_local();
++                assert_eq!(
++                    reserved.prepare_mmio(0).err(),
++                    Some(MmioPrepareError::InvalidContext)
++                );
++                assert_eq!(
++                    loc.read16(4),
++                    original,
++                    "IRQ rejection must not touch command"
++                );
++            }
++        }
++        assert_eq!(bus.unclaimed_devices().count(), before_count);
++    }
++    assert!(bus.unclaimed_devices().any(|d| *d.location() == location));
++    ostd::early_println!(
++        "PCI resource lifecycle passed: 8 real QEMU pci-testdev reserve/map/read/rollback/reacquire cycles; not NVIDIA/GPU proof"
++    );
++}
+diff --git a/kernel/core/comps/pci/src/mmio.rs b/kernel/core/comps/pci/src/mmio.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/mmio.rs
+@@ -0,0 +1,238 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Pre-driver MMIO resource lifetime, with bus mastering and interrupts kept disabled.
++use ostd::{Error, io::IoMem, mm::VmIoOnce};
++
++use crate::{
++    cfg_space::{Bar, Command, PciCommonCfgOffset, Status},
++    common_device::PciCommonDevice,
++};
++
++/// A rejected pre-driver resource acquisition. No error means RM or a GPU is initialized.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum MmioPrepareError {
++    /// Mapping cannot be performed with IRQs disabled or from interrupt context.
++    InvalidContext,
++    /// An absent, already mapped, invalid, or unallocatable memory BAR.
++    Mapping(Error),
++    /// Device configuration no longer responds.
++    DeviceGone,
++    /// Invalid/cyclic conventional capability chain.
++    MalformedCapabilities,
++    /// Existing MSI/MSI-X interrupts require a real driver stop/reset first.
++    ActiveMessageInterrupts,
++    /// Existing DMA needs driver-specific shutdown/reset; clearing a bit is not quiescence.
++    BusMasterActive,
++    /// The function is not in D0. This guard does not implement power transitions.
++    NotD0,
++    /// PCI command bits did not latch as requested.
++    CommandRejected,
++}
++
++/// A temporary mapping of one memory BAR of an exclusively owned function.
++///
++/// This is not a DMA domain, IRQ registration, RM instance, hardware reset or working driver.
++/// The mutable device borrow prevents the reservation from returning to the PCI bus early.
++/// It rejects enabled MSI/MSI-X and non-D0 power states, disables bus mastering and INTx,
++/// enables memory decoding, and restores the exact command word after dropping the mapping.
++/// It must be acquired/dropped with IRQs enabled, as IoMem mapping uses cross-CPU TLB flushes.
++/// No mapping reference/clone or MMIO write interface is exposed.
++pub struct PciMmioGuard<'a> {
++    device: &'a mut PciCommonDevice,
++    mapping: Option<IoMem>,
++    original_command: u16,
++}
++
++impl<'a> PciMmioGuard<'a> {
++    /// Acquires one BAR for pre-driver CPU MMIO access. All ordinary error paths roll back.
++    pub fn prepare(
++        device: &'a mut PciCommonDevice,
++        bar_index: u8,
++    ) -> Result<Self, MmioPrepareError> {
++        if !ostd::irq::is_local_enabled()
++            || ostd::irq::InterruptLevel::current().is_interrupt_context()
++        {
++            return Err(MmioPrepareError::InvalidContext);
++        }
++        if bar_index >= 6 {
++            return Err(MmioPrepareError::Mapping(Error::InvalidArgs));
++        }
++        let loc = device.location();
++        if loc.read16(0) == 0xffff {
++            return Err(MmioPrepareError::DeviceGone);
++        }
++        if device.read_status().contains(Status::CAPABILITIES_LIST) {
++            validate_capabilities(
++                loc.read8(0x34),
++                |offset| loc.read8(offset),
++                |offset| loc.read16(offset),
++            )?;
++        }
++        let original_command = loc.read16(PciCommonCfgOffset::Command as u16);
++        if original_command & Command::BUS_MASTER.bits() != 0 {
++            return Err(MmioPrepareError::BusMasterActive);
++        }
++        let prepared = prepared_command(original_command);
++        device.write_command_raw(prepared);
++        // Config read flushes the write before mapping or issuing CPU MMIO reads.
++        if device.location().read16(PciCommonCfgOffset::Command as u16) != prepared {
++            device.write_command_raw(original_command);
++            return Err(MmioPrepareError::CommandRejected);
++        }
++        let mut guard = Self {
++            device,
++            mapping: None,
++            original_command,
++        };
++        let bar = guard
++            .device
++            .bar_manager_mut()
++            .bar_mut(bar_index)
++            .ok_or(MmioPrepareError::Mapping(Error::InvalidArgs))?;
++        let Bar::Memory(memory) = bar else {
++            return Err(MmioPrepareError::Mapping(Error::InvalidArgs));
++        };
++        guard.mapping = Some(memory.acquire_owned().map_err(MmioPrepareError::Mapping)?);
++        Ok(guard)
++    }
++
++    /// Read a naturally aligned 32-bit register inside the mapped BAR.
++    ///
++    /// Register-specific read side effects remain the caller's responsibility. This does not
++    /// infer any GPU identity, readiness or successful hardware initialization from its value.
++    pub fn read32(&self, offset: usize) -> Result<u32, Error> {
++        if !offset.is_multiple_of(4) {
++            return Err(Error::InvalidArgs);
++        }
++        self.mapping.as_ref().unwrap().read_once(offset)
++    }
++}
++
++impl Drop for PciMmioGuard<'_> {
++    fn drop(&mut self) {
++        // No DMA buffers, ISR callbacks, task queues or GPU commands are ever created here.
++        // Drop/unmap/recycle CPU mapping before restoring the prior function command state.
++        drop(self.mapping.take());
++        self.device.write_command_raw(self.original_command);
++        let _ = self
++            .device
++            .location()
++            .read16(PciCommonCfgOffset::Command as u16);
++    }
++}
++
++fn prepared_command(original: u16) -> u16 {
++    (original | Command::MEMORY_SPACE.bits() | Command::INTERRUPT_DISABLE.bits())
++        & !Command::BUS_MASTER.bits()
++}
++
++fn validate_capabilities(
++    mut pointer: u8,
++    read8: impl Fn(u16) -> u8,
++    read16: impl Fn(u16) -> u16,
++) -> Result<(), MmioPrepareError> {
++    let mut visited = 0u64;
++    while pointer != 0 {
++        if pointer < 0x40 || pointer > 0xfc || pointer & 3 != 0 {
++            return Err(MmioPrepareError::MalformedCapabilities);
++        }
++        let bit = 1u64 << (pointer / 4);
++        if visited & bit != 0 {
++            return Err(MmioPrepareError::MalformedCapabilities);
++        }
++        visited |= bit;
++        let offset = u16::from(pointer);
++        let control = read16(offset + 2);
++        match read8(offset) {
++            0x05 if control & 1 != 0 => return Err(MmioPrepareError::ActiveMessageInterrupts),
++            0x11 if control & 0x8000 != 0 => return Err(MmioPrepareError::ActiveMessageInterrupts),
++            0x01 => {
++                if offset > 0xf8 {
++                    return Err(MmioPrepareError::MalformedCapabilities);
++                }
++                if read16(offset + 4) & 3 != 0 {
++                    return Err(MmioPrepareError::NotD0);
++                }
++            }
++            _ => {}
++        }
++        pointer = read8(offset + 1);
++    }
++    Ok(())
++}
++
++#[cfg(ktest)]
++mod tests {
++    use ostd::prelude::ktest;
++
++    use super::*;
++    #[ktest]
++    fn preparation_disables_dma_preserves_other_command_bits() {
++        for original in [0, 0xffff, 0xa5a5, 0x5a5a, Command::BUS_MASTER.bits()] {
++            let new = prepared_command(original);
++            assert_eq!(new & Command::BUS_MASTER.bits(), 0);
++            assert_ne!(new & Command::MEMORY_SPACE.bits(), 0);
++            assert_ne!(new & Command::INTERRUPT_DISABLE.bits(), 0);
++            let touched =
++                (Command::BUS_MASTER | Command::MEMORY_SPACE | Command::INTERRUPT_DISABLE).bits();
++            assert_eq!(new & !touched, original & !touched);
++        }
++    }
++    fn capabilities(data: &[u8; 256], pointer: u8) -> Result<(), MmioPrepareError> {
++        validate_capabilities(
++            pointer,
++            |o| data[o as usize],
++            |o| u16::from_le_bytes([data[o as usize], data[o as usize + 1]]),
++        )
++    }
++    #[ktest]
++    fn capabilities_reject_cycles_alignment_and_header_pointers() {
++        let mut data = [0; 256];
++        assert_eq!(capabilities(&data, 0), Ok(()));
++        for p in [1, 0x3c, 0x41, 0xff] {
++            assert_eq!(
++                capabilities(&data, p),
++                Err(MmioPrepareError::MalformedCapabilities)
++            );
++        }
++        data[0x41] = 0x40;
++        assert_eq!(
++            capabilities(&data, 0x40),
++            Err(MmioPrepareError::MalformedCapabilities)
++        );
++        data[0x41] = 0x48;
++        data[0x49] = 0x40;
++        assert_eq!(
++            capabilities(&data, 0x40),
++            Err(MmioPrepareError::MalformedCapabilities)
++        );
++    }
++    #[ktest]
++    fn active_msi_msix_and_low_power_are_rejected_without_writes() {
++        let mut data = [0; 256];
++        data[0x40] = 5;
++        data[0x42] = 1;
++        assert_eq!(
++            capabilities(&data, 0x40),
++            Err(MmioPrepareError::ActiveMessageInterrupts)
++        );
++        data[0x42] = 0;
++        assert_eq!(capabilities(&data, 0x40), Ok(()));
++        data[0x40] = 0x11;
++        data[0x43] = 0x80;
++        assert_eq!(
++            capabilities(&data, 0x40),
++            Err(MmioPrepareError::ActiveMessageInterrupts)
++        );
++        data[0x40] = 1;
++        data[0x43] = 0;
++        data[0x44] = 3;
++        assert_eq!(capabilities(&data, 0x40), Err(MmioPrepareError::NotD0));
++        data[0x44] = 0;
++        assert_eq!(capabilities(&data, 0x40), Ok(()));
++        data[0xfc] = 1;
++        assert_eq!(
++            capabilities(&data, 0xfc),
++            Err(MmioPrepareError::MalformedCapabilities)
++        );
++    }
++}
+diff --git a/kernel/core/comps/pci/src/reservation.rs b/kernel/core/comps/pci/src/reservation.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/reservation.rs
+@@ -0,0 +1,49 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Exclusive, reversible ownership of an enumerated, unbound PCI function.
++//!
++//! A reservation is not a successfully probed driver. The bus remains borrowed until the
++//! reservation is dropped, so neither driver registration nor another reservation can take it.
++use core::ops::Deref;
++
++use crate::{bus::PciBus, common_device::PciCommonDevice};
++
++/// An unbound PCI function temporarily removed from the bus probe queue.
++///
++/// Drop returns the same function to the queue without probing it or advertising readiness.
++/// This is a non-hotplug interface: callers must not use it after physical device removal.
++/// Hardware services must be stopped and their resource guards dropped before this guard.
++pub struct PciReservation<'a> {
++    bus: &'a mut PciBus,
++    device: Option<PciCommonDevice>,
++}
++
++impl<'a> PciReservation<'a> {
++    pub(crate) fn new(bus: &'a mut PciBus, device: PciCommonDevice) -> Self {
++        Self {
++            bus,
++            device: Some(device),
++        }
++    }
++
++    /// Borrows a resource guard that cannot outlive this reservation.
++    /// No mutable PciCommonDevice is exposed, preventing independent MSI-X ownership.
++    pub fn prepare_mmio(
++        &mut self,
++        index: u8,
++    ) -> Result<crate::mmio::PciMmioGuard<'_>, crate::mmio::MmioPrepareError> {
++        crate::mmio::PciMmioGuard::prepare(self.device.as_mut().unwrap(), index)
++    }
++}
++
++impl Deref for PciReservation<'_> {
++    type Target = PciCommonDevice;
++    fn deref(&self) -> &Self::Target {
++        self.device.as_ref().unwrap()
++    }
++}
++
++impl Drop for PciReservation<'_> {
++    fn drop(&mut self) {
++        self.bus.return_reserved(self.device.take().unwrap());
++    }
++}
+diff --git a/ostd/src/io/io_mem/allocator.rs b/ostd/src/io/io_mem/allocator.rs
+--- a/ostd/src/io/io_mem/allocator.rs
++++ b/ostd/src/io/io_mem/allocator.rs
+@@ -2,8 +2,8 @@
+ 
+ //! I/O Memory allocator.
+ 
+-use alloc::vec::Vec;
+-use core::ops::Range;
++use alloc::{sync::Arc, vec::Vec};
++use core::{fmt, ops::Range};
+ 
+ use spin::Once;
+ 
+@@ -16,7 +16,40 @@
+ 
+ /// I/O memory allocator that allocates memory I/O access to device drivers.
+ pub(super) struct IoMemAllocator {
+-    allocators: Vec<RangeAllocator>,
++    allocators: Vec<Arc<RangeAllocator>>,
++}
++
++/// Owns a range allocated from an IoMem allocator and returns it on drop.
++///
++/// This token is stored inside the shared IoMem backing, so it is dropped only
++/// after all clones and slices have released the underlying mapping.
++pub(super) struct Reservation {
++    allocator: Arc<RangeAllocator>,
++    range: Range<usize>,
++}
++
++impl Reservation {
++    pub(super) fn new(allocator: Arc<RangeAllocator>, range: Range<usize>) -> Self {
++        Self { allocator, range }
++    }
++}
++
++impl Drop for Reservation {
++    fn drop(&mut self) {
++        // A final IoMem may be released by an IRQ. Match acquisition's IRQ exclusion,
++        // since RangeAllocator's own lock disables preemption but not local IRQs.
++        let _irq_guard = crate::irq::disable_local();
++        self.allocator.free(self.range.clone());
++    }
++}
++
++impl fmt::Debug for Reservation {
++    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
++        formatter
++            .debug_struct("Reservation")
++            .field("range", &self.range)
++            .finish_non_exhaustive()
++    }
+ }
+ 
+ impl IoMemAllocator {
+@@ -33,9 +66,13 @@
+             range, cache_policy
+         );
+ 
+-        find_allocator(&self.allocators, &range)?
+-            .alloc_specific(&range)
+-            .ok()?;
++        let allocator = find_allocator(&self.allocators, &range)?;
++        {
++            let _irq_guard = crate::irq::disable_local();
++            allocator.alloc_specific(&range).ok()?;
++        }
++        // Restore IRQs before creating mappings / cross-CPU TLB synchronization.
++        let reservation = Reservation::new(Arc::clone(allocator), range.clone());
+ 
+         // SAFETY:
+         // 1. The `IoMemAllocator` instance is built from an
+@@ -43,29 +80,22 @@
+         //    kernel page table is activated.
+         // 2. The created `IoMem` is guaranteed not to access physical memory or
+         //    system device I/O.
+-        unsafe { Some(IoMem::new(range, PageFlags::RW, cache_policy)) }
+-    }
+-
+-    /// Recycles an MMIO range.
++        unsafe {
++            Some(IoMem::new(
++                range,
++                PageFlags::RW,
++                cache_policy,
++                Some(reservation),
++            ))
++        }
++    }
++
++    /// Initializes usable memory I/O region.
+     ///
+     /// # Safety
+     ///
+-    /// The caller must have ownership of the MMIO region through the `IoMemAllocator::get` interface.
+-    #[expect(dead_code)]
+-    pub(super) unsafe fn recycle(&self, range: Range<usize>) {
+-        debug!("Recycling MMIO range: {:#x?}", range);
+-
+-        let allocator = find_allocator(&self.allocators, &range).unwrap();
+-
+-        allocator.free(range);
+-    }
+-
+-    /// Initializes usable memory I/O region.
+-    ///
+-    /// # Safety
+-    ///
+     /// User must ensure the range doesn't belong to physical memory or system device I/O.
+-    unsafe fn new(allocators: Vec<RangeAllocator>) -> Self {
++    unsafe fn new(allocators: Vec<Arc<RangeAllocator>>) -> Self {
+         Self { allocators }
+     }
+ }
+@@ -75,7 +105,7 @@
+ /// The builder must contains the memory I/O regions that don't belong to the physical memory. Also, OSTD
+ /// must exclude the memory I/O regions of the system device before building the `IoMemAllocator`.
+ pub(crate) struct IoMemAllocatorBuilder {
+-    allocators: Vec<RangeAllocator>,
++    allocators: Vec<Arc<RangeAllocator>>,
+ }
+ 
+ impl IoMemAllocatorBuilder {
+@@ -94,7 +124,7 @@
+         );
+         let mut allocators = Vec::with_capacity(ranges.len());
+         for range in ranges {
+-            allocators.push(RangeAllocator::new(range));
++            allocators.push(Arc::new(RangeAllocator::new(range)));
+         }
+         Self { allocators }
+     }
+@@ -122,7 +152,9 @@
+         //    kernel page table is activated.
+         // 2. The range falls within I/O memory area and does not overlap
+         //    with other system devices' I/O memory.
+-        unsafe { IoMem::new(range, PageFlags::RW, cache_policy) }
++        // Sensitive/system-device regions are permanently removed from the
++        // public allocator and deliberately receive no recycling reservation.
++        unsafe { IoMem::new(range, PageFlags::RW, cache_policy, None) }
+     }
+ 
+     /// Removes access to a specific memory I/O range.
+@@ -136,6 +168,7 @@
+             );
+         };
+ 
++        let _irq_guard = crate::irq::disable_local();
+         if let Err(err) = allocator.alloc_specific(&range) {
+             panic!(
+                 "An error occurred while trying to remove access to the system device's MMIO. Range: {:x?}. Error: {:?}",
+@@ -160,9 +193,9 @@
+ }
+ 
+ fn find_allocator<'a>(
+-    allocators: &'a [RangeAllocator],
++    allocators: &'a [Arc<RangeAllocator>],
+     range: &Range<usize>,
+-) -> Option<&'a RangeAllocator> {
++) -> Option<&'a Arc<RangeAllocator>> {
+     for allocator in allocators.iter() {
+         let allocator_range = allocator.fullrange();
+         if allocator_range.start >= range.end || allocator_range.end <= range.start {
+diff --git a/ostd/src/io/io_mem/mod.rs b/ostd/src/io/io_mem/mod.rs
+--- a/ostd/src/io/io_mem/mod.rs
++++ b/ostd/src/io/io_mem/mod.rs
+@@ -5,10 +5,7 @@
+ mod allocator;
+ pub(crate) mod util;
+ 
+-use core::{
+-    marker::PhantomData,
+-    ops::{Deref, Range},
+-};
++use core::{marker::PhantomData, ops::Range};
+ 
+ use align_ext::AlignExt;
+ use inherit_methods_macro::inherit_methods;
+@@ -45,10 +42,21 @@
+ #[derive(Clone, Debug)]
+ pub enum Insensitive {}
+ 
++/// Shared mapping and its optional allocator reservation.
++///
++/// The mapping is deliberately declared before the reservation: Rust drops
++/// struct fields in declaration order, so the virtual mapping is unmapped
++/// before its MMIO range becomes available to another caller.
++#[derive(Debug)]
++struct IoMemInner {
++    kvirt_area: KVirtArea,
++    _reservation: Option<allocator::Reservation>,
++}
++
+ /// I/O memory.
+ #[derive(Clone, Debug)]
+ pub struct IoMem<SecuritySensitivity = Insensitive> {
+-    kvirt_area: Arc<KVirtArea>,
++    inner: Arc<IoMemInner>,
+     // The actually used range for MMIO is `kvirt_area.start + offset..kvirt_area.start + offset + limit`
+     offset: usize,
+     limit: usize,
+@@ -69,7 +77,7 @@
+ 
+         // We've checked the range is in bounds, so we can construct the new `IoMem` safely.
+         Self {
+-            kvirt_area: self.kvirt_area.clone(),
++            inner: self.inner.clone(),
+             offset: self.offset + range.start,
+             limit: range.len(),
+             pa: self.pa + range.start,
+@@ -88,7 +96,12 @@
+     ///    If `SecuritySensitivity` is `Insensitive`, those side effects must
+     ///    not cause soundness problems (e.g., they must not corrupt the kernel
+     ///    memory).
+-    pub(crate) unsafe fn new(range: Range<Paddr>, flags: PageFlags, cache: CachePolicy) -> Self {
++    unsafe fn new(
++        range: Range<Paddr>,
++        flags: PageFlags,
++        cache: CachePolicy,
++        reservation: Option<allocator::Reservation>,
++    ) -> Self {
+         let first_page_start = range.start.align_down(PAGE_SIZE);
+         let last_page_end = range.end.align_up(PAGE_SIZE);
+ 
+@@ -141,7 +154,10 @@
+         };
+ 
+         Self {
+-            kvirt_area: Arc::new(kva),
++            inner: Arc::new(IoMemInner {
++                kvirt_area: kva,
++                _reservation: reservation,
++            }),
+             offset: range.start - first_page_start,
+             limit: range.len(),
+             pa: range.start,
+@@ -157,7 +173,7 @@
+ 
+     /// Returns the base virtual address of the MMIO range.
+     fn base(&self) -> usize {
+-        self.kvirt_area.deref().start() + self.offset
++        self.inner.kvirt_area.start() + self.offset
+     }
+ 
+     /// Validates that the offset range lies within the MMIO window.
+@@ -185,7 +201,7 @@
+     /// effects (e.g., corrupting the kernel memory).
+     pub(crate) unsafe fn read_once<T: PodOnce>(&self, offset: usize) -> T {
+         debug_assert!(offset + size_of::<T>() <= self.limit);
+-        let ptr = (self.kvirt_area.deref().start() + self.offset + offset) as *const T;
++        let ptr = (self.inner.kvirt_area.start() + self.offset + offset) as *const T;
+         // SAFETY: The safety of the read operation's semantics is upheld by the caller.
+         unsafe { read_once(ptr) }
+     }
+@@ -204,7 +220,7 @@
+     /// effects (e.g., corrupting the kernel memory).
+     pub(crate) unsafe fn write_once<T: PodOnce>(&self, offset: usize, value: &T) {
+         debug_assert!(offset + size_of::<T>() <= self.limit);
+-        let ptr = (self.kvirt_area.deref().start() + self.offset + offset) as *mut T;
++        let ptr = (self.inner.kvirt_area.start() + self.offset + offset) as *mut T;
+         // SAFETY: The safety of the write operation's semantics is upheld by the caller.
+         unsafe { write_once(ptr, *value) };
+     }
+@@ -427,20 +443,66 @@
+     }
+ }
+ 
+-impl<SecuritySensitivity> Drop for IoMem<SecuritySensitivity> {
+-    fn drop(&mut self) {
+-        // TODO: Multiple `IoMem` instances should not overlap, we should refactor the driver code and
+-        // remove the `Clone` and `IoMem::slice`. After refactoring, the `Drop` can be implemented to recycle
+-        // the `IoMem`.
+-    }
+-}
+-
+ #[cfg(ktest)]
+ mod test {
++    use alloc::sync::Arc;
++
++    use super::{IoMem, IoMemInner, allocator::Reservation};
+     use crate::{
+         arch::io::io_mem::{copy_from_mmio, copy_to_mmio, read_once, write_once},
++        mm::{
++            CachePolicy, PAGE_SIZE, PageFlags, PageProperty, PrivilegedPageFlags,
++            kspace::kvirt_area::KVirtArea,
++        },
+         prelude::ktest,
++        util::range_alloc::RangeAllocator,
+     };
++
++    #[ktest]
++    fn reservation_lives_through_iomem_clones_and_slices() {
++        let reserved_range = 0x4000_0000..0x4000_0000 + PAGE_SIZE;
++        let allocator = Arc::new(RangeAllocator::new(reserved_range.clone()));
++        allocator.alloc_specific(&reserved_range).unwrap();
++
++        // Use a virtual area with no physical frames: this test exercises
++        // backing lifetime only and never accesses the synthetic MMIO range.
++        let kvirt_area = unsafe {
++            KVirtArea::map_untracked_frames(
++                PAGE_SIZE,
++                0,
++                0..0,
++                PageProperty {
++                    flags: PageFlags::RW,
++                    cache: CachePolicy::Uncacheable,
++                    priv_flags: PrivilegedPageFlags::empty(),
++                },
++            )
++        };
++        let io_mem: IoMem = IoMem {
++            inner: Arc::new(IoMemInner {
++                kvirt_area,
++                _reservation: Some(Reservation::new(
++                    Arc::clone(&allocator),
++                    reserved_range.clone(),
++                )),
++            }),
++            offset: 0,
++            limit: PAGE_SIZE,
++            pa: reserved_range.start,
++            cache_policy: CachePolicy::Uncacheable,
++            phantom: core::marker::PhantomData,
++        };
++        let slice = io_mem.slice(32..96);
++        let last_owner = slice.clone();
++
++        drop(io_mem);
++        drop(slice);
++        assert!(allocator.alloc_specific(&reserved_range).is_err());
++
++        drop(last_owner);
++        assert!(allocator.alloc_specific(&reserved_range).is_ok());
++        allocator.free(reserved_range);
++    }
+ 
+     #[ktest]
+     fn read_write_u8() {
+diff --git a/ostd/src/irq/mod.rs b/ostd/src/irq/mod.rs
+--- a/ostd/src/irq/mod.rs
++++ b/ostd/src/irq/mod.rs
+@@ -86,6 +86,13 @@
+     cpu::PrivilegeLevel,
+ };
+ 
++/// Reports whether local hardware interrupts are enabled at the instant of this query.
++///
++/// This is not a transferable permission token and does not by itself permit sleeping.
++pub fn is_local_enabled() -> bool {
++    crate::arch::irq::is_local_enabled()
++}
++
+ pub(crate) fn call_irq_callback_functions(
+     trap_frame: &TrapFrame,
+     hw_irq_line: &HwIrqLine,
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -6,7 +6,7 @@
+ mkdir -p "$OUTPUT"
+ OUTPUT=$(cd -- "$OUTPUT" && pwd)
+ 
+-for package in ostd/libs/nvidia-nvport kernel/comps/nvidia-platform ostd; do
++for package in ostd/libs/nvidia-nvport kernel/comps/nvidia-platform kernel/core/comps/pci ostd; do
+     name=${package##*/}
+     log="$OUTPUT/native-$name-tests.log"
+     (
+@@ -14,13 +14,17 @@
+         # Never overwrite a developer-provided package manifest. noclobber also
+         # closes the race with another local process creating this file.
+         set -o noclobber
++        pci_test_device=""
++        if [[ "$name" == pci ]]; then
++            pci_test_device=" -device pci-testdev,membar=4096"
++        fi
+         printf '%s\n' \
+             '[boot]' \
+             'method = "grub-rescue-iso"' \
+             '[grub]' \
+             'boot_protocol = "multiboot2"' \
+             '[qemu]' \
+-            'args = "-machine q35,accel=tcg -cpu max -m 2048M -smp 2 -display none -monitor none -serial stdio -no-reboot -nic none -device isa-debug-exit,iobase=0xf4,iosize=0x04"' \
++            "args = \"-machine q35,accel=tcg -cpu max -m 2048M -smp 2 -display none -monitor none -serial stdio -no-reboot -nic none -device isa-debug-exit,iobase=0xf4,iosize=0x04${pci_test_device}\"" \
+             '[test.boot]' \
+             'kcmd_args = ["earlycon", "console=ttyS0"]' > OSDK.toml
+         trap 'rm -f OSDK.toml' EXIT

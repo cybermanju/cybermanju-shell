@@ -1,0 +1,3 @@
+__pycache__/
+vulkan_compute_bench
+*.spv

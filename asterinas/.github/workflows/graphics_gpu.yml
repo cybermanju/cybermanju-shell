@@ -1,0 +1,203 @@
+name: Graphics checks and NVIDIA Vulkan benchmark
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+    inputs:
+      run_native_gpu:
+        description: Boot current Asterinas with preauthorized NVIDIA VFIO devices
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  graphics-checks:
+    name: Graphics prerequisite tests and compute build (not GPUI/Wayland acceptance)
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        id: checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install C and Vulkan shader build prerequisites
+        id: toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential libvulkan-dev glslang-tools
+
+      - name: Run graphics unit tests
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/graphics -v
+
+      - name: Compile Vulkan compute benchmark and shader
+        if: ${{ always() && steps.checkout.outcome == 'success' && steps.toolchain.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -O2 tools/graphics/vulkan_compute_bench.c -lvulkan -o tools/graphics/vulkan_compute_bench
+          glslangValidator -V --target-env vulkan1.2 tools/graphics/vector.comp -o tools/graphics/vector.spv
+
+  nvidia-nvport-link:
+    name: Real NVIDIA NVport host tests and CPU-only TCG boot smoke
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: asterinas/kernel-dev:0.19.0-20261012
+    defaults:
+      run:
+        shell: bash
+    env:
+      NVIDIA_SOURCE_DIR: /tmp/nvidia-open-gpu-kernel-modules
+      NVPORT_OUTPUT: artifacts/nvport-smoke
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Prepare NVport evidence directory
+        run: mkdir -p "$NVPORT_OUTPUT"
+      - name: Fetch public NVIDIA sources at the exact reviewed revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$NVIDIA_SOURCE_DIR"
+          git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
+            https://github.com/NVIDIA/open-gpu-kernel-modules.git 1a82fbfda8f321b056eb3568850f9316c5e465c5
+          git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
+      - name: Install QEMU and BIOS rescue ISO prerequisites
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install --yes --no-install-recommends qemu-system-x86 grub-pc-bin grub-common xorriso
+      - name: Execute real C/Rust NVport memory tests on host
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu \
+            2>&1 | tee "$NVPORT_OUTPUT/host-tests.log"
+      - name: Test actual freestanding diagnostic formatting against host libc
+        run: |
+          set -euo pipefail
+          bash tools/graphics/run_nvport_format_tests.sh \
+            2>&1 | tee "$NVPORT_OUTPUT/formatter-host-tests.log"
+      - name: Execute NVport, platform, PCI/EDU DMA, IOMMU rejection and OSTD inside Asterinas
+        run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
+      - name: Build grub-rescue multiboot2 ISO with serial console
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$NVPORT_OUTPUT"
+          cargo osdk build --features nvidia-nvport-selftest,nvidia-pci-diagnostics \
+            --boot-method grub-rescue-iso --grub-boot-protocol multiboot2 \
+            --kcmd-args='earlycon console=ttyS0' --strip-elf \
+            2>&1 | tee "$NVPORT_OUTPUT/kernel-build.log"
+      - name: Run bounded CPU-only NVport smoke under QEMU TCG
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/run_nvport_smoke.py \
+            --image target/osdk/asterinas/asterinas-osdk-bin.iso \
+            --output "$NVPORT_OUTPUT" --timeout 180
+      - name: Upload NVport smoke logs and result even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nvidia-nvport-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/nvport-smoke/
+          if-no-files-found: warn
+          retention-days: 14
+
+  asterinas-native-nvidia:
+    name: Manual Asterinas-native NVIDIA compute (not Linux-host compute)
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.run_native_gpu }}
+    runs-on: [self-hosted, linux, x64, nvidia-vfio]
+    timeout-minutes: 45
+    environment:
+      name: asterinas-native-gpu
+    concurrency:
+      group: asterinas-native-nvidia-vfio
+      cancel-in-progress: false
+    env:
+      ASTER_GPU_ROOTFS: ${{ vars.ASTER_GPU_ROOTFS }}
+      ASTER_GPU_VFIO_DEVICES: ${{ vars.ASTER_GPU_VFIO_DEVICES }}
+      NVIDIA_SOURCE_DIR: /tmp/nvidia-native-${{ github.run_id }}-${{ github.run_attempt }}
+      NATIVE_GPU_OUTPUT: /tmp/asterinas-native-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out exact approved main dispatch commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Fetch exact public NVIDIA source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$NVIDIA_SOURCE_DIR"
+          git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
+            https://github.com/NVIDIA/open-gpu-kernel-modules.git 1a82fbfda8f321b056eb3568850f9316c5e465c5
+          git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
+      - name: Build current kernel and run compute only inside its VFIO guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$NATIVE_GPU_OUTPUT"
+          python3 tools/graphics/run_native_nvidia.py \
+            --rootfs "$ASTER_GPU_ROOTFS" --vfio-devices "$ASTER_GPU_VFIO_DEVICES" \
+            --output "$NATIVE_GPU_OUTPUT" 2>&1 | tee "$NATIVE_GPU_OUTPUT/runner.log"
+      - name: Retain native evidence even on failure, without redistributing guest libraries
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: asterinas-native-nvidia-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.NATIVE_GPU_OUTPUT }}/*.log
+            ${{ env.NATIVE_GPU_OUTPUT }}/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  nvidia-vulkan-benchmark:
+    name: Manual NVIDIA Vulkan compute benchmark
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, linux, x64, nvidia-gpu]
+    timeout-minutes: 20
+    environment:
+      name: gpu-benchmark
+    steps:
+      - name: Check out the exact main dispatch commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build and run benchmark, retaining output on failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/graphics-gpu
+          {
+            printf '%s\n' 'NVIDIA Vulkan compute benchmark (not an Asterinas native test)' \
+              "Commit: ${GITHUB_SHA}" \
+              "Runner: ${RUNNER_NAME} (${RUNNER_OS}/${RUNNER_ARCH})"
+            cc -std=c11 -Wall -Wextra -Werror -O2 tools/graphics/vulkan_compute_bench.c -lvulkan -o tools/graphics/vulkan_compute_bench
+            glslangValidator -V --target-env vulkan1.2 tools/graphics/vector.comp -o tools/graphics/vector.spv
+            timeout --signal=TERM --kill-after=10s 300s \
+              tools/graphics/vulkan_compute_bench --shader tools/graphics/vector.spv --vendor nvidia
+          } 2>&1 | tee artifacts/graphics-gpu/vulkan-compute.log
+
+      - name: Upload GPU benchmark logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nvidia-vulkan-benchmark-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/graphics-gpu/
+          if-no-files-found: warn
+          retention-days: 14

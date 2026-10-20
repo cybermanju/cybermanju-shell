@@ -1,0 +1,14 @@
+#version 450
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(set = 0, binding = 0, std430) buffer OutputBuffer {
+    uint values[];
+} output_buffer;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index < output_buffer.values.length()) {
+        // Unsigned 32-bit arithmetic wraps modulo 2^32 in GLSL.
+        output_buffer.values[index] = (index * 1664525u + 1013904223u) ^ (index >> 3u);
+    }
+}

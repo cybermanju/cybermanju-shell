@@ -1,0 +1,1129 @@
+diff --git a/.github/workflows/graphics_gpu.yml b/.github/workflows/graphics_gpu.yml
+--- a/.github/workflows/graphics_gpu.yml
++++ b/.github/workflows/graphics_gpu.yml
+@@ -16,7 +16,7 @@
+ 
+ jobs:
+   graphics-checks:
+-    name: Graphics unit tests and build
++    name: Graphics prerequisite tests and compute build (not GPUI/Wayland acceptance)
+     if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+@@ -47,19 +47,25 @@
+           glslangValidator -V --target-env vulkan1.2 tools/graphics/vector.comp -o tools/graphics/vector.spv
+ 
+   nvidia-nvport-link:
+-    name: Real NVIDIA NVport host tests and Asterinas kernel link
++    name: Real NVIDIA NVport host tests and CPU-only TCG boot smoke
+     if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+     runs-on: ubuntu-latest
+     timeout-minutes: 45
+     container:
+       image: asterinas/kernel-dev:0.19.0-20261012
++    defaults:
++      run:
++        shell: bash
+     env:
+       NVIDIA_SOURCE_DIR: /tmp/nvidia-open-gpu-kernel-modules
++      NVPORT_OUTPUT: artifacts/nvport-smoke
+     steps:
+       - name: Check out source
+         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+         with:
+           persist-credentials: false
++      - name: Prepare NVport evidence directory
++        run: mkdir -p "$NVPORT_OUTPUT"
+       - name: Fetch public NVIDIA sources at the exact reviewed revision
+         shell: bash
+         run: |
+@@ -68,10 +74,42 @@
+           git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
+             https://github.com/NVIDIA/open-gpu-kernel-modules.git ca2d03e6fafd4d4b56b383497d931c25b283bfcf
+           git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
++      - name: Install QEMU and BIOS rescue ISO prerequisites
++        run: |
++          set -euo pipefail
++          apt-get update
++          apt-get install --yes --no-install-recommends qemu-system-x86 grub-pc-bin grub-common xorriso
+       - name: Execute real C/Rust NVport memory tests on host
+-        run: cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu
+-      - name: Link real NVport object and OSTD services into the Asterinas kernel
+-        run: cargo osdk build --features nvidia-nvport-selftest --boot-method vmm-direct --grub-boot-protocol linux --linux-x86-legacy-boot --strip-elf
++        shell: bash
++        run: |
++          set -euo pipefail
++          cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu \
++            2>&1 | tee "$NVPORT_OUTPUT/host-tests.log"
++      - name: Execute NVport, PCI platform and OSTD suites inside Asterinas
++        run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
++      - name: Build grub-rescue multiboot2 ISO with serial console
++        shell: bash
++        run: |
++          set -euo pipefail
++          mkdir -p "$NVPORT_OUTPUT"
++          cargo osdk build --features nvidia-nvport-selftest,nvidia-pci-diagnostics \
++            --boot-method grub-rescue-iso --grub-boot-protocol multiboot2 \
++            --kcmd-args='earlycon console=ttyS0' --strip-elf \
++            2>&1 | tee "$NVPORT_OUTPUT/kernel-build.log"
++      - name: Run bounded CPU-only NVport smoke under QEMU TCG
++        run: |
++          set -euo pipefail
++          python3 tools/graphics/run_nvport_smoke.py \
++            --image target/osdk/asterinas/asterinas-osdk-bin.iso \
++            --output "$NVPORT_OUTPUT" --timeout 180
++      - name: Upload NVport smoke logs and result even on failure
++        if: ${{ always() }}
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
++        with:
++          name: nvidia-nvport-smoke-${{ github.run_id }}-${{ github.run_attempt }}
++          path: artifacts/nvport-smoke/
++          if-no-files-found: warn
++          retention-days: 14
+ 
+   asterinas-native-nvidia:
+     name: Manual Asterinas-native NVIDIA compute (not Linux-host compute)
+diff --git a/Cargo.lock b/Cargo.lock
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -323,6 +323,15 @@
+ ]
+ 
+ [[package]]
++name = "aster-nvidia-platform"
++version = "0.1.0"
++dependencies = [
++ "aster-pci",
++ "component",
++ "ostd",
++]
++
++[[package]]
+ name = "aster-nvme"
+ version = "0.1.0"
+ dependencies = [
+@@ -487,6 +496,7 @@
+  "aster-core",
+  "aster-drm",
+  "aster-i8042",
++ "aster-nvidia-platform",
+  "aster-simpledrm",
+  "aster-uart",
+  "ostd",
+diff --git a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -30,6 +30,7 @@
+     "kernel",
+     "kernel/comps/drm",
+     "kernel/comps/i8042",
++    "kernel/comps/nvidia-platform",
+     "kernel/comps/simpledrm",
+     "kernel/comps/uart",
+     "kernel/core",
+@@ -85,6 +86,7 @@
+     "kernel",
+     "kernel/comps/drm",
+     "kernel/comps/i8042",
++    "kernel/comps/nvidia-platform",
+     "kernel/comps/simpledrm",
+     "kernel/comps/uart",
+     "kernel/core",
+diff --git a/Components.toml b/Components.toml
+--- a/Components.toml
++++ b/Components.toml
+@@ -12,6 +12,7 @@
+ logger = { name = "aster-logger" }
+ mlsdisk = { name = "aster-mlsdisk" }
+ network = { name = "aster-network" }
++nvidia_platform = { name = "aster-nvidia-platform" }
+ nvme = { name = "aster-nvme" }
+ pci = { name = "aster-pci" }
+ simpledrm = { name = "aster-simpledrm" }
+diff --git a/kernel/Cargo.toml b/kernel/Cargo.toml
+--- a/kernel/Cargo.toml
++++ b/kernel/Cargo.toml
+@@ -7,6 +7,7 @@
+ aster-core.workspace = true
+ ostd.workspace = true
+ ostd-nvidia-nvport = { workspace = true, optional = true }
++aster-nvidia-platform = { path = "comps/nvidia-platform", optional = true }
+ 
+ # High-level component crates.
+ #
+@@ -21,7 +22,8 @@
+ [features]
+ default = ["cvm_guest"]
+ nvidia-nvport-selftest = ["dep:ostd-nvidia-nvport"]
+-native-gpu-ci = ["nvidia-nvport-selftest"]
++nvidia-pci-diagnostics = ["dep:aster-nvidia-platform"]
++native-gpu-ci = ["nvidia-nvport-selftest", "nvidia-pci-diagnostics"]
+ coverage = ["aster-core/coverage"]
+ cvm_guest = ["aster-core/cvm_guest"]
+ pvh_boot = ["aster-core/pvh_boot"]
+diff --git a/kernel/comps/nvidia-platform/Cargo.toml b/kernel/comps/nvidia-platform/Cargo.toml
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/Cargo.toml
+@@ -0,0 +1,13 @@
++[package]
++name = "aster-nvidia-platform"
++version = "0.1.0"
++edition.workspace = true
++license.workspace = true
++
++[dependencies]
++aster-pci.workspace = true
++component.workspace = true
++ostd.workspace = true
++
++[lints]
++workspace = true
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -0,0 +1,23 @@
++# Asterinas NVIDIA platform inventory (experimental)
++
++`aster-nvidia-platform` is a small, read-only layer over the existing `aster-pci` framework in `kernel/core/comps/pci`. It does **not** pretend that PCI support is absent: `PciCommonDevice` exposes the real `PciDeviceId`, location, and `BarManager`; the PCI framework has already enumerated the function and populated BAR metadata.
++
++## API
++
++- `ResourceSnapshot::from_device(&PciCommonDevice)` accepts vendor `0x10de` and PCI base class `0x03` (display controller), then reports each existing BAR's framework-provided address, size, memory/I/O kind, memory width, and prefetchability. It requires a valid memory BAR0 and rejects zero ranges and address overflow.
++- `ConfigReader::new(&device)` provides bounded, read-only 8/16/32-bit config reads within the conventional 256-byte config space. It checks bounds/alignment before using the public `PciDeviceLocation` read methods; it does not invent a write interface. The underlying `aster-pci` accessor is infallible/panic-on-backend-error, so this wrapper is intended for an already enumerated function and cannot turn hardware errors into recoverable results.
++- `resource_inventory()` borrows unclaimed NVIDIA display functions from the initialized `PCI_BUS`, snapshots their actual enumerator metadata, and does not remove them from the bus. Call only after PCI component initialization.
++
++The snapshot does not call `Bar::acquire`, resize BARs, map MMIO, claim/reserve a resource, change PCI command bits, or construct a `PciDriver`. Its output is diagnostic metadata only—not a bound/initialized GPU, a successful probe, or working NVIDIA RM. BAR lengths are copied from `BarManager`'s measured `MemoryBar::size()` / `IoBar::size()` values, never inferred from addresses. Note that Asterinas' PCI enumerator itself performs the PCI-spec BAR sizing transaction while constructing the manager; this new crate merely reads its resulting metadata.
++
++The crate is a workspace/default member and is optionally linked into the kernel by `nvidia-pci-diagnostics` (also enabled by `native-gpu-ci`). Its component runs after its PCI dependency and logs actual resources or explicitly says no unclaimed NVIDIA display controller was found. Component initialization returning `Ok(())` means the diagnostic ran, not that a GPU driver initialized; no `PciDriver` is registered.
++
++## Tests
++
++Three pure validation tests cover NVIDIA/display identity checks, zero/overflow range validation, and config-read bounds/alignment. All three ran successfully inside OSTD under QEMU TCG via `cargo osdk test`; they do not validate NVIDIA BAR/config I/O against a real GPU. The ordinary CI entrypoint `bash tools/graphics/run_cpu_kernel_tests.sh OUTPUT_DIRECTORY` runs this suite as well as NVport and OSTD without KVM or device passthrough.
++
++## RM integration boundary and GSP gap
++
++Useful NVIDIA open-kernel source/API targets for a later real integration include `nv_pci_probe_body()` / `nv_pci_probe()` and BAR validation/collection (`nv_pci_validate_bars()`, `nv->bars[*].cpu_address`, `NV_PCI_RESOURCE_START()` / `NV_PCI_RESOURCE_SIZE()`), followed by `nv_start_device()` and RM initialization. This inventory supplies only the PCI identity/resource observation that could inform that work; it implements none of those RM calls or a PCI driver's probe lifecycle.
++
++A functioning recent NVIDIA stack also needs a compatible RM binary/interface path plus firmware and the actual GSP boot/runtime handshake (firmware loading, mailbox/queue setup, and RM interaction), in addition to MMIO ownership/mapping, interrupts, DMA/IOMMU, and power/device lifecycle. None is implemented or validated here. In particular, creating a resource snapshot must never be presented as proof that GSP started or RM initialized.
+diff --git a/kernel/comps/nvidia-platform/src/lib.rs b/kernel/comps/nvidia-platform/src/lib.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/src/lib.rs
+@@ -0,0 +1,346 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Read-only NVIDIA PCI resource inspection built on Asterinas' real `aster-pci` framework.
++//!
++//! This crate takes snapshots from BARs already parsed by `PciCommonDevice`. It does not probe
++//! BAR sizes, map or claim resources, enable PCI decoding, initialize NVIDIA RM, or start GSP.
++#![no_std]
++#![deny(unsafe_code)]
++
++extern crate alloc;
++
++macro_rules! __log_prefix {
++    () => {
++        "nvidia-platform: "
++    };
++}
++
++use alloc::vec::Vec;
++
++use aster_pci::{
++    PciDeviceLocation,
++    cfg_space::{AddrLen, Bar},
++    common_device::PciCommonDevice,
++};
++use component::{ComponentInitError, init_component};
++
++/// Inspects unclaimed NVIDIA display functions using the initialized PCI bus.
++///
++/// This only copies enumerator metadata and does not claim or initialize GPUs.
++pub fn resource_inventory() -> Vec<Result<ResourceSnapshot, SnapshotError>> {
++    aster_pci::PCI_BUS
++        .lock()
++        .unclaimed_devices()
++        .filter(|device| {
++            let id = device.device_id();
++            id.vendor_id == NVIDIA_VENDOR_ID && id.class == PCI_BASE_CLASS_DISPLAY
++        })
++        .map(ResourceSnapshot::from_device)
++        .collect()
++}
++
++#[init_component]
++fn init() -> Result<(), ComponentInitError> {
++    let resources = resource_inventory();
++    if resources.is_empty() {
++        ostd::warn!(
++            "NVIDIA PCI diagnostics: no unclaimed NVIDIA display controller; RM/GSP not initialized"
++        );
++    }
++    for resource in resources {
++        match resource {
++            Ok(snapshot) => ostd::info!(
++                "NVIDIA PCI resources (not claimed, RM/GSP not initialized): {snapshot:?}"
++            ),
++            Err(error) => ostd::error!("NVIDIA PCI resource validation failed: {error:?}"),
++        }
++    }
++    // Successful diagnostic initialization is not a successful GPU probe: this
++    // component deliberately does not implement or register PciDriver.
++    Ok(())
++}
++
++/// NVIDIA's PCI vendor ID.
++pub const NVIDIA_VENDOR_ID: u16 = 0x10de;
++/// PCI base class for display controllers (including VGA-compatible and 3D controllers).
++pub const PCI_BASE_CLASS_DISPLAY: u8 = 0x03;
++/// Conservative limit for the conventional PCI configuration header, supported by legacy config
++/// mechanisms as well as ECAM. Extended configuration space is deliberately not exposed here.
++pub const CONFIG_SPACE_LIMIT: u16 = 0x0100;
++
++/// Resource inventory errors. A snapshot is rejected rather than making assumptions about an
++/// absent, zero-sized, or wrapping BAR.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum SnapshotError {
++    /// The PCI function is not manufactured by NVIDIA.
++    NotNvidia { vendor_id: u16 },
++    /// PCI class information is present but is not a display controller.
++    NotDisplayController { base_class: u8 },
++    /// BAR0 was not found in the already-parsed BAR manager.
++    MissingBar0,
++    /// NVIDIA's required BAR0 is present but is not a memory BAR.
++    Bar0NotMemory,
++    /// A BAR reports an unusable zero base or zero size.
++    InvalidBar { index: u8 },
++    /// The exclusive end of a BAR's address range is not representable in u64.
++    AddressOverflow { index: u8 },
++}
++
++/// Kind of PCI BAR, preserving whether the range is MMIO or port I/O.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum BarKind {
++    /// Memory-mapped I/O BAR.
++    Memory,
++    /// I/O-port BAR.
++    Io,
++}
++
++/// A diagnostic snapshot of one BAR's already-decoded resource information.
++///
++/// `end_exclusive` is computed with checked arithmetic. These fields describe the PCI framework's
++/// current BAR metadata; they do not indicate that this crate or a driver has claimed or mapped it.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct BarSnapshot {
++    /// BAR slot number (0 through 5). A 64-bit BAR's upper slot is not a separate entry.
++    pub index: u8,
++    /// Resource address as provided by `aster-pci`.
++    pub base: u64,
++    /// Resource length as provided by `aster-pci`'s hardware BAR sizing path.
++    pub size: u64,
++    /// Exclusive end address (`base + size`).
++    pub end_exclusive: u64,
++    /// Whether this is a memory BAR or an I/O-port BAR.
++    pub kind: BarKind,
++    /// Memory BAR address width; `None` for I/O BARs.
++    pub address_length: Option<AddrLen>,
++    /// PCI prefetchable attribute; `None` for I/O BARs.
++    pub prefetchable: Option<bool>,
++}
++
++/// A read-only diagnostic resource inventory for one NVIDIA display-class PCI function.
++///
++/// This is a **snapshot only**, not a PCI resource claim, initialized device, successful driver
++/// probe, MMIO mapping, or indication that NVIDIA RM/GSP is operational.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct ResourceSnapshot {
++    /// PCI bus/device/function location.
++    pub location: PciDeviceLocation,
++    /// Vendor ID (`0x10de` for accepted devices).
++    pub vendor_id: u16,
++    /// PCI device ID.
++    pub device_id: u16,
++    /// PCI base class.
++    pub base_class: u8,
++    /// PCI subclass.
++    pub subclass: u8,
++    /// Slots with a BAR parsed by the PCI framework. Empty slots and upper halves of 64-bit BARs
++    /// are `None`.
++    pub bars: [Option<BarSnapshot>; 6],
++}
++
++impl ResourceSnapshot {
++    /// Validate and snapshot an enumerated device using its existing `BarManager` metadata.
++    ///
++    /// This method never calls `Bar::acquire`, resizes BARs, reads config-space BARs directly,
++    /// maps MMIO, or changes PCI command state. The PCI framework itself previously sized the BARs
++    /// while enumerating the device; this method only consumes the resulting `base`, `size`, and
++    /// attributes.
++    pub fn from_device(device: &PciCommonDevice) -> Result<Self, SnapshotError> {
++        let id = device.device_id();
++        validate_identity(id.vendor_id, id.class)?;
++
++        let mut bars = [None; 6];
++        for index in 0..6u8 {
++            if let Some(bar) = device.bar_manager().bar(index) {
++                let snapshot = snapshot_bar(index, bar)?;
++                bars[index as usize] = Some(snapshot);
++            }
++        }
++
++        match bars[0] {
++            None => return Err(SnapshotError::MissingBar0),
++            Some(bar) if bar.kind != BarKind::Memory => return Err(SnapshotError::Bar0NotMemory),
++            Some(_) => {}
++        }
++
++        Ok(Self {
++            location: *device.location(),
++            vendor_id: id.vendor_id,
++            device_id: id.device_id,
++            base_class: id.class,
++            subclass: id.subclass,
++            bars,
++        })
++    }
++}
++
++fn validate_identity(vendor_id: u16, base_class: u8) -> Result<(), SnapshotError> {
++    if vendor_id != NVIDIA_VENDOR_ID {
++        return Err(SnapshotError::NotNvidia { vendor_id });
++    }
++    // The PCI framework always reads the base-class byte into PciDeviceId. Do not silently accept
++    // unknown/other class values: this API intentionally inventories display-class GPUs only.
++    if base_class != PCI_BASE_CLASS_DISPLAY {
++        return Err(SnapshotError::NotDisplayController { base_class });
++    }
++    Ok(())
++}
++
++fn checked_range(index: u8, base: u64, size: u64) -> Result<u64, SnapshotError> {
++    if base == 0 || size == 0 {
++        return Err(SnapshotError::InvalidBar { index });
++    }
++    base.checked_add(size)
++        .ok_or(SnapshotError::AddressOverflow { index })
++}
++
++fn snapshot_bar(index: u8, bar: &Bar) -> Result<BarSnapshot, SnapshotError> {
++    let snapshot = match bar {
++        Bar::Memory(memory) => BarSnapshot {
++            index,
++            base: memory.base(),
++            size: memory.size(),
++            end_exclusive: checked_range(index, memory.base(), memory.size())?,
++            kind: BarKind::Memory,
++            address_length: Some(memory.address_length()),
++            prefetchable: Some(memory.prefetchable()),
++        },
++        Bar::Io(io) => BarSnapshot {
++            index,
++            base: io.base() as u64,
++            size: io.size() as u64,
++            end_exclusive: checked_range(index, io.base() as u64, io.size() as u64)?,
++            kind: BarKind::Io,
++            address_length: None,
++            prefetchable: None,
++        },
++    };
++    Ok(snapshot)
++}
++
++/// Bounds and validates reads through the public `PciDeviceLocation` config-space interface.
++///
++/// Reads are read-only and restricted to the first 256 bytes. Callers should use this only with a
++/// device returned by the initialized PCI enumerator; the underlying architecture accessor can
++/// report hardware/configuration faults by panicking in the existing PCI API, and cannot be made
++/// fallible by this wrapper.
++pub struct ConfigReader<'a> {
++    location: &'a PciDeviceLocation,
++}
++
++impl<'a> ConfigReader<'a> {
++    /// Create a bounded reader for this enumerated PCI function.
++    pub fn new(device: &'a PciCommonDevice) -> Self {
++        Self {
++            location: device.location(),
++        }
++    }
++
++    /// Read one byte at an offset in conventional PCI configuration space.
++    pub fn read8(&self, offset: u16) -> Result<u8, ConfigReadError> {
++        check_bounds(offset, 1)?;
++        Ok(self.location.read8(offset))
++    }
++
++    /// Read a little-endian 16-bit value at an aligned offset.
++    pub fn read16(&self, offset: u16) -> Result<u16, ConfigReadError> {
++        check_alignment(offset, 2)?;
++        check_bounds(offset, 2)?;
++        Ok(self.location.read16(offset))
++    }
++
++    /// Read a little-endian 32-bit value at an aligned offset.
++    pub fn read32(&self, offset: u16) -> Result<u32, ConfigReadError> {
++        check_alignment(offset, 4)?;
++        check_bounds(offset, 4)?;
++        Ok(self.location.read32(offset))
++    }
++}
++
++/// Rejection from the safe bounds/alignment checks of [`ConfigReader`].
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum ConfigReadError {
++    /// Offset/width extends beyond conventional 256-byte config space.
++    OutOfBounds { offset: u16, width: u8 },
++    /// 16/32-bit reads must be naturally aligned.
++    Misaligned { offset: u16, width: u8 },
++}
++
++fn check_bounds(offset: u16, width: u8) -> Result<(), ConfigReadError> {
++    let end = offset.checked_add(width as u16);
++    if offset >= CONFIG_SPACE_LIMIT || !matches!(end, Some(end) if end <= CONFIG_SPACE_LIMIT) {
++        return Err(ConfigReadError::OutOfBounds { offset, width });
++    }
++    Ok(())
++}
++
++fn check_alignment(offset: u16, width: u8) -> Result<(), ConfigReadError> {
++    if offset % width as u16 != 0 {
++        return Err(ConfigReadError::Misaligned { offset, width });
++    }
++    Ok(())
++}
++
++#[cfg(any(test, ktest))]
++mod tests {
++    use super::*;
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn identity_requires_nvidia_display_class() {
++        assert_eq!(validate_identity(0x10de, 0x03), Ok(()));
++        assert_eq!(
++            validate_identity(0x1234, 0x03),
++            Err(SnapshotError::NotNvidia { vendor_id: 0x1234 })
++        );
++        assert_eq!(
++            validate_identity(0x10de, 0x02),
++            Err(SnapshotError::NotDisplayController { base_class: 0x02 })
++        );
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn range_is_checked_and_rejects_empty_or_zero_base() {
++        assert_eq!(checked_range(0, 0x1000, 0x2000), Ok(0x3000));
++        assert_eq!(
++            checked_range(0, 0, 0x1000),
++            Err(SnapshotError::InvalidBar { index: 0 })
++        );
++        assert_eq!(
++            checked_range(2, 0x1000, 0),
++            Err(SnapshotError::InvalidBar { index: 2 })
++        );
++        assert_eq!(
++            checked_range(4, u64::MAX - 7, 8),
++            Err(SnapshotError::AddressOverflow { index: 4 })
++        );
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn conventional_config_reads_are_bounded_and_aligned() {
++        assert_eq!(check_bounds(0xfc, 4), Ok(()));
++        assert_eq!(
++            check_bounds(0xfd, 4),
++            Err(ConfigReadError::OutOfBounds {
++                offset: 0xfd,
++                width: 4
++            })
++        );
++        assert_eq!(
++            check_bounds(0x100, 1),
++            Err(ConfigReadError::OutOfBounds {
++                offset: 0x100,
++                width: 1
++            })
++        );
++        assert_eq!(check_alignment(0x10, 4), Ok(()));
++        assert_eq!(
++            check_alignment(0x11, 4),
++            Err(ConfigReadError::Misaligned {
++                offset: 0x11,
++                width: 4
++            })
++        );
++    }
++}
+diff --git a/kernel/core/comps/pci/src/bus.rs b/kernel/core/comps/pci/src/bus.rs
+--- a/kernel/core/comps/pci/src/bus.rs
++++ b/kernel/core/comps/pci/src/bus.rs
+@@ -46,6 +46,14 @@
+ }
+ 
+ impl PciBus {
++    /// Borrows the enumerated functions that have not been claimed by a driver.
++    ///
++    /// The caller must retain the bus lock while using this iterator. Inspecting
++    /// a function does not claim it or establish a working device driver.
++    pub fn unclaimed_devices(&self) -> impl Iterator<Item = &PciCommonDevice> {
++        self.common_devices.iter()
++    }
++
+     /// Registers a PCI driver to the PCI bus.
+     pub fn register_driver(&mut self, driver: Arc<dyn PciDriver>) {
+         debug!("Register PCI driver: {:#x?}", driver);
+diff --git a/kernel/src/lib.rs b/kernel/src/lib.rs
+--- a/kernel/src/lib.rs
++++ b/kernel/src/lib.rs
+@@ -15,6 +15,8 @@
+ extern crate aster_drm as _;
+ #[cfg(target_arch = "x86_64")]
+ extern crate aster_i8042 as _;
++#[cfg(feature = "nvidia-pci-diagnostics")]
++extern crate aster_nvidia_platform as _;
+ extern crate aster_simpledrm as _;
+ extern crate aster_uart as _;
+ 
+diff --git a/ostd/src/arch/x86/boot/multiboot2/mod.rs b/ostd/src/arch/x86/boot/multiboot2/mod.rs
+--- a/ostd/src/arch/x86/boot/multiboot2/mod.rs
++++ b/ostd/src/arch/x86/boot/multiboot2/mod.rs
+@@ -1,10 +1,13 @@
+ // SPDX-License-Identifier: MPL-2.0
+ 
+-use core::arch::global_asm;
+-
+-use multiboot2::{BootInformation, BootInformationHeader, MemoryAreaType};
++use core::{arch::global_asm, num::NonZeroUsize};
++
++use multiboot2::{BootInformation, BootInformationHeader, FramebufferType, MemoryAreaType};
+ 
+ use super::ToEarlyBootInfo;
++#[cfg(ktest)]
++mod tests;
++
+ use crate::{
+     boot::{
+         BootloaderAcpiArg, BootloaderFramebufferArg,
+@@ -101,6 +104,13 @@
+     fn framebuffer_arg(&self) -> Option<BootloaderFramebufferArg> {
+         let fb_tag = self.framebuffer_tag()?.ok()?;
+ 
++        // EGA text has 16 bits per character, not RGB565 pixels. Passing its
++        // address (typically 0xb8000) to the pixel framebuffer is both a format
++        // error and an invalid acquisition from the generic MMIO allocator.
++        if matches!(fb_tag.buffer_type().ok()?, FramebufferType::Text) {
++            return None;
++        }
++
+         Some(BootloaderFramebufferArg {
+             address: fb_tag.address() as usize,
+             width: fb_tag.width() as usize,
+@@ -121,10 +131,28 @@
+         let memory_regions_tag = self
+             .memory_map_tag()
+             .expect("No memory regions are found in the Multiboot2 header!");
++        // Firmware may mark the RAM containing ACPI tables as reserved rather
++        // than ACPI-reclaimable. As on the Multiboot v1/PVH paths, preserve that
++        // region in the linear mapping after the boot page table is replaced.
++        // QEMU/SeaBIOS places the RSDT above the last usable RAM region.
++        // Do not BIOS-scan an EFI boot that did not supply ACPI information.
++        let acpi_root_table_address = match self.acpi_arg() {
++            BootloaderAcpiArg::Rsdt(addr) | BootloaderAcpiArg::Xsdt(addr) => {
++                NonZeroUsize::new(addr)
++            }
++            BootloaderAcpiArg::ScanBios => super::find_acpi_root_table_address(),
++            _ => None,
++        };
+         for region in memory_regions_tag.memory_areas() {
+             let start = region.start_address();
+             let end = region.end_address();
+             let area_typ: MemoryRegionType = MemoryAreaType::from(region.typ()).into();
++            let area_typ = super::effective_region_type(
++                area_typ,
++                start.try_into().unwrap(),
++                (end - start).try_into().unwrap(),
++                acpi_root_table_address,
++            );
+             regions
+                 .push(MemoryRegion::new(
+                     start.try_into().unwrap(),
+diff --git a/ostd/src/arch/x86/boot/multiboot2/tests.rs b/ostd/src/arch/x86/boot/multiboot2/tests.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/src/arch/x86/boot/multiboot2/tests.rs
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: MPL-2.0
++
++use multiboot2::{
++    Builder, EFISdt64Tag, FramebufferTag, MaybeDynSized, MemoryArea, MemoryMapTag, RsdpV1Tag,
++    RsdpV2Tag,
++};
++
++use super::*;
++use crate::prelude::ktest;
++
++fn memory_builder() -> Builder {
++    Builder::new().mmap(MemoryMapTag::new(&[
++        MemoryArea::new(0x100000, 0x7fedf000, MemoryAreaType::Available),
++        MemoryArea::new(0x7ffdf000, 0x21000, MemoryAreaType::Reserved),
++        MemoryArea::new(0xfffc0000, 0x40000, MemoryAreaType::Reserved),
++    ]))
++}
++
++fn check_reserved_acpi(builder: Builder) {
++    let storage = builder.build();
++    // SAFETY: The builder owns a valid, aligned MBI throughout this test.
++    let info = unsafe { BootInformation::load(storage.as_bytes().as_ptr().cast()) }.unwrap();
++    let regions = info.memory_regions(None, None, None);
++    let acpi = regions
++        .iter()
++        .find(|region| (region.base()..region.end()).contains(&0x7ffe2321))
++        .unwrap();
++    assert_eq!(acpi.typ(), MemoryRegionType::Reclaimable);
++    assert!(acpi.typ().is_physical());
++    // Do not promote unrelated firmware/ROM reservations.
++    let rom = regions
++        .iter()
++        .find(|region| region.base() == 0xfffc0000)
++        .unwrap();
++    assert_eq!(rom.typ(), MemoryRegionType::Reserved);
++}
++
++#[ktest]
++fn reserved_rsdt_remains_in_linear_mapping() {
++    check_reserved_acpi(memory_builder().rsdpv1(RsdpV1Tag::new(0, *b"TEST  ", 0, 0x7ffe2300)));
++}
++
++#[ktest]
++fn reserved_xsdt_remains_in_linear_mapping() {
++    check_reserved_acpi(
++        memory_builder().rsdpv2(RsdpV2Tag::new(0, *b"TEST  ", 2, 0, 36, 0x7ffe2300, 0)),
++    );
++}
++
++#[ktest]
++fn efi_without_acpi_does_not_promote_reserved_ram() {
++    let storage = memory_builder().efi64(EFISdt64Tag::new(0x100000)).build();
++    // SAFETY: The builder owns a valid, aligned MBI throughout this test.
++    let info = unsafe { BootInformation::load(storage.as_bytes().as_ptr().cast()) }.unwrap();
++    assert!(matches!(info.acpi_arg(), BootloaderAcpiArg::NotProvided));
++    let regions = info.memory_regions(None, None, None);
++    let acpi = regions
++        .iter()
++        .find(|region| (region.base()..region.end()).contains(&0x7ffe2321))
++        .unwrap();
++    assert_eq!(acpi.typ(), MemoryRegionType::Reserved);
++}
++
++#[ktest]
++fn ega_text_is_not_a_pixel_framebuffer() {
++    let storage = Builder::new()
++        .framebuffer(FramebufferTag::new(
++            0xb8000,
++            160,
++            80,
++            25,
++            16,
++            FramebufferType::Text,
++        ))
++        .build();
++    // SAFETY: The builder owns a valid, aligned MBI throughout this test.
++    let info = unsafe { BootInformation::load(storage.as_bytes().as_ptr().cast()) }.unwrap();
++    assert!(info.framebuffer_arg().is_none());
++}
+diff --git a/tools/graphics/NATIVE_NVIDIA.md b/tools/graphics/NATIVE_NVIDIA.md
+--- a/tools/graphics/NATIVE_NVIDIA.md
++++ b/tools/graphics/NATIVE_NVIDIA.md
+@@ -45,8 +45,20 @@
+ 
+ ## Current local evidence and blockers
+ 
+-Eight real C/Rust memory tests passed on the host; OSDK compiled the same registered native tests. The complete Asterinas kernel linked the NVport object with no unresolved symbols in that final kernel. No full RM/modeset object was linked.
++Eight real C/Rust NVport memory tests now passed **inside Asterinas/OSTD under QEMU TCG**, as well as on the host. The OSTD runner reported 225 passed tests, including four new Multiboot2 regressions; one VMX/EPT-dependent test body reported its explicit unavailable-hardware skip. Three NVIDIA PCI platform validation tests also passed inside the kernel. No full RM/modeset object was linked.
+ 
+-Multiboot2 TCG boots initially timed out without serial output. Enabling `earlycon` exposed a kernel page fault at `0xffff80007ffe2321` during early OSTD initialization, after xAPIC detection and before the assembler's NVport self-test. This is a real boot failure, not a memory-test result. Its root cause has not been fixed or proved. The local native GPU entrypoint separately rejects the unavailable `/dev/kvm`; this sandbox has no assigned NVIDIA GPU.
++The fault at `0xffff80007ffe2321` was reproduced and traced to reading ACPI MADT data outside the new kernel linear mapping. SeaBIOS placed the ACPI root/tables in reserved RAM beyond the last usable range (`0x7ffdf000`); Multiboot2 failed to apply the ACPI reserved-region preservation already used by other boot paths. Applying `effective_region_type` with the actual RSDT/XSDT extends preserved metadata/mapping through that region (`0x80000000` in this VM). Reserved RAM unrelated to ACPI is not promoted. The same boot then passed APIC/ACPI initialization.
++
++The next failure was an EGA text console misinterpreted as an RGB pixel framebuffer at VGA text memory. Multiboot2 now returns no pixel framebuffer for EGA text, rather than letting the framebuffer component attempt to acquire the wrong memory type. This does not fix the separate general pitch/pixel-mask limitations or create display acceleration.
++
++The corrected complete kernel ran the NVport self-test, executed a real static `/init` in userspace, printed `ASTERINAS_CPU_USERSPACE_SMOKE passed (not a GPU test)` and successfully invoked `reboot(POWER_OFF)`. QEMU's `isa-debug-exit` success encoding is process status **33**, not Unix status 0. Local logs and explicit CPU-only result are in `../evidence/nvport/` relative to the checkout: `native-eight-tests.log`, `native-ostd-suite.log`, `native-pci-platform-tests.log`, `cpu-userspace-boot.log`, `cpu-userspace-result.json`, and `tcg-ci-smoke/result.json`.
++
++`aster-nvidia-platform` now consumes the real `aster-pci` enumerator's identity and measured BAR metadata, validates NVIDIA display BAR0/ranges, and provides bounded, read-only config access. The optional `nvidia-pci-diagnostics` feature emits resource inventories without claiming a device or initializing RM/GSP. `native-gpu-ci` includes that diagnostic. There is no successful NVIDIA hardware probe in this sandbox; no GPU is assigned, and the native GPU entrypoint continues to reject missing `/dev/kvm`.
+ 
+ Even with a working boot and GPU runner, native Vulkan cannot work until the missing NVIDIA RM/GSP initialization, DMA/IOMMU/pinning/interrupt services, device-node ioctl/mmap ABI, GPU memory/submission/fence/reset/teardown and accelerated DRM integration are genuinely implemented. GPUI/Wayland rendering then needs separate end-to-end acceptance. Neither a GitHub token nor a passing Linux benchmark supplies these missing kernel components.
++
++## CPU-only CI is not hardware acceptance
++
++Ordinary PR/push CI runs `bash tools/graphics/run_cpu_kernel_tests.sh OUTPUT_DIRECTORY` for the NVport, PCI platform and OSTD suites with TCG, no networking and no GPU passthrough. Each run is bounded, uses an exclusive temporary package manifest, retains logs, and rejects a zero-tests result. The kernel build then enables NVport plus PCI diagnostics and `run_nvport_smoke.py` requires the exact data-checking NVport success line. That smoke ends at the CPU marker and deliberately does not certify subsequent full boot or GPU activity. These commands were exercised locally, but no Actions workflow was uploaded or run remotely.
++
++`validate_native_gpu_evidence.py` continues to identify a possible future hardware compute result as compute-only, with `full_gpui_wayland_vulkan_acceptance = false`. Missing hardware/GSP/ABI is a failure, not a skip-pass; neither the CPU smoke nor a Linux-host result can satisfy the native GPU requirement.
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+new file mode 100644
+--- /dev/null
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -0,0 +1,44 @@
++#!/usr/bin/env bash
++# Real Asterinas/OSTD tests under CPU-only QEMU TCG. Never GPU acceptance.
++set -euo pipefail
++ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
++OUTPUT=${1:?usage: run_cpu_kernel_tests.sh OUTPUT_DIRECTORY}
++mkdir -p "$OUTPUT"
++OUTPUT=$(cd -- "$OUTPUT" && pwd)
++
++for package in ostd/libs/nvidia-nvport kernel/comps/nvidia-platform ostd; do
++    name=${package##*/}
++    log="$OUTPUT/native-$name-tests.log"
++    (
++        cd "$ROOT/$package"
++        # Never overwrite a developer-provided package manifest. noclobber also
++        # closes the race with another local process creating this file.
++        set -o noclobber
++        printf '%s\n' \
++            '[boot]' \
++            'method = "grub-rescue-iso"' \
++            '[grub]' \
++            'boot_protocol = "multiboot2"' \
++            '[qemu]' \
++            'args = "-machine q35,accel=tcg -cpu max -m 2048M -smp 2 -display none -monitor none -serial stdio -no-reboot -nic none -device isa-debug-exit,iobase=0xf4,iosize=0x04"' \
++            '[test.boot]' \
++            'kcmd_args = ["earlycon", "console=ttyS0"]' > OSDK.toml
++        trap 'rm -f OSDK.toml' EXIT
++        # No guest input is needed. Detach stdin so QEMU never attempts to
++        # read the controlling terminal from this pipeline/background group.
++        timeout --signal=TERM --kill-after=5 600s cargo osdk test --strip-elf </dev/null
++    ) 2>&1 | tee "$log"
++    # An OSDK filter can exit successfully after executing zero tests. Do not
++    # mistake that for a pass, or accept logs without the final runner marker.
++    python3 - "$log" <<'PY'
++from pathlib import Path
++import re
++import sys
++text = Path(sys.argv[1]).read_text(errors="strict")
++text = re.sub(r"\x1b\[[0-9;]*[mK]", "", text)
++if not re.search(r"test result: ok\. [1-9][0-9]* passed; 0 failed;", text):
++    raise SystemExit("No positive, passing kernel test count in " + sys.argv[1])
++if "[ktest runner] All crates tested." not in text:
++    raise SystemExit("Missing final kernel runner marker in " + sys.argv[1])
++PY
++done
+diff --git a/tools/graphics/run_nvport_smoke.py b/tools/graphics/run_nvport_smoke.py
+new file mode 100644
+--- /dev/null
++++ b/tools/graphics/run_nvport_smoke.py
+@@ -0,0 +1,169 @@
++#!/usr/bin/env python3
++"""Run the NVport CPU memory self-test in a bounded, software-emulated QEMU VM.
++
++This is strictly a CPU-only self-test; it is not a GPU test and does not certify
++that the kernel completes a full boot after the marker.
++"""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import re
++import selectors
++import subprocess
++import time
++
++MARKER = b"NVIDIA NVport CPU memory self-test passed (not a GPU test)"
++SCOPE = "CPU-only NVIDIA NVport memory self-test; not a GPU test or full-boot certification"
++PANIC = re.compile(rb"(?:kernel\s+)?panic(?:\b|:)|panicked at", re.IGNORECASE)
++MAX_TIMEOUT_SECONDS = 900
++
++
++def sha256(path):
++    digest = hashlib.sha256()
++    with path.open("rb") as stream:
++        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
++            digest.update(chunk)
++    return digest.hexdigest()
++
++
++def qemu_command(image):
++    """Build a deliberately restricted QEMU command: TCG, no network or passthrough."""
++    return [
++        "qemu-system-x86_64",
++        "-machine", "q35,accel=tcg",
++        "-cpu", "max",
++        "-m", "2048",
++        "-smp", "2",
++        "-display", "none",
++        "-monitor", "none",
++        "-serial", "stdio",
++        "-no-reboot",
++        "-nic", "none",
++        "-cdrom", str(image),
++    ]
++
++
++def _stop(process):
++    if process.poll() is not None:
++        return
++    process.terminate()
++    try:
++        process.wait(timeout=2)
++    except subprocess.TimeoutExpired:
++        process.kill()
++        process.wait()
++
++
++def capture_qemu(command, serial_path, stderr_path, timeout):
++    """Capture serial and QEMU diagnostics; accept only an exact complete marker line."""
++    process = subprocess.Popen(
++        command,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++        bufsize=0,
++    )
++    streams = {process.stdout: "serial", process.stderr: "stderr"}
++    pending = b""
++    serial_bytes = 0
++    deadline = time.monotonic() + timeout
++    try:
++        with selectors.DefaultSelector() as selector, serial_path.open("wb") as serial, stderr_path.open("wb") as stderr:
++            for stream, kind in streams.items():
++                selector.register(stream, selectors.EVENT_READ, kind)
++            while selector.get_map():
++                remaining = deadline - time.monotonic()
++                if remaining <= 0:
++                    raise RuntimeError("QEMU timed out before the complete NVport marker")
++                events = selector.select(min(0.25, remaining))
++                if not events and process.poll() is not None:
++                    # Continue until both pipes reach EOF, preserving all captured output.
++                    continue
++                for key, _ in events:
++                    stream = key.fileobj
++                    data = os.read(stream.fileno(), 65536)
++                    if not data:
++                        selector.unregister(stream)
++                        continue
++                    if key.data == "stderr":
++                        stderr.write(data)
++                        stderr.flush()
++                        continue
++                    serial.write(data)
++                    serial.flush()
++                    serial_bytes += len(data)
++                    pending += data
++                    lines = pending.split(b"\n")
++                    pending = lines.pop()
++                    for line in lines:
++                        line = line[:-1] if line.endswith(b"\r") else line
++                        if PANIC.search(line):
++                            raise RuntimeError("Kernel panic appeared on serial before the NVport marker")
++                        if line == MARKER:
++                            return
++                    if PANIC.search(pending):
++                        raise RuntimeError("Kernel panic appeared on serial before the NVport marker")
++            if pending:
++                final_line = pending[:-1] if pending.endswith(b"\r") else pending
++                if PANIC.search(final_line):
++                    raise RuntimeError("Kernel panic appeared on serial before the NVport marker")
++                if final_line == MARKER:
++                    return
++            if serial_bytes == 0:
++                raise RuntimeError("QEMU exited with empty serial output before the NVport marker")
++            raise RuntimeError("QEMU process exited before the complete NVport marker")
++    finally:
++        _stop(process)
++        for stream in streams:
++            stream.close()
++
++
++def run_smoke(image_arg, output_arg, timeout):
++    output = Path(output_arg).resolve()
++    output.mkdir(parents=True, exist_ok=True)
++    serial_path = output / "serial.log"
++    stderr_path = output / "qemu-stderr.log"
++    result_path = output / "result.json"
++    result = {
++        "scope": SCOPE,
++        "image_sha256": None,
++        "log": serial_path.name,
++        "qemu_stderr_log": stderr_path.name,
++        "pass": False,
++    }
++    try:
++        image = Path(image_arg).resolve(strict=True)
++        if not image.is_file():
++            raise ValueError("--image must name a regular ISO image file")
++        result["image_sha256"] = sha256(image)
++        capture_qemu(qemu_command(image), serial_path, stderr_path, timeout)
++        result["pass"] = True
++    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
++        result["error"] = str(error)
++    finally:
++        # Keep the evidence shape stable even when image validation/QEMU startup fails.
++        serial_path.touch(exist_ok=True)
++        stderr_path.touch(exist_ok=True)
++        result_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
++    return result
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--image", required=True, type=Path, help="Caller-built bootable ISO image")
++    parser.add_argument("--output", required=True, type=Path, help="Directory for result and QEMU logs")
++    parser.add_argument("--timeout", required=True, type=int, help="Maximum QEMU runtime in seconds (1..900)")
++    args = parser.parse_args(argv)
++    if not 1 <= args.timeout <= MAX_TIMEOUT_SECONDS:
++        parser.error(f"--timeout must be 1..{MAX_TIMEOUT_SECONDS} seconds")
++    result = run_smoke(args.image, args.output, args.timeout)
++    if not result["pass"]:
++        print(f"NVport CPU smoke failed: {result['error']}")
++        return 1
++    print(f"NVport CPU smoke passed; result: {(args.output / 'result.json').resolve()}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/graphics/test_native_gpu_evidence.py b/tools/graphics/test_native_gpu_evidence.py
+--- a/tools/graphics/test_native_gpu_evidence.py
++++ b/tools/graphics/test_native_gpu_evidence.py
+@@ -70,6 +70,11 @@
+     def test_accepts_synthetic_valid_chain_and_linux_uname_is_not_evidence(self) -> None:
+         report = validate_serial_log(synthetic_log(), COMMIT, NONCE)
+         self.assertEqual(report["status"], "validated")
++        self.assertEqual(
++            report["scope"],
++            "Asterinas-native NVIDIA Vulkan compute only; not GPUI/Wayland acceptance",
++        )
++        self.assertIs(report["full_gpui_wayland_vulkan_acceptance"], False)
+         benchmark = report["benchmark"]
+         self.assertEqual(benchmark["os"], "Linux synthetic-fixture 0.0.0 test")
+         self.assertIn("not cryptographic attestation", report["trust_boundary"])
+diff --git a/tools/graphics/test_run_nvport_smoke.py b/tools/graphics/test_run_nvport_smoke.py
+new file mode 100644
+--- /dev/null
++++ b/tools/graphics/test_run_nvport_smoke.py
+@@ -0,0 +1,109 @@
++#!/usr/bin/env python3
++"""Synthetic runner tests; no kernel build, GPU, or real QEMU boot is performed."""
++import hashlib
++import json
++from pathlib import Path
++import sys
++import tempfile
++import time
++import unittest
++from unittest import mock
++
++from run_nvport_smoke import MARKER, SCOPE, capture_qemu, qemu_command, run_smoke
++
++
++class NvportSmokeRunnerTests(unittest.TestCase):
++    def run_capture(self, code, timeout=3):
++        temporary = tempfile.TemporaryDirectory()
++        self.addCleanup(temporary.cleanup)
++        root = Path(temporary.name)
++        serial = root / "serial.log"
++        stderr = root / "qemu-stderr.log"
++        capture_qemu([sys.executable, "-u", "-c", code], serial, stderr, timeout)
++        return serial.read_bytes(), stderr.read_bytes()
++
++    def test_qemu_command_is_tcg_only_without_network_or_passthrough(self):
++        command = qemu_command(Path("/tmp/kernel.iso"))
++        self.assertIn("q35,accel=tcg", command)
++        # QEMU rejects -accel together with -machine accel=, even for TCG.
++        self.assertNotIn("-accel", command)
++        self.assertIn("-nic", command)
++        self.assertIn("none", command)
++        self.assertNotIn("kvm", " ".join(command).lower())
++        self.assertFalse(any("vfio" in item.lower() or "host=" in item.lower() for item in command))
++        self.assertEqual(command[-2:], ["-cdrom", "/tmp/kernel.iso"])
++
++    def test_accepts_exact_complete_marker_and_terminates_qemu_immediately(self):
++        start = time.monotonic()
++        serial, _ = self.run_capture(
++            f"import sys,time; print({MARKER.decode()!r}, flush=True); time.sleep(30)",
++            timeout=4,
++        )
++        self.assertEqual(serial.decode().strip(), MARKER.decode())
++        self.assertLess(time.monotonic() - start, 3)
++
++    def test_rejects_marker_with_prefix_or_suffix(self):
++        for line in (b"noise " + MARKER, MARKER + b" extra"):
++            code = f"import sys; sys.stdout.buffer.write({line + bytes([10])!r}); sys.stdout.flush()"
++            with self.subTest(line=line), tempfile.TemporaryDirectory() as temporary:
++                root = Path(temporary)
++                with self.assertRaisesRegex(RuntimeError, "process exited"):
++                    capture_qemu([sys.executable, "-u", "-c", code], root / "serial.log", root / "stderr.log", 3)
++
++    def test_rejects_panic_before_marker_even_if_marker_follows(self):
++        code = f"import sys; sys.stdout.buffer.write(b'Kernel panic: framebuffer\\n' + {MARKER + bytes([10])!r}); sys.stdout.flush()"
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            with self.assertRaisesRegex(RuntimeError, "panic"):
++                capture_qemu([sys.executable, "-u", "-c", code], root / "serial.log", root / "stderr.log", 3)
++
++    def test_rejects_empty_serial_and_process_exit_without_marker(self):
++        for code, expected in (("pass", "empty serial"), ("print('boot ended')", "process exited")):
++            with self.subTest(code=code), tempfile.TemporaryDirectory() as temporary:
++                root = Path(temporary)
++                with self.assertRaisesRegex(RuntimeError, expected):
++                    capture_qemu([sys.executable, "-u", "-c", code], root / "serial.log", root / "stderr.log", 3)
++
++    def test_rejects_timeout_and_preserves_serial(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            code = "import sys,time; print('booting', flush=True); time.sleep(30)"
++            with self.assertRaisesRegex(RuntimeError, "timed out"):
++                capture_qemu([sys.executable, "-u", "-c", code], root / "serial.log", root / "stderr.log", 1)
++            self.assertIn("booting", (root / "serial.log").read_text())
++
++    def test_result_json_records_cpu_only_scope_hash_logs_and_pass(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            image = root / "kernel.iso"
++            image.write_bytes(b"synthetic ISO")
++            output = root / "out"
++            with mock.patch("run_nvport_smoke.capture_qemu") as capture:
++                result = run_smoke(image, output, 10)
++            capture.assert_called_once()
++            self.assertTrue(result["pass"])
++            self.assertIn("CPU-only", result["scope"])
++            self.assertIn("not a GPU test", result["scope"])
++            self.assertEqual(result["image_sha256"], hashlib.sha256(b"synthetic ISO").hexdigest())
++            saved = json.loads((output / "result.json").read_text())
++            self.assertEqual(saved, result)
++            self.assertEqual(result["log"], "serial.log")
++            self.assertEqual(result["scope"], SCOPE)
++
++    def test_failure_result_is_written_and_never_passes(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            image = root / "kernel.iso"
++            image.write_bytes(b"synthetic ISO")
++            output = root / "out"
++            with mock.patch("run_nvport_smoke.capture_qemu", side_effect=RuntimeError("synthetic panic")):
++                result = run_smoke(image, output, 10)
++            self.assertFalse(result["pass"])
++            self.assertEqual(result["error"], "synthetic panic")
++            self.assertTrue((output / "serial.log").exists())
++            self.assertTrue((output / "qemu-stderr.log").exists())
++            self.assertFalse(json.loads((output / "result.json").read_text())["pass"])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/graphics/validate_native_gpu_evidence.py b/tools/graphics/validate_native_gpu_evidence.py
+--- a/tools/graphics/validate_native_gpu_evidence.py
++++ b/tools/graphics/validate_native_gpu_evidence.py
+@@ -180,6 +180,10 @@
+     benchmark = _validate_benchmark(json_text)
+     return {
+         "status": "validated",
++        # This is a scope annotation produced by the validator, not evidence
++        # that GPUI or a Wayland compositor was exercised.
++        "scope": "Asterinas-native NVIDIA Vulkan compute only; not GPUI/Wayland acceptance",
++        "full_gpui_wayland_vulkan_acceptance": False,
+         "commit": expected_commit,
+         "nonce": expected_nonce,
+         "benchmark": benchmark,

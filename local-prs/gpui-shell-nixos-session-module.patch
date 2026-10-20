@@ -1,0 +1,148 @@
+diff --git a/docs/src/content/docs/developer/setup.md b/docs/src/content/docs/developer/setup.md
+index 3749055..f345950 100644
+--- a/docs/src/content/docs/developer/setup.md
++++ b/docs/src/content/docs/developer/setup.md
+@@ -6,6 +6,18 @@ description: Build, run, test and profile GPUi Shell from source.
+ To run the shell, you need a Wayland session on Hyprland, Niri or Mango.
+ Building works anywhere.
+ 
++## NixOS installation
++
++The flake exports `nixosModules.default`. Add it to your NixOS flake's modules
++and enable `programs.gpuishell.enable = true;` to install `gpuishell` in the
++system profile. The module does not configure a compositor. Autostart is
++opt-in (`programs.gpuishell.autostart = true;`) and uses a user service wanted
++by `graphical-session.target` with a `WAYLAND_DISPLAY` condition; the session
++manager must start that target and provide its Wayland environment. Leave it
++disabled and configure startup yourself if your compositor uses another
++session mechanism. Override `programs.gpuishell.package` to install a different
++package.
++
+ ## With Nix (recommended)
+ 
+ ```bash
+diff --git a/flake.nix b/flake.nix
+index ece97c3..f22ed14 100644
+--- a/flake.nix
++++ b/flake.nix
+@@ -80,6 +80,12 @@
+         };
+       });
+ 
++      nixosModules.default = import ./nix/nixos-module.nix { inherit self; };
++
++      checks = forAllSystems (pkgs: {
++        nixos-module-evaluation = import ./nix/nixos-module-test.nix { inherit pkgs; };
++      });
++
+       overlays.default = final: prev: {
+         gpuishell = mkBuild final;
+         matugen = inputs.matugen.packages.${final.system}.default;
+diff --git a/nix/nixos-module-test.nix b/nix/nixos-module-test.nix
+new file mode 100644
+index 0000000..f79b7b2
+--- /dev/null
++++ b/nix/nixos-module-test.nix
+@@ -0,0 +1,58 @@
++{ pkgs }:
++let
++  inherit (pkgs) lib;
++  system = pkgs.stdenv.hostPlatform.system;
++  defaultPackage = pkgs.writeShellScriptBin "gpuishell" "exit 0";
++  overridePackage = pkgs.writeShellScriptBin "gpuishell-override" "exit 0";
++  fakeSelf.packages.${system}.default = defaultPackage;
++  module = import ./nixos-module.nix { self = fakeSelf; };
++
++  evaluate =
++    moduleConfig:
++    import (pkgs.path + "/nixos/lib/eval-config.nix") {
++      inherit system;
++      modules = [
++        module
++        ({ ... }: {
++          nixpkgs.pkgs = pkgs;
++          system.stateVersion = "24.11";
++        })
++        moduleConfig
++      ];
++    };
++
++  disabled = evaluate { };
++  enabled = evaluate { programs.gpuishell.enable = true; };
++  sessionEnabled = evaluate {
++    programs.gpuishell = {
++      enable = true;
++      autostart = true;
++    };
++  };
++  autostartWithoutEnable = evaluate { programs.gpuishell.autostart = true; };
++  overridden = evaluate {
++    programs.gpuishell = {
++      enable = true;
++      package = overridePackage;
++    };
++  };
++
++  sessionService = sessionEnabled.config.systemd.user.services.gpuishell;
++  sessionUnit = sessionEnabled.config.systemd.user.units."gpuishell.service".text;
++in
++assert !(builtins.elem defaultPackage disabled.config.environment.systemPackages);
++assert !(builtins.hasAttr "gpuishell" disabled.config.systemd.user.services);
++assert builtins.elem defaultPackage enabled.config.environment.systemPackages;
++assert !(builtins.hasAttr "gpuishell" enabled.config.systemd.user.services);
++assert !(builtins.hasAttr "gpuishell" autostartWithoutEnable.config.systemd.user.services);
++assert sessionService.wantedBy == [ "graphical-session.target" ];
++assert sessionService.unitConfig.ConditionEnvironment == "WAYLAND_DISPLAY";
++assert sessionService.unitConfig.PartOf == "graphical-session.target";
++assert sessionService.serviceConfig.ExecStart == "${defaultPackage}/bin/gpuishell";
++assert lib.hasInfix "ConditionEnvironment=WAYLAND_DISPLAY" sessionUnit;
++assert lib.hasInfix "PartOf=graphical-session.target" sessionUnit;
++assert lib.hasInfix "ExecStart=" sessionUnit;
++assert builtins.elem overridePackage overridden.config.environment.systemPackages;
++assert !(builtins.elem defaultPackage overridden.config.environment.systemPackages);
++assert !(builtins.hasAttr "gpuishell" overridden.config.systemd.user.services);
++pkgs.runCommand "gpuishell-nixos-module-evaluation" { } "touch $out"
+diff --git a/nix/nixos-module.nix b/nix/nixos-module.nix
+new file mode 100644
+index 0000000..63e3281
+--- /dev/null
++++ b/nix/nixos-module.nix
+@@ -0,0 +1,38 @@
++{ self }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++let
++  cfg = config.programs.gpuishell;
++in
++{
++  options.programs.gpuishell = {
++    enable = lib.mkEnableOption "GPUi Shell";
++
++    autostart = lib.mkEnableOption "starting GPUi Shell in the Wayland graphical session";
++
++    package = lib.mkOption {
++      type = lib.types.package;
++      default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
++      defaultText = lib.literalExpression "gpuishell.packages.\${pkgs.system}.default";
++      description = "The GPUi Shell package to install.";
++    };
++  };
++
++  config = lib.mkIf cfg.enable {
++    environment.systemPackages = [ cfg.package ];
++
++    systemd.user.services.gpuishell = lib.mkIf cfg.autostart {
++      description = "GPUi Shell Wayland session shell";
++      wantedBy = [ "graphical-session.target" ];
++      unitConfig = {
++        ConditionEnvironment = "WAYLAND_DISPLAY";
++        PartOf = "graphical-session.target";
++      };
++      serviceConfig.ExecStart = lib.getExe cfg.package;
++    };
++  };
++}

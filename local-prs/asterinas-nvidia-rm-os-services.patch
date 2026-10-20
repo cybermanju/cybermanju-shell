@@ -1,0 +1,3306 @@
+diff --git a/.github/workflows/graphics_gpu.yml b/.github/workflows/graphics_gpu.yml
+--- a/.github/workflows/graphics_gpu.yml
++++ b/.github/workflows/graphics_gpu.yml
+@@ -72,7 +72,7 @@
+           set -euo pipefail
+           git init "$NVIDIA_SOURCE_DIR"
+           git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
+-            https://github.com/NVIDIA/open-gpu-kernel-modules.git ca2d03e6fafd4d4b56b383497d931c25b283bfcf
++            https://github.com/NVIDIA/open-gpu-kernel-modules.git 1a82fbfda8f321b056eb3568850f9316c5e465c5
+           git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
+       - name: Install QEMU and BIOS rescue ISO prerequisites
+         run: |
+@@ -85,6 +85,11 @@
+           set -euo pipefail
+           cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu \
+             2>&1 | tee "$NVPORT_OUTPUT/host-tests.log"
++      - name: Test actual freestanding diagnostic formatting against host libc
++        run: |
++          set -euo pipefail
++          bash tools/graphics/run_nvport_format_tests.sh \
++            2>&1 | tee "$NVPORT_OUTPUT/formatter-host-tests.log"
+       - name: Execute NVport, PCI platform and OSTD suites inside Asterinas
+         run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
+       - name: Build grub-rescue multiboot2 ISO with serial console
+@@ -138,7 +143,7 @@
+           set -euo pipefail
+           git init "$NVIDIA_SOURCE_DIR"
+           git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
+-            https://github.com/NVIDIA/open-gpu-kernel-modules.git ca2d03e6fafd4d4b56b383497d931c25b283bfcf
++            https://github.com/NVIDIA/open-gpu-kernel-modules.git 1a82fbfda8f321b056eb3568850f9316c5e465c5
+           git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
+       - name: Build current kernel and run compute only inside its VFIO guest
+         shell: bash
+diff --git a/Cargo.lock b/Cargo.lock
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -327,8 +327,10 @@
+ version = "0.1.0"
+ dependencies = [
+  "aster-pci",
++ "aster-time",
+  "component",
+  "ostd",
++ "ostd-nvidia-nvport",
+ ]
+ 
+ [[package]]
+@@ -1460,6 +1462,7 @@
+ version = "0.1.0"
+ dependencies = [
+  "ostd",
++ "spin",
+ ]
+ 
+ [[package]]
+diff --git a/kernel/Cargo.toml b/kernel/Cargo.toml
+--- a/kernel/Cargo.toml
++++ b/kernel/Cargo.toml
+@@ -21,7 +21,7 @@
+ 
+ [features]
+ default = ["cvm_guest"]
+-nvidia-nvport-selftest = ["dep:ostd-nvidia-nvport"]
++nvidia-nvport-selftest = ["dep:ostd-nvidia-nvport", "aster-nvidia-platform?/nvport-runtime"]
+ nvidia-pci-diagnostics = ["dep:aster-nvidia-platform"]
+ native-gpu-ci = ["nvidia-nvport-selftest", "nvidia-pci-diagnostics"]
+ coverage = ["aster-core/coverage"]
+diff --git a/kernel/comps/nvidia-platform/Cargo.toml b/kernel/comps/nvidia-platform/Cargo.toml
+--- a/kernel/comps/nvidia-platform/Cargo.toml
++++ b/kernel/comps/nvidia-platform/Cargo.toml
+@@ -4,10 +4,15 @@
+ edition.workspace = true
+ license.workspace = true
+ 
++[features]
++nvport-runtime = ["dep:aster-time", "dep:ostd-nvidia-nvport"]
++
+ [dependencies]
+ aster-pci.workspace = true
++aster-time = { workspace = true, optional = true }
+ component.workspace = true
+ ostd.workspace = true
++ostd-nvidia-nvport = { workspace = true, optional = true }
+ 
+ [lints]
+ workspace = true
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -20,4 +20,18 @@
+ 
+ Useful NVIDIA open-kernel source/API targets for a later real integration include `nv_pci_probe_body()` / `nv_pci_probe()` and BAR validation/collection (`nv_pci_validate_bars()`, `nv->bars[*].cpu_address`, `NV_PCI_RESOURCE_START()` / `NV_PCI_RESOURCE_SIZE()`), followed by `nv_start_device()` and RM initialization. This inventory supplies only the PCI identity/resource observation that could inform that work; it implements none of those RM calls or a PCI driver's probe lifecycle.
+ 
+-A functioning recent NVIDIA stack also needs a compatible RM binary/interface path plus firmware and the actual GSP boot/runtime handshake (firmware loading, mailbox/queue setup, and RM interaction), in addition to MMIO ownership/mapping, interrupts, DMA/IOMMU, and power/device lifecycle. None is implemented or validated here. In particular, creating a resource snapshot must never be presented as proof that GSP started or RM initialized.
++A functioning recent NVIDIA stack also needs RM-private-state/adapter integration and the actual GSP boot/runtime handshake, in addition to MMIO ownership/mapping, interrupts, device-bound DMA/IOMMU and power/device lifecycle. A separate NVport provider now retrieves release-matched firmware files from guest boot storage, but file acquisition is not GSP loading into GPU memory, signature validation, mailbox/queue setup or RM startup. Creating a resource snapshot must never be presented as proof that GSP started or RM initialized.
++
++## Opt-in real runtime service
++
++The `nvport-runtime` feature installs immutable callbacks backed by Asterinas' initialized monotonic clock, RTC-derived realtime and clocksource counter resolution. Installation occurs at the component's `Kthread` stage, after core time initialization, not during early PCI inventory. A boot round trip exercises unchanged NVIDIA time/thread code, confirms a stable live-task identity across a real scheduler yield, and labels RM/GSP as uninitialized. The nominal counter interval is not a promise of absolute clock accuracy; realtime preserves Asterinas' existing RTC/dummy policy.
++
++The kernel selects this runtime only when both `nvidia-nvport-selftest` and `nvidia-pci-diagnostics` are enabled. A diagnostics-only build still requires neither the NVIDIA C checkout nor the time adapter. The native suite explicitly enables the runtime and adds calendar boundary/leap-year/overflow validation to the three inventory tests.
++
++## Minimal real device lifecycle still to port
++
++In the reviewed NVIDIA source, `nv_pci_probe` / `nv_pci_probe_body` validates and claims PCI/BAR resources and creates per-device/RM private state. Probe-time initialization or first open reaches `nv_start_device`, which establishes power, IRQ and task prerequisites before `rm_init_adapter`. GSP startup then traverses `kgspInitRm_IMPL` / `_kgspBootGspRm` into the hardware-specific bootstrap. Last close/removal requires `nv_stop_device`, `rm_shutdown_adapter`, work/interrupt quiescence and DMA/BAR release in a safe order. The implemented OS services are prerequisites for that lifecycle, not replacements for it.
++
++Asterinas already provides `PciDriver`/`register_driver`, `Bar::acquire`, `IoMem`, IRQ, DMA and scheduler facilities; the work is to supply NVIDIA-specific ownership and correct device-bound semantics, not invent stub equivalents. Its PCI driver interface currently lacks a remove callback, which must be addressed or explicitly bounded to non-hot-unplug lifetime before claiming complete teardown.
++
++DRM additionally needs a real `DrmDevice` and per-open RM state mapped to Asterinas' `DrmMinor`/`DrmFile` lifecycle, GPU-backed GEM, sharing/synchronization and display operations. A successful future compute dispatch still would not establish KMS scanout, Wayland rendering/presentation or full GPUI acceptance.
+diff --git a/kernel/comps/nvidia-platform/src/lib.rs b/kernel/comps/nvidia-platform/src/lib.rs
+--- a/kernel/comps/nvidia-platform/src/lib.rs
++++ b/kernel/comps/nvidia-platform/src/lib.rs
+@@ -7,6 +7,9 @@
+ #![deny(unsafe_code)]
+ 
+ extern crate alloc;
++
++#[cfg(feature = "nvport-runtime")]
++mod runtime;
+ 
+ macro_rules! __log_prefix {
+     () => {
+@@ -56,6 +59,28 @@
+     }
+     // Successful diagnostic initialization is not a successful GPU probe: this
+     // component deliberately does not implement or register PciDriver.
++    Ok(())
++}
++
++#[cfg(feature = "nvport-runtime")]
++#[init_component(kthread)]
++fn initialize_runtime() -> Result<(), ComponentInitError> {
++    runtime::install_runtime().map_err(|_| ComponentInitError::Unknown)?;
++    let uptime = ostd_nvidia_nvport::runtime::upstream_uptime_ns()
++        .map_err(|_| ComponentInitError::Unknown)?;
++    let realtime = ostd_nvidia_nvport::runtime::upstream_realtime_us()
++        .map_err(|_| ComponentInitError::Unknown)?;
++    let resolution = ostd_nvidia_nvport::runtime::upstream_resolution_ns()
++        .map_err(|_| ComponentInitError::Unknown)?;
++    let task = ostd_nvidia_nvport::runtime::upstream_task_identity()
++        .map_err(|_| ComponentInitError::Unknown)?;
++    ostd_nvidia_nvport::runtime::upstream_yield().map_err(|_| ComponentInitError::Unknown)?;
++    if ostd_nvidia_nvport::runtime::upstream_task_identity().ok() != Some(task) {
++        return Err(ComponentInitError::Unknown);
++    }
++    ostd::info!(
++        "NVIDIA NVport runtime: real clock/thread/yield round trip; uptime_ns={uptime} realtime_us={realtime} nominal_tick_ns={resolution}; RM/GSP not initialized"
++    );
+     Ok(())
+ }
+ 
+diff --git a/kernel/comps/nvidia-platform/src/runtime.rs b/kernel/comps/nvidia-platform/src/runtime.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/src/runtime.rs
+@@ -0,0 +1,127 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Asterinas clock callbacks for the NVIDIA NVport runtime.
++//!
++//! Install this only after Asterinas' time component and core system-time
++//! initialization. Realtime follows the same policy as Asterinas `SystemTime`:
++//! RTC calendar time at boot plus the calibrated monotonic elapsed time. If the
++//! calendar value is invalid, before the Unix epoch, or overflows, realtime
++//! reads fail closed. Asterinas currently falls back to a 1970 RTC dummy when
++//! no RTC is found; this callback deliberately preserves that kernel policy
++//! rather than pretending it is a hardware wall clock.
++use core::time::Duration;
++
++use ostd_nvidia_nvport::runtime::{self, Clock, Error};
++
++/// Installs immutable callbacks backed by the initialized Asterinas time source.
++pub(super) fn install_runtime() -> Result<(), Error> {
++    runtime::install_clock(Clock::new(
++        monotonic_ns,
++        realtime_ns,
++        monotonic_resolution_ns,
++    ))
++}
++
++fn monotonic_ns() -> Option<u64> {
++    duration_ns(aster_time::read_monotonic_time())
++}
++
++fn realtime_ns() -> Option<u64> {
++    let base_ns = calendar_to_unix_ns(aster_time::read_start_time())?;
++    base_ns.checked_add(duration_ns(aster_time::read_monotonic_time())?)
++}
++
++fn duration_ns(duration: Duration) -> Option<u64> {
++    duration.as_nanos().try_into().ok()
++}
++
++fn monotonic_resolution_ns() -> Option<u64> {
++    let frequency_hz = aster_time::default_clocksource().freq();
++    if frequency_hz == 0 {
++        return None;
++    }
++    // Report the nominal duration of one counter tick, rounded upward; this is
++    // the clocksource's tick interval, not a claim about absolute TSC accuracy.
++    Some(1_000_000_000u64.div_ceil(frequency_hz))
++}
++
++fn calendar_to_unix_ns(time: aster_time::SystemTime) -> Option<u64> {
++    let year = u32::from(time.year);
++    if year < 1970
++        || time.hour > 23
++        || time.minute > 59
++        || time.second > 59
++        || time.nanos >= 1_000_000_000
++    {
++        return None;
++    }
++    let month = u32::from(time.month);
++    let day = u32::from(time.day);
++    if !(1..=12).contains(&month) || day == 0 || day > days_in_month(year, month)? {
++        return None;
++    }
++
++    // RTC years are bounded by u16, so this loop is small and avoids a
++    // dependency on a second calendar/time implementation in the driver shim.
++    let mut days = 0u64;
++    for prior_year in 1970..year {
++        days = days.checked_add(if is_leap_year(prior_year) { 366 } else { 365 })?;
++    }
++    for prior_month in 1..month {
++        days = days.checked_add(u64::from(days_in_month(year, prior_month)?))?;
++    }
++    days = days.checked_add(u64::from(day - 1))?;
++
++    let seconds = days
++        .checked_mul(86_400)?
++        .checked_add(u64::from(time.hour) * 3_600)?
++        .checked_add(u64::from(time.minute) * 60)?
++        .checked_add(u64::from(time.second))?;
++    seconds.checked_mul(1_000_000_000)?.checked_add(time.nanos)
++}
++
++fn days_in_month(year: u32, month: u32) -> Option<u32> {
++    match month {
++        1 | 3 | 5 | 7 | 8 | 10 | 12 => Some(31),
++        4 | 6 | 9 | 11 => Some(30),
++        2 if is_leap_year(year) => Some(29),
++        2 => Some(28),
++        _ => None,
++    }
++}
++
++const fn is_leap_year(year: u32) -> bool {
++    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
++}
++
++#[cfg(any(test, ktest))]
++mod tests {
++    use super::*;
++
++    fn date(year: u16, month: u8, day: u8) -> aster_time::SystemTime {
++        aster_time::SystemTime {
++            year,
++            month,
++            day,
++            hour: 0,
++            minute: 0,
++            second: 0,
++            nanos: 0,
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn converts_calendar_to_unix_epoch_and_leap_day() {
++        assert_eq!(calendar_to_unix_ns(date(1970, 1, 1)), Some(0));
++        assert_eq!(
++            calendar_to_unix_ns(date(1970, 1, 2)),
++            Some(86_400_000_000_000)
++        );
++        assert_eq!(
++            calendar_to_unix_ns(date(2000, 3, 1)),
++            Some(951_868_800_000_000_000)
++        );
++        assert_eq!(calendar_to_unix_ns(date(1900, 1, 1)), None);
++        assert_eq!(calendar_to_unix_ns(date(2001, 2, 29)), None);
++    }
++}
+diff --git a/kernel/src/lib.rs b/kernel/src/lib.rs
+--- a/kernel/src/lib.rs
++++ b/kernel/src/lib.rs
+@@ -20,6 +20,9 @@
+ extern crate aster_simpledrm as _;
+ extern crate aster_uart as _;
+ 
++#[cfg(feature = "nvidia-nvport-selftest")]
++mod nvidia_boot;
++
+ #[ostd::main]
+ fn main() {
+     #[cfg(feature = "native-gpu-ci")]
+@@ -32,6 +35,7 @@
+     {
+         ostd_nvidia_nvport::self_test().expect("NVIDIA NVport CPU memory integration failed");
+         ostd::early_println!("NVIDIA NVport CPU memory self-test passed (not a GPU test)");
++        nvidia_boot::initialize_firmware_archive();
+     }
+     aster_core::boot();
+ }
+diff --git a/kernel/src/nvidia_boot.rs b/kernel/src/nvidia_boot.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/src/nvidia_boot.rs
+@@ -0,0 +1,61 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Real RM firmware file service backed exclusively by the guest boot archive.
++
++use ostd_nvidia_nvport::firmware::{self, ChipFamily, FirmwareError, FirmwareKind, FirmwareLease};
++
++pub(super) fn initialize_firmware_archive() {
++    let Some(bytes) = ostd::boot::boot_info().initramfs else {
++        ostd::early_println!(
++            "NVIDIA RM firmware unavailable: no guest boot archive (GSP not started)"
++        );
++        return;
++    };
++    if let Err(error) = firmware::install_boot_archive(bytes) {
++        ostd::early_println!(
++            "NVIDIA RM firmware archive rejected: {:?} (GSP not started)",
++            error
++        );
++        return;
++    }
++    let mut acquired = 0;
++    // These are file-family inventories only. Real RM must select the hardware
++    // family, validate firmware, establish GPU DMA and execute the GSP handshake.
++    for family in [ChipFamily::Tu10x, ChipFamily::Ga10x] {
++        for kind in [
++            FirmwareKind::Gsp,
++            FirmwareKind::GspLog,
++            FirmwareKind::Ucodes,
++        ] {
++            match FirmwareLease::acquire(kind, family) {
++                Ok(lease) => {
++                    // CPU-only readback evidence, not signature validation or a
++                    // GPU workload. The recorded host SHA-256 remains separate.
++                    let checksum = lease
++                        .as_bytes()
++                        .iter()
++                        .fold(0xcbf29ce484222325u64, |hash, byte| {
++                            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
++                        });
++                    ostd::early_println!(
++                        "NVIDIA RM firmware acquired from guest boot archive: {} bytes={} cpu_fnv1a64={:016x} (GSP not started)",
++                        firmware::filename(kind, family),
++                        lease.as_bytes().len(),
++                        checksum,
++                    );
++                    acquired += 1;
++                    // The owning handle is genuinely released here.
++                }
++                Err(FirmwareError::NotFound) => {}
++                Err(error) => ostd::early_println!(
++                    "NVIDIA RM firmware acquisition rejected: {}: {:?} (GSP not started)",
++                    firmware::filename(kind, family),
++                    error,
++                ),
++            }
++        }
++    }
++    ostd::early_println!(
++        "NVIDIA RM firmware file service: {} images acquired/released; GPU initialization not attempted",
++        acquired,
++    );
++}
+diff --git a/ostd/libs/nvidia-nvport/Cargo.toml b/ostd/libs/nvidia-nvport/Cargo.toml
+--- a/ostd/libs/nvidia-nvport/Cargo.toml
++++ b/ostd/libs/nvidia-nvport/Cargo.toml
+@@ -5,6 +5,9 @@
+ license.workspace = true
+ build = "build.rs"
+ 
++[dependencies]
++spin.workspace = true
++
+ [target.'cfg(target_os = "none")'.dependencies]
+ ostd.workspace = true
+ 
+diff --git a/ostd/libs/nvidia-nvport/README.md b/ostd/libs/nvidia-nvport/README.md
+--- a/ostd/libs/nvidia-nvport/README.md
++++ b/ostd/libs/nvidia-nvport/README.md
+@@ -1,40 +1,45 @@
+-# Experimental NVIDIA NVport memory integration
++# Experimental NVIDIA NVport and RM OS-service integration
+ 
+-This opt-in crate compiles the **unmodified NVIDIA 615.78.08** translation unit `src/nvidia/src/libraries/nvport/memory/memory_unix_kernel_os.c` and links it to real Rust/OSTD OS services. The exact upstream revision is `ca2d03e6fafd4d4b56b383497d931c25b283bfcf`. It is an implemented source-level component port, **not an NVIDIA GPU driver**.
++This opt-in crate connects unchanged NVIDIA **615.78.08** source to real Rust/OSTD services. The exact source pin is the official release tag's peeled commit, `1a82fbfda8f321b056eb3568850f9316c5e465c5`. The earlier snapshot `ca2d03e6fafd4d4b56b383497d931c25b283bfcf` has the identical source tree, `e121e9c407c996e4aaca25a801232a53f7dc1b5b`; the pin now matches the public tag. This is working source-port infrastructure, **not a complete NVIDIA GPU driver**.
+ 
+-The build requires an administrator-controlled NVIDIA checkout at `NVIDIA_SOURCE_DIR`, rejects a different revision or modified tracked files, verifies the release identifier, and compiles an ABI probe against NVIDIA's actual `os-interface.h`. The C compiler and checkout must be trusted; this is not a hermetic build or a security boundary against a malicious build host. Source is not downloaded automatically by Cargo. The CI fetch step uses the public repository without credentials and pins the same commit.
++Cargo requires a trusted clean checkout at `NVIDIA_SOURCE_DIR`, rejects another commit or modified tracked sources, and checks the release and actual NVIDIA ABI headers. The compiler and checkout remain trusted; this is not a hermetic build. Cargo downloads neither sources nor firmware. Prepared CI fetches the exact public commit without credentials.
+ 
+-## Implemented services
++## Real services
+ 
+-`os_alloc_mem`/`os_free_mem` use the real global allocator: OSTD in an Asterinas kernel, the system allocator in host unit tests. Checked allocation layouts retain an exact, private, 16-byte-aligned allocation header. Invalid sizes fail and the output pointer is cleared. Interrupt-context allocations are rejected rather than pretending that a sleeping allocator is safe there. These allocations are ordinary CPU heap storage, not pinned or DMA-capable GPU memory. Paged/nonpaged NVport entrypoints both use resident kernel heap storage; demand-paged allocation and atomic-context pools are not advertised.
++CPU memory allocation/free uses the real allocator, checked layouts, private aligned headers and cleared outputs on failure. Interrupt-context allocation is rejected. This is resident heap storage, not pinned GPU/DMA memory. The safe `Buffer` invokes original NVport copy, fill, compare, pattern and overlapping-move routines with bounds capped to the upstream u32 memory ABI.
+ 
+-`os_mem_copy`, `os_mem_set`, `os_mem_cmp` and `os_page_size` supply their real NVIDIA ABI contracts. Kernel-side `os_memcpy_from_user`/`os_memcpy_to_user` validate user ranges and task context, use OSTD's fault-aware `VmReader`/`VmWriter`, require a complete copy, and return an error otherwise. They require the current task's active address space and an initialized user-page-fault handler. Linux-host tests explicitly return `NV_ERR_NOT_SUPPORTED` for nonempty usercopy rather than using an unchecked memcpy or claiming native validation.
++Native usercopy validates ranges and context and uses OSTD's fault-aware `VmReader`/`VmWriter`; complete transfer and initialized address-space/fault handling are required. Host tests explicitly reject nonempty native usercopy rather than using unchecked memcpy.
+ 
+-The safe `Buffer` API owns initialized storage and exposes bounded copy, fill, compare, pattern fill and overlapping move through the original NVIDIA functions. Lengths are capped at `u32::MAX` because NVIDIA's Unix implementations narrow these operations to the u32 `os_mem_*` ABI. Raw ABI symbols and allocation pointers are private to the crate.
++The firmware provider replaces Linux `request_firmware` with immutable guest boot storage. It validates the complete uncompressed `070701` newc archive, including checked fields, names, alignment and trailer. It selects exact filenames using NVIDIA's own release-specific selector. Malformed/truncated archives, accepted-form duplicate paths, symlinks/hardlinks, missing/wrong-release files, empty images and images above 128 MiB fail closed. Interior dot/repeated-separator names are ignored, not normalized or followed. No host-file fallback or decompression is advertised.
+ 
+-## Build and tests
++`nv_get_firmware` allocates distinct handles over static boot bytes; `nv_put_firmware` releases them. Safe `FirmwareLease` exercises a real Rust-to-C-to-Rust acquire/release round trip. The optional boot inventory reads all image bytes on the CPU and reports a reproducible noncryptographic checksum. This does **not** authenticate firmware, establish GPU DMA, or boot GSP.
+ 
+-Use the repository-pinned Rust toolchain and the usual Asterinas build prerequisites, including the matching vDSO. For example:
++Clock callbacks install once from initialized Asterinas time services. They provide monotonic/realtime values and nominal counter-tick resolution, not an absolute-accuracy guarantee. Realtime preserves Asterinas' RTC policy, including its epoch dummy when RTC is unavailable. Safe wrappers check readiness. Since upstream time code ignores callback status, unguarded foreign calls with unavailable/out-of-range clocks halt instead of fabricating timestamps. Task identities are opaque tokens unique among simultaneously live OSTD tasks, not POSIX TIDs. Yielding enters the real scheduler only in a sleepable task context. Host builds explicitly lack native task identity/yielding.
++
++Native mutex, semaphore and reader-writer callbacks use atomic state and OSTD wait queues. Contention tests use actual OSTD tasks, blocking and wakeups, not a host scheduler mock. IRQ-save spinlocks retain and restore the real CPU-local IRQ guard. Destruction of still-held state leaks that state rather than dropping a forgotten guard on another CPU. Safe semaphore release reports overflow. Sleepability uses a tested OSTD preemption/IRQ/task predicate, not a constant compatibility answer. These primitives do not guarantee fairness or real-time latency.
++
++The native link also uses unchanged upstream allocator-tracking source instead of dummy allocator dispatch symbols. `nv_printf` has a real freestanding integer/pointer/string formatter, bounded output with explicit truncation, width/precision/length handling and libc-comparison tests. Floating conversions, `%n` and custom unknown conversions (including the LibOS-only `%a` form) report formatting failure, not false success; this is not a full libc or every-platform NVIDIA formatting implementation. Diagnostic strings/bytes are actually logged, including escaped non-UTF8 data. An upstream debug breakpoint halts through the kernel panic path rather than silently continuing.
++
++## Build and validation
++
++Use the pinned toolchain, matching vDSO and standard Asterinas prerequisites:
+ 
+ ```sh
+-export NVIDIA_SOURCE_DIR=/absolute/path/to/open-gpu-kernel-modules
++export NVIDIA_SOURCE_DIR=/absolute/path/to/official-615.78.08-checkout
+ cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu
+-cargo osdk check --ktests -p ostd-nvidia-nvport
+-cargo osdk build --features nvidia-nvport-selftest \
+-  --boot-method vmm-direct --grub-boot-protocol linux \
+-  --linux-x86-legacy-boot --strip-elf
++bash tools/graphics/run_nvport_format_tests.sh
++bash tools/graphics/run_cpu_kernel_tests.sh /absolute/path/to/evidence
++cargo osdk build --features nvidia-nvport-selftest,nvidia-pci-diagnostics \
++  --boot-method grub-rescue-iso --grub-boot-protocol multiboot2 \
++  --kcmd-args='earlycon console=ttyS0' --strip-elf
+ ```
+ 
+-The eight Rust/C host tests execute real C code. The same tests are registered with `#[ktest]` for native OSDK execution; a successful `check --ktests` compiles but does not execute them. Enabling the kernel's `nvidia-nvport-selftest` feature runs a CPU-memory self-test before `aster_core::boot()` and only prints success after the data checks succeed. Enable `earlycon` when booting to retain early serial output. **That success marker is not GPU evidence.**
++Host tests execute real memory/time code and firmware-ABI ownership with explicitly CPU-only fixtures. Native scheduler tests execute under QEMU TCG. The runner rejects zero-test success logs. A successful compile/check is not execution evidence, and CPU boot markers are not GPU evidence.
+ 
+-The native C build uses the x86-64 kernel code model, no red zone, no PIC/PIE, no SSE/MMX and no hosted C runtime. Linux-host testing uses PIC instead. Other targets are deliberately rejected.
++Native C uses the x86-64 kernel code model, no red zone, no PIC/PIE, no SSE/MMX or hosted runtime. Host C uses PIC. Other targets are rejected. The optional platform runtime is enabled when both kernel NVIDIA features are selected; standalone PCI diagnostics remains independent of NVIDIA source compilation.
+ 
+-## Security and remaining GPU work
++## Trusted boundary and unfinished driver work
+ 
+-The C object, the C ABI bridge and their unsafe ownership contracts extend OSTD's trusted computing base. The kernel assembler remains `deny(unsafe_code)`, but wrapping C in a safe Rust API does not make the C memory-safe. This feature is opt-in; it is not an automatically initialized PCI driver.
++C sources, bridges and unsafe ownership contracts extend OSTD's trusted computing base. The kernel assembler retains `deny(unsafe_code)`; safe wrappers do not make C memory-safe. Integration remains opt-in.
+ 
+-No RM or modeset object is linked by this crate. It does not register a PCI device, map a GPU BAR, establish DMA/IOMMU mappings, pin user pages, request an interrupt, boot GSP firmware, implement NVIDIA device ioctls or mmap, submit a GPU command, manage GPU memory/fences/reset/teardown, or supply accelerated DRM interoperability. These must be implemented and reviewed before matching NVIDIA userspace can function. They are not supplied by creating device files or returning success from callbacks.
+-
+-The local full kernel link succeeded and retained the NVIDIA memory symbols without undefined symbols in that kernel. This says nothing about the unresolved symbols in the separately compiled full RM/modeset objects. The available TCG Multiboot2 boot hit a kernel page fault during early OSTD initialization before this self-test was reached. No native runtime pass or GPU benchmark is claimed.
+-
+-For the hardware-only acceptance path, see [`tools/graphics/NATIVE_NVIDIA.md`](../../../../tools/graphics/NATIVE_NVIDIA.md).
++Full RM/modeset is not linked. GPU/BAR ownership, device-bound DMA/IOMMU mappings, interrupts, user-page pinning, GSP boot, NVIDIA device ioctls/mmap, GPU allocation/submission/fences/reset/teardown and accelerated DRM/KMS/Wayland interoperability remain unfinished. Successful CPU tests, device names or a Linux-host benchmark supply none of those. Hardware acceptance requires the protected native VFIO runner and genuine guest GPU evidence; compute alone still does not establish full GPUI/display acceptance. See [the native acceptance path](../../../tools/graphics/NATIVE_NVIDIA.md).
+diff --git a/ostd/libs/nvidia-nvport/build.rs b/ostd/libs/nvidia-nvport/build.rs
+--- a/ostd/libs/nvidia-nvport/build.rs
++++ b/ostd/libs/nvidia-nvport/build.rs
+@@ -6,7 +6,7 @@
+     process::{Command, Output},
+ };
+ 
+-const NVIDIA_COMMIT: &str = "ca2d03e6fafd4d4b56b383497d931c25b283bfcf";
++const NVIDIA_COMMIT: &str = "1a82fbfda8f321b056eb3568850f9316c5e465c5";
+ const NVIDIA_RELEASE: &str = "615.78.08";
+ 
+ macro_rules! fail {
+@@ -65,7 +65,9 @@
+         "src/nvidia/inc/kernel",
+         "src/nvidia/inc/libraries",
+         "src/nvidia/src/libraries",
++        "src/nvidia/src/libraries/nvport/sync",
+         "src/common/sdk/nvidia/inc",
++        "src/common/inc",
+         "kernel-open/common/inc",
+     ]
+     .into_iter()
+@@ -170,6 +172,8 @@
+         "-Wwrite-strings",
+         "-Wundef",
+         "-fno-common",
++        "-ffunction-sections",
++        "-fdata-sections",
+         "-ffreestanding",
+         "-fno-stack-protector",
+         "-fno-builtin",
+@@ -251,6 +255,55 @@
+         "compiling unmodified upstream memory_unix_kernel_os.c",
+     );
+ 
++    let firmware_bridge =
++        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("firmware_bridge.c");
++    let firmware_object = out_dir.join("firmware_bridge.o");
++    let mut firmware_args = common_args.clone();
++    firmware_args.extend([
++        "-c".to_owned(),
++        firmware_bridge.display().to_string(),
++        "-o".to_owned(),
++        firmware_object.display().to_string(),
++    ]);
++    run_tool(
++        &compiler,
++        &firmware_args,
++        "compiling NVIDIA firmware selector and ABI checks",
++    );
++    println!("cargo:rerun-if-changed={}", firmware_bridge.display());
++
++    let mut objects = vec![object.clone(), firmware_object.clone()];
++    let mut runtime_sources = vec![
++        root.join("src/nvidia/src/libraries/nvport/time/time_unix_kernel_os.c"),
++        root.join("src/nvidia/src/libraries/nvport/thread/thread_unix_kernel_os.c"),
++    ];
++    if kernel_abi {
++        runtime_sources.extend([
++            root.join("src/nvidia/src/libraries/nvport/memory/memory_tracking.c"),
++            root.join("src/nvidia/src/libraries/nvport/sync/sync_unix_kernel_os.c"),
++            PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("sync_bridge.c"),
++            PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("diagnostics_format.c"),
++        ]);
++    }
++    for runtime_source in runtime_sources {
++        let filename = runtime_source.file_stem().unwrap().to_str().unwrap();
++        let runtime_object = out_dir.join(format!("{filename}.o"));
++        let mut args = common_args.clone();
++        args.extend([
++            "-c".to_owned(),
++            runtime_source.display().to_string(),
++            "-o".to_owned(),
++            runtime_object.display().to_string(),
++        ]);
++        run_tool(
++            &compiler,
++            &args,
++            &format!("compiling {}", runtime_source.display()),
++        );
++        println!("cargo:rerun-if-changed={}", runtime_source.display());
++        objects.push(runtime_object);
++    }
++
+     let mut probe_args = common_args;
+     probe_args.extend(["-fsyntax-only".to_owned(), probe.display().to_string()]);
+     run_tool(
+@@ -262,15 +315,9 @@
+     let archive = out_dir.join("libnvidia_nvport_memory.a");
+     let (ar, ar_args) = tool("AR", "ar");
+     let archiver = (ar, ar_args);
+-    run_tool(
+-        &archiver,
+-        &[
+-            "crs".to_owned(),
+-            archive.display().to_string(),
+-            object.display().to_string(),
+-        ],
+-        "creating nvport static archive",
+-    );
++    let mut archive_args = vec!["crs".to_owned(), archive.display().to_string()];
++    archive_args.extend(objects.iter().map(|object| object.display().to_string()));
++    run_tool(&archiver, &archive_args, "creating nvport static archive");
+ 
+     println!("cargo:rustc-link-search=native={}", out_dir.display());
+     println!("cargo:rustc-link-lib=static=nvidia_nvport_memory");
+diff --git a/ostd/libs/nvidia-nvport/diagnostics_format.c b/ostd/libs/nvidia-nvport/diagnostics_format.c
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/diagnostics_format.c
+@@ -0,0 +1,252 @@
++// SPDX-License-Identifier: MPL-2.0
++/* A small, freestanding printf subset for NVport diagnostics. */
++#include <nvtypes.h>
++#include <os-interface.h>
++#include <stdarg.h>
++#include <stddef.h>
++#include <stdint.h>
++
++#define NV_FMT_LIMIT ((size_t)1048576)
++#define LOG_BUFFER_SIZE 1024U
++#define TRUNC_MARKER "...[truncated]"
++#define FAIL_MARKER "nvidia-nvport: <formatting failed>"
++
++extern void aster_nv_log_bytes(const char *bytes, NvU32 length);
++
++typedef struct {
++    char *buffer;
++    size_t capacity;
++    size_t length;
++} nv_out;
++
++typedef struct {
++    unsigned left, plus, space, alternate, zero;
++    size_t width, precision;
++    unsigned precision_set;
++} nv_spec;
++
++enum nv_length { LEN_NONE, LEN_HH, LEN_H, LEN_L, LEN_LL, LEN_Z, LEN_T, LEN_J };
++
++static int out_char(nv_out *o, char c)
++{
++    if (o->length >= NV_FMT_LIMIT) return -1;
++    if (o->capacity && o->length < o->capacity - 1) o->buffer[o->length] = c;
++    ++o->length;
++    return 0;
++}
++
++static int out_repeat(nv_out *o, char c, size_t count)
++{
++    if (count > NV_FMT_LIMIT - o->length) return -1;
++    while (count--) if (out_char(o, c) < 0) return -1;
++    return 0;
++}
++
++static int parse_number(const char **p, size_t *value, size_t *scanned)
++{
++    size_t n = 0;
++    while (**p >= '0' && **p <= '9') {
++        if (++*scanned > NV_FMT_LIMIT) return -1;
++        unsigned digit = (unsigned)(*(*p)++ - '0');
++        if (n > (NV_FMT_LIMIT - digit) / 10) return -1;
++        n = n * 10 + digit;
++    }
++    *value = n;
++    return 0;
++}
++
++static uintmax_t get_unsigned(va_list *ap, enum nv_length len)
++{
++    switch (len) {
++    case LEN_HH: return (unsigned char)va_arg(*ap, int);
++    case LEN_H: return (unsigned short)va_arg(*ap, int);
++    case LEN_L: return va_arg(*ap, unsigned long);
++    case LEN_LL: return va_arg(*ap, unsigned long long);
++    case LEN_Z: return va_arg(*ap, size_t);
++    case LEN_T: return (uintmax_t)va_arg(*ap, size_t);
++    case LEN_J: return va_arg(*ap, uintmax_t);
++    default: return va_arg(*ap, unsigned int);
++    }
++}
++
++static intmax_t get_signed(va_list *ap, enum nv_length len)
++{
++    switch (len) {
++    case LEN_HH: return (signed char)va_arg(*ap, int);
++    case LEN_H: return (short)va_arg(*ap, int);
++    case LEN_L: return va_arg(*ap, long);
++    case LEN_LL: return va_arg(*ap, long long);
++    case LEN_Z: case LEN_T: return va_arg(*ap, ptrdiff_t);
++    case LEN_J: return va_arg(*ap, intmax_t);
++    default: return va_arg(*ap, int);
++    }
++}
++
++static int emit_number(nv_out *o, uintmax_t value, int negative, unsigned base,
++                       int upper, int pointer, const nv_spec *s)
++{
++    char reversed[sizeof(uintmax_t) * 8];
++    size_t digits = 0, zeros, prefix = 0, pad;
++    char sign = negative ? '-' : (s->plus ? '+' : (s->space ? ' ' : 0));
++    const char *alphabet = upper ? "0123456789ABCDEF" : "0123456789abcdef";
++    if (value || !s->precision_set || s->precision) {
++        do { reversed[digits++] = alphabet[value % base]; value /= base; } while (value);
++    }
++    zeros = s->precision_set && s->precision > digits ? s->precision - digits : 0;
++    if (pointer || (s->alternate && base == 16 && digits)) prefix = 2;
++    if (s->alternate && base == 8 && (!digits || (!zeros && reversed[digits - 1] != '0'))) zeros++;
++    if (pointer) sign = 0;
++    pad = s->width > digits + zeros + prefix + (sign != 0) ?
++          s->width - digits - zeros - prefix - (sign != 0) : 0;
++    if (!s->left && (!s->zero || s->precision_set) && out_repeat(o, ' ', pad) < 0) return -1;
++    if (sign && out_char(o, sign) < 0) return -1;
++    if (prefix) {
++        if (out_char(o, '0') < 0 || out_char(o, upper ? 'X' : 'x') < 0) return -1;
++    }
++    if (!s->left && s->zero && !s->precision_set && out_repeat(o, '0', pad) < 0) return -1;
++    if (out_repeat(o, '0', zeros) < 0) return -1;
++    while (digits) if (out_char(o, reversed[--digits]) < 0) return -1;
++    if (s->left && out_repeat(o, ' ', pad) < 0) return -1;
++    return 0;
++}
++
++static int emit_text(nv_out *o, const char *text, size_t length, const nv_spec *s)
++{
++    size_t pad = s->width > length ? s->width - length : 0;
++    if (!s->left && out_repeat(o, ' ', pad) < 0) return -1;
++    while (length--) if (out_char(o, *text++) < 0) return -1;
++    if (s->left && out_repeat(o, ' ', pad) < 0) return -1;
++    return 0;
++}
++
++static int format_core(char *buffer, NvU32 capacity, const char *fmt, va_list *args)
++{
++    nv_out out = { buffer, capacity, 0 };
++    size_t scanned = 0;
++    if (!fmt || (capacity && !buffer)) return -1;
++    if (capacity) buffer[0] = '\0';
++    while (*fmt) {
++        nv_spec s = {0, 0, 0, 0, 0, 0, 0, 0};
++        enum nv_length len = LEN_NONE;
++        char conversion;
++        if (++scanned > NV_FMT_LIMIT) return -1;
++        if (*fmt != '%') {
++            if (out_char(&out, *fmt++) < 0) return -1;
++            continue;
++        }
++        ++fmt;
++        if (++scanned > NV_FMT_LIMIT) return -1;
++        for (;;) {
++            if (*fmt == '-') s.left = 1;
++            else if (*fmt == '+') s.plus = 1;
++            else if (*fmt == ' ') s.space = 1;
++            else if (*fmt == '#') s.alternate = 1;
++            else if (*fmt == '0') s.zero = 1;
++            else break;
++            ++fmt; if (++scanned > NV_FMT_LIMIT) return -1;
++        }
++        if (*fmt == '*') {
++            int w = va_arg(*args, int); ++fmt; ++scanned;
++            if (w < 0) { s.left = 1; s.width = (size_t)(-(int64_t)w); }
++            else s.width = (size_t)w;
++            if (s.width > NV_FMT_LIMIT) return -1;
++        } else if (parse_number(&fmt, &s.width, &scanned) < 0) return -1;
++        if (s.width > NV_FMT_LIMIT) return -1;
++        if (*fmt == '.') {
++            ++fmt; ++scanned; s.precision_set = 1;
++            if (*fmt == '*') {
++                int p = va_arg(*args, int); ++fmt; ++scanned;
++                if (p < 0) s.precision_set = 0;
++                else s.precision = (size_t)p;
++            } else if (parse_number(&fmt, &s.precision, &scanned) < 0) return -1;
++            if (s.precision > NV_FMT_LIMIT) return -1;
++        }
++        if (fmt[0] == 'h' && fmt[1] == 'h') { len = LEN_HH; fmt += 2; }
++        else if (*fmt == 'h') { len = LEN_H; ++fmt; }
++        else if (fmt[0] == 'l' && fmt[1] == 'l') { len = LEN_LL; fmt += 2; }
++        else if (*fmt == 'l') { len = LEN_L; ++fmt; }
++        else if (*fmt == 'z') { len = LEN_Z; ++fmt; }
++        else if (*fmt == 't') { len = LEN_T; ++fmt; }
++        else if (*fmt == 'j') { len = LEN_J; ++fmt; }
++        conversion = *fmt++;
++        if (!conversion || ++scanned > NV_FMT_LIMIT) return -1;
++        switch (conversion) {
++        case 'd': case 'i': {
++            intmax_t signed_value = get_signed(args, len);
++            uintmax_t magnitude = signed_value < 0 ? (uintmax_t)(-(signed_value + 1)) + 1 : (uintmax_t)signed_value;
++            if (emit_number(&out, magnitude, signed_value < 0, 10, 0, 0, &s) < 0) return -1;
++            break;
++        }
++        case 'u': case 'o': case 'x': case 'X': {
++            unsigned base = conversion == 'o' ? 8 : ((conversion == 'x' || conversion == 'X') ? 16 : 10);
++            if (emit_number(&out, get_unsigned(args, len), 0, base, conversion == 'X', 0, &s) < 0) return -1;
++            break;
++        }
++        case 'p': {
++            void *ptr = va_arg(*args, void *);
++            s.alternate = 1;
++            if (emit_number(&out, (uintptr_t)ptr, 0, 16, 0, 1, &s) < 0) return -1;
++            break;
++        }
++        case 's': {
++            const char *str = va_arg(*args, const char *);
++            size_t n = 0;
++            if (!str) str = "(null)";
++            while (n < (s.precision_set ? s.precision : NV_FMT_LIMIT) && str[n]) ++n;
++            if (!s.precision_set && n == NV_FMT_LIMIT) return -1;
++            if (emit_text(&out, str, n, &s) < 0) return -1;
++            break;
++        }
++        case 'c': {
++            char c = (char)va_arg(*args, int);
++            if (emit_text(&out, &c, 1, &s) < 0) return -1;
++            break;
++        }
++        case '%': {
++            if (len != LEN_NONE || out_char(&out, '%') < 0) return -1;
++            break;
++        }
++        default: return -1; /* Includes floating-point and the unsafe %n. */
++        }
++    }
++    if (capacity) buffer[out.length < capacity ? out.length : capacity - 1] = '\0';
++    return (int)out.length;
++}
++
++int aster_nv_snprintf(char *buffer, NvU32 capacity, const char *fmt, ...)
++{
++    va_list args;
++    int result;
++    va_start(args, fmt);
++    result = format_core(buffer, capacity, fmt, &args);
++    va_end(args);
++    return result;
++}
++
++int nv_printf(NvU32 level, const char *fmt, ...)
++{
++    char buffer[LOG_BUFFER_SIZE];
++    va_list args;
++    int result;
++    NvU32 length;
++    (void)level; /* The platform logger currently accepts bytes, not a level. */
++    va_start(args, fmt);
++    result = format_core(buffer, sizeof(buffer), fmt, &args);
++    va_end(args);
++    if (result < 0) {
++        static const char failure[] = FAIL_MARKER;
++        aster_nv_log_bytes(failure, (NvU32)(sizeof(failure) - 1));
++        return -1;
++    }
++    length = (NvU32)((size_t)result < sizeof(buffer) ? (size_t)result : sizeof(buffer) - 1);
++    if ((size_t)result > sizeof(buffer) - 1) {
++        const char marker[] = TRUNC_MARKER;
++        const size_t marker_len = sizeof(marker) - 1;
++        const size_t keep = sizeof(buffer) - 1 - marker_len;
++        for (size_t i = 0; i < marker_len; ++i) buffer[keep + i] = marker[i];
++        buffer[sizeof(buffer) - 1] = '\0';
++        length = sizeof(buffer) - 1;
++    }
++    aster_nv_log_bytes(buffer, length);
++    return result;
++}
+diff --git a/ostd/libs/nvidia-nvport/diagnostics_format_test.c b/ostd/libs/nvidia-nvport/diagnostics_format_test.c
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/diagnostics_format_test.c
+@@ -0,0 +1,102 @@
++// SPDX-License-Identifier: MPL-2.0
++/* Host-only tests: cc this with diagnostics_format.c and NVIDIA include roots. */
++#include <nvtypes.h>
++#include <os-interface.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++int aster_nv_snprintf(char *buffer, NvU32 capacity, const char *fmt, ...);
++int nv_printf(NvU32 level, const char *fmt, ...);
++
++static char logged[2048];
++static NvU32 logged_length;
++
++void aster_nv_log_bytes(const char *bytes, NvU32 length)
++{
++    logged_length = length < sizeof(logged) ? length : (NvU32)sizeof(logged);
++    memcpy(logged, bytes, logged_length);
++    (void)fwrite(bytes, 1, length, stderr);
++    (void)fputc('\n', stderr);
++}
++
++static int failures;
++#define CHECK(condition) do { \
++    if (!(condition)) { \
++        fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #condition); \
++        ++failures; \
++    } \
++} while (0)
++
++#define COMPARE(format, ...) do { \
++    char expected[512], actual[512]; \
++    int er = snprintf(expected, sizeof(expected), format, ##__VA_ARGS__); \
++    int ar = aster_nv_snprintf(actual, sizeof(actual), format, ##__VA_ARGS__); \
++    if (er != ar || (er >= 0 && strcmp(expected, actual) != 0)) { \
++        fprintf(stderr, "format mismatch [%s]: libc=%d <%s>, ours=%d <%s>\n", \
++                format, er, expected, ar, actual); \
++        ++failures; \
++    } \
++} while (0)
++
++int main(void)
++{
++    char a[64], b[64], big[1400], exact[1024];
++    int n = 77;
++    int r;
++
++    COMPARE("signed=%d unsigned=%u", -123, 4000000000U);
++    COMPARE("oct=%#o hex=%#x HEX=%#X", 0755U, 0xfeedU, 0xfeedU);
++    COMPARE("sign=[%+08d][% 6i]", -42, 42);
++    COMPARE("precision=[%#.0o][%.0u][%08.4x]", 0U, 0U, 0x2aU);
++    COMPARE("left=[%-9d] width=[%*u]", 12, -8, 31U);
++    COMPARE("string=[%-8.3s] char=[%4c] %%", "abcdef", 'Q');
++    COMPARE("hh=%hhd h=%hd l=%ld ll=%lld", (int)-7, (int)-1234, (long)-7654321,
++            (long long)-1234567890123LL);
++    COMPARE("hh=%hhu h=%hu z=%zu t=%td j=%jd", (int)250, (int)60000,
++            (size_t)123456, (ptrdiff_t)-9876, (intmax_t)-1234567890123LL);
++    COMPARE("hex=%llx upper=%#llX", (unsigned long long)0x123456789abcdef0ULL,
++            (unsigned long long)0xabcdeULL);
++    COMPARE("p=%p nullstr=%.0s", (void *)&n, "ignored");
++    COMPARE("[%05%]");
++
++    /* libc-compatible truncation and NUL termination, including size one. */
++    memset(a, 'x', sizeof(a)); memset(b, 'x', sizeof(b));
++    r = snprintf(a, 5, "%s", "abcdefgh");
++    CHECK(r == aster_nv_snprintf(b, 5, "%s", "abcdefgh"));
++    CHECK(strcmp(a, b) == 0 && b[4] == '\0');
++    CHECK(aster_nv_snprintf(b, 1, "abc") == 3 && b[0] == '\0');
++    CHECK(aster_nv_snprintf(NULL, 0, "%#x", 255U) == snprintf(NULL, 0, "%#x", 255U));
++    CHECK(aster_nv_snprintf(NULL, 1, "x") == -1);
++
++    /* Unsupported directives and pathological sizes fail closed. */
++    CHECK(aster_nv_snprintf(b, sizeof(b), "bad %f", 1.0) == -1);
++    CHECK(aster_nv_snprintf(b, sizeof(b), "bad %n", &n) == -1 && n == 77);
++    CHECK(aster_nv_snprintf(b, sizeof(b), "%2147483647d", 1) == -1);
++    CHECK(aster_nv_snprintf(b, sizeof(b), "%*d", 1048577, 1) == -1);
++    CHECK(aster_nv_snprintf(b, sizeof(b), "%.*s", -1, "abc") == 3);
++
++    memset(big, 'A', sizeof(big)); big[sizeof(big) - 1] = '\0';
++    logged_length = 0;
++    CHECK(nv_printf(3, "prefix:%s", big) == (int)(sizeof(big) + 6));
++    CHECK(logged_length == 1023);
++    CHECK(memcmp(logged + 1009, "...[truncated]", 14) == 0);
++    CHECK(logged[logged_length - 1] == ']');
++    memset(exact, 'B', sizeof(exact) - 1); exact[sizeof(exact) - 1] = '\0';
++    logged_length = 0;
++    CHECK(nv_printf(3, "%s", exact) == 1023);
++    CHECK(logged_length == 1023 && logged[1022] == 'B');
++    CHECK(memcmp(logged + 1009, "...[truncated]", 14) != 0);
++    logged_length = 0;
++    CHECK(nv_printf(1, "unsupported %f", 2.0) == -1);
++    CHECK(logged_length == strlen("nvidia-nvport: <formatting failed>"));
++    CHECK(memcmp(logged, "nvidia-nvport: <formatting failed>", logged_length) == 0);
++
++    if (failures) {
++        fprintf(stderr, "%d formatter test(s) failed\n", failures);
++        return 1;
++    }
++    puts("diagnostics formatter tests passed");
++    return 0;
++}
+diff --git a/ostd/libs/nvidia-nvport/firmware_bridge.c b/ostd/libs/nvidia-nvport/firmware_bridge.c
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/firmware_bridge.c
+@@ -0,0 +1,56 @@
++/* SPDX-License-Identifier: MIT */
++/* No firmware filename table is reimplemented here. */
++#include <nvUnixVersion.h>
++#define NV_FIRMWARE_FOR_NAME(name) "nvidia/" NV_VERSION_STRING "/" name ".bin"
++#include <nv-firmware.h>
++#include <nv.h>
++
++_Static_assert(sizeof(nv_firmware_type_t) == 4, "firmware kind ABI");
++_Static_assert(sizeof(nv_firmware_chip_family_t) == 4, "firmware family ABI");
++_Static_assert(NV_FIRMWARE_TYPE_GSP == 0 && NV_FIRMWARE_TYPE_GSP_LOG == 1 &&
++               NV_FIRMWARE_TYPE_UCODES == 2, "non-VMware firmware kind ABI");
++
++_Static_assert(NV_FIRMWARE_CHIP_FAMILY_TU10X == 1 &&
++               NV_FIRMWARE_CHIP_FAMILY_TU11X == 2 &&
++               NV_FIRMWARE_CHIP_FAMILY_GA100 == 3 &&
++               NV_FIRMWARE_CHIP_FAMILY_GA10X == 4 &&
++               NV_FIRMWARE_CHIP_FAMILY_AD10X == 5 &&
++               NV_FIRMWARE_CHIP_FAMILY_GH100 == 6 &&
++               NV_FIRMWARE_CHIP_FAMILY_GB10X == 8 &&
++               NV_FIRMWARE_CHIP_FAMILY_GB20X == 9 &&
++               NV_FIRMWARE_CHIP_FAMILY_GR10X == 10 &&
++               NV_FIRMWARE_CHIP_FAMILY_GB10Y == 11 &&
++               NV_FIRMWARE_CHIP_FAMILY_GB20Y == 12, "firmware family discriminants");
++
++const char *aster_nv_firmware_path(NvU32 kind, NvU32 family)
++{
++    if (kind > NV_FIRMWARE_TYPE_UCODES || family == 0 || family == 7 ||
++        family >= NV_FIRMWARE_CHIP_FAMILY_END)
++        return "";
++    return nv_firmware_for_chip_family((nv_firmware_type_t)kind,
++                                       (nv_firmware_chip_family_t)family);
++}
++
++/* Real C-to-Rust ABI round trip used by the safe owning wrapper. The port's
++ * provider deliberately does not require a Linux nv_linux_state_t. */
++const void *aster_nv_firmware_acquire(NvU32 kind, NvU32 family,
++                                     const void **buffer, NvU32 *size)
++{
++    return nv_get_firmware(NULL, (nv_firmware_type_t)kind,
++                          (nv_firmware_chip_family_t)family, buffer, size);
++}
++
++void aster_nv_firmware_release(const void *handle)
++{
++    nv_put_firmware(handle);
++}
++
++/* Type validation against the real RM ABI declarations. */
++void aster_nv_firmware_abi_probe(void)
++{
++    const void *(NV_API_CALL *get)(nv_state_t *, nv_firmware_type_t,
++        nv_firmware_chip_family_t, const void **, NvU32 *) = &nv_get_firmware;
++    void (NV_API_CALL *put)(const void *) = &nv_put_firmware;
++    (void)get;
++    (void)put;
++}
+diff --git a/ostd/libs/nvidia-nvport/src/diagnostics.rs b/ostd/libs/nvidia-nvport/src/diagnostics.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/diagnostics.rs
+@@ -0,0 +1,179 @@
++// SPDX-License-Identifier: MPL-2.0
++
++//! Bounded diagnostics for the unmodified NVIDIA Unix-kernel NVport sources.
++
++use core::ffi::c_char;
++
++/// Maximum number of input bytes read from an NVIDIA diagnostic C string.
++const MAX_C_STRING_BYTES: usize = 256;
++
++/// Sink for fully formatted diagnostics. It never interprets format strings.
++///
++/// # Safety
++/// A nonzero `length` requires that many immutable readable bytes at `message`.
++/// The C formatter's fixed output budget is 1024 bytes; larger lengths halt.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn aster_nv_log_bytes(message: *const c_char, length: u32) {
++    assert!(
++        length <= 1024,
++        "NVIDIA formatted log exceeds its ABI budget"
++    );
++    assert!(
++        !message.is_null() || length == 0,
++        "NVIDIA formatted log has a null pointer"
++    );
++    let bytes = if length == 0 {
++        &[][..]
++    } else {
++        // SAFETY: Caller guarantees this bounded immutable readable range.
++        unsafe { core::slice::from_raw_parts(message.cast::<u8>(), length as usize) }
++    };
++    if let Ok(text) = core::str::from_utf8(bytes) {
++        ostd::early_println!("nvidia-nvport: {}", text);
++    } else {
++        ostd::early_print!("nvidia-nvport: <C bytes ");
++        for byte in bytes {
++            ostd::early_print!("\\x{byte:02x}");
++        }
++        ostd::early_println!(">");
++    }
++}
++
++/// Logs a bounded C string from NVIDIA's `out_string` callback.
++///
++/// The callback contract requires `message` to point to a readable NUL-terminated
++/// C string. To keep accidental unterminated strings bounded, at most 256 bytes
++/// are read and the log explicitly marks truncation. Valid UTF-8 is printed as
++/// text; other byte sequences are escaped losslessly as `\\xNN` bytes.
++///
++/// # Safety
++/// `message` must be non-null and point to readable memory through its NUL
++/// terminator, or through at least 256 readable bytes if there is no terminator
++/// within that bound.
++#[unsafe(no_mangle)]
++pub(crate) unsafe extern "C" fn out_string(message: *const c_char) {
++    if message.is_null() {
++        ostd::early_println!("nvidia-nvport: out_string(<null>)");
++        return;
++    }
++
++    let mut len = 0;
++    let mut terminated = false;
++    while len < MAX_C_STRING_BYTES {
++        // SAFETY: The callback contract guarantees readable bytes through the
++        // terminator, or at least MAX_C_STRING_BYTES bytes for a bounded string.
++        let byte = unsafe { message.cast::<u8>().add(len).read() };
++        if byte == 0 {
++            terminated = true;
++            break;
++        }
++        len += 1;
++    }
++
++    // SAFETY: Every byte in this bounded range was just read under the pointer
++    // validity contract, and the immutable C string remains readable for the call.
++    let bytes = unsafe { core::slice::from_raw_parts(message.cast::<u8>(), len) };
++    match core::str::from_utf8(bytes) {
++        Ok(text) if terminated => ostd::early_println!("nvidia-nvport: {}", text),
++        Ok(text) => ostd::early_println!(
++            "nvidia-nvport: {} [truncated after {} bytes]",
++            text,
++            MAX_C_STRING_BYTES
++        ),
++        Err(_) => {
++            // Hex-escape every byte without allocation. This preserves arbitrary
++            // C-string bytes in a printable, fixed-size diagnostic.
++            const HEX: &[u8; 16] = b"0123456789abcdef";
++            let mut escaped = [0u8; MAX_C_STRING_BYTES * 4];
++            for (index, &byte) in bytes.iter().enumerate() {
++                let offset = index * 4;
++                escaped[offset..offset + 4].copy_from_slice(&[
++                    b'\\',
++                    b'x',
++                    HEX[(byte >> 4) as usize],
++                    HEX[(byte & 0x0f) as usize],
++                ]);
++            }
++            // SAFETY: The escaped buffer consists exclusively of ASCII bytes.
++            let escaped = unsafe { core::str::from_utf8_unchecked(&escaped[..len * 4]) };
++            if terminated {
++                ostd::early_println!("nvidia-nvport: <C bytes {}>", escaped);
++            } else {
++                ostd::early_println!(
++                    "nvidia-nvport: <C bytes {}> [truncated after {} bytes]",
++                    escaped,
++                    MAX_C_STRING_BYTES
++                );
++            }
++        }
++    }
++}
++
++/// Fails closed when NVIDIA requests a debug breakpoint.
++///
++/// This is intentionally not a no-op: reaching a breakpoint in the unmodified
++/// NVport code is treated as a kernel-fatal invariant/debug failure.
++#[unsafe(no_mangle)]
++pub(crate) extern "C" fn os_dbg_breakpoint() -> ! {
++    panic!("nvidia-nvport: upstream requested os_dbg_breakpoint");
++}
++
++#[cfg(ktest)]
++mod tests {
++    use core::ffi::{c_char, c_int};
++    unsafe extern "C" {
++        fn aster_nv_snprintf(
++            buffer: *mut c_char,
++            capacity: u32,
++            format: *const c_char,
++            ...
++        ) -> c_int;
++        fn nv_printf(level: u32, format: *const c_char, ...) -> c_int;
++    }
++
++    #[ostd::prelude::ktest]
++    fn actual_freestanding_formatter_through_c_abi() {
++        let mut bytes = [0u8; 128];
++        // SAFETY: Buffer and C strings are valid; variadic arguments exactly
++        // match the format's promoted C integer/pointer types on x86-64.
++        let count = unsafe {
++            aster_nv_snprintf(
++                bytes.as_mut_ptr().cast(),
++                bytes.len() as u32,
++                c"%#08x|%+lld|%.3s|%zu|%%".as_ptr(),
++                42u32,
++                7i64,
++                c"abcdef".as_ptr(),
++                12usize,
++            )
++        };
++        let expected = b"0x00002a|+7|abc|12|%";
++        assert_eq!(count as usize, expected.len());
++        assert_eq!(&bytes[..expected.len()], expected);
++        assert_eq!(bytes[expected.len()], 0);
++        let mut short = [0u8; 5];
++        let count =
++            unsafe { aster_nv_snprintf(short.as_mut_ptr().cast(), 5, c"%u".as_ptr(), 123456u32) };
++        assert_eq!(count, 6);
++        assert_eq!(&short, b"1234\0");
++        let mut untouched = 77i32;
++        let count = unsafe {
++            aster_nv_snprintf(
++                bytes.as_mut_ptr().cast(),
++                128,
++                c"%n".as_ptr(),
++                &mut untouched as *mut i32,
++            )
++        };
++        assert_eq!(count, -1);
++        assert_eq!(untouched, 77);
++        let count = unsafe {
++            nv_printf(
++                u32::MAX,
++                c"native formatter CPU-only check=%u".as_ptr(),
++                17u32,
++            )
++        };
++        assert_eq!(count as usize, b"native formatter CPU-only check=17".len());
++    }
++}
+diff --git a/ostd/libs/nvidia-nvport/src/firmware.rs b/ostd/libs/nvidia-nvport/src/firmware.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/firmware.rs
+@@ -0,0 +1,619 @@
++// SPDX-License-Identifier: MPL-2.0
++//! NVIDIA RM firmware ownership backed by an immutable boot `newc` archive.
++//!
++//! This implements file acquisition/release, not firmware authentication, GSP
++//! loading, DMA, or a GPU boot handshake. Only NVIDIA's release-pinned filename
++//! selector chooses paths; symlinks, duplicates, malformed and compressed archives
++//! fail closed. Firmware bytes remain pinned by the boot archive's static lifetime.
++
++use alloc::alloc::{alloc, dealloc};
++use core::{
++    alloc::Layout,
++    ffi::{CStr, c_char, c_void},
++    ptr,
++};
++
++use spin::Once;
++
++/// Firmware release required by the linked NVIDIA source.
++pub const RELEASE: &str = "615.78.08";
++/// Maximum accepted individual firmware payload (128 MiB), not an allocation size.
++pub const MAX_FIRMWARE_SIZE: usize = 128 * 1024 * 1024;
++
++/// NVIDIA's firmware image kinds, excluding the VMware-only bindata variant.
++#[repr(u32)]
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum FirmwareKind {
++    /// GSP-RM image.
++    Gsp = 0,
++    /// Optional GSP log symbols.
++    GspLog = 1,
++    /// Companion microcode image.
++    Ucodes = 2,
++}
++
++/// Families recognized by the exact upstream release's filename selector.
++#[repr(u32)]
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum ChipFamily {
++    /// Turing TU10x.
++    Tu10x = 1,
++    /// Turing TU11x.
++    Tu11x = 2,
++    /// Ampere GA100.
++    Ga100 = 3,
++    /// Ampere GA10x.
++    Ga10x = 4,
++    /// Ada AD10x.
++    Ad10x = 5,
++    /// Hopper GH100.
++    Gh100 = 6,
++    /// Blackwell GB10x.
++    Gb10x = 8,
++    /// Blackwell GB20x.
++    Gb20x = 9,
++    /// GR10x.
++    Gr10x = 10,
++    /// GB10y.
++    Gb10y = 11,
++    /// GB20y.
++    Gb20y = 12,
++}
++
++/// Firmware retrieval failures; none indicates a running GSP or GPU.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum FirmwareError {
++    /// Only uncompressed, non-CRC `newc` archives are accepted by this provider.
++    UnsupportedArchive,
++    /// A header, filename, size, padding or trailer is invalid or truncated.
++    MalformedArchive,
++    /// The requested release-specific regular file is absent.
++    NotFound,
++    /// More than one archive entry resolves to the requested path.
++    Duplicate,
++    /// A matching entry is not a standalone regular file (no symlink/hardlink following).
++    NotRegularFile,
++    /// The image is empty or exceeds the provider's explicit size limit.
++    InvalidSize,
++    /// Another boot archive was already installed.
++    AlreadyInstalled,
++    /// No immutable boot archive has been registered.
++    NotInitialized,
++    /// The real handle allocation failed.
++    NoMemory,
++    /// Firmware acquisition cannot run in interrupt context.
++    InvalidContext,
++    /// The FFI provider returned bytes inconsistent with the registered image.
++    ContractViolation,
++}
++
++unsafe extern "C" {
++    fn aster_nv_firmware_path(kind: u32, family: u32) -> *const c_char;
++    fn aster_nv_firmware_acquire(
++        kind: u32,
++        family: u32,
++        buffer: *mut *const c_void,
++        size: *mut u32,
++    ) -> *const c_void;
++    fn aster_nv_firmware_release(handle: *const c_void);
++}
++
++/// Returns NVIDIA's own exact, relative `/lib/firmware` filename for this release.
++pub fn filename(kind: FirmwareKind, family: ChipFamily) -> &'static str {
++    // SAFETY: The C bridge calls the reviewed static-inline upstream selector
++    // with valid enum values and returns an immutable, NUL-terminated literal.
++    let path = unsafe { aster_nv_firmware_path(kind as u32, family as u32) };
++    // SAFETY: The bridge's result is a static C string for every input.
++    unsafe { CStr::from_ptr(path) }
++        .to_str()
++        .expect("upstream firmware path is ASCII")
++}
++
++#[derive(Clone, Copy)]
++struct Entry<'a> {
++    name: &'a str,
++    data: &'a [u8],
++    mode: u32,
++    links: u32,
++}
++
++/// A fully bounds-checked, borrowed `newc` archive. No file data is copied.
++pub struct FirmwareArchive<'a> {
++    bytes: &'a [u8],
++}
++
++fn hex(bytes: &[u8], offset: usize) -> Result<u32, FirmwareError> {
++    let field = bytes
++        .get(offset..offset + 8)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    if !field.iter().all(u8::is_ascii_hexdigit) {
++        return Err(FirmwareError::MalformedArchive);
++    }
++    let text = core::str::from_utf8(field).map_err(|_| FirmwareError::MalformedArchive)?;
++    u32::from_str_radix(text, 16).map_err(|_| FirmwareError::MalformedArchive)
++}
++
++fn align4(value: usize) -> Result<usize, FirmwareError> {
++    value
++        .checked_add(3)
++        .map(|value| value & !3)
++        .ok_or(FirmwareError::MalformedArchive)
++}
++
++fn next_entry<'a>(bytes: &'a [u8], cursor: &mut usize) -> Result<Entry<'a>, FirmwareError> {
++    let start = *cursor;
++    let header_end = start
++        .checked_add(110)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    let header = bytes
++        .get(start..header_end)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    if &header[..6] != b"070701" {
++        return Err(FirmwareError::UnsupportedArchive);
++    }
++    // Validate *all* header fields, not just those needed for a lookup.
++    for offset in (6..110).step_by(8) {
++        hex(header, offset)?;
++    }
++    if hex(header, 102)? != 0 {
++        return Err(FirmwareError::MalformedArchive);
++    }
++    let name_len = hex(header, 94)? as usize;
++    if name_len == 0 || name_len > 4096 {
++        return Err(FirmwareError::MalformedArchive);
++    }
++    let name_end = header_end
++        .checked_add(name_len)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    let name = bytes
++        .get(header_end..name_end)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    let name = CStr::from_bytes_with_nul(name).map_err(|_| FirmwareError::MalformedArchive)?;
++    let name = name.to_str().map_err(|_| FirmwareError::MalformedArchive)?;
++    let data_start = align4(name_end)?;
++    let size = hex(header, 54)? as usize;
++    let data_end = data_start
++        .checked_add(size)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    let end = align4(data_end)?;
++    let data = bytes
++        .get(data_start..data_end)
++        .ok_or(FirmwareError::MalformedArchive)?;
++    if end > bytes.len() {
++        return Err(FirmwareError::MalformedArchive);
++    }
++    *cursor = end;
++    Ok(Entry {
++        name,
++        data,
++        mode: hex(header, 14)?,
++        links: hex(header, 38)?,
++    })
++}
++
++fn canonical_name(mut name: &str) -> Option<&str> {
++    // Accept the conventional './' or '/' archive prefix, but never resolve
++    // traversal, repeated separators or interior dot components.
++    name = name.strip_prefix('/').unwrap_or(name);
++    name = name.strip_prefix("./").unwrap_or(name);
++    if name.is_empty()
++        || name
++            .split('/')
++            .any(|part| part.is_empty() || part == "." || part == "..")
++    {
++        return None;
++    }
++    Some(name)
++}
++
++impl<'a> FirmwareArchive<'a> {
++    /// Validates the entire archive before it can supply firmware. Nonzero
++    /// trailing data, missing trailer and truncated unrelated entries are errors.
++    pub fn new(bytes: &'a [u8]) -> Result<Self, FirmwareError> {
++        if !bytes.starts_with(b"070701") {
++            return Err(FirmwareError::UnsupportedArchive);
++        }
++        let mut cursor = 0;
++        loop {
++            let entry = next_entry(bytes, &mut cursor)?;
++            if entry.name == "TRAILER!!!" {
++                if !entry.data.is_empty() || bytes[cursor..].iter().any(|&byte| byte != 0) {
++                    return Err(FirmwareError::MalformedArchive);
++                }
++                return Ok(Self { bytes });
++            }
++        }
++    }
++
++    /// Borrows an exact release-specific image. This does not validate its
++    /// vendor signature or internal image format; the real RM must do that.
++    pub fn get(&self, kind: FirmwareKind, family: ChipFamily) -> Result<&'a [u8], FirmwareError> {
++        self.get_path(filename(kind, family))
++    }
++
++    fn get_path(&self, relative: &str) -> Result<&'a [u8], FirmwareError> {
++        let mut cursor = 0;
++        let mut found = None;
++        loop {
++            let entry = next_entry(self.bytes, &mut cursor)?;
++            if entry.name == "TRAILER!!!" {
++                return found.ok_or(FirmwareError::NotFound);
++            }
++            let Some(name) = canonical_name(entry.name) else {
++                continue;
++            };
++            let Some(name) = name.strip_prefix("lib/firmware/") else {
++                continue;
++            };
++            if name != relative {
++                continue;
++            }
++            if found.is_some() {
++                return Err(FirmwareError::Duplicate);
++            }
++            if entry.mode & 0o170000 != 0o100000 || entry.links != 1 {
++                return Err(FirmwareError::NotRegularFile);
++            }
++            if entry.data.is_empty() || entry.data.len() > MAX_FIRMWARE_SIZE {
++                return Err(FirmwareError::InvalidSize);
++            }
++            found = Some(entry.data);
++        }
++    }
++}
++
++static ARCHIVE: Once<FirmwareArchive<'static>> = Once::new();
++
++/// Registers real immutable boot archive storage once. Re-registering the exact
++/// same slice is idempotent; a different source is rejected, including races.
++/// This accepts neither host files nor a fabricated GPU-success callback.
++pub fn install_boot_archive(bytes: &'static [u8]) -> Result<(), FirmwareError> {
++    let archive = FirmwareArchive::new(bytes)?;
++    let installed = ARCHIVE.call_once(|| archive);
++    if installed.bytes.as_ptr() != bytes.as_ptr() || installed.bytes.len() != bytes.len() {
++        return Err(FirmwareError::AlreadyInstalled);
++    }
++    Ok(())
++}
++
++/// Retrieves a borrowed image from the registered boot archive.
++pub fn image(kind: FirmwareKind, family: ChipFamily) -> Result<&'static [u8], FirmwareError> {
++    ARCHIVE
++        .get()
++        .ok_or(FirmwareError::NotInitialized)?
++        .get(kind, family)
++}
++
++/// An owning lease acquired through the actual RM firmware ABI. The handle
++/// cannot be duplicated or manually released by safe callers.
++pub struct FirmwareLease {
++    handle: ptr::NonNull<c_void>,
++    bytes: &'static [u8],
++}
++
++impl FirmwareLease {
++    /// Acquires an image from the real installed boot archive, not a Linux host.
++    pub fn acquire(kind: FirmwareKind, family: ChipFamily) -> Result<Self, FirmwareError> {
++        #[cfg(target_os = "none")]
++        if ostd::irq::InterruptLevel::current().is_interrupt_context() {
++            return Err(FirmwareError::InvalidContext);
++        }
++        let expected = image(kind, family)?;
++        let mut data = ptr::null();
++        let mut size = 0;
++        // SAFETY: Valid, distinct output slots. This provider does not
++        // dereference nv_state_t; a successful handle is immediately owned.
++        let handle =
++            unsafe { aster_nv_firmware_acquire(kind as u32, family as u32, &mut data, &mut size) };
++        let handle = ptr::NonNull::new(handle.cast_mut()).ok_or(FirmwareError::NoMemory)?;
++        if data != expected.as_ptr().cast() || size as usize != expected.len() {
++            // SAFETY: This is the exact owned handle and no bytes were exposed.
++            unsafe { aster_nv_firmware_release(handle.as_ptr()) };
++            return Err(FirmwareError::ContractViolation);
++        }
++        Ok(Self {
++            handle,
++            bytes: expected,
++        })
++    }
++
++    /// Exact, immutable firmware file bytes; no signature or GSP boot claim.
++    pub fn as_bytes(&self) -> &[u8] {
++        self.bytes
++    }
++}
++
++impl Drop for FirmwareLease {
++    fn drop(&mut self) {
++        // SAFETY: Unique ownership ensures one release after all borrows end.
++        unsafe { aster_nv_firmware_release(self.handle.as_ptr()) };
++    }
++}
++
++struct Handle {
++    bytes: &'static [u8],
++}
++
++fn raw_filename(kind: u32, family: u32) -> Option<&'static str> {
++    // SAFETY: The bridge validates all raw enum values before the upstream call
++    // and returns a static string, with the empty string meaning invalid input.
++    let path = unsafe { CStr::from_ptr(aster_nv_firmware_path(kind, family)) };
++    let path = path.to_str().ok()?;
++    (!path.is_empty()).then_some(path)
++}
++
++/// RM firmware acquisition ABI. `nv` is not dereferenced: unlike Linux, this
++/// provider has no Linux `struct device` dependency and no per-device fallback.
++///
++/// # Safety
++/// Both output slots must be aligned, writable and nonoverlapping for the call.
++/// Call in task context, never in an interrupt or while holding a spinlock.
++/// On success the handle must be released exactly once by `nv_put_firmware`,
++/// after all foreign accesses to the returned firmware bytes have completed.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn nv_get_firmware(
++    _nv: *mut c_void,
++    kind: u32,
++    family: u32,
++    buffer: *mut *const c_void,
++    size: *mut u32,
++) -> *const c_void {
++    if buffer.is_null() || size.is_null() {
++        return ptr::null();
++    }
++    // SAFETY: Caller grants exclusive access to both output slots.
++    unsafe {
++        buffer.write(ptr::null());
++        size.write(0);
++    }
++    #[cfg(target_os = "none")]
++    if ostd::irq::InterruptLevel::current().is_interrupt_context() {
++        return ptr::null();
++    }
++    let Some(path) = raw_filename(kind, family) else {
++        return ptr::null();
++    };
++    let Some(archive) = ARCHIVE.get() else {
++        return ptr::null();
++    };
++    let Ok(bytes) = archive.get_path(path) else {
++        return ptr::null();
++    };
++    let layout = Layout::new::<Handle>();
++    // SAFETY: Nonzero valid layout. Null allocation is reported as failure.
++    let handle = unsafe { alloc(layout) }.cast::<Handle>();
++    if handle.is_null() {
++        return ptr::null();
++    }
++    // SAFETY: New handle is exclusively owned. Archive bytes are static,
++    // nonempty and bounded below u32::MAX by the validated provider.
++    unsafe {
++        handle.write(Handle { bytes });
++        let stored = &*handle;
++        buffer.write(stored.bytes.as_ptr().cast());
++        size.write(stored.bytes.len() as u32);
++    }
++    handle.cast()
++}
++
++/// Releases one actual RM firmware ownership handle; NULL is harmless.
++///
++/// # Safety
++/// `handle` must be NULL or an unreleased handle returned by `nv_get_firmware`.
++/// No foreign accesses associated with this handle may outlive this call.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn nv_put_firmware(handle: *const c_void) {
++    if handle.is_null() {
++        return;
++    }
++    let handle = handle.cast_mut().cast::<Handle>();
++    // SAFETY: Caller returns exclusive ownership of the exact live handle.
++    unsafe {
++        ptr::drop_in_place(handle);
++        dealloc(handle.cast(), Layout::new::<Handle>());
++    }
++}
++
++#[cfg(any(test, ktest))]
++mod tests {
++    use alloc::{boxed::Box, format, vec::Vec};
++
++    use super::*;
++
++    fn entry(out: &mut Vec<u8>, name: &str, bytes: &[u8], mode: u32, links: u32) {
++        let fields = [
++            1,
++            mode,
++            0,
++            0,
++            links,
++            0,
++            bytes.len() as u32,
++            0,
++            0,
++            0,
++            0,
++            (name.len() + 1) as u32,
++            0,
++        ];
++        out.extend_from_slice(b"070701");
++        for field in fields {
++            out.extend_from_slice(format!("{field:08x}").as_bytes());
++        }
++        out.extend_from_slice(name.as_bytes());
++        out.push(0);
++        while out.len() % 4 != 0 {
++            out.push(0);
++        }
++        out.extend_from_slice(bytes);
++        while out.len() % 4 != 0 {
++            out.push(0);
++        }
++    }
++    fn finish(out: &mut Vec<u8>) {
++        entry(out, "TRAILER!!!", &[], 0, 1);
++    }
++    fn path() -> &'static str {
++        "lib/firmware/nvidia/615.78.08/gsp_tu10x.bin"
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn upstream_release_and_family_selection() {
++        assert_eq!(
++            filename(FirmwareKind::Gsp, ChipFamily::Tu10x),
++            "nvidia/615.78.08/gsp_tu10x.bin"
++        );
++        assert_eq!(
++            filename(FirmwareKind::Ucodes, ChipFamily::Ga100),
++            "nvidia/615.78.08/ucodes_tu10x.bin"
++        );
++        for family in [
++            ChipFamily::Ga10x,
++            ChipFamily::Ad10x,
++            ChipFamily::Gh100,
++            ChipFamily::Gb10x,
++            ChipFamily::Gb20x,
++            ChipFamily::Gr10x,
++            ChipFamily::Gb10y,
++            ChipFamily::Gb20y,
++        ] {
++            assert_eq!(
++                filename(FirmwareKind::GspLog, family),
++                "nvidia/615.78.08/gsp_log_ga10x.bin"
++            );
++        }
++        for (kind, family) in [(3, 1), (0, 0), (0, 7), (0, 13), (u32::MAX, u32::MAX)] {
++            assert_eq!(raw_filename(kind, family), None);
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn archive_exact_image_and_no_cross_release_fallback() {
++        let mut bytes = Vec::new();
++        entry(
++            &mut bytes,
++            "lib/firmware/nvidia/615.71.09/gsp_tu10x.bin",
++            &[9],
++            0o100644,
++            1,
++        );
++        entry(&mut bytes, path(), &[1, 2, 3, 4, 5], 0o100644, 1);
++        finish(&mut bytes);
++        let archive = FirmwareArchive::new(&bytes).unwrap();
++        assert_eq!(
++            archive.get(FirmwareKind::Gsp, ChipFamily::Tu10x),
++            Ok(&[1, 2, 3, 4, 5][..])
++        );
++        assert_eq!(
++            archive.get(FirmwareKind::Gsp, ChipFamily::Ga10x),
++            Err(FirmwareError::NotFound)
++        );
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn archive_rejects_every_truncation_and_bad_numeric_header() {
++        let mut bytes = Vec::new();
++        entry(&mut bytes, path(), &[1, 2, 3], 0o100644, 1);
++        finish(&mut bytes);
++        for end in 0..bytes.len() {
++            assert!(FirmwareArchive::new(&bytes[..end]).is_err(), "{end}");
++        }
++        bytes[6] = b'g';
++        assert!(matches!(
++            FirmwareArchive::new(&bytes),
++            Err(FirmwareError::MalformedArchive)
++        ));
++        assert!(matches!(
++            FirmwareArchive::new(&[0x1f, 0x8b]),
++            Err(FirmwareError::UnsupportedArchive)
++        ));
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn archive_rejects_alias_duplicates_links_empty_and_traversal() {
++        let mut bytes = Vec::new();
++        entry(&mut bytes, path(), &[1], 0o100644, 1);
++        entry(&mut bytes, &format!("./{}", path()), &[2], 0o100644, 1);
++        finish(&mut bytes);
++        assert_eq!(
++            FirmwareArchive::new(&bytes)
++                .unwrap()
++                .get(FirmwareKind::Gsp, ChipFamily::Tu10x),
++            Err(FirmwareError::Duplicate)
++        );
++        for (mode, links, data, error) in [
++            (0o120777, 1, &[1][..], FirmwareError::NotRegularFile),
++            (0o100644, 2, &[1][..], FirmwareError::NotRegularFile),
++            (0o100644, 1, &[][..], FirmwareError::InvalidSize),
++        ] {
++            let mut bytes = Vec::new();
++            entry(&mut bytes, path(), data, mode, links);
++            finish(&mut bytes);
++            assert_eq!(
++                FirmwareArchive::new(&bytes)
++                    .unwrap()
++                    .get(FirmwareKind::Gsp, ChipFamily::Tu10x),
++                Err(error)
++            );
++        }
++        assert_eq!(canonical_name("./lib/../firmware/x"), None);
++        assert_eq!(canonical_name("lib//firmware/x"), None);
++        assert_eq!(canonical_name("/./lib/firmware/x"), Some("lib/firmware/x"));
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn actual_rm_ffi_handles_own_distinct_leases_of_static_fixture() {
++        // Explicit CPU-only ABI fixture, never a signed GSP image or GPU result.
++        let mut bytes = Vec::new();
++        entry(&mut bytes, path(), &[7, 8, 9, 10], 0o100644, 1);
++        finish(&mut bytes);
++        let bytes = Box::leak(bytes.into_boxed_slice());
++        install_boot_archive(bytes).unwrap();
++        assert_eq!(install_boot_archive(bytes), Ok(()));
++        let lease = FirmwareLease::acquire(FirmwareKind::Gsp, ChipFamily::Tu10x).unwrap();
++        assert_eq!(lease.as_bytes(), &[7, 8, 9, 10]);
++        drop(lease);
++        let mut other = bytes.to_vec();
++        other.extend_from_slice(&[0, 0, 0, 0]);
++        assert_eq!(
++            install_boot_archive(Box::leak(other.into_boxed_slice())),
++            Err(FirmwareError::AlreadyInstalled)
++        );
++        let mut first = ptr::null();
++        let mut len = 0;
++        // SAFETY: Valid output slots; successful handles are freed exactly once.
++        unsafe {
++            let a = nv_get_firmware(ptr::null_mut(), 0, 1, &mut first, &mut len);
++            assert!(!a.is_null());
++            assert_eq!(len, 4);
++            assert_eq!(
++                core::slice::from_raw_parts(first.cast::<u8>(), len as usize),
++                &[7, 8, 9, 10]
++            );
++            assert_eq!((*a.cast::<Handle>()).bytes, &[7, 8, 9, 10]);
++            let mut second = ptr::null();
++            let b = nv_get_firmware(ptr::null_mut(), 0, 1, &mut second, &mut len);
++            assert!(!b.is_null());
++            assert_ne!(a, b);
++            assert_eq!(first, second);
++            nv_put_firmware(a);
++            assert_eq!(
++                core::slice::from_raw_parts(second.cast::<u8>(), len as usize),
++                &[7, 8, 9, 10]
++            );
++            nv_put_firmware(b);
++            nv_put_firmware(ptr::null());
++            first = ptr::dangling();
++            len = 99;
++            assert!(nv_get_firmware(ptr::null_mut(), 0, 4, &mut first, &mut len).is_null());
++            assert!(first.is_null());
++            assert_eq!(len, 0);
++            assert!(nv_get_firmware(ptr::null_mut(), 0, 1, ptr::null_mut(), &mut len).is_null());
++        }
++    }
++}
+diff --git a/ostd/libs/nvidia-nvport/src/lib.rs b/ostd/libs/nvidia-nvport/src/lib.rs
+--- a/ostd/libs/nvidia-nvport/src/lib.rs
++++ b/ostd/libs/nvidia-nvport/src/lib.rs
+@@ -11,7 +11,14 @@
+ 
+ extern crate alloc;
+ 
++#[cfg(target_os = "none")]
++mod diagnostics;
++pub mod firmware;
+ mod os;
++pub mod runtime;
++mod runtime_os;
++#[cfg(target_os = "none")]
++pub mod sync;
+ 
+ use core::{ffi::c_void, ptr::NonNull};
+ 
+diff --git a/ostd/libs/nvidia-nvport/src/runtime.rs b/ostd/libs/nvidia-nvport/src/runtime.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/runtime.rs
+@@ -0,0 +1,327 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Runtime services for the NVIDIA NVport OS-facing time and thread APIs.
++//!
++//! A platform component installs immutable clock callbacks after its clock
++//! source is initialized. Reads before installation (or callbacks that cannot
++//! produce a valid value) fail rather than manufacturing timestamps. The
++//! thread helpers are available only in a real OSTD task context.
++use core::sync::atomic::{AtomicBool, Ordering};
++
++use spin::Once;
++#[cfg(test)]
++extern crate std;
++
++/// A fallible source of a nanosecond clock value.
++///
++/// `None` means the source is not ready or cannot represent a valid value.
++pub type ClockRead = fn() -> Option<u64>;
++
++/// Immutable clock sources supplied by the platform.
++#[derive(Clone, Copy)]
++pub struct Clock {
++    monotonic_ns: ClockRead,
++    realtime_ns: ClockRead,
++    monotonic_resolution_ns: ClockRead,
++}
++
++impl Clock {
++    /// Creates a clock backed by platform-owned, static callback functions.
++    pub const fn new(
++        monotonic_ns: ClockRead,
++        realtime_ns: ClockRead,
++        monotonic_resolution_ns: ClockRead,
++    ) -> Self {
++        Self {
++            monotonic_ns,
++            realtime_ns,
++            monotonic_resolution_ns,
++        }
++    }
++}
++
++/// Runtime-service errors. No error case is converted to a synthetic value.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum Error {
++    /// No platform clock has been installed.
++    NotInstalled,
++    /// A platform clock was already installed; it cannot be replaced.
++    AlreadyInstalled,
++    /// The installed clock could not provide a valid value.
++    ClockUnavailable,
++    /// The caller is not running in an OSTD task context.
++    WrongContext,
++    /// This operation is not supported by this build target.
++    Unsupported,
++}
++
++static CLOCK: Once<Clock> = Once::new();
++static CLOCK_INSTALL_CLAIMED: AtomicBool = AtomicBool::new(false);
++
++/// Installs the one immutable clock source for this kernel instance.
++///
++/// Concurrent or subsequent registration attempts return [`Error::AlreadyInstalled`];
++/// the first successful registration is never silently replaced.
++pub fn install_clock(clock: Clock) -> Result<(), Error> {
++    CLOCK_INSTALL_CLAIMED
++        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
++        .map_err(|_| Error::AlreadyInstalled)?;
++    // The callback set is copied by value and contains only function pointers,
++    // so initialization cannot borrow caller-owned state or fail partway.
++    CLOCK.call_once(|| clock);
++    Ok(())
++}
++
++/// Reads monotonic nanoseconds since the platform's clock epoch.
++pub fn monotonic_ns() -> Result<u64, Error> {
++    (CLOCK.get().ok_or(Error::NotInstalled)?.monotonic_ns)().ok_or(Error::ClockUnavailable)
++}
++
++/// Reads realtime nanoseconds since the Unix epoch.
++pub fn realtime_ns() -> Result<u64, Error> {
++    (CLOCK.get().ok_or(Error::NotInstalled)?.realtime_ns)().ok_or(Error::ClockUnavailable)
++}
++
++/// Returns the clocksource's nominal minimum tick interval in nanoseconds.
++pub fn monotonic_resolution_ns() -> Result<u64, Error> {
++    let ns = (CLOCK
++        .get()
++        .ok_or(Error::NotInstalled)?
++        .monotonic_resolution_ns)()
++    .ok_or(Error::ClockUnavailable)?;
++    if ns == 0 {
++        return Err(Error::ClockUnavailable);
++    }
++    Ok(ns)
++}
++
++unsafe extern "C" {
++    fn portTimeGetUptimeNanoseconds() -> u64;
++    fn portTimeGetUptimeNanosecondsHighPrecision() -> u64;
++    fn portTimeGetUptimeResolution() -> u64;
++    fn portTimeGetMicroseconds() -> u64;
++    fn portThreadGetCurrentThreadId() -> u64;
++    fn portThreadYield();
++}
++
++/// Reads uptime through unchanged upstream C and the installed OS callback.
++pub fn upstream_uptime_ns() -> Result<u64, Error> {
++    monotonic_ns()?;
++    // SAFETY: Clock installation was checked and this function has no pointers.
++    Ok(unsafe { portTimeGetUptimeNanoseconds() })
++}
++
++/// Reads the high-precision API using the same calibrated platform clocksource.
++pub fn upstream_uptime_high_precision_ns() -> Result<u64, Error> {
++    monotonic_ns()?;
++    // SAFETY: As above; this does not invent a separate precision domain.
++    Ok(unsafe { portTimeGetUptimeNanosecondsHighPrecision() })
++}
++
++/// Returns the actual installed clocksource's nominal tick interval through C.
++pub fn upstream_resolution_ns() -> Result<u64, Error> {
++    monotonic_resolution_ns()?;
++    // SAFETY: The callback has a nonzero, representable resolution.
++    Ok(unsafe { portTimeGetUptimeResolution() })
++}
++
++/// Reads realtime through C only when its u32-seconds ABI can represent it.
++pub fn upstream_realtime_us() -> Result<u64, Error> {
++    let ns = realtime_ns()?;
++    u32::try_from(ns / 1_000_000_000).map_err(|_| Error::ClockUnavailable)?;
++    // SAFETY: The real clock is available and within the upstream ABI range.
++    Ok(unsafe { portTimeGetMicroseconds() })
++}
++
++/// Gets the current live task's opaque identity through upstream C.
++pub fn upstream_task_identity() -> Result<u64, Error> {
++    current_task_identity()?;
++    // SAFETY: Current execution is a real task, checked above.
++    Ok(unsafe { portThreadGetCurrentThreadId() })
++}
++
++/// Actually yields a sleepable OSTD task through upstream C and `os_schedule`.
++pub fn upstream_yield() -> Result<(), Error> {
++    current_task_identity()?;
++    #[cfg(target_os = "none")]
++    if !ostd::task::atomic_mode::can_sleep() {
++        return Err(Error::WrongContext);
++    }
++    // SAFETY: Real task context and sleepability checked; upstream has no args.
++    unsafe { portThreadYield() };
++    Ok(())
++}
++
++/// Returns an opaque identity for the currently executing OSTD task.
++///
++/// OSTD does not expose a numeric task ID. The stable address of the live
++/// `Task` allocation is therefore used as an opaque equality token: it is
++/// unique for simultaneously-live tasks and may be reused after task exit,
++/// just as kernel thread IDs may be reused. It is not a POSIX TID.
++#[cfg(target_os = "none")]
++pub fn current_task_identity() -> Result<u64, Error> {
++    use ostd::{irq::InterruptLevel, task::Task};
++
++    if !InterruptLevel::current().is_task_context() {
++        return Err(Error::WrongContext);
++    }
++    let task = Task::current().ok_or(Error::WrongContext)?;
++    let identity = (&*task as *const Task as usize) as u64;
++    if identity == 0 {
++        return Err(Error::WrongContext);
++    }
++    Ok(identity)
++}
++
++/// Yields the currently executing task to the OSTD scheduler.
++#[cfg(target_os = "none")]
++pub fn yield_current_task() -> Result<(), Error> {
++    use ostd::{irq::InterruptLevel, task::Task};
++
++    if !InterruptLevel::current().is_task_context()
++        || Task::current().is_none()
++        || !ostd::task::atomic_mode::can_sleep()
++    {
++        return Err(Error::WrongContext);
++    }
++    Task::yield_now();
++    Ok(())
++}
++
++/// Host builds do not have an OSTD scheduler or task identity.
++#[cfg(not(target_os = "none"))]
++pub fn current_task_identity() -> Result<u64, Error> {
++    Err(Error::Unsupported)
++}
++
++/// Host builds do not have an OSTD scheduler to yield to.
++#[cfg(not(target_os = "none"))]
++pub fn yield_current_task() -> Result<(), Error> {
++    Err(Error::Unsupported)
++}
++
++#[cfg(test)]
++mod tests {
++    use std::{
++        sync::OnceLock,
++        time::{Instant, SystemTime, UNIX_EPOCH},
++    };
++
++    use super::*;
++
++    static MONOTONIC_START: OnceLock<Instant> = OnceLock::new();
++
++    fn host_monotonic_ns() -> Option<u64> {
++        MONOTONIC_START
++            .get_or_init(Instant::now)
++            .elapsed()
++            .as_nanos()
++            .try_into()
++            .ok()
++    }
++
++    fn host_realtime_ns() -> Option<u64> {
++        SystemTime::now()
++            .duration_since(UNIX_EPOCH)
++            .ok()?
++            .as_nanos()
++            .try_into()
++            .ok()
++    }
++
++    fn unknown_resolution() -> Option<u64> {
++        // std exposes no portable clocksource resolution; do not claim one.
++        None
++    }
++
++    #[test]
++    fn host_clock_callbacks_use_real_clocks_and_fail_closed_for_unknown_resolution() {
++        install_clock(Clock::new(
++            host_monotonic_ns,
++            host_realtime_ns,
++            unknown_resolution,
++        ))
++        .unwrap();
++        let first = monotonic_ns().unwrap();
++        let second = monotonic_ns().unwrap();
++        assert!(second >= first);
++        assert!(realtime_ns().unwrap() > 1_700_000_000_000_000_000);
++        assert!(upstream_uptime_ns().unwrap() >= second);
++        assert!(upstream_uptime_high_precision_ns().unwrap() >= second);
++        assert!(upstream_realtime_us().unwrap() > 1_700_000_000_000_000);
++        assert_eq!(monotonic_resolution_ns(), Err(Error::ClockUnavailable));
++        assert_eq!(upstream_resolution_ns(), Err(Error::ClockUnavailable));
++        assert_eq!(current_task_identity(), Err(Error::Unsupported));
++        assert_eq!(yield_current_task(), Err(Error::Unsupported));
++        assert_eq!(upstream_task_identity(), Err(Error::Unsupported));
++        assert_eq!(upstream_yield(), Err(Error::Unsupported));
++        assert_eq!(
++            install_clock(Clock::new(
++                host_monotonic_ns,
++                host_realtime_ns,
++                unknown_resolution,
++            )),
++            Err(Error::AlreadyInstalled)
++        );
++    }
++}
++
++#[cfg(ktest)]
++mod native_tests {
++    use alloc::sync::Arc;
++    use core::sync::atomic::AtomicU64;
++
++    use ostd::{sync::WaitQueue, task::TaskOptions};
++
++    use super::*;
++
++    fn timer_ns() -> Option<u64> {
++        ostd::timer::Jiffies::elapsed()
++            .as_duration()
++            .as_nanos()
++            .try_into()
++            .ok()
++    }
++    fn timer_resolution() -> Option<u64> {
++        Some(1_000_000_000u64.div_ceil(ostd::timer::TIMER_FREQ))
++    }
++    fn no_wall_clock_in_ostd_only_test() -> Option<u64> {
++        None
++    }
++
++    #[ostd::prelude::ktest]
++    fn actual_timer_and_distinct_live_tasks_through_upstream_c() {
++        assert_eq!(monotonic_ns(), Err(Error::NotInstalled));
++        install_clock(Clock::new(
++            timer_ns,
++            no_wall_clock_in_ostd_only_test,
++            timer_resolution,
++        ))
++        .unwrap();
++        let before = upstream_uptime_ns().unwrap();
++        assert!(upstream_uptime_high_precision_ns().unwrap() >= before);
++        assert_eq!(
++            upstream_resolution_ns(),
++            timer_resolution().ok_or(Error::ClockUnavailable)
++        );
++        assert_eq!(upstream_realtime_us(), Err(Error::ClockUnavailable));
++        let parent = upstream_task_identity().unwrap();
++        let child = Arc::new(AtomicU64::new(0));
++        let done = Arc::new(WaitQueue::new());
++        let (child_out, child_done) = (child.clone(), done.clone());
++        TaskOptions::new(move || {
++            child_out.store(upstream_task_identity().unwrap(), Ordering::Release);
++            child_done.wake_all();
++        })
++        .spawn()
++        .unwrap();
++        upstream_yield().unwrap();
++        done.wait_until(|| (child.load(Ordering::Acquire) != 0).then_some(()));
++        assert_ne!(child.load(Ordering::Acquire), parent);
++        assert_eq!(upstream_task_identity(), Ok(parent));
++        assert!(upstream_uptime_ns().unwrap() >= before);
++        let guard = ostd::task::disable_preempt();
++        assert_eq!(upstream_yield(), Err(Error::WrongContext));
++        drop(guard);
++        assert_eq!(upstream_yield(), Ok(()));
++    }
++}
+diff --git a/ostd/libs/nvidia-nvport/src/runtime_os.rs b/ostd/libs/nvidia-nvport/src/runtime_os.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/runtime_os.rs
+@@ -0,0 +1,76 @@
++// SPDX-License-Identifier: MPL-2.0
++//! OS callbacks for unmodified NVIDIA time/thread translation units.
++use super::runtime;
++
++const NV_OK: u32 = 0;
++const NV_ERR_INVALID_POINTER: u32 = 0x3d;
++const NV_ERR_INVALID_STATE: u32 = 0x40;
++const NV_ERR_NOT_SUPPORTED: u32 = 0x56;
++
++/// # Safety
++/// Both output slots must be valid, aligned and nonoverlapping. A clock must be
++/// installed before entering the upstream time API: its C body ignores status.
++/// Consequently an unavailable/out-of-range clock halts rather than synthesizing
++/// an epoch-zero timestamp that RM could mistake for a working clock.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_get_system_time(seconds: *mut u32, micros: *mut u32) -> u32 {
++    if seconds.is_null() || micros.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    let ns = runtime::realtime_ns()
++        .expect("NVIDIA realtime clock unavailable; refusing false timestamp");
++    let sec = u32::try_from(ns / 1_000_000_000).expect("NVIDIA realtime seconds exceed ABI range");
++    // SAFETY: Caller grants both output slots.
++    unsafe {
++        seconds.write(sec);
++        micros.write(((ns % 1_000_000_000) / 1_000) as u32);
++    }
++    NV_OK
++}
++
++#[unsafe(no_mangle)]
++extern "C" fn os_get_monotonic_time_ns() -> u64 {
++    runtime::monotonic_ns().expect("NVIDIA monotonic clock unavailable; refusing false timestamp")
++}
++#[unsafe(no_mangle)]
++extern "C" fn os_get_monotonic_time_ns_hr() -> u64 {
++    // Same calibrated real clocksource; no claim of a second precision domain.
++    os_get_monotonic_time_ns()
++}
++#[unsafe(no_mangle)]
++extern "C" fn os_get_monotonic_tick_resolution_ns() -> u64 {
++    runtime::monotonic_resolution_ns().expect("NVIDIA clock resolution unavailable")
++}
++
++/// # Safety
++/// `identity` must be a valid writable u64 slot. Returned value is an opaque
++/// identity for the currently live OSTD task, not a userspace/POSIX TID.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_get_current_thread(identity: *mut u64) -> u32 {
++    if identity.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    // SAFETY: Valid output slot by contract, always cleared on failure.
++    unsafe {
++        identity.write(0);
++    }
++    match runtime::current_task_identity() {
++        Ok(value) => {
++            unsafe {
++                identity.write(value);
++            }
++            NV_OK
++        }
++        Err(runtime::Error::Unsupported) => NV_ERR_NOT_SUPPORTED,
++        Err(_) => NV_ERR_INVALID_STATE,
++    }
++}
++
++#[unsafe(no_mangle)]
++extern "C" fn os_schedule() -> u32 {
++    match runtime::yield_current_task() {
++        Ok(()) => NV_OK,
++        Err(runtime::Error::Unsupported) => NV_ERR_NOT_SUPPORTED,
++        Err(_) => NV_ERR_INVALID_STATE,
++    }
++}
+diff --git a/ostd/libs/nvidia-nvport/src/sync.rs b/ostd/libs/nvidia-nvport/src/sync.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/sync.rs
+@@ -0,0 +1,815 @@
++// SPDX-License-Identifier: MPL-2.0
++
++//! OSTD-backed implementation of NVIDIA's Unix-kernel synchronization ABI.
++//!
++//! The C bridge owns the opaque NVIDIA `PORT_*` layouts and calls the unmodified
++//! upstream `sync_unix_kernel_os.c` entry points. This module supplies that
++//! source's `os_*` synchronization callbacks and safe RAII owners for exercising
++//! the real upstream entry points. Sleeping locks require task context; spinlocks
++//! disable local IRQs and keep OSTD's non-migratable IRQ guard until release.
++
++#![cfg(target_os = "none")]
++
++use alloc::alloc::{alloc, dealloc};
++use core::{
++    alloc::Layout,
++    cell::UnsafeCell,
++    ffi::c_void,
++    marker::PhantomData,
++    ptr::{self, NonNull},
++    sync::atomic::{AtomicBool, AtomicU32, Ordering},
++};
++
++use ostd::{
++    irq::{self, DisabledLocalIrqGuard},
++    sync::WaitQueue,
++};
++
++const NV_OK: u32 = 0;
++const NV_ERR_INVALID_POINTER: u32 = 0x3d;
++const NV_ERR_INVALID_ARGUMENT: u32 = 0x1f;
++const NV_ERR_INVALID_REQUEST: u32 = 0x3f;
++const NV_ERR_TIMEOUT_RETRY: u32 = 0x66;
++const NV_ERR_NO_MEMORY: u32 = 0x51;
++
++struct MutexState {
++    locked: AtomicBool,
++    waiters: WaitQueue,
++}
++impl MutexState {
++    const fn new() -> Self {
++        Self {
++            locked: AtomicBool::new(false),
++            waiters: WaitQueue::new(),
++        }
++    }
++    fn try_lock(&self) -> bool {
++        self.locked
++            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
++            .is_ok()
++    }
++}
++
++struct SemaphoreState {
++    count: AtomicU32,
++    waiters: WaitQueue,
++}
++impl SemaphoreState {
++    const fn new(count: u32) -> Self {
++        Self {
++            count: AtomicU32::new(count),
++            waiters: WaitQueue::new(),
++        }
++    }
++    fn try_down(&self) -> bool {
++        let mut count = self.count.load(Ordering::Acquire);
++        while count != 0 {
++            match self.count.compare_exchange_weak(
++                count,
++                count - 1,
++                Ordering::Acquire,
++                Ordering::Relaxed,
++            ) {
++                Ok(_) => return true,
++                Err(actual) => count = actual,
++            }
++        }
++        false
++    }
++}
++
++const WRITER: u32 = 1 << 31;
++const READERS: u32 = WRITER - 1;
++struct RwState {
++    state: AtomicU32,
++    waiters: WaitQueue,
++}
++impl RwState {
++    const fn new() -> Self {
++        Self {
++            state: AtomicU32::new(0),
++            waiters: WaitQueue::new(),
++        }
++    }
++    fn try_read(&self) -> bool {
++        let mut state = self.state.load(Ordering::Acquire);
++        while state & WRITER == 0 && state & READERS != READERS {
++            match self.state.compare_exchange_weak(
++                state,
++                state + 1,
++                Ordering::Acquire,
++                Ordering::Relaxed,
++            ) {
++                Ok(_) => return true,
++                Err(actual) => state = actual,
++            }
++        }
++        false
++    }
++    fn try_write(&self) -> bool {
++        self.state
++            .compare_exchange(0, WRITER, Ordering::Acquire, Ordering::Relaxed)
++            .is_ok()
++    }
++}
++
++/// Spinlock storage. The guard is created and ultimately dropped on the lock
++/// owner's CPU; local IRQ disable also prevents task migration while held.
++struct SpinState {
++    held: AtomicBool,
++    irq_guard: UnsafeCell<Option<DisabledLocalIrqGuard>>,
++}
++impl SpinState {
++    const fn new() -> Self {
++        Self {
++            held: AtomicBool::new(false),
++            irq_guard: UnsafeCell::new(None),
++        }
++    }
++}
++// SAFETY: `held` serializes access to `irq_guard`. The ABI requires release by
++// the same non-preemptible execution context that acquired the spinlock.
++unsafe impl Sync for SpinState {}
++
++unsafe fn allocate<T>(value: T, output: *mut *mut c_void) -> u32 {
++    if output.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    // Clear output before any failure path.
++    unsafe { output.write(ptr::null_mut()) };
++    if irq::InterruptLevel::current().is_interrupt_context() {
++        return NV_ERR_INVALID_REQUEST;
++    }
++    let layout = Layout::new::<T>();
++    // SAFETY: `layout` is a valid, non-zero Rust layout for T.
++    let ptr = unsafe { alloc(layout) }.cast::<T>();
++    if ptr.is_null() {
++        return NV_ERR_NO_MEMORY;
++    }
++    // SAFETY: allocation is aligned and large enough for a T.
++    unsafe { ptr.write(value) };
++    // SAFETY: output is a valid writable pointer slot by contract.
++    unsafe { output.write(ptr.cast()) };
++    NV_OK
++}
++
++unsafe fn free<T>(ptr: *mut c_void) {
++    if ptr.is_null() {
++        return;
++    }
++    let typed = ptr.cast::<T>();
++    // SAFETY: caller passes the unique live pointer created by allocate::<T>.
++    unsafe { typed.drop_in_place() };
++    // SAFETY: exact same layout and pointer used for allocation.
++    unsafe { dealloc(typed.cast(), Layout::new::<T>()) };
++}
++
++/// Allocate a native spinlock state.
++/// # Safety
++/// `out` is a writable pointer slot; the returned handle is freed exactly once
++/// after all lock users have stopped.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_alloc_spinlock(out: *mut *mut c_void) -> u32 {
++    // SAFETY: forwarded caller contract; initialize with no held owner.
++    unsafe { allocate(SpinState::new(), out) }
++}
++/// # Safety
++/// `lock` is the unique handle from `os_alloc_spinlock` and no lock operation
++/// is in progress. If a caller has forgotten an acquired lock guard, the
++/// allocation is intentionally leaked rather than dropping its CPU-local IRQ
++/// guard on a potentially different CPU.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_free_spinlock(lock: *mut c_void) {
++    if !lock.is_null() {
++        // SAFETY: caller provides the unique handle and has stopped lock users.
++        let state = unsafe { &*lock.cast::<SpinState>() };
++        if state.held.load(Ordering::Acquire) {
++            // `irq_guard` is !Send and its destructor restores IRQ state on the
++            // acquiring CPU. Forgetting the public lock guard can outlive that
++            // CPU context, so retain the whole state instead of freeing it.
++            return;
++        }
++    }
++    unsafe { free::<SpinState>(lock) }
++}
++/// Acquires with irq-save semantics. `oldIrql` is an opaque upstream token; the
++/// matching OSTD guard, rather than a reconstructed IRQ bit, restores state.
++/// # Safety
++/// `lock` is live and release occurs on this same CPU/context.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_acquire_spinlock(lock: *mut c_void) -> u64 {
++    if lock.is_null() {
++        return 0;
++    }
++    // SAFETY: valid callback handle.
++    let state = unsafe { &*lock.cast::<SpinState>() };
++    loop {
++        let irq_guard = irq::disable_local();
++        if state
++            .held
++            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
++            .is_ok()
++        {
++            // SAFETY: successful exclusive acquisition gives sole access to the slot.
++            unsafe { *state.irq_guard.get() = Some(irq_guard) };
++            return 0;
++        }
++        drop(irq_guard);
++        core::hint::spin_loop();
++    }
++}
++/// # Safety
++/// `lock` is held by this context and `old_irql` is its matching token.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_release_spinlock(lock: *mut c_void, _old_irql: u64) {
++    if lock.is_null() {
++        return;
++    }
++    // SAFETY: valid callback handle and caller owns the lock.
++    let state = unsafe { &*lock.cast::<SpinState>() };
++    // Take the non-Send guard before releasing the state so no next owner can
++    // overwrite it. Drop only after the interlock is available.
++    // SAFETY: only the owner accesses this slot while held.
++    let irq_guard = unsafe { (&mut *state.irq_guard.get()).take() };
++    state.held.store(false, Ordering::Release);
++    drop(irq_guard);
++}
++
++/// # Safety
++/// `out` is writable; returned handle is freed once, after all users stop.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_alloc_mutex(out: *mut *mut c_void) -> u32 {
++    unsafe { allocate(MutexState::new(), out) }
++}
++/// # Safety
++/// `mutex` is unique and quiescent.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_free_mutex(mutex: *mut c_void) {
++    unsafe { free::<MutexState>(mutex) }
++}
++/// # Safety
++/// `mutex` is live; caller is in task context and not in OSTD atomic mode.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_acquire_mutex(mutex: *mut c_void) -> u32 {
++    if mutex.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    ostd::task::atomic_mode::might_sleep();
++    let lock = unsafe { &*mutex.cast::<MutexState>() };
++    lock.waiters.wait_until(|| lock.try_lock().then_some(()));
++    NV_OK
++}
++/// # Safety
++/// `mutex` is live; lock acquisition is nonblocking.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_cond_acquire_mutex(mutex: *mut c_void) -> u32 {
++    if mutex.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    if !ostd::task::atomic_mode::can_sleep() {
++        return NV_ERR_INVALID_REQUEST;
++    }
++    if unsafe { &*mutex.cast::<MutexState>() }.try_lock() {
++        NV_OK
++    } else {
++        NV_ERR_TIMEOUT_RETRY
++    }
++}
++/// # Safety
++/// The caller owns one successful acquisition of `mutex`.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_release_mutex(mutex: *mut c_void) {
++    if mutex.is_null() {
++        return;
++    }
++    let lock = unsafe { &*mutex.cast::<MutexState>() };
++    lock.locked.store(false, Ordering::Release);
++    lock.waiters.wake_one();
++}
++
++/// # Safety
++/// Returned handle is freed once, only when there are no outstanding operations.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_alloc_semaphore(count: u32) -> *mut c_void {
++    let mut out = ptr::null_mut();
++    // SAFETY: local writable output slot.
++    if unsafe { allocate(SemaphoreState::new(count), &mut out) } == NV_OK {
++        out
++    } else {
++        ptr::null_mut()
++    }
++}
++/// # Safety
++/// `sem` is unique and quiescent.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_free_semaphore(sem: *mut c_void) {
++    unsafe { free::<SemaphoreState>(sem) }
++}
++/// # Safety
++/// `sem` is live; caller is in task context and not atomic mode.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_acquire_semaphore(sem: *mut c_void) -> u32 {
++    if sem.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    ostd::task::atomic_mode::might_sleep();
++    let sem = unsafe { &*sem.cast::<SemaphoreState>() };
++    sem.waiters.wait_until(|| sem.try_down().then_some(()));
++    NV_OK
++}
++/// # Safety
++/// `sem` is live; this is a nonblocking operation.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_cond_acquire_semaphore(sem: *mut c_void) -> u32 {
++    if sem.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    if unsafe { &*sem.cast::<SemaphoreState>() }.try_down() {
++        NV_OK
++    } else {
++        NV_ERR_TIMEOUT_RETRY
++    }
++}
++/// # Safety
++/// `sem` is live and count must not overflow; caller uses NVport's release contract.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_release_semaphore(sem: *mut c_void) -> u32 {
++    if sem.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    let sem = unsafe { &*sem.cast::<SemaphoreState>() };
++    if sem
++        .count
++        .try_update(Ordering::Release, Ordering::Relaxed, |n| n.checked_add(1))
++        .is_err()
++    {
++        return NV_ERR_INVALID_ARGUMENT;
++    }
++    sem.waiters.wake_one();
++    NV_OK
++}
++
++/// # Safety
++/// Returned handle is freed exactly once after all users stop.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_alloc_rwlock() -> *mut c_void {
++    let mut out = ptr::null_mut();
++    if unsafe { allocate(RwState::new(), &mut out) } == NV_OK {
++        out
++    } else {
++        ptr::null_mut()
++    }
++}
++/// # Safety
++/// `rw` is unique and quiescent.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_free_rwlock(rw: *mut c_void) {
++    unsafe { free::<RwState>(rw) }
++}
++/// # Safety
++/// `rw` is live and caller can sleep.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_acquire_rwlock_read(rw: *mut c_void) -> u32 {
++    if rw.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    ostd::task::atomic_mode::might_sleep();
++    let rw = unsafe { &*rw.cast::<RwState>() };
++    rw.waiters.wait_until(|| rw.try_read().then_some(()));
++    NV_OK
++}
++/// # Safety
++/// `rw` is live; nonblocking attempt.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_cond_acquire_rwlock_read(rw: *mut c_void) -> u32 {
++    if rw.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    if unsafe { &*rw.cast::<RwState>() }.try_read() {
++        NV_OK
++    } else {
++        NV_ERR_TIMEOUT_RETRY
++    }
++}
++/// # Safety
++/// `rw` is live and caller can sleep.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_acquire_rwlock_write(rw: *mut c_void) -> u32 {
++    if rw.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    ostd::task::atomic_mode::might_sleep();
++    let rw = unsafe { &*rw.cast::<RwState>() };
++    rw.waiters.wait_until(|| rw.try_write().then_some(()));
++    NV_OK
++}
++/// # Safety
++/// `rw` is live; nonblocking attempt.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_cond_acquire_rwlock_write(rw: *mut c_void) -> u32 {
++    if rw.is_null() {
++        return NV_ERR_INVALID_POINTER;
++    }
++    if unsafe { &*rw.cast::<RwState>() }.try_write() {
++        NV_OK
++    } else {
++        NV_ERR_TIMEOUT_RETRY
++    }
++}
++/// # Safety
++/// Caller owns one successful read acquisition.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_release_rwlock_read(rw: *mut c_void) {
++    if rw.is_null() {
++        return;
++    }
++    let rw = unsafe { &*rw.cast::<RwState>() };
++    if rw.state.fetch_sub(1, Ordering::Release) == 1 {
++        rw.waiters.wake_all();
++    }
++}
++/// # Safety
++/// Caller owns the successful write acquisition.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_release_rwlock_write(rw: *mut c_void) {
++    if rw.is_null() {
++        return;
++    }
++    let rw = unsafe { &*rw.cast::<RwState>() };
++    rw.state.store(0, Ordering::Release);
++    rw.waiters.wake_all();
++}
++
++/// Reports whether the current task can safely block according to OSTD's
++/// current-task, preemption, and local-IRQ checks.
++#[unsafe(no_mangle)]
++extern "C" fn os_semaphore_may_sleep() -> u8 {
++    u8::from(ostd::task::atomic_mode::can_sleep())
++}
++
++unsafe extern "C" {
++    fn nvport_sync_mutex_new() -> *mut c_void;
++    fn nvport_sync_mutex_delete(mutex: *mut c_void);
++    fn nvport_sync_mutex_acquire(mutex: *mut c_void);
++    fn nvport_sync_mutex_try_acquire(mutex: *mut c_void) -> i32;
++    fn nvport_sync_mutex_release(mutex: *mut c_void);
++    fn nvport_sync_semaphore_new(count: u32) -> *mut c_void;
++    fn nvport_sync_semaphore_delete(sem: *mut c_void);
++    fn nvport_sync_semaphore_acquire(sem: *mut c_void);
++    fn nvport_sync_semaphore_try_acquire(sem: *mut c_void) -> i32;
++    fn nvport_sync_semaphore_release_checked(sem: *mut c_void) -> u32;
++    fn nvport_sync_rwlock_new() -> *mut c_void;
++    fn nvport_sync_rwlock_delete(lock: *mut c_void);
++    fn nvport_sync_rwlock_read(lock: *mut c_void);
++    fn nvport_sync_rwlock_try_read(lock: *mut c_void) -> i32;
++    fn nvport_sync_rwlock_write(lock: *mut c_void);
++    fn nvport_sync_rwlock_try_write(lock: *mut c_void) -> i32;
++    fn nvport_sync_rwlock_release_read(lock: *mut c_void);
++    fn nvport_sync_rwlock_release_write(lock: *mut c_void);
++    fn nvport_sync_spin_new() -> *mut c_void;
++    fn nvport_sync_spin_delete(lock: *mut c_void);
++    fn nvport_sync_spin_acquire(lock: *mut c_void);
++    fn nvport_sync_spin_release(lock: *mut c_void);
++}
++
++/// Error creating a C-layout NVIDIA synchronization object.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct InitError;
++
++/// A safe owner of an upstream NVIDIA `PORT_MUTEX`.
++pub struct NvMutex(NonNull<c_void>);
++// SAFETY: The handle owns a native state whose mutable operations are serialized
++// by the mutex; the owner can be moved or shared while it remains uniquely owned.
++unsafe impl Send for NvMutex {}
++unsafe impl Sync for NvMutex {}
++impl NvMutex {
++    /// Create through upstream `portSyncMutexInitialize` and the OSTD callbacks.
++    pub fn new() -> Result<Self, InitError> {
++        NonNull::new(unsafe { nvport_sync_mutex_new() })
++            .map(Self)
++            .ok_or(InitError)
++    }
++    /// Acquire, blocking in valid task context.
++    pub fn lock(&self) -> NvMutexGuard<'_> {
++        unsafe { nvport_sync_mutex_acquire(self.0.as_ptr()) };
++        NvMutexGuard {
++            lock: self,
++            _not_send: PhantomData,
++        }
++    }
++    /// Try to acquire without sleeping.
++    pub fn try_lock(&self) -> Option<NvMutexGuard<'_>> {
++        (unsafe { nvport_sync_mutex_try_acquire(self.0.as_ptr()) } != 0).then(|| NvMutexGuard {
++            lock: self,
++            _not_send: PhantomData,
++        })
++    }
++}
++impl Drop for NvMutex {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_mutex_delete(self.0.as_ptr()) }
++    }
++}
++/// Guard that releases its NVport mutex on drop; cannot move between CPUs/tasks.
++pub struct NvMutexGuard<'a> {
++    lock: &'a NvMutex,
++    _not_send: PhantomData<*mut ()>,
++}
++impl Drop for NvMutexGuard<'_> {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_mutex_release(self.lock.0.as_ptr()) }
++    }
++}
++
++/// A safe owner of an upstream NVIDIA `PORT_SEMAPHORE`.
++pub struct NvSemaphore(NonNull<c_void>);
++// SAFETY: Semaphore state is atomic and waiters use an OSTD wait queue.
++unsafe impl Send for NvSemaphore {}
++unsafe impl Sync for NvSemaphore {}
++impl NvSemaphore {
++    /// Create with the requested initial count.
++    pub fn new(count: u32) -> Result<Self, InitError> {
++        NonNull::new(unsafe { nvport_sync_semaphore_new(count) })
++            .map(Self)
++            .ok_or(InitError)
++    }
++    /// Acquire one permit, sleeping as required.
++    pub fn acquire(&self) {
++        unsafe { nvport_sync_semaphore_acquire(self.0.as_ptr()) }
++    }
++    /// Nonblocking permit acquisition.
++    pub fn try_acquire(&self) -> bool {
++        unsafe { nvport_sync_semaphore_try_acquire(self.0.as_ptr()) != 0 }
++    }
++    /// Add one permit, reporting counter overflow instead of silently
++    /// discarding the callback's status as NVIDIA's native void ABI does.
++    pub fn release(&self) -> Result<(), SemaphoreReleaseError> {
++        if unsafe { nvport_sync_semaphore_release_checked(self.0.as_ptr()) } == NV_OK {
++            Ok(())
++        } else {
++            Err(SemaphoreReleaseError)
++        }
++    }
++}
++impl Drop for NvSemaphore {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_semaphore_delete(self.0.as_ptr()) }
++    }
++}
++
++/// The semaphore's permit counter was already at its maximum value.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub struct SemaphoreReleaseError;
++
++/// A safe owner of an upstream NVIDIA `PORT_RWLOCK`.
++pub struct NvRwLock(NonNull<c_void>);
++// SAFETY: The native state uses atomic reader/writer ownership and an OSTD queue.
++unsafe impl Send for NvRwLock {}
++unsafe impl Sync for NvRwLock {}
++impl NvRwLock {
++    /// Construct through upstream NVport initialization.
++    pub fn new() -> Result<Self, InitError> {
++        NonNull::new(unsafe { nvport_sync_rwlock_new() })
++            .map(Self)
++            .ok_or(InitError)
++    }
++    /// Acquire shared access.
++    pub fn read(&self) -> NvRwReadGuard<'_> {
++        unsafe { nvport_sync_rwlock_read(self.0.as_ptr()) };
++        NvRwReadGuard {
++            lock: self,
++            _not_send: PhantomData,
++        }
++    }
++    /// Try shared access without sleeping.
++    pub fn try_read(&self) -> Option<NvRwReadGuard<'_>> {
++        (unsafe { nvport_sync_rwlock_try_read(self.0.as_ptr()) } != 0).then(|| NvRwReadGuard {
++            lock: self,
++            _not_send: PhantomData,
++        })
++    }
++    /// Acquire exclusive access.
++    pub fn write(&self) -> NvRwWriteGuard<'_> {
++        unsafe { nvport_sync_rwlock_write(self.0.as_ptr()) };
++        NvRwWriteGuard {
++            lock: self,
++            _not_send: PhantomData,
++        }
++    }
++    /// Try exclusive access without sleeping.
++    pub fn try_write(&self) -> Option<NvRwWriteGuard<'_>> {
++        (unsafe { nvport_sync_rwlock_try_write(self.0.as_ptr()) } != 0).then(|| NvRwWriteGuard {
++            lock: self,
++            _not_send: PhantomData,
++        })
++    }
++}
++impl Drop for NvRwLock {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_rwlock_delete(self.0.as_ptr()) }
++    }
++}
++/// RAII shared-lock lease.
++pub struct NvRwReadGuard<'a> {
++    lock: &'a NvRwLock,
++    _not_send: PhantomData<*mut ()>,
++}
++impl Drop for NvRwReadGuard<'_> {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_rwlock_release_read(self.lock.0.as_ptr()) }
++    }
++}
++/// RAII exclusive-lock lease.
++pub struct NvRwWriteGuard<'a> {
++    lock: &'a NvRwLock,
++    _not_send: PhantomData<*mut ()>,
++}
++impl Drop for NvRwWriteGuard<'_> {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_rwlock_release_write(self.lock.0.as_ptr()) }
++    }
++}
++
++/// A safe owner of an upstream NVIDIA `PORT_SPINLOCK`.
++pub struct NvSpinLock(NonNull<c_void>);
++// SAFETY: The state is an irq-save spinlock; guard values are !Send, and lock
++// operations synchronize access to its saved IRQ guard.
++unsafe impl Send for NvSpinLock {}
++// SAFETY: The IRQ-save atomic interlock serializes all access to its state.
++unsafe impl Sync for NvSpinLock {}
++impl NvSpinLock {
++    /// Construct through the upstream spinlock initializer.
++    pub fn new() -> Result<Self, InitError> {
++        NonNull::new(unsafe { nvport_sync_spin_new() })
++            .map(Self)
++            .ok_or(InitError)
++    }
++    /// Acquire with local IRQ save and disable semantics.
++    pub fn lock(&self) -> NvSpinLockGuard<'_> {
++        unsafe { nvport_sync_spin_acquire(self.0.as_ptr()) };
++        NvSpinLockGuard {
++            lock: self,
++            _not_send: PhantomData,
++        }
++    }
++}
++impl Drop for NvSpinLock {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_spin_delete(self.0.as_ptr()) }
++    }
++}
++/// RAII spinlock lease; deliberately non-Send to preserve CPU-local IRQ state.
++pub struct NvSpinLockGuard<'a> {
++    lock: &'a NvSpinLock,
++    _not_send: PhantomData<*mut ()>,
++}
++impl Drop for NvSpinLockGuard<'_> {
++    fn drop(&mut self) {
++        unsafe { nvport_sync_spin_release(self.lock.0.as_ptr()) }
++    }
++}
++
++#[cfg(ktest)]
++mod tests {
++    use alloc::sync::Arc;
++
++    use ostd::task::TaskOptions;
++
++    use super::*;
++
++    #[ostd::prelude::ktest]
++    fn upstream_mutex_contention_across_ostd_tasks() {
++        let lock = Arc::new(NvMutex::new().unwrap());
++        let value = Arc::new(AtomicU32::new(0));
++        let completed = Arc::new(AtomicU32::new(0));
++        let done = Arc::new(WaitQueue::new());
++
++        for _ in 0..4 {
++            let (lock, value, completed, done) =
++                (lock.clone(), value.clone(), completed.clone(), done.clone());
++            TaskOptions::new(move || {
++                for _ in 0..1000 {
++                    let _guard = lock.lock();
++                    value.fetch_add(1, Ordering::Relaxed);
++                }
++                completed.fetch_add(1, Ordering::Release);
++                done.wake_all();
++            })
++            .spawn()
++            .unwrap();
++        }
++
++        done.wait_until(|| (completed.load(Ordering::Acquire) == 4).then_some(()));
++        assert_eq!(value.load(Ordering::Relaxed), 4000);
++    }
++
++    #[ostd::prelude::ktest]
++    fn upstream_semaphore_rwlock_and_irq_spinlock() {
++        let sem = NvSemaphore::new(2).unwrap();
++        assert!(sem.try_acquire());
++        assert!(sem.try_acquire());
++        assert!(!sem.try_acquire());
++        sem.release().unwrap();
++        assert!(sem.try_acquire());
++        assert!(!sem.try_acquire());
++
++        let rw = NvRwLock::new().unwrap();
++        let read_a = rw.read();
++        let read_b = rw.try_read().unwrap();
++        assert!(rw.try_write().is_none());
++        drop((read_a, read_b));
++        let write = rw.write();
++        assert!(rw.try_read().is_none());
++        drop(write);
++        assert!(rw.try_read().is_some());
++
++        let spin = NvSpinLock::new().unwrap();
++        drop(spin.lock());
++    }
++
++    #[ostd::prelude::ktest]
++    fn sleep_predicate_tracks_atomic_mode_and_nested_spin_irqs() {
++        assert!(ostd::task::atomic_mode::can_sleep());
++        {
++            let preempt = ostd::task::disable_preempt();
++            assert!(!ostd::task::atomic_mode::can_sleep());
++            drop(preempt);
++        }
++        assert!(ostd::task::atomic_mode::can_sleep());
++
++        let spin = NvSpinLock::new().unwrap();
++        {
++            let outer_irq = irq::disable_local();
++            assert!(!ostd::task::atomic_mode::can_sleep());
++            drop(spin.lock());
++            // Releasing the spinlock must preserve the caller's prior IRQ-off
++            // state; the outer nested guard alone restores enabled IRQs.
++            assert!(!ostd::task::atomic_mode::can_sleep());
++            drop(outer_irq);
++        }
++        assert!(ostd::task::atomic_mode::can_sleep());
++    }
++
++    #[ostd::prelude::ktest]
++    fn semaphore_overflow_is_reported_without_wrapping() {
++        let sem = NvSemaphore::new(u32::MAX).unwrap();
++        assert_eq!(sem.release(), Err(SemaphoreReleaseError));
++        assert!(sem.try_acquire());
++        sem.release().unwrap();
++        assert_eq!(sem.release(), Err(SemaphoreReleaseError));
++    }
++
++    #[ostd::prelude::ktest]
++    fn upstream_semaphore_and_rwlock_wake_contenders() {
++        let sem = Arc::new(NvSemaphore::new(0).unwrap());
++        let sem_started = Arc::new(AtomicU32::new(0));
++        let sem_done = Arc::new(AtomicU32::new(0));
++        let sem_wait = Arc::new(WaitQueue::new());
++        {
++            let (sem, started, done, wait) = (
++                sem.clone(),
++                sem_started.clone(),
++                sem_done.clone(),
++                sem_wait.clone(),
++            );
++            TaskOptions::new(move || {
++                started.store(1, Ordering::Release);
++                wait.wake_all();
++                sem.acquire();
++                done.store(1, Ordering::Release);
++                wait.wake_all();
++            })
++            .spawn()
++            .unwrap();
++        }
++        sem_wait.wait_until(|| (sem_started.load(Ordering::Acquire) != 0).then_some(()));
++        sem.release().unwrap();
++        sem_wait.wait_until(|| (sem_done.load(Ordering::Acquire) != 0).then_some(()));
++
++        let rw = Arc::new(NvRwLock::new().unwrap());
++        let held_writer = rw.write();
++        let rw_started = Arc::new(AtomicU32::new(0));
++        let rw_done = Arc::new(AtomicU32::new(0));
++        let rw_wait = Arc::new(WaitQueue::new());
++        {
++            let (rw, started, done, wait) = (
++                rw.clone(),
++                rw_started.clone(),
++                rw_done.clone(),
++                rw_wait.clone(),
++            );
++            TaskOptions::new(move || {
++                started.store(1, Ordering::Release);
++                wait.wake_all();
++                drop(rw.read());
++                done.store(1, Ordering::Release);
++                wait.wake_all();
++            })
++            .spawn()
++            .unwrap();
++        }
++        rw_wait.wait_until(|| (rw_started.load(Ordering::Acquire) != 0).then_some(()));
++        drop(held_writer);
++        rw_wait.wait_until(|| (rw_done.load(Ordering::Acquire) != 0).then_some(()));
++    }
++}
+diff --git a/ostd/libs/nvidia-nvport/sync_bridge.c b/ostd/libs/nvidia-nvport/sync_bridge.c
+new file mode 100644
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/sync_bridge.c
+@@ -0,0 +1,130 @@
++/* SPDX-License-Identifier: MPL-2.0 */
++/*
++ * Thin ABI bridge for the unmodified NVIDIA sync_unix_kernel_os.c object.
++ * The bridge allocates only the upstream's opaque struct containers via the
++ * Rust os_alloc_mem callback; all lock state remains in the OSTD callbacks.
++ */
++#include <stddef.h>
++
++#define PORT_SYNC_IMPL
++#include "nvport/nvport.h"
++#include "os-interface.h"
++#include "inc/sync_unix_kernel_os_def.h"
++
++static PORT_MUTEX *mutex_new(void)
++{
++    PORT_MUTEX *object = NULL;
++    if (os_alloc_mem((void **)&object, sizeof(*object)) != NV_OK)
++        return NULL;
++    if (portSyncMutexInitialize(object) != NV_OK) {
++        os_free_mem(object);
++        return NULL;
++    }
++    return object;
++}
++
++void *nvport_sync_mutex_new(void) { return mutex_new(); }
++void nvport_sync_mutex_delete(void *object)
++{
++    if (object == NULL) return;
++    portSyncMutexDestroy((PORT_MUTEX *)object);
++    os_free_mem(object);
++}
++void nvport_sync_mutex_acquire(void *object) { portSyncMutexAcquire((PORT_MUTEX *)object); }
++int nvport_sync_mutex_try_acquire(void *object)
++{
++    return portSyncMutexAcquireConditional((PORT_MUTEX *)object) ? 1 : 0;
++}
++void nvport_sync_mutex_release(void *object) { portSyncMutexRelease((PORT_MUTEX *)object); }
++
++void *nvport_sync_semaphore_new(NvU32 count)
++{
++    PORT_SEMAPHORE *object = NULL;
++    if (os_alloc_mem((void **)&object, sizeof(*object)) != NV_OK)
++        return NULL;
++    if (portSyncSemaphoreInitialize(object, count) != NV_OK) {
++        os_free_mem(object);
++        return NULL;
++    }
++    return object;
++}
++void nvport_sync_semaphore_delete(void *object)
++{
++    if (object == NULL) return;
++    portSyncSemaphoreDestroy((PORT_SEMAPHORE *)object);
++    os_free_mem(object);
++}
++void nvport_sync_semaphore_acquire(void *object) { portSyncSemaphoreAcquire((PORT_SEMAPHORE *)object); }
++int nvport_sync_semaphore_try_acquire(void *object)
++{
++    return portSyncSemaphoreAcquireConditional((PORT_SEMAPHORE *)object) ? 1 : 0;
++}
++void nvport_sync_semaphore_release(void *object)
++{
++    if (object == NULL) return;
++    /* The upstream public release routine is void and asserts callback success. */
++    portSyncSemaphoreRelease((PORT_SEMAPHORE *)object);
++}
++
++/*
++ * Safe Rust owners need the callback status because the upstream public
++ * portSyncSemaphoreRelease ABI is void and discards it outside assertions.
++ * Keep that native ABI unchanged; this helper directly reports the OS callback
++ * result for Rust's checked API.
++ */
++NvU32 nvport_sync_semaphore_release_checked(void *object)
++{
++    if (object == NULL)
++        return NV_ERR_INVALID_POINTER;
++    return os_release_semaphore(((PORT_SEMAPHORE *)object)->sem);
++}
++
++void *nvport_sync_rwlock_new(void)
++{
++    PORT_RWLOCK *object = NULL;
++    if (os_alloc_mem((void **)&object, sizeof(*object)) != NV_OK)
++        return NULL;
++    if (portSyncRwLockInitialize(object) != NV_OK) {
++        os_free_mem(object);
++        return NULL;
++    }
++    return object;
++}
++void nvport_sync_rwlock_delete(void *object)
++{
++    if (object == NULL) return;
++    portSyncRwLockDestroy((PORT_RWLOCK *)object);
++    os_free_mem(object);
++}
++void nvport_sync_rwlock_read(void *object) { portSyncRwLockAcquireRead((PORT_RWLOCK *)object); }
++int nvport_sync_rwlock_try_read(void *object)
++{
++    return portSyncRwLockAcquireReadConditional((PORT_RWLOCK *)object) ? 1 : 0;
++}
++void nvport_sync_rwlock_write(void *object) { portSyncRwLockAcquireWrite((PORT_RWLOCK *)object); }
++int nvport_sync_rwlock_try_write(void *object)
++{
++    return portSyncRwLockAcquireWriteConditional((PORT_RWLOCK *)object) ? 1 : 0;
++}
++void nvport_sync_rwlock_release_read(void *object) { portSyncRwLockReleaseRead((PORT_RWLOCK *)object); }
++void nvport_sync_rwlock_release_write(void *object) { portSyncRwLockReleaseWrite((PORT_RWLOCK *)object); }
++
++void *nvport_sync_spin_new(void)
++{
++    PORT_SPINLOCK *object = NULL;
++    if (os_alloc_mem((void **)&object, sizeof(*object)) != NV_OK)
++        return NULL;
++    if (portSyncSpinlockInitialize(object) != NV_OK) {
++        os_free_mem(object);
++        return NULL;
++    }
++    return object;
++}
++void nvport_sync_spin_delete(void *object)
++{
++    if (object == NULL) return;
++    portSyncSpinlockDestroy((PORT_SPINLOCK *)object);
++    os_free_mem(object);
++}
++void nvport_sync_spin_acquire(void *object) { portSyncSpinlockAcquire((PORT_SPINLOCK *)object); }
++void nvport_sync_spin_release(void *object) { portSyncSpinlockRelease((PORT_SPINLOCK *)object); }
+diff --git a/ostd/src/task/atomic_mode.rs b/ostd/src/task/atomic_mode.rs
+--- a/ostd/src/task/atomic_mode.rs
++++ b/ostd/src/task/atomic_mode.rs
+@@ -28,6 +28,21 @@
+ //! This module provides API to detect such "sleep-like" actions.
+ 
+ use core::sync::atomic::Ordering;
++
++/// Reports whether the current execution context can use task-blocking APIs.
++///
++/// Unlike [`might_sleep`], this query does not panic and never grants the
++/// bootstrap-context exception: a current task, enabled local interrupts and
++/// enabled preemption are all required. The result describes only the current
++/// context at the instant of the query, not a transferable permission token.
++pub fn can_sleep() -> bool {
++    let preempt_count = super::preempt::cpu_local::get_guard_count();
++    let interrupts_enabled = crate::arch::irq::is_local_enabled();
++    preempt_count == 0
++        && interrupts_enabled
++        && crate::irq::InterruptLevel::current().is_task_context()
++        && super::Task::current().is_some()
++}
+ 
+ /// Marks a function as one that might sleep.
+ ///
+@@ -84,3 +99,34 @@
+         self
+     }
+ }
++
++#[cfg(ktest)]
++mod tests {
++    use super::can_sleep;
++
++    #[crate::prelude::ktest]
++    fn sleep_query_tracks_preemption_guards() {
++        assert!(can_sleep());
++        let outer = crate::task::disable_preempt();
++        assert!(!can_sleep());
++        let inner = crate::task::disable_preempt();
++        assert!(!can_sleep());
++        drop(inner);
++        assert!(!can_sleep());
++        drop(outer);
++        assert!(can_sleep());
++    }
++
++    #[crate::prelude::ktest]
++    fn sleep_query_tracks_nested_irq_guards() {
++        assert!(can_sleep());
++        let outer = crate::irq::disable_local();
++        assert!(!can_sleep());
++        let inner = crate::irq::disable_local();
++        assert!(!can_sleep());
++        drop(inner);
++        assert!(!can_sleep());
++        drop(outer);
++        assert!(can_sleep());
++    }
++}
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -26,7 +26,11 @@
+         trap 'rm -f OSDK.toml' EXIT
+         # No guest input is needed. Detach stdin so QEMU never attempts to
+         # read the controlling terminal from this pipeline/background group.
+-        timeout --signal=TERM --kill-after=5 600s cargo osdk test --strip-elf </dev/null
++        features=()
++        if [[ "$name" == nvidia-platform ]]; then
++            features=(--features nvport-runtime)
++        fi
++        timeout --signal=TERM --kill-after=5 600s cargo osdk test --strip-elf "${features[@]}" </dev/null
+     ) 2>&1 | tee "$log"
+     # An OSDK filter can exit successfully after executing zero tests. Do not
+     # mistake that for a pass, or accept logs without the final runner marker.
+diff --git a/tools/graphics/run_native_nvidia.py b/tools/graphics/run_native_nvidia.py
+--- a/tools/graphics/run_native_nvidia.py
++++ b/tools/graphics/run_native_nvidia.py
+@@ -165,7 +165,7 @@
+             raise ValueError("Unexpected OSDK boot image")
+         saved_image = output / "asterinas-native.iso"
+         shutil.copyfile(image, saved_image)
+-        provenance = {"commit": commit, "nonce": nonce, "kernel_image_sha256": sha256(saved_image), "initramfs_sha256": sha256(archive), "benchmark_sha256": sha256(binary), "shader_sha256": sha256(shader), "vfio_devices": devices, "nvidia_source": "ca2d03e6fafd4d4b56b383497d931c25b283bfcf", "test_scope": "Asterinas-native NVIDIA Vulkan compute; not GPUI/Wayland acceptance"}
++        provenance = {"commit": commit, "nonce": nonce, "kernel_image_sha256": sha256(saved_image), "initramfs_sha256": sha256(archive), "benchmark_sha256": sha256(binary), "shader_sha256": sha256(shader), "vfio_devices": devices, "nvidia_source": "1a82fbfda8f321b056eb3568850f9316c5e465c5", "test_scope": "Asterinas-native NVIDIA Vulkan compute; not GPUI/Wayland acceptance"}
+         (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+         serial = output / "guest-serial.log"
+         qemu = ["qemu-system-x86_64", "-machine", "q35,accel=kvm,kernel-irqchip=split", "-cpu", "host", "-m", "4096", "-smp", "4", "-display", "none", "-monitor", "none", "-serial", "stdio", "-no-reboot", "-nic", "none", "-cdrom", str(saved_image)]
+diff --git a/tools/graphics/run_nvport_format_tests.sh b/tools/graphics/run_nvport_format_tests.sh
+new file mode 100644
+--- /dev/null
++++ b/tools/graphics/run_nvport_format_tests.sh
+@@ -0,0 +1,33 @@
++#!/usr/bin/env bash
++# Tests real freestanding NVIDIA diagnostic formatting against libc on the host.
++# This is a CPU-only ABI/formatting test, never GPU evidence.
++set -euo pipefail
++ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
++SOURCE=${NVIDIA_SOURCE_DIR:?Set NVIDIA_SOURCE_DIR to the clean official 615.78.08 checkout}
++EXPECTED=1a82fbfda8f321b056eb3568850f9316c5e465c5
++[[ $(git -C "$SOURCE" rev-parse HEAD) == "$EXPECTED" ]] || { echo 'Wrong NVIDIA source revision' >&2; exit 1; }
++[[ -z $(git -C "$SOURCE" status --porcelain --untracked-files=no) ]] || { echo 'NVIDIA tracked sources are modified' >&2; exit 1; }
++BUILD=$(mktemp -d)
++trap 'rm -rf "$BUILD"' EXIT
++includes=()
++for directory in \
++    src/nvidia/arch/nvalloc/unix/include src/nvidia/arch/nvalloc/common/inc \
++    src/nvidia/inc src/nvidia/inc/os src/nvidia/inc/kernel \
++    src/nvidia/inc/libraries src/nvidia/src/libraries \
++    src/nvidia/src/libraries/nvport/sync src/common/sdk/nvidia/inc \
++    src/common/inc kernel-open/common/inc; do
++    includes+=(-I "$SOURCE/$directory")
++done
++"${CC:-cc}" -std=gnu11 -Wall -Wextra -Werror -O2 \
++    -D_LANGUAGE_C -D__NO_CTYPE -DNVRM \
++    -include "$SOURCE/src/common/sdk/nvidia/inc/cpuopsys.h" "${includes[@]}" \
++    -c "$ROOT/ostd/libs/nvidia-nvport/diagnostics_format.c" -o "$BUILD/formatter.o"
++# The harness intentionally asks libc about truncated output and GNU percent
++# padding/ignored-flag behavior. These warnings are disabled only for fixtures.
++"${CC:-cc}" -std=gnu11 -Wall -Wextra -Werror -Wno-format -Wno-format-truncation -O2 \
++    -D_LANGUAGE_C -D__NO_CTYPE -DNVRM \
++    -include "$SOURCE/src/common/sdk/nvidia/inc/cpuopsys.h" "${includes[@]}" \
++    "$BUILD/formatter.o" \
++    "$ROOT/ostd/libs/nvidia-nvport/diagnostics_format_test.c" \
++    -o "$BUILD/nvport-format-tests"
++"$BUILD/nvport-format-tests"

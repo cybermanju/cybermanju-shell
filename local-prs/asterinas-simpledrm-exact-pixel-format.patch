@@ -1,0 +1,79 @@
+diff --git a/kernel/comps/simpledrm/src/lib.rs b/kernel/comps/simpledrm/src/lib.rs
+index 7746be6..cafc818 100644
+--- a/kernel/comps/simpledrm/src/lib.rs
++++ b/kernel/comps/simpledrm/src/lib.rs
+@@ -84,22 +84,7 @@ struct SimpleDrmDevice {
+ impl SimpleDrmDevice {
+     fn new(boot_framebuffer: &Arc<FrameBuffer>) -> Result<Self> {
+         let mut builder = DrmKmsObjectStoreBuilder::default();
+-        let pixel_format = match boot_framebuffer.pixel_format() {
+-            PixelFormat::BgrReserved => DrmPixelFormat::XRGB8888,
+-            format => {
+-                // TODO: Derive the exact DRM format once framebuffer initialization
+-                // preserves the complete boot framebuffer layout.
+-                // See `aster_framebuffer::framebuffer::init` for boot framebuffer initialization.
+-                //
+-                // Until then, advertise XRGB8888 so simpledrm remains available for
+-                // KMS query tests. This may not match the actual framebuffer layout.
+-                ostd::warn!(
+-                    "Boot framebuffer format {:?} has no DRM mapping; assuming XRGB8888",
+-                    format
+-                );
+-                DrmPixelFormat::XRGB8888
+-            }
+-        };
++        let pixel_format = drm_pixel_format_for(boot_framebuffer.pixel_format())?;
+         let primary = builder.add_plane(DrmPlaneType::Primary, vec![pixel_format])?;
+         let crtc = builder.add_crtc(0, primary, None)?;
+         let encoder = builder.add_encoder(DrmEncoderType::Virtual)?;
+@@ -195,6 +180,21 @@ impl SimpleDrmDevice {
+     }
+ }
+ 
++fn drm_pixel_format_for(framebuffer_format: PixelFormat) -> Result<DrmPixelFormat> {
++    match framebuffer_format {
++        // DRM FourCCs describe component significance, while the boot framebuffer API
++        // describes byte order. On little-endian systems these layouts are equivalent.
++        PixelFormat::BgrReserved => Ok(DrmPixelFormat::XRGB8888),
++        PixelFormat::Rgb888 => Ok(DrmPixelFormat::BGR888),
++        PixelFormat::Grayscale8 | PixelFormat::Rgb565 => {
++            return_errno_with_message!(
++                Errno::EOPNOTSUPP,
++                "the boot framebuffer pixel format has no exact supported DRM layout"
++            );
++        }
++    }
++}
++
+ impl DrmDevice for SimpleDrmDevice {
+     fn name(&self) -> &str {
+         SIMPLEDRM_NAME
+@@ -276,3 +276,28 @@ impl DrmKmsOps for SimpleDrmDevice {
+         Ok(())
+     }
+ }
++
++#[cfg(ktest)]
++mod tests {
++    use ostd::prelude::*;
++
++    use super::*;
++
++    #[ktest]
++    fn maps_boot_framebuffer_byte_order_to_drm_fourcc() {
++        assert_eq!(
++            drm_pixel_format_for(PixelFormat::BgrReserved).unwrap(),
++            DrmPixelFormat::XRGB8888
++        );
++        assert_eq!(
++            drm_pixel_format_for(PixelFormat::Rgb888).unwrap(),
++            DrmPixelFormat::BGR888
++        );
++    }
++
++    #[ktest]
++    fn rejects_boot_framebuffer_layouts_without_an_exact_supported_fourcc() {
++        assert!(drm_pixel_format_for(PixelFormat::Grayscale8).is_err());
++        assert!(drm_pixel_format_for(PixelFormat::Rgb565).is_err());
++    }
++}

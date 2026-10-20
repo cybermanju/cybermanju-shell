@@ -1,0 +1,19 @@
+target/
+
+# Nix
+result*
+result-*
+
+# Profiling
+perf.data
+perf.data.old
+flamegraph.svg
+
+# Misc
+.direnv
+
+
+
+.bkp
+.agents
+.claude

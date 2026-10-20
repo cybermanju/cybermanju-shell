@@ -1,0 +1,1889 @@
+diff --git a/.github/actionlint.yaml b/.github/actionlint.yaml
+index 3f6b00d..c1b29d9 100644
+--- a/.github/actionlint.yaml
++++ b/.github/actionlint.yaml
+@@ -1,3 +1,4 @@
+ self-hosted-runner:
+   labels:
+     - nvidia-gpu
++    - nvidia-vfio
+diff --git a/.github/workflows/graphics_gpu.yml b/.github/workflows/graphics_gpu.yml
+index c836f85..900e503 100644
+--- a/.github/workflows/graphics_gpu.yml
++++ b/.github/workflows/graphics_gpu.yml
+@@ -4,6 +4,12 @@ on:
+   pull_request:
+   push:
+   workflow_dispatch:
++    inputs:
++      run_native_gpu:
++        description: Boot current Asterinas with preauthorized NVIDIA VFIO devices
++        required: false
++        default: false
++        type: boolean
+ 
+ permissions:
+   contents: read
+@@ -40,6 +46,81 @@ jobs:
+           cc -std=c11 -Wall -Wextra -Werror -O2 tools/graphics/vulkan_compute_bench.c -lvulkan -o tools/graphics/vulkan_compute_bench
+           glslangValidator -V --target-env vulkan1.2 tools/graphics/vector.comp -o tools/graphics/vector.spv
+ 
++  nvidia-nvport-link:
++    name: Real NVIDIA NVport host tests and Asterinas kernel link
++    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
++    runs-on: ubuntu-latest
++    timeout-minutes: 45
++    container:
++      image: asterinas/kernel-dev:0.19.0-20261012
++    env:
++      NVIDIA_SOURCE_DIR: /tmp/nvidia-open-gpu-kernel-modules
++    steps:
++      - name: Check out source
++        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
++        with:
++          persist-credentials: false
++      - name: Fetch public NVIDIA sources at the exact reviewed revision
++        shell: bash
++        run: |
++          set -euo pipefail
++          git init "$NVIDIA_SOURCE_DIR"
++          git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
++            https://github.com/NVIDIA/open-gpu-kernel-modules.git ca2d03e6fafd4d4b56b383497d931c25b283bfcf
++          git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
++      - name: Execute real C/Rust NVport memory tests on host
++        run: cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu
++      - name: Link real NVport object and OSTD services into the Asterinas kernel
++        run: cargo osdk build --features nvidia-nvport-selftest --boot-method vmm-direct --grub-boot-protocol linux --linux-x86-legacy-boot --strip-elf
++
++  asterinas-native-nvidia:
++    name: Manual Asterinas-native NVIDIA compute (not Linux-host compute)
++    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.run_native_gpu }}
++    runs-on: [self-hosted, linux, x64, nvidia-vfio]
++    timeout-minutes: 45
++    environment:
++      name: asterinas-native-gpu
++    concurrency:
++      group: asterinas-native-nvidia-vfio
++      cancel-in-progress: false
++    env:
++      ASTER_GPU_ROOTFS: ${{ vars.ASTER_GPU_ROOTFS }}
++      ASTER_GPU_VFIO_DEVICES: ${{ vars.ASTER_GPU_VFIO_DEVICES }}
++      NVIDIA_SOURCE_DIR: /tmp/nvidia-native-${{ github.run_id }}-${{ github.run_attempt }}
++      NATIVE_GPU_OUTPUT: /tmp/asterinas-native-${{ github.run_id }}-${{ github.run_attempt }}
++    steps:
++      - name: Check out exact approved main dispatch commit
++        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
++        with:
++          ref: ${{ github.sha }}
++          persist-credentials: false
++      - name: Fetch exact public NVIDIA source revision
++        shell: bash
++        run: |
++          set -euo pipefail
++          git init "$NVIDIA_SOURCE_DIR"
++          git -c credential.helper= -C "$NVIDIA_SOURCE_DIR" fetch --depth=1 \
++            https://github.com/NVIDIA/open-gpu-kernel-modules.git ca2d03e6fafd4d4b56b383497d931c25b283bfcf
++          git -C "$NVIDIA_SOURCE_DIR" checkout --detach FETCH_HEAD
++      - name: Build current kernel and run compute only inside its VFIO guest
++        shell: bash
++        run: |
++          set -euo pipefail
++          mkdir -p "$NATIVE_GPU_OUTPUT"
++          python3 tools/graphics/run_native_nvidia.py \
++            --rootfs "$ASTER_GPU_ROOTFS" --vfio-devices "$ASTER_GPU_VFIO_DEVICES" \
++            --output "$NATIVE_GPU_OUTPUT" 2>&1 | tee "$NATIVE_GPU_OUTPUT/runner.log"
++      - name: Retain native evidence even on failure, without redistributing guest libraries
++        if: ${{ always() }}
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
++        with:
++          name: asterinas-native-nvidia-${{ github.run_id }}-${{ github.run_attempt }}
++          path: |
++            ${{ env.NATIVE_GPU_OUTPUT }}/*.log
++            ${{ env.NATIVE_GPU_OUTPUT }}/*.json
++          if-no-files-found: warn
++          retention-days: 14
++
+   nvidia-vulkan-benchmark:
+     name: Manual NVIDIA Vulkan compute benchmark
+     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+diff --git a/Cargo.lock b/Cargo.lock
+index 77d8f4b..07d1910 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -490,6 +490,7 @@ dependencies = [
+  "aster-simpledrm",
+  "aster-uart",
+  "ostd",
++ "ostd-nvidia-nvport",
+ ]
+ 
+ [[package]]
+@@ -1444,6 +1445,13 @@ dependencies = [
+  "syn 2.0.118",
+ ]
+ 
++[[package]]
++name = "ostd-nvidia-nvport"
++version = "0.1.0"
++dependencies = [
++ "ostd",
++]
++
+ [[package]]
+ name = "ostd-pod"
+ version = "0.4.0"
+diff --git a/Cargo.toml b/Cargo.toml
+index 034636c..a705fc9 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -26,6 +26,7 @@ members = [
+     "ostd/libs/ostd-pod/macros",
+     "ostd/libs/ostd-test",
+     "ostd/libs/padding-struct",
++    "ostd/libs/nvidia-nvport",
+     "kernel",
+     "kernel/comps/drm",
+     "kernel/comps/i8042",
+@@ -153,6 +154,8 @@ edition = "2024"
+ [workspace.dependencies]
+ ostd = { path = "ostd", version = "0.19.0" }
+ 
++ostd-nvidia-nvport = { path = "ostd/libs/nvidia-nvport" }
++
+ # Crates under ostd/libs
+ align_ext = { path = "ostd/libs/align_ext", version = "0.1.0" }
+ id-alloc = { path = "ostd/libs/id-alloc", version = "0.1.0" }
+diff --git a/kernel/Cargo.toml b/kernel/Cargo.toml
+index 0b09fed..0b622ba 100644
+--- a/kernel/Cargo.toml
++++ b/kernel/Cargo.toml
+@@ -6,6 +6,7 @@ edition.workspace = true
+ [dependencies]
+ aster-core.workspace = true
+ ostd.workspace = true
++ostd-nvidia-nvport = { workspace = true, optional = true }
+ 
+ # High-level component crates.
+ #
+@@ -19,6 +20,8 @@ aster-i8042.workspace = true
+ 
+ [features]
+ default = ["cvm_guest"]
++nvidia-nvport-selftest = ["dep:ostd-nvidia-nvport"]
++native-gpu-ci = ["nvidia-nvport-selftest"]
+ coverage = ["aster-core/coverage"]
+ cvm_guest = ["aster-core/cvm_guest"]
+ pvh_boot = ["aster-core/pvh_boot"]
+diff --git a/kernel/src/lib.rs b/kernel/src/lib.rs
+index 734d049..13343ef 100644
+--- a/kernel/src/lib.rs
++++ b/kernel/src/lib.rs
+@@ -20,5 +20,16 @@ extern crate aster_uart as _;
+ 
+ #[ostd::main]
+ fn main() {
++    #[cfg(feature = "native-gpu-ci")]
++    ostd::early_println!(
++        "ASTERINAS_NATIVE_GPU_BOOT commit={} nonce={}",
++        env!("ASTER_NATIVE_GPU_CI_COMMIT"),
++        env!("ASTER_NATIVE_GPU_CI_NONCE"),
++    );
++    #[cfg(feature = "nvidia-nvport-selftest")]
++    {
++        ostd_nvidia_nvport::self_test().expect("NVIDIA NVport CPU memory integration failed");
++        ostd::early_println!("NVIDIA NVport CPU memory self-test passed (not a GPU test)");
++    }
+     aster_core::boot();
+ }
+diff --git a/ostd/libs/nvidia-nvport/Cargo.toml b/ostd/libs/nvidia-nvport/Cargo.toml
+new file mode 100644
+index 0000000..1951e31
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/Cargo.toml
+@@ -0,0 +1,12 @@
++[package]
++name = "ostd-nvidia-nvport"
++version = "0.1.0"
++edition.workspace = true
++license.workspace = true
++build = "build.rs"
++
++[target.'cfg(target_os = "none")'.dependencies]
++ostd.workspace = true
++
++[lints]
++workspace = true
+diff --git a/ostd/libs/nvidia-nvport/README.md b/ostd/libs/nvidia-nvport/README.md
+new file mode 100644
+index 0000000..c5cfef2
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/README.md
+@@ -0,0 +1,40 @@
++# Experimental NVIDIA NVport memory integration
++
++This opt-in crate compiles the **unmodified NVIDIA 615.78.08** translation unit `src/nvidia/src/libraries/nvport/memory/memory_unix_kernel_os.c` and links it to real Rust/OSTD OS services. The exact upstream revision is `ca2d03e6fafd4d4b56b383497d931c25b283bfcf`. It is an implemented source-level component port, **not an NVIDIA GPU driver**.
++
++The build requires an administrator-controlled NVIDIA checkout at `NVIDIA_SOURCE_DIR`, rejects a different revision or modified tracked files, verifies the release identifier, and compiles an ABI probe against NVIDIA's actual `os-interface.h`. The C compiler and checkout must be trusted; this is not a hermetic build or a security boundary against a malicious build host. Source is not downloaded automatically by Cargo. The CI fetch step uses the public repository without credentials and pins the same commit.
++
++## Implemented services
++
++`os_alloc_mem`/`os_free_mem` use the real global allocator: OSTD in an Asterinas kernel, the system allocator in host unit tests. Checked allocation layouts retain an exact, private, 16-byte-aligned allocation header. Invalid sizes fail and the output pointer is cleared. Interrupt-context allocations are rejected rather than pretending that a sleeping allocator is safe there. These allocations are ordinary CPU heap storage, not pinned or DMA-capable GPU memory. Paged/nonpaged NVport entrypoints both use resident kernel heap storage; demand-paged allocation and atomic-context pools are not advertised.
++
++`os_mem_copy`, `os_mem_set`, `os_mem_cmp` and `os_page_size` supply their real NVIDIA ABI contracts. Kernel-side `os_memcpy_from_user`/`os_memcpy_to_user` validate user ranges and task context, use OSTD's fault-aware `VmReader`/`VmWriter`, require a complete copy, and return an error otherwise. They require the current task's active address space and an initialized user-page-fault handler. Linux-host tests explicitly return `NV_ERR_NOT_SUPPORTED` for nonempty usercopy rather than using an unchecked memcpy or claiming native validation.
++
++The safe `Buffer` API owns initialized storage and exposes bounded copy, fill, compare, pattern fill and overlapping move through the original NVIDIA functions. Lengths are capped at `u32::MAX` because NVIDIA's Unix implementations narrow these operations to the u32 `os_mem_*` ABI. Raw ABI symbols and allocation pointers are private to the crate.
++
++## Build and tests
++
++Use the repository-pinned Rust toolchain and the usual Asterinas build prerequisites, including the matching vDSO. For example:
++
++```sh
++export NVIDIA_SOURCE_DIR=/absolute/path/to/open-gpu-kernel-modules
++cargo test -p ostd-nvidia-nvport --target x86_64-unknown-linux-gnu
++cargo osdk check --ktests -p ostd-nvidia-nvport
++cargo osdk build --features nvidia-nvport-selftest \
++  --boot-method vmm-direct --grub-boot-protocol linux \
++  --linux-x86-legacy-boot --strip-elf
++```
++
++The eight Rust/C host tests execute real C code. The same tests are registered with `#[ktest]` for native OSDK execution; a successful `check --ktests` compiles but does not execute them. Enabling the kernel's `nvidia-nvport-selftest` feature runs a CPU-memory self-test before `aster_core::boot()` and only prints success after the data checks succeed. Enable `earlycon` when booting to retain early serial output. **That success marker is not GPU evidence.**
++
++The native C build uses the x86-64 kernel code model, no red zone, no PIC/PIE, no SSE/MMX and no hosted C runtime. Linux-host testing uses PIC instead. Other targets are deliberately rejected.
++
++## Security and remaining GPU work
++
++The C object, the C ABI bridge and their unsafe ownership contracts extend OSTD's trusted computing base. The kernel assembler remains `deny(unsafe_code)`, but wrapping C in a safe Rust API does not make the C memory-safe. This feature is opt-in; it is not an automatically initialized PCI driver.
++
++No RM or modeset object is linked by this crate. It does not register a PCI device, map a GPU BAR, establish DMA/IOMMU mappings, pin user pages, request an interrupt, boot GSP firmware, implement NVIDIA device ioctls or mmap, submit a GPU command, manage GPU memory/fences/reset/teardown, or supply accelerated DRM interoperability. These must be implemented and reviewed before matching NVIDIA userspace can function. They are not supplied by creating device files or returning success from callbacks.
++
++The local full kernel link succeeded and retained the NVIDIA memory symbols without undefined symbols in that kernel. This says nothing about the unresolved symbols in the separately compiled full RM/modeset objects. The available TCG Multiboot2 boot hit a kernel page fault during early OSTD initialization before this self-test was reached. No native runtime pass or GPU benchmark is claimed.
++
++For the hardware-only acceptance path, see [`tools/graphics/NATIVE_NVIDIA.md`](../../../../tools/graphics/NATIVE_NVIDIA.md).
+diff --git a/ostd/libs/nvidia-nvport/abi_probe.c b/ostd/libs/nvidia-nvport/abi_probe.c
+new file mode 100644
+index 0000000..1ba902e
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/abi_probe.c
+@@ -0,0 +1,35 @@
++/* SPDX-License-Identifier: MIT */
++/* Compile-only ABI check for NVIDIA 615.78.08's Unix nvport memory backend. */
++#include <nvport/nvport.h>
++#include "os-interface.h"
++
++_Static_assert(sizeof(void *) == 8, "nvport target ABI must be x86_64");
++_Static_assert(sizeof(NvU8) == 1, "NvU8 ABI width mismatch");
++_Static_assert(sizeof(NvU32) == 4, "NvU32 ABI width mismatch");
++_Static_assert(sizeof(NvS32) == 4, "NvS32 ABI width mismatch");
++_Static_assert(sizeof(NvU64) == 8, "NvU64 ABI width mismatch");
++_Static_assert(sizeof(NvLength) == sizeof(NvU64), "NvLength ABI width mismatch");
++_Static_assert(sizeof(NV_STATUS) == sizeof(NvS32), "NV_STATUS ABI width mismatch");
++_Static_assert(sizeof(os_page_size) == sizeof(NvU64), "os_page_size ABI width mismatch");
++
++/* Assignments force the C compiler to check each imported symbol's exact
++ * prototype and calling convention; this translation unit is syntax-only and
++ * contributes neither stubs nor symbols to the archive. */
++void nvidia_nvport_memory_abi_probe(void)
++{
++    NV_STATUS (NV_API_CALL *alloc_mem)(void **, NvU64) = &os_alloc_mem;
++    void (NV_API_CALL *free_mem)(void *) = &os_free_mem;
++    void *(NV_API_CALL *mem_copy)(void *, const void *, NvU32) = &os_mem_copy;
++    void *(NV_API_CALL *mem_set)(void *, NvU8, NvU32) = &os_mem_set;
++    NvS32 (NV_API_CALL *mem_cmp)(const NvU8 *, const NvU8 *, NvU32) = &os_mem_cmp;
++    NV_STATUS (NV_API_CALL *copy_from_user)(void *, const void *, NvU32) = &os_memcpy_from_user;
++    NV_STATUS (NV_API_CALL *copy_to_user)(void *, const void *, NvU32) = &os_memcpy_to_user;
++
++    (void)alloc_mem;
++    (void)free_mem;
++    (void)mem_copy;
++    (void)mem_set;
++    (void)mem_cmp;
++    (void)copy_from_user;
++    (void)copy_to_user;
++}
+diff --git a/ostd/libs/nvidia-nvport/build.rs b/ostd/libs/nvidia-nvport/build.rs
+new file mode 100644
+index 0000000..36f2005
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/build.rs
+@@ -0,0 +1,287 @@
++// SPDX-License-Identifier: MPL-2.0
++
++use std::{
++    env, fs,
++    path::{Path, PathBuf},
++    process::{Command, Output},
++};
++
++const NVIDIA_COMMIT: &str = "ca2d03e6fafd4d4b56b383497d931c25b283bfcf";
++const NVIDIA_RELEASE: &str = "615.78.08";
++
++macro_rules! fail {
++    ($($arg:tt)*) => {{
++        panic!("nvidia-nvport build: {}", format_args!($($arg)*));
++    }};
++}
++
++fn output(command: &mut Command, what: &str) -> Output {
++    let rendered = format!("{command:?}");
++    let output = command
++        .output()
++        .unwrap_or_else(|err| fail!("could not run {what} ({rendered}): {err}"));
++    if !output.status.success() {
++        fail!(
++            "{what} failed ({rendered})\nstdout:\n{}\nstderr:\n{}",
++            String::from_utf8_lossy(&output.stdout),
++            String::from_utf8_lossy(&output.stderr)
++        );
++    }
++    output
++}
++
++fn text_output(command: &mut Command, what: &str) -> String {
++    String::from_utf8(output(command, what).stdout)
++        .unwrap_or_else(|err| fail!("{what} output is not UTF-8: {err}"))
++        .trim()
++        .to_owned()
++}
++
++fn tool(env_name: &str, default: &str) -> (String, Vec<String>) {
++    let spec = env::var(env_name).unwrap_or_else(|_| default.to_owned());
++    let mut words = spec.split_whitespace();
++    let program = words
++        .next()
++        .unwrap_or_else(|| fail!("{env_name} is empty"))
++        .to_owned();
++    (program, words.map(str::to_owned).collect())
++}
++
++fn run_tool(program: &(String, Vec<String>), args: &[String], what: &str) {
++    let mut command = Command::new(&program.0);
++    command.args(&program.1).args(args);
++    output(&mut command, what);
++}
++
++fn include_dirs(root: &Path) -> Vec<PathBuf> {
++    // These are the NVIDIA 615.78.08 src/nvidia/Makefile include roots used
++    // for the nvport memory translation unit, plus its checked-in common ABI
++    // header root. Keep os-interface.h's actual Unix declaration header first.
++    [
++        "src/nvidia/arch/nvalloc/unix/include",
++        "src/nvidia/arch/nvalloc/common/inc",
++        "src/nvidia/inc",
++        "src/nvidia/inc/os",
++        "src/nvidia/inc/kernel",
++        "src/nvidia/inc/libraries",
++        "src/nvidia/src/libraries",
++        "src/common/sdk/nvidia/inc",
++        "kernel-open/common/inc",
++    ]
++    .into_iter()
++    .map(|path| root.join(path))
++    .collect()
++}
++
++fn main() {
++    println!("cargo:rerun-if-env-changed=NVIDIA_SOURCE_DIR");
++    println!("cargo:rerun-if-env-changed=CC");
++    println!("cargo:rerun-if-env-changed=AR");
++    println!("cargo:rerun-if-env-changed=TARGET");
++
++    let source_root = env::var_os("NVIDIA_SOURCE_DIR")
++        .map(PathBuf::from)
++        .unwrap_or_else(|| {
++            fail!("NVIDIA_SOURCE_DIR is required; expected the NVIDIA 615.78.08 source checkout")
++        });
++    let root = fs::canonicalize(&source_root).unwrap_or_else(|err| {
++        fail!(
++            "cannot resolve NVIDIA_SOURCE_DIR {}: {err}",
++            source_root.display()
++        )
++    });
++
++    let commit = text_output(
++        Command::new("git")
++            .arg("-C")
++            .arg(&root)
++            .args(["rev-parse", "HEAD"]),
++        "reading NVIDIA source commit",
++    );
++    if commit != NVIDIA_COMMIT {
++        fail!("NVIDIA source commit is {commit}, expected exactly {NVIDIA_COMMIT}");
++    }
++    let tracked_changes = text_output(
++        Command::new("git").arg("-C").arg(&root).args([
++            "status",
++            "--porcelain",
++            "--untracked-files=no",
++        ]),
++        "checking NVIDIA tracked worktree",
++    );
++    if !tracked_changes.is_empty() {
++        fail!("NVIDIA tracked worktree is dirty:\n{tracked_changes}");
++    }
++    let readme_path = root.join("README.md");
++    let readme = fs::read_to_string(&readme_path)
++        .unwrap_or_else(|err| fail!("cannot read {}: {err}", readme_path.display()));
++    if !readme.contains(&format!("version {NVIDIA_RELEASE}.")) {
++        fail!("README.md does not identify NVIDIA release {NVIDIA_RELEASE}");
++    }
++
++    let target = env::var("TARGET").unwrap_or_else(|_| fail!("Cargo TARGET is required"));
++    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
++    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
++    let kernel_abi = target == "x86_64-unknown-none";
++    let host_test = arch == "x86_64" && target_os == "linux";
++    if !kernel_abi && !host_test {
++        fail!(
++            "unsupported target {target}; supported: x86_64-unknown-none kernel ABI or x86_64 Linux PIC host tests"
++        );
++    }
++    if kernel_abi && arch != "x86_64" {
++        fail!("x86_64-unknown-none requires CARGO_CFG_TARGET_ARCH=x86_64 (got {arch})");
++    }
++
++    let out_dir =
++        PathBuf::from(env::var_os("OUT_DIR").unwrap_or_else(|| fail!("Cargo OUT_DIR is required")));
++    fs::create_dir_all(&out_dir)
++        .unwrap_or_else(|err| fail!("cannot create OUT_DIR {}: {err}", out_dir.display()));
++
++    let source = root.join("src/nvidia/src/libraries/nvport/memory/memory_unix_kernel_os.c");
++    if !source.is_file() {
++        fail!("upstream source file is missing: {}", source.display());
++    }
++    let probe = PathBuf::from(
++        env::var_os("CARGO_MANIFEST_DIR")
++            .unwrap_or_else(|| fail!("CARGO_MANIFEST_DIR is required to find abi_probe.c")),
++    )
++    .join("abi_probe.c");
++    if !probe.is_file() {
++        fail!("ABI probe is missing: {}", probe.display());
++    }
++    let common_header = root.join("src/common/sdk/nvidia/inc/cpuopsys.h");
++    let includes = include_dirs(&root);
++    for path in includes.iter().chain([&common_header]) {
++        println!("cargo:rerun-if-changed={}", path.display());
++        if !path.exists() {
++            fail!(
++                "required NVIDIA include path is missing: {}",
++                path.display()
++            );
++        }
++    }
++
++    let mut flags = vec![
++        "-std=gnu11",
++        "-Werror",
++        "-Werror=implicit-function-declaration",
++        "-Werror=incompatible-pointer-types",
++        "-Wwrite-strings",
++        "-Wundef",
++        "-fno-common",
++        "-ffreestanding",
++        "-fno-stack-protector",
++        "-fno-builtin",
++        "-D_LANGUAGE_C",
++        "-D__NO_CTYPE",
++        "-DNVRM",
++        "-DLOCK_VAL_ENABLED=0",
++        "-DPORT_ATOMIC_64_BIT_SUPPORTED=1",
++        "-DPORT_IS_KERNEL_BUILD=1",
++        "-DPORT_IS_CHECKED_BUILD=0",
++        "-DPORT_MODULE_atomic=1",
++        "-DPORT_MODULE_core=1",
++        "-DPORT_MODULE_cpu=1",
++        "-DPORT_MODULE_crypto=1",
++        "-DPORT_MODULE_debug=1",
++        "-DPORT_MODULE_memory=1",
++        "-DPORT_MODULE_safe=1",
++        "-DPORT_MODULE_string=1",
++        "-DPORT_MODULE_sync=1",
++        "-DPORT_MODULE_thread=1",
++        "-DPORT_MODULE_time=1",
++        "-DPORT_MODULE_util=1",
++        "-DPORT_MODULE_example=0",
++        "-DPORT_MODULE_mmio=0",
++        "-DRS_STANDALONE=0",
++        "-DRS_STANDALONE_TEST=0",
++        "-DRS_COMPATABILITY_MODE=1",
++        "-DRS_PROVIDES_API_STATE=0",
++        "-DNV_CONTAINERS_NO_TEMPLATES",
++        "-DINCLUDE_NVLINK_LIB",
++        "-DINCLUDE_NVSWITCH_LIB",
++        "-DNV_PRINTF_STRINGS_ALLOWED=1",
++        "-DNV_ASSERT_FAILED_USES_STRINGS=1",
++        "-DPORT_ASSERT_FAILED_USES_STRINGS=1",
++    ]
++    .into_iter()
++    .map(str::to_owned)
++    .collect::<Vec<_>>();
++    if kernel_abi {
++        flags.extend(
++            [
++                "-fno-pic",
++                "-fno-pie",
++                "-mno-red-zone",
++                "-mcmodel=kernel",
++                "-mno-mmx",
++                "-mno-sse",
++                "-mno-sse2",
++                "-mno-3dnow",
++                "-msoft-float",
++            ]
++            .into_iter()
++            .map(str::to_owned),
++        );
++    } else {
++        flags.push("-fPIC".to_owned());
++    }
++
++    let mut common_args = flags.clone();
++    common_args.push("-include".to_owned());
++    common_args.push(common_header.display().to_string());
++    for include in &includes {
++        common_args.push(format!("-I{}", include.display()));
++    }
++
++    let (cc, cc_args) = tool("CC", "cc");
++    let compiler = (cc, cc_args);
++    let object = out_dir.join("memory_unix_kernel_os.o");
++    let mut compile_args = common_args.clone();
++    compile_args.extend([
++        "-c".to_owned(),
++        source.display().to_string(),
++        "-o".to_owned(),
++        object.display().to_string(),
++    ]);
++    run_tool(
++        &compiler,
++        &compile_args,
++        "compiling unmodified upstream memory_unix_kernel_os.c",
++    );
++
++    let mut probe_args = common_args;
++    probe_args.extend(["-fsyntax-only".to_owned(), probe.display().to_string()]);
++    run_tool(
++        &compiler,
++        &probe_args,
++        "checking NVIDIA C ABI declarations and signatures",
++    );
++
++    let archive = out_dir.join("libnvidia_nvport_memory.a");
++    let (ar, ar_args) = tool("AR", "ar");
++    let archiver = (ar, ar_args);
++    run_tool(
++        &archiver,
++        &[
++            "crs".to_owned(),
++            archive.display().to_string(),
++            object.display().to_string(),
++        ],
++        "creating nvport static archive",
++    );
++
++    println!("cargo:rustc-link-search=native={}", out_dir.display());
++    println!("cargo:rustc-link-lib=static=nvidia_nvport_memory");
++    println!("cargo:rerun-if-changed={}", probe.display());
++    println!("cargo:rerun-if-changed={}", source.display());
++    println!(
++        "cargo:rerun-if-changed={}",
++        root.join("src/nvidia/arch/nvalloc/unix/include/os-interface.h")
++            .display()
++    );
++    println!("cargo:rerun-if-changed={}", readme_path.display());
++    println!("cargo:metadata=nvidia_commit={NVIDIA_COMMIT}");
++    println!("cargo:metadata=nvidia_release={NVIDIA_RELEASE}");
++}
+diff --git a/ostd/libs/nvidia-nvport/src/lib.rs b/ostd/libs/nvidia-nvport/src/lib.rs
+new file mode 100644
+index 0000000..6140026
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/lib.rs
+@@ -0,0 +1,313 @@
++// SPDX-License-Identifier: MPL-2.0
++
++//! Experimental, opt-in NVIDIA 615.78.08 NVport memory integration.
++//!
++//! This is not a GPU driver. The private C ABI and NVIDIA code extend OSTD's
++//! trusted computing base. No PCI registration, DMA, RM startup, or Vulkan
++//! acceleration is provided. See the crate README for the exact boundary.
++
++#![no_std]
++#![warn(missing_docs)]
++
++extern crate alloc;
++
++mod os;
++
++use core::{ffi::c_void, ptr::NonNull};
++
++unsafe extern "C" {
++    fn _portMemAllocNonPagedUntracked(len: u64) -> *mut c_void;
++    fn _portMemFreeUntracked(ptr: *mut c_void);
++    fn portMemCopy(dst: *mut c_void, dst_len: u64, src: *const c_void, src_len: u64)
++    -> *mut c_void;
++    fn portMemSet(dst: *mut c_void, value: u8, len: u64) -> *mut c_void;
++    fn portMemCmp(a: *const c_void, b: *const c_void, len: u64) -> i32;
++    fn portMemMove(dst: *mut c_void, dst_len: u64, src: *const c_void, src_len: u64)
++    -> *mut c_void;
++    fn portMemSetPattern(
++        dst: *mut c_void,
++        len: u64,
++        pattern: *const u8,
++        pattern_len: u64,
++    ) -> *mut c_void;
++    fn portMemExGetPageSize() -> u64;
++}
++
++/// A failure reported by the real NVport memory integration.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum Error {
++    /// Zero, oversized, empty-pattern, or out-of-bounds operation.
++    InvalidArgument,
++    /// The kernel/host heap could not allocate the requested storage.
++    NoMemory,
++    /// The NVIDIA routine returned an unexpected pointer or data.
++    ContractViolation,
++}
++
++/// Exclusively owned, initialized CPU kernel heap storage allocated through
++/// NVIDIA NVport and the real OSTD global heap. This is not GPU/DMA memory.
++///
++/// Lengths are capped at u32::MAX because the upstream Unix NVport memory
++/// functions narrow NvLength to the u32 os_mem_* ABI.
++pub struct Buffer {
++    ptr: NonNull<u8>,
++    len: u32,
++}
++
++impl Buffer {
++    /// Allocates and zeroes a buffer. Requires initialized heap services.
++    pub fn new(len: usize) -> Result<Self, Error> {
++        let len = u32::try_from(len)
++            .ok()
++            .filter(|&len| len > 0)
++            .ok_or(Error::InvalidArgument)?;
++        // SAFETY: No raw pointer is supplied; the reviewed implementation calls
++        // our checked heap allocator and returns null on allocation failure.
++        let ptr =
++            NonNull::new(unsafe { _portMemAllocNonPagedUntracked(u64::from(len)) }.cast::<u8>())
++                .ok_or(Error::NoMemory)?;
++        let mut buffer = Self { ptr, len };
++        buffer.fill(0)?;
++        Ok(buffer)
++    }
++
++    /// Returns the initialized, exclusively owned storage as a shared slice.
++    pub fn as_slice(&self) -> &[u8] {
++        // SAFETY: All bytes were initialized before construction completed. The
++        // allocation stays live, and no mutation is possible while borrowed.
++        unsafe { core::slice::from_raw_parts(self.ptr.as_ptr(), self.len as usize) }
++    }
++
++    /// Fills all storage using the NVIDIA routine and OSTD OS-service ABI.
++    pub fn fill(&mut self, value: u8) -> Result<(), Error> {
++        // SAFETY: The allocation is live and exclusively borrowed for len bytes.
++        let result = unsafe { portMemSet(self.ptr.as_ptr().cast(), value, u64::from(self.len)) };
++        self.check_pointer(result)
++    }
++
++    /// Copies a slice of exactly the buffer length through NVIDIA NVport.
++    pub fn copy_from_slice(&mut self, source: &[u8]) -> Result<(), Error> {
++        if source.len() != self.len as usize {
++            return Err(Error::InvalidArgument);
++        }
++        // SAFETY: Safe Rust borrowing makes source disjoint from this mutable
++        // buffer; both live ranges have the exact checked length.
++        let result = unsafe {
++            portMemCopy(
++                self.ptr.as_ptr().cast(),
++                u64::from(self.len),
++                source.as_ptr().cast(),
++                source.len() as u64,
++            )
++        };
++        self.check_pointer(result)
++    }
++
++    /// Compares all bytes using the original NVIDIA comparison routine.
++    pub fn equals(&self, other: &[u8]) -> bool {
++        if other.len() != self.len as usize {
++            return false;
++        }
++        // SAFETY: Both ranges are initialized and read-only for this borrow.
++        unsafe {
++            portMemCmp(
++                self.ptr.as_ptr().cast(),
++                other.as_ptr().cast(),
++                u64::from(self.len),
++            ) == 0
++        }
++    }
++
++    /// Repeats a nonempty pattern, including its partial last repetition.
++    pub fn fill_pattern(&mut self, pattern: &[u8]) -> Result<(), Error> {
++        if pattern.is_empty() || pattern.len() > u32::MAX as usize {
++            return Err(Error::InvalidArgument);
++        }
++        // SAFETY: The source is a nonempty disjoint immutable slice. NVIDIA's
++        // loop copies only the remaining length, bounded by our allocation.
++        let result = unsafe {
++            portMemSetPattern(
++                self.ptr.as_ptr().cast(),
++                u64::from(self.len),
++                pattern.as_ptr(),
++                pattern.len() as u64,
++            )
++        };
++        self.check_pointer(result)
++    }
++
++    /// Moves bytes within this buffer, including overlapping ranges.
++    pub fn copy_within(
++        &mut self,
++        source: core::ops::Range<usize>,
++        destination: usize,
++    ) -> Result<(), Error> {
++        let count = source
++            .end
++            .checked_sub(source.start)
++            .ok_or(Error::InvalidArgument)?;
++        let end = destination
++            .checked_add(count)
++            .ok_or(Error::InvalidArgument)?;
++        if source.end > self.len as usize || end > self.len as usize {
++            return Err(Error::InvalidArgument);
++        }
++        if count == 0 {
++            return Ok(());
++        }
++        // SAFETY: Both ranges are within the same exclusively owned initialized
++        // allocation. portMemMove explicitly supports overlap in either direction.
++        let (dst, result) = unsafe {
++            let dst = self.ptr.as_ptr().add(destination).cast::<c_void>();
++            (
++                dst,
++                portMemMove(
++                    dst,
++                    count as u64,
++                    self.ptr.as_ptr().add(source.start).cast(),
++                    count as u64,
++                ),
++            )
++        };
++        if result == dst {
++            Ok(())
++        } else {
++            Err(Error::ContractViolation)
++        }
++    }
++
++    fn check_pointer(&self, result: *mut c_void) -> Result<(), Error> {
++        if result == self.ptr.as_ptr().cast() {
++            Ok(())
++        } else {
++            Err(Error::ContractViolation)
++        }
++    }
++}
++
++impl Drop for Buffer {
++    fn drop(&mut self) {
++        // SAFETY: This is the exact live pointer from NVport, uniquely owned by
++        // this buffer. No references survive drop and the pointer is freed once.
++        unsafe { _portMemFreeUntracked(self.ptr.as_ptr().cast()) };
++    }
++}
++
++/// Runs actual NVIDIA C memory routines against real OS allocation services.
++/// This is a CPU-only kernel integration check, never GPU benchmark evidence.
++pub fn self_test() -> Result<(), Error> {
++    let mut buffer = Buffer::new(257)?;
++    if buffer.as_slice().iter().any(|&byte| byte != 0) {
++        return Err(Error::ContractViolation);
++    }
++    buffer.fill_pattern(&[0x12, 0x34, 0x56])?;
++    for (index, &byte) in buffer.as_slice().iter().enumerate() {
++        if byte != [0x12, 0x34, 0x56][index % 3] {
++            return Err(Error::ContractViolation);
++        }
++    }
++    let source = [0x5a; 257];
++    buffer.copy_from_slice(&source)?;
++    if !buffer.equals(&source) {
++        return Err(Error::ContractViolation);
++    }
++    buffer.copy_within(0..256, 1)?;
++    buffer.copy_within(1..257, 0)?;
++    if !buffer.equals(&source) {
++        return Err(Error::ContractViolation);
++    }
++    // SAFETY: The C accessor reads our immutable, platform-specific page size.
++    let page_size = unsafe { portMemExGetPageSize() };
++    #[cfg(target_os = "none")]
++    if page_size != ostd::mm::PAGE_SIZE as u64 {
++        return Err(Error::ContractViolation);
++    }
++    #[cfg(not(target_os = "none"))]
++    if page_size != 4096 {
++        return Err(Error::ContractViolation);
++    }
++    Ok(())
++}
++
++#[cfg(any(test, ktest))]
++mod tests {
++    use alloc::vec::Vec;
++
++    use super::*;
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn upstream_memory_self_test() {
++        self_test().unwrap();
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn copy_fill_compare_many_lengths() {
++        for len in [1, 2, 3, 15, 16, 17, 255, 256, 257, 4095, 4096, 65537] {
++            let source: Vec<u8> = (0..len).map(|index| (index * 37) as u8).collect();
++            let mut buffer = Buffer::new(len).unwrap();
++            buffer.copy_from_slice(&source).unwrap();
++            assert!(buffer.equals(&source));
++            assert_eq!(buffer.as_slice(), source);
++            buffer.fill(0xa5).unwrap();
++            assert!(buffer.as_slice().iter().all(|&byte| byte == 0xa5));
++            assert!(!buffer.equals(&[]));
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn overlapping_move_matches_rust_both_directions() {
++        for len in 1..80 {
++            for offset in 0..len {
++                let source: Vec<u8> = (0..len).map(|index| index as u8).collect();
++                let mut expected = source.clone();
++                let mut buffer = Buffer::new(len).unwrap();
++                buffer.copy_from_slice(&source).unwrap();
++                expected.copy_within(0..len - offset, offset);
++                buffer.copy_within(0..len - offset, offset).unwrap();
++                assert_eq!(buffer.as_slice(), expected);
++                buffer.copy_from_slice(&source).unwrap();
++                expected.copy_from_slice(&source);
++                expected.copy_within(offset..len, 0);
++                buffer.copy_within(offset..len, 0).unwrap();
++                assert_eq!(buffer.as_slice(), expected);
++            }
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn patterned_fill_including_partial_repetition() {
++        for len in 1..65 {
++            let mut buffer = Buffer::new(len).unwrap();
++            for pattern in [&[0x88][..], &[1, 2, 3][..], &[4, 5, 6, 7, 8][..]] {
++                buffer.fill_pattern(pattern).unwrap();
++                for (index, byte) in buffer.as_slice().iter().enumerate() {
++                    assert_eq!(*byte, pattern[index % pattern.len()]);
++                }
++            }
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn invalid_operations_leave_buffer_unchanged() {
++        assert!(matches!(Buffer::new(0), Err(Error::InvalidArgument)));
++        assert!(matches!(
++            Buffer::new(u32::MAX as usize + 1),
++            Err(Error::InvalidArgument)
++        ));
++        let mut buffer = Buffer::new(8).unwrap();
++        assert_eq!(buffer.fill_pattern(&[]), Err(Error::InvalidArgument));
++        assert_eq!(buffer.copy_from_slice(&[1]), Err(Error::InvalidArgument));
++        assert_eq!(buffer.copy_within(0..9, 0), Err(Error::InvalidArgument));
++        assert_eq!(buffer.copy_within(0..8, 1), Err(Error::InvalidArgument));
++        assert_eq!(
++            buffer.copy_within(0..1, usize::MAX),
++            Err(Error::InvalidArgument)
++        );
++        assert_eq!(buffer.as_slice(), &[0; 8]);
++    }
++}
+diff --git a/ostd/libs/nvidia-nvport/src/os.rs b/ostd/libs/nvidia-nvport/src/os.rs
+new file mode 100644
+index 0000000..f13b322
+--- /dev/null
++++ b/ostd/libs/nvidia-nvport/src/os.rs
+@@ -0,0 +1,250 @@
++// SPDX-License-Identifier: MPL-2.0
++
++//! Private NVIDIA OS-service ABI. Only the reviewed NVport memory module calls it.
++
++use alloc::alloc::{alloc, dealloc};
++use core::{alloc::Layout, ffi::c_void, ptr};
++
++pub(super) const NV_OK: u32 = 0;
++pub(super) const NV_ERR_INVALID_ADDRESS: u32 = 0x1e;
++pub(super) const NV_ERR_INVALID_ARGUMENT: u32 = 0x1f;
++const NV_ERR_NO_MEMORY: u32 = 0x51;
++
++// The NVIDIA ABI expects ordinary kernel heap memory, not DMA addresses. Keep
++// the payload 16-byte aligned and retain its exact Layout for os_free_mem.
++const ALIGN: usize = 16;
++const HEADER: usize = 16;
++
++fn allocation_layout(size: u64) -> Option<Layout> {
++    let size = usize::try_from(size).ok()?;
++    if size == 0 {
++        return None;
++    }
++    Layout::from_size_align(size.checked_add(HEADER)?, ALIGN).ok()
++}
++
++/// # Safety
++/// `address` must be null or an aligned, writable pointer slot, exclusively
++/// accessible for this call. Call only after heap initialization in task context.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_alloc_mem(address: *mut *mut c_void, size: u64) -> u32 {
++    if address.is_null() {
++        return NV_ERR_INVALID_ARGUMENT;
++    }
++    // SAFETY: The pointer slot is writable by the caller's contract.
++    unsafe { address.write(ptr::null_mut()) };
++    let Some(layout) = allocation_layout(size) else {
++        return NV_ERR_INVALID_ARGUMENT;
++    };
++    #[cfg(target_os = "none")]
++    if ostd::irq::InterruptLevel::current().is_interrupt_context() {
++        return NV_ERR_NO_MEMORY;
++    }
++    // SAFETY: The nonzero checked Layout describes the entire allocation.
++    let base = unsafe { alloc(layout) };
++    if base.is_null() {
++        return NV_ERR_NO_MEMORY;
++    }
++    // SAFETY: Both the aligned header and output slot are writable. The payload
++    // lies in the same allocation and remains live until exactly one free.
++    unsafe {
++        base.cast::<usize>().write(layout.size());
++        address.write(base.add(HEADER).cast());
++    }
++    NV_OK
++}
++
++/// # Safety
++/// `address` must be null or the exact live payload returned by os_alloc_mem,
++/// with no outstanding accesses or references to that allocation.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_free_mem(address: *mut c_void) {
++    if address.is_null() {
++        return;
++    }
++    // SAFETY: The caller returns ownership of the exact allocation; its header
++    // is private and still contains the size used by os_alloc_mem.
++    unsafe {
++        let base = address.cast::<u8>().sub(HEADER);
++        let size = base.cast::<usize>().read();
++        let layout = Layout::from_size_align_unchecked(size, ALIGN);
++        dealloc(base, layout);
++    }
++}
++
++/// # Safety
++/// Source and destination must be valid for `size` bytes, nonoverlapping, with
++/// exclusive destination access and no source mutation throughout the call.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_mem_copy(dst: *mut c_void, src: *const c_void, size: u32) -> *mut c_void {
++    if size != 0 {
++        // SAFETY: The caller provides valid nonoverlapping ranges.
++        unsafe { ptr::copy_nonoverlapping(src.cast::<u8>(), dst.cast::<u8>(), size as usize) };
++    }
++    dst
++}
++
++/// # Safety
++/// `dst` must be valid and exclusively writable for `size` bytes.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_mem_set(dst: *mut c_void, value: u8, size: u32) -> *mut c_void {
++    if size != 0 {
++        // SAFETY: The caller grants exclusive access to the destination range.
++        unsafe { ptr::write_bytes(dst.cast::<u8>(), value, size as usize) };
++    }
++    dst
++}
++
++/// # Safety
++/// Both pointers must be readable for `size` bytes without concurrent mutation.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_mem_cmp(a: *const u8, b: *const u8, size: u32) -> i32 {
++    for offset in 0..size as usize {
++        // SAFETY: The caller guarantees readable ranges of at least size bytes.
++        let (a, b) = unsafe { (a.add(offset).read(), b.add(offset).read()) };
++        if a != b {
++            return i32::from(a) - i32::from(b);
++        }
++    }
++    0
++}
++
++#[cfg(target_os = "none")]
++#[unsafe(no_mangle)]
++static os_page_size: u64 = ostd::mm::PAGE_SIZE as u64;
++
++// Host tests use the real host allocator, but cannot certify Asterinas usercopy.
++// Reject it explicitly there instead of substituting an unchecked memcpy.
++#[cfg(not(target_os = "none"))]
++#[unsafe(no_mangle)]
++static os_page_size: u64 = 4096;
++
++/// # Safety
++/// `dst` must be a kernel buffer exclusively writable for size bytes. The
++/// current task's user address space must stay active for the complete call.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_memcpy_from_user(dst: *mut c_void, src: *const c_void, size: u32) -> u32 {
++    if size == 0 {
++        return NV_OK;
++    }
++    if dst.is_null() || src.is_null() {
++        return NV_ERR_INVALID_ADDRESS;
++    }
++    #[cfg(target_os = "none")]
++    {
++        use ostd::mm::{Fallible, VmReader, VmWriter, io::FallibleVmRead};
++        if !ostd::mm::is_in_user_space(src.addr(), size as usize)
++            || ostd::irq::InterruptLevel::current().is_interrupt_context()
++        {
++            return NV_ERR_INVALID_ADDRESS;
++        }
++        // SAFETY: The user range was validated. The ABI caller provides a live,
++        // exclusively writable kernel destination, not a userspace pointer.
++        let (mut reader, mut writer) = unsafe {
++            (
++                VmReader::<Fallible>::from_user_space(src.cast(), size as usize),
++                VmWriter::from_kernel_space(dst.cast(), size as usize),
++            )
++        };
++        return match reader.read_fallible(&mut writer) {
++            Ok(copied) if copied == size as usize => NV_OK,
++            _ => NV_ERR_INVALID_ADDRESS,
++        };
++    }
++    #[cfg(not(target_os = "none"))]
++    {
++        0x56
++    } // NV_ERR_NOT_SUPPORTED: no Asterinas VM on the host.
++}
++
++/// # Safety
++/// `src` must be a kernel buffer readable for size bytes without concurrent
++/// mutation. The task's user address space must stay active for this call.
++#[unsafe(no_mangle)]
++unsafe extern "C" fn os_memcpy_to_user(dst: *mut c_void, src: *const c_void, size: u32) -> u32 {
++    if size == 0 {
++        return NV_OK;
++    }
++    if dst.is_null() || src.is_null() {
++        return NV_ERR_INVALID_ADDRESS;
++    }
++    #[cfg(target_os = "none")]
++    {
++        use ostd::mm::{Fallible, VmReader, VmWriter, io::FallibleVmWrite};
++        if !ostd::mm::is_in_user_space(dst.addr(), size as usize)
++            || ostd::irq::InterruptLevel::current().is_interrupt_context()
++        {
++            return NV_ERR_INVALID_ADDRESS;
++        }
++        // SAFETY: The destination is a checked user range; the ABI caller
++        // guarantees the kernel source is valid and not concurrently mutated.
++        let (mut reader, mut writer) = unsafe {
++            (
++                VmReader::from_kernel_space(src.cast(), size as usize),
++                VmWriter::<Fallible>::from_user_space(dst.cast(), size as usize),
++            )
++        };
++        return match writer.write_fallible(&mut reader) {
++            Ok(copied) if copied == size as usize => NV_OK,
++            _ => NV_ERR_INVALID_ADDRESS,
++        };
++    }
++    #[cfg(not(target_os = "none"))]
++    {
++        0x56
++    } // NV_ERR_NOT_SUPPORTED: no Asterinas VM on the host.
++}
++
++#[cfg(any(test, ktest))]
++mod tests {
++    use super::*;
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn reject_invalid_sizes_and_clear_output() {
++        assert!(allocation_layout(0).is_none());
++        assert!(allocation_layout(u64::MAX).is_none());
++        assert!(allocation_layout(isize::MAX as u64).is_none());
++        let mut output = ptr::dangling_mut::<c_void>();
++        // SAFETY: output is a valid pointer slot; no allocation is returned.
++        unsafe {
++            assert_eq!(os_alloc_mem(&mut output, u64::MAX), NV_ERR_INVALID_ARGUMENT);
++            assert!(output.is_null());
++            assert_eq!(os_alloc_mem(ptr::null_mut(), 8), NV_ERR_INVALID_ARGUMENT);
++            os_free_mem(ptr::null_mut());
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn allocation_alignment_and_free() {
++        for len in [1, 15, 16, 17, 4095, 4096, 65537] {
++            let mut output = ptr::null_mut();
++            // SAFETY: The allocation is exclusively owned and freed once.
++            unsafe {
++                assert_eq!(os_alloc_mem(&mut output, len), NV_OK);
++                assert_eq!(output.addr() % ALIGN, 0);
++                os_mem_set(output, 0xa5, len as u32);
++                assert_eq!(output.cast::<u8>().add(len as usize - 1).read(), 0xa5);
++                os_free_mem(output);
++            }
++        }
++    }
++
++    #[cfg_attr(test, test)]
++    #[cfg_attr(ktest, ostd::prelude::ktest)]
++    fn usercopy_does_not_report_false_success() {
++        let mut byte = 0u8;
++        // SAFETY: Kernel ranges are valid; invalid user pointers are rejected.
++        unsafe {
++            assert_eq!(
++                os_memcpy_from_user((&mut byte as *mut u8).cast(), ptr::null(), 1),
++                NV_ERR_INVALID_ADDRESS
++            );
++            assert_eq!(
++                os_memcpy_to_user(ptr::null_mut(), (&byte as *const u8).cast(), 1),
++                NV_ERR_INVALID_ADDRESS
++            );
++        }
++    }
++}
+diff --git a/tools/graphics/NATIVE_NVIDIA.md b/tools/graphics/NATIVE_NVIDIA.md
+new file mode 100644
+index 0000000..f4bc302
+--- /dev/null
++++ b/tools/graphics/NATIVE_NVIDIA.md
+@@ -0,0 +1,52 @@
++# NVIDIA acceptance inside Asterinas
++
++**There is no native GPU pass yet.** The implemented NVport CPU-memory component is linked into Asterinas, but the RM/modeset driver and its required GPU lifecycle and userspace ABI are not ported. This workflow defines a strict, failing-until-implemented hardware acceptance path; it does not make the port complete.
++
++## Two different tests
++
++`nvidia-vulkan-benchmark` runs compute on a Linux host. It can validate the machine's NVIDIA Vulkan installation, but cannot validate Asterinas.
++
++`asterinas-native-nvidia` builds the dispatched Asterinas kernel, creates an initramfs from an administrator-provided guest tree, boots that exact image in QEMU/KVM with preauthorized VFIO devices, and runs the benchmark only inside the guest. No host compute result is accepted as a guest result. This is native-kernel **compute** acceptance, not GPUI, Wayland, display, presentation, synchronization-sharing, or full-driver acceptance.
++
++## Provisioning required outside the workflow
++
++Use an isolated, disposable self-hosted Linux x86-64 runner labeled `nvidia-vfio`. Configure the GitHub environment `asterinas-native-gpu` with required reviewers and branch restrictions before enabling it. A YAML environment name alone does not configure protection. Untrusted PR code must never execute on this privileged runner. Keep this runner separate from a Linux-host benchmark runner using its GPU normally.
++
++An administrator must prepare and explicitly authorize the complete PCI device assignment and IOMMU-group isolation. Select an NVIDIA GPU supported by the open kernel sources and GSP firmware. Bind the intended functions to `vfio-pci` beforehand; all IOMMU peers must be VFIO-bound or unbound. The script never unbinds a host driver, changes PCI bindings, uses unsafe no-IOMMU mode, or falls back to CPU emulation. The runner needs access to `/dev/kvm` and the relevant `/dev/vfio` group devices. GPU assignment/reset and a kernel under test can hang or reset a device, which is why this belongs on a dedicated test machine.
++
++Install the repository-pinned Rust toolchain, `cargo-osdk`, matching vDSO/build dependencies, a C compiler, Vulkan development headers, `glslangValidator`, `cpio`, `find`, `grub-mkrescue`, `xorriso`, Python 3.11+ and QEMU with KVM/VFIO support. Ordinary PR CI uses the project's pinned kernel-dev container for the C/Rust host tests and complete kernel link.
++
++Configure environment/repository variables:
++
++- `ASTER_GPU_VFIO_DEVICES`: explicit comma-separated full-domain PCI addresses, such as `0000:01:00.0,0000:01:00.1`. These are examples, not autodetected or authorized device choices.
++- `ASTER_GPU_ROOTFS`: an absolute path to an administrator-controlled, device-free guest tree. It must contain `/bin/sh`, `mount`, `cat`, `poweroff`, `/proc`, `/sys`, `/dev`, the Vulkan loader, NVIDIA Vulkan ICD configuration, matching NVIDIA **615.78.08** userspace libraries and GSP firmware, with all dynamic-loader dependencies needed by a benchmark compiled on that runner. Prepare these legally and verify guest compatibility. The workflow does not fetch or redistribute proprietary userspace.
++
++Do not give the guest tree `/aster-native-gpu-bench`, `/aster-native-gpu.spv` or `/aster-native-gpu-init`; those reserved names are rejected. Use an output directory outside the checkout. The script requires a clean checkout so its commit marker is not silently attached to uncommitted source changes. It creates an exclusive temporary `kernel/OSDK.toml` to avoid inheriting the workspace's interactive `sh -l` init arguments, and removes that file after building; it refuses to overwrite an existing package manifest.
++
++Manually dispatch the workflow on `main` and explicitly select `run_native_gpu`. The native job has a separate concurrency group and protected environment, fixed source SHA, read-only repository permissions, pinned action revisions and bounded guest execution. NVIDIA source is fetched publicly at the pinned commit. No GitHub authentication or remote run was performed during local preparation.
++
++For an already prepared, clean checkout and authorized machine, the equivalent entrypoint is:
++
++```sh
++export NVIDIA_SOURCE_DIR=/absolute/path/to/pinned-nvidia-checkout
++python3 tools/graphics/run_native_nvidia.py \
++  --rootfs "$ASTER_GPU_ROOTFS" \
++  --vfio-devices "$ASTER_GPU_VFIO_DEVICES" \
++  --output /absolute/path/outside-checkout
++```
++
++## What counts as evidence
++
++The kernel emits a boot marker containing the dispatched commit and a fresh run nonce through an explicitly enabled `earlycon`. Guest init runs the real C/SPIR-V benchmark, emits its JSON only on correctness/timing success, and emits its exit status with the same nonce. The validator requires exactly one ordered boot/result/success chain, NVIDIA vendor and driver identity, explicit **615.78.08** driver metadata, hardware device type, complete output verification, bounded workloads and positive finite GPU/host timings. Missing firmware, device ABI, real GPU, driver version, boot marker or result is a failure, never a skip-pass.
++
++`provenance.json` records the source commit, nonce, exact image/initramfs/benchmark/shader SHA-256 hashes and assigned device list. `native-result.json` is written only after evidence validates. Serial and build logs are retained on failure. CI uploads only logs and JSON, not the guest image or its NVIDIA libraries.
++
++This is a trusted-runner log chain, **not cryptographic attestation**. A compromised runner can forge logs or binaries. `uname` is not native-kernel proof: Asterinas itself reports Linux-compatible identity. The image build, hash, boot marker and guest-only execution establish the intended chain under the trusted-runner assumption.
++
++## Current local evidence and blockers
++
++Eight real C/Rust memory tests passed on the host; OSDK compiled the same registered native tests. The complete Asterinas kernel linked the NVport object with no unresolved symbols in that final kernel. No full RM/modeset object was linked.
++
++Multiboot2 TCG boots initially timed out without serial output. Enabling `earlycon` exposed a kernel page fault at `0xffff80007ffe2321` during early OSTD initialization, after xAPIC detection and before the assembler's NVport self-test. This is a real boot failure, not a memory-test result. Its root cause has not been fixed or proved. The local native GPU entrypoint separately rejects the unavailable `/dev/kvm`; this sandbox has no assigned NVIDIA GPU.
++
++Even with a working boot and GPU runner, native Vulkan cannot work until the missing NVIDIA RM/GSP initialization, DMA/IOMMU/pinning/interrupt services, device-node ioctl/mmap ABI, GPU memory/submission/fence/reset/teardown and accelerated DRM integration are genuinely implemented. GPUI/Wayland rendering then needs separate end-to-end acceptance. Neither a GitHub token nor a passing Linux benchmark supplies these missing kernel components.
+diff --git a/tools/graphics/README.md b/tools/graphics/README.md
+index 3402921..a5691d0 100644
+--- a/tools/graphics/README.md
++++ b/tools/graphics/README.md
+@@ -23,3 +23,7 @@ Run the standard-library unit tests with temporary test-only fixtures and mocked
+ ```sh
+ python3 -m unittest discover -s tools/graphics -v
+ ```
++
++## Experimental NVIDIA source integration and native acceptance
++
++The optional [`ostd-nvidia-nvport`](../../ostd/libs/nvidia-nvport/README.md) crate compiles and links real NVIDIA 615.78.08 CPU-memory routines against OSTD services. It is not a GPU driver. See [native NVIDIA acceptance](NATIVE_NVIDIA.md) for the protected VFIO guest workflow, exact evidence contract, current boot failure and remaining kernel-driver work. A Linux-host compute pass is never treated as an Asterinas-native pass.
+diff --git a/tools/graphics/run_native_nvidia.py b/tools/graphics/run_native_nvidia.py
+new file mode 100644
+index 0000000..e2c73cb
+--- /dev/null
++++ b/tools/graphics/run_native_nvidia.py
+@@ -0,0 +1,185 @@
++#!/usr/bin/env python3
++"""Build current Asterinas, boot it with preauthorized VFIO devices, validate guest compute.
++
++Requires an administrator-provisioned, isolated runner and NVIDIA-matched guest
++rootfs. Never binds PCI devices, downloads firmware, or runs compute on Linux.
++The serial/nonce chain is evidence from a trusted runner, not remote attestation.
++"""
++import argparse
++import hashlib
++import json
++import os
++from pathlib import Path
++import re
++import secrets
++import selectors
++import shutil
++import subprocess
++import tempfile
++import time
++import tomllib
++
++ROOT = Path(__file__).resolve().parents[2]
++BDF = re.compile(r"[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]")
++
++
++def sha256(path):
++    digest = hashlib.sha256()
++    with path.open("rb") as stream:
++        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
++            digest.update(chunk)
++    return digest.hexdigest()
++
++
++def checked_devices(text, sysfs=Path("/sys/bus/pci/devices")):
++    devices = text.split(",")
++    if not devices or len(devices) != len(set(devices)):
++        raise ValueError("VFIO device list must be nonempty and unique")
++    found_gpu = False
++    for bdf in devices:
++        if BDF.fullmatch(bdf) is None:
++            raise ValueError("Invalid full-domain PCI BDF")
++        device = sysfs / bdf
++        if (device / "driver").resolve().name != "vfio-pci":
++            raise ValueError(f"{bdf} must already be bound to vfio-pci by the administrator")
++        group = device / "iommu_group"
++        if not group.exists():
++            raise ValueError(f"{bdf} has no IOMMU group; unsafe no-IOMMU mode is not supported")
++        for peer in (group / "devices").iterdir():
++            if (peer / "driver").exists() and (peer / "driver").resolve().name != "vfio-pci":
++                raise ValueError(f"IOMMU peer {peer.name} remains attached to a host driver")
++        found_gpu |= (device / "vendor").read_text().strip() == "0x10de" and (device / "class").read_text().strip().startswith("0x03")
++    if not found_gpu:
++        raise ValueError("No prebound NVIDIA display/3D controller selected")
++    return devices
++
++
++def capture_guest(command, serial, nonce, timeout):
++    """Stop only the QEMU process we created, on terminal guest marker or timeout."""
++    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
++    pending = b""
++    terminal = f"ASTERINAS_NATIVE_GPU_EXIT nonce={nonce} status=".encode()
++    deadline = time.monotonic() + timeout
++    try:
++        with selectors.DefaultSelector() as selector, serial.open("wb") as output:
++            selector.register(process.stdout, selectors.EVENT_READ)
++            while time.monotonic() < deadline:
++                events = selector.select(min(1, max(0, deadline - time.monotonic())))
++                if not events:
++                    if process.poll() is not None:
++                        break
++                    continue
++                chunk = os.read(process.stdout.fileno(), 65536)
++                if not chunk:
++                    break
++                output.write(chunk)
++                output.flush()
++                pending += chunk
++                lines = pending.split(b"\n")
++                pending = lines.pop()
++                if any(line.rstrip(b"\r").startswith(terminal) for line in lines):
++                    return
++            raise RuntimeError("Guest exited or timed out without a complete terminal marker")
++    finally:
++        if process.poll() is None:
++            process.terminate()
++            try:
++                process.wait(timeout=10)
++            except subprocess.TimeoutExpired:
++                process.kill()
++                process.wait()
++        process.stdout.close()
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--rootfs", required=True, type=Path, help="Prepared guest tree with /bin/sh, mount/cat/poweroff, Vulkan loader, matching NVIDIA userspace and GSP firmware")
++    parser.add_argument("--vfio-devices", required=True, help="Comma-separated prebound full PCI BDFs")
++    parser.add_argument("--output", required=True, type=Path)
++    parser.add_argument("--timeout", type=int, default=300)
++    args = parser.parse_args()
++    if not 1 <= args.timeout <= 900:
++        parser.error("timeout must be 1..900 seconds")
++    output = args.output.resolve()
++    output.mkdir(parents=True, exist_ok=True)
++    if not os.access("/dev/kvm", os.R_OK | os.W_OK):
++        raise RuntimeError("Accessible /dev/kvm is required; no CPU/software fallback")
++    devices = checked_devices(args.vfio_devices)
++    source_root = args.rootfs.resolve(strict=True)
++    if not (source_root / "bin/sh").exists():
++        raise ValueError("Guest rootfs must supply /bin/sh")
++    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
++    if not re.fullmatch(r"[0-9a-f]{40}", commit):
++        raise ValueError("Invalid source commit")
++    if subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=normal"], cwd=ROOT):
++        raise ValueError("Native evidence requires an exact clean dispatched checkout")
++    nonce = secrets.token_hex(16)
++    env = dict(os.environ, ASTER_NATIVE_GPU_CI_COMMIT=commit, ASTER_NATIVE_GPU_CI_NONCE=nonce)
++    with tempfile.TemporaryDirectory(prefix="aster-native-gpu-") as temporary:
++        rootfs = Path(temporary) / "rootfs"
++        shutil.copytree(source_root, rootfs, symlinks=True)
++        binary = rootfs / "aster-native-gpu-bench"
++        shader = rootfs / "aster-native-gpu.spv"
++        init = rootfs / "aster-native-gpu-init"
++        for path in (binary, shader, init):
++            if path.exists() or path.is_symlink():
++                raise ValueError(f"Reserved rootfs entry already exists: {path.name}")
++        subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2", str(ROOT / "tools/graphics/vulkan_compute_bench.c"), "-lvulkan", "-o", str(binary)], check=True)
++        subprocess.run(["glslangValidator", "-V", "--target-env", "vulkan1.2", str(ROOT / "tools/graphics/vector.comp"), "-o", str(shader)], check=True)
++        init.write_text(f'''#!/bin/sh
++set -u
++export PATH=/bin:/usr/bin:/sbin:/usr/sbin
++mount -t proc proc /proc || exit 1
++mount -t sysfs sysfs /sys || exit 1
++mount -t devtmpfs devtmpfs /dev || exit 1
++/aster-native-gpu-bench --shader /aster-native-gpu.spv --vendor nvidia > /aster-native-gpu-result.json
++status=$?
++if [ "$status" -eq 0 ]; then
++    printf 'ASTERINAS_NATIVE_GPU_RESULT nonce={nonce} '
++    cat /aster-native-gpu-result.json
++fi
++printf 'ASTERINAS_NATIVE_GPU_EXIT nonce={nonce} status=%s\\n' "$status"
++poweroff -f
++''')
++        init.chmod(0o755)
++        archive = output / "native-initramfs.cpio"
++        names = subprocess.check_output(["find", ".", "-print0"], cwd=rootfs)
++        with archive.open("wb") as stream:
++            subprocess.run(["cpio", "--null", "-o", "--format=newc", "--owner=0:0"], cwd=rootfs, input=names, stdout=stream, check=True)
++        command = ["cargo", "osdk", "build", "--features", "native-gpu-ci", "--boot-method", "grub-rescue-iso", "--grub-boot-protocol", "multiboot2", "--strip-elf", "--initramfs", str(archive), "--kcmd-args=earlycon console=ttyS0 rdinit=/bin/sh", "--init-args=/aster-native-gpu-init"]
++        # OSDK appends CLI init arguments to manifest defaults. The workspace
++        # defaults include interactive `sh -l`, which must not precede our script.
++        # A nearest-package manifest is independent of the workspace manifest.
++        config = ROOT / "kernel/OSDK.toml"
++        with config.open("x") as stream:
++            stream.write('[boot]\nmethod = "grub-rescue-iso"\n[grub]\nboot_protocol = "multiboot2"\n[qemu]\nargs = "-nic none"\n')
++        try:
++            with (output / "kernel-build.log").open("w") as log:
++                subprocess.run(command, cwd=ROOT / "kernel", env=env, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=1800)
++        finally:
++            config.unlink()
++        bundle = ROOT / "target/osdk/asterinas"
++        manifest = tomllib.loads((bundle / "bundle.toml").read_text())
++        image = (bundle / manifest["vm_image"]["path"]).resolve(strict=True)
++        if image.parent != bundle.resolve() or image.suffix != ".iso":
++            raise ValueError("Unexpected OSDK boot image")
++        saved_image = output / "asterinas-native.iso"
++        shutil.copyfile(image, saved_image)
++        provenance = {"commit": commit, "nonce": nonce, "kernel_image_sha256": sha256(saved_image), "initramfs_sha256": sha256(archive), "benchmark_sha256": sha256(binary), "shader_sha256": sha256(shader), "vfio_devices": devices, "nvidia_source": "ca2d03e6fafd4d4b56b383497d931c25b283bfcf", "test_scope": "Asterinas-native NVIDIA Vulkan compute; not GPUI/Wayland acceptance"}
++        (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
++        serial = output / "guest-serial.log"
++        qemu = ["qemu-system-x86_64", "-machine", "q35,accel=kvm,kernel-irqchip=split", "-cpu", "host", "-m", "4096", "-smp", "4", "-display", "none", "-monitor", "none", "-serial", "stdio", "-no-reboot", "-nic", "none", "-cdrom", str(saved_image)]
++        for device in devices:
++            qemu.extend(["-device", f"vfio-pci,host={device}"])
++        try:
++            capture_guest(qemu, serial, nonce, args.timeout)
++        finally:
++            subprocess.run(["python3", str(ROOT / "tools/graphics/validate_native_gpu_evidence.py"), "--serial", str(serial), "--commit", commit, "--nonce", nonce, "--output", str(output / "native-result.json")], check=True)
++    return 0
++
++
++if __name__ == "__main__":
++    try:
++        raise SystemExit(main())
++    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
++        raise SystemExit(f"Asterinas native GPU run failed: {error}") from error
+diff --git a/tools/graphics/test_native_gpu_evidence.py b/tools/graphics/test_native_gpu_evidence.py
+new file mode 100644
+index 0000000..a3eaebb
+--- /dev/null
++++ b/tools/graphics/test_native_gpu_evidence.py
+@@ -0,0 +1,143 @@
++#!/usr/bin/env python3
++"""Synthetic fixtures for the serial evidence validator; these claim no GPU run."""
++from __future__ import annotations
++
++import json
++import unittest
++
++from validate_native_gpu_evidence import EvidenceError, validate_serial_log
++
++COMMIT = "0123456789abcdef0123456789abcdef01234567"
++NONCE = "abcdef0123456789abcdef0123456789"
++OTHER_NONCE = "11111111111111111111111111111111"
++OTHER_COMMIT = "fedcba9876543210fedcba9876543210fedcba98"
++
++
++def synthetic_benchmark(**overrides: object) -> dict[str, object]:
++    """Return a synthetic JSON record shaped like vulkan_compute_bench.c output."""
++    record: dict[str, object] = {
++        "status": "pass",
++        "device": "Synthetic NVIDIA test fixture",
++        "vendor": "NVIDIA",
++        "vendor_id": "0x10de",
++        "device_type": "discrete",
++        "driver": "Synthetic NVIDIA driver",
++        "driver_info": "Synthetic NVIDIA 615.78.08 fixture",
++        "driver_id": 4,
++        "driver_id_name": "nvidia-proprietary",
++        "os": "Linux synthetic-fixture 0.0.0 test",
++        "count": 64,
++        "dispatches": 2,
++        "verified_outputs": 64,
++        "gpu_elapsed_ns": 17.25,
++        "host_elapsed_ns": 90,
++    }
++    record.update(overrides)
++    return record
++
++
++def synthetic_log(
++    *,
++    benchmark: dict[str, object] | None = None,
++    boot_commit: str = COMMIT,
++    boot_nonce: str = NONCE,
++    result_nonce: str = NONCE,
++    exit_nonce: str = NONCE,
++    exit_status: str = "0",
++    include_boot: bool = True,
++    include_result: bool = True,
++    include_exit: bool = True,
++) -> str:
++    """Construct a clearly synthetic serial transcript."""
++    lines: list[str] = ["[synthetic test fixture; not output from a VM]"]
++    if include_boot:
++        lines.append(f"ASTERINAS_NATIVE_GPU_BOOT commit={boot_commit} nonce={boot_nonce}")
++    if include_result:
++        result_json = json.dumps(benchmark if benchmark is not None else synthetic_benchmark())
++        lines.append(f"ASTERINAS_NATIVE_GPU_RESULT nonce={result_nonce} {result_json}")
++    if include_exit:
++        lines.append(f"ASTERINAS_NATIVE_GPU_EXIT nonce={exit_nonce} status={exit_status}")
++    return "\n".join(lines) + "\n"
++
++
++class NativeGpuEvidenceTests(unittest.TestCase):
++    def assert_rejected(self, transcript: str, message: str | None = None) -> None:
++        with self.assertRaises(EvidenceError) as caught:
++            validate_serial_log(transcript, COMMIT, NONCE)
++        if message is not None:
++            self.assertIn(message, str(caught.exception))
++
++    def test_accepts_synthetic_valid_chain_and_linux_uname_is_not_evidence(self) -> None:
++        report = validate_serial_log(synthetic_log(), COMMIT, NONCE)
++        self.assertEqual(report["status"], "validated")
++        benchmark = report["benchmark"]
++        self.assertEqual(benchmark["os"], "Linux synthetic-fixture 0.0.0 test")
++        self.assertIn("not cryptographic attestation", report["trust_boundary"])
++
++    def test_rejects_missing_boot_marker(self) -> None:
++        self.assert_rejected(synthetic_log(include_boot=False), "missing ASTERINAS_NATIVE_GPU_BOOT")
++
++    def test_rejects_plain_linux_benchmark_without_native_prefixes(self) -> None:
++        linux_only = "Linux host uname output\n" + json.dumps(synthetic_benchmark()) + "\n"
++        self.assert_rejected(linux_only, "missing ASTERINAS_NATIVE_GPU_BOOT")
++
++    def test_rejects_wrong_nonce(self) -> None:
++        self.assert_rejected(
++            synthetic_log(boot_nonce=OTHER_NONCE, result_nonce=OTHER_NONCE, exit_nonce=OTHER_NONCE),
++            "missing ASTERINAS_NATIVE_GPU_BOOT",
++        )
++
++    def test_rejects_zero_or_nonfinite_timings(self) -> None:
++        for field, value, message in (
++            ("gpu_elapsed_ns", 0, "gpu_elapsed_ns"),
++            ("host_elapsed_ns", float("nan"), "non-standard numeric constant NaN"),
++        ):
++            with self.subTest(field=field):
++                self.assert_rejected(
++                    synthetic_log(benchmark=synthetic_benchmark(**{field: value})),
++                    message,
++                )
++
++    def test_rejects_mismatched_commit(self) -> None:
++        self.assert_rejected(synthetic_log(boot_commit=OTHER_COMMIT), "commit mismatch")
++
++    def test_rejects_bad_hardware_identity_and_software(self) -> None:
++        for changes, message in (
++            ({"vendor_id": "0x1002"}, "vendor_id"),
++            ({"device_type": "virtual"}, "device_type"),
++            ({"driver_id_name": "mesa-radv"}, "driver_id_name"),
++            ({"device": "llvmpipe software adapter"}, "software/virtual"),
++        ):
++            with self.subTest(changes=changes):
++                self.assert_rejected(synthetic_log(benchmark=synthetic_benchmark(**changes)), message)
++
++    def test_rejects_duplicate_result_for_nonce(self) -> None:
++        transcript = synthetic_log()
++        duplicate = f"ASTERINAS_NATIVE_GPU_RESULT nonce={NONCE} {json.dumps(synthetic_benchmark())}\n"
++        transcript = transcript.replace("ASTERINAS_NATIVE_GPU_EXIT", duplicate + "ASTERINAS_NATIVE_GPU_EXIT")
++        self.assert_rejected(transcript, "exactly one benchmark result")
++
++    def test_rejects_boot_commit_mismatch_and_bad_work_bounds(self) -> None:
++        self.assert_rejected(synthetic_log(boot_commit=OTHER_COMMIT), "commit mismatch")
++        self.assert_rejected(
++            synthetic_log(benchmark=synthetic_benchmark(count=16_777_217)),
++            "count exceeds benchmark limit",
++        )
++
++    def test_rejects_wrong_marker_order_and_nonzero_guest_exit(self) -> None:
++        normal = synthetic_log()
++        lines = normal.splitlines()
++        reordered = "\n".join((lines[0], lines[2], lines[1], lines[3]))
++        self.assert_rejected(reordered, "marker order")
++        self.assert_rejected(synthetic_log(exit_status="1"), "nonzero exit status")
++
++    def test_rejects_unknown_or_mismatched_nvidia_release(self) -> None:
++        for info in ("", "release not exposed", "NVIDIA 590.44.01"):
++            with self.subTest(driver_info=info):
++                self.assert_rejected(
++                    synthetic_log(benchmark=synthetic_benchmark(driver_info=info)),
++                    "not expected NVIDIA release",
++                )
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/graphics/test_run_native_nvidia.py b/tools/graphics/test_run_native_nvidia.py
+new file mode 100644
+index 0000000..86aa9aa
+--- /dev/null
++++ b/tools/graphics/test_run_native_nvidia.py
+@@ -0,0 +1,82 @@
++#!/usr/bin/env python3
++"""Synthetic orchestration tests; no GPU, PCI binding, or native boot is performed."""
++import os
++from pathlib import Path
++import sys
++import tempfile
++import unittest
++
++from run_native_nvidia import capture_guest, checked_devices
++
++
++class NativeRunnerTests(unittest.TestCase):
++    def create_pci_fixture(self, root, *, driver="vfio-pci", vendor="0x10de", pci_class="0x030000"):
++        device = root / "0000:01:00.0"
++        device.mkdir()
++        (device / "vendor").write_text(vendor)
++        (device / "class").write_text(pci_class)
++        target = root / "drivers" / driver
++        target.mkdir(parents=True)
++        (device / "driver").symlink_to(target, target_is_directory=True)
++        group = root / "groups" / "7"
++        (group / "devices").mkdir(parents=True)
++        (device / "iommu_group").symlink_to(group, target_is_directory=True)
++        (group / "devices" / device.name).symlink_to(device, target_is_directory=True)
++        return device, group
++
++    def test_prebound_nvidia_fixture_is_selected_without_writes(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            device, _ = self.create_pci_fixture(root)
++            before = os.readlink(device / "driver")
++            self.assertEqual(checked_devices(device.name, root), [device.name])
++            self.assertEqual(os.readlink(device / "driver"), before)
++
++    def test_rejects_invalid_or_duplicate_bdfs(self):
++        for value in ("", "01:00.0", "0000:01:00.0,0000:01:00.0", "$(command)"):
++            with self.subTest(value=value), self.assertRaises(ValueError):
++                checked_devices(value, Path("/nonexistent-fixture"))
++
++    def test_rejects_host_driver_and_non_nvidia(self):
++        for kwargs in ({"driver": "nvidia"}, {"vendor": "0x1002"}, {"pci_class": "0x040300"}):
++            with self.subTest(kwargs=kwargs), tempfile.TemporaryDirectory() as temporary:
++                root = Path(temporary)
++                device, _ = self.create_pci_fixture(root, **kwargs)
++                with self.assertRaises(ValueError):
++                    checked_devices(device.name, root)
++
++    def test_rejects_missing_iommu_and_host_bound_peer(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            root = Path(temporary)
++            device, group = self.create_pci_fixture(root)
++            peer = root / "0000:01:00.1"
++            peer.mkdir()
++            host_driver = root / "drivers/snd_hda_intel"
++            host_driver.mkdir()
++            (peer / "driver").symlink_to(host_driver, target_is_directory=True)
++            (group / "devices" / peer.name).symlink_to(peer, target_is_directory=True)
++            with self.assertRaisesRegex(ValueError, "host driver"):
++                checked_devices(device.name, root)
++            (device / "iommu_group").unlink()
++            with self.assertRaisesRegex(ValueError, "IOMMU"):
++                checked_devices(device.name, root)
++
++    def test_captures_complete_synthetic_serial_terminal_line(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            output = Path(temporary) / "serial.log"
++            nonce = "0" * 32
++            line = f"ASTERINAS_NATIVE_GPU_EXIT nonce={nonce} status=1"
++            # This deliberately failing guest marker tests capture only, not acceptance.
++            capture_guest([sys.executable, "-c", f"print({line!r}, flush=True)"], output, nonce, 3)
++            self.assertEqual(output.read_text().strip(), line)
++
++    def test_missing_terminal_marker_is_failure(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            output = Path(temporary) / "serial.log"
++            with self.assertRaisesRegex(RuntimeError, "without a complete terminal marker"):
++                capture_guest([sys.executable, "-c", "print('synthetic boot failure')"], output, "0" * 32, 3)
++            self.assertIn("synthetic boot failure", output.read_text())
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/graphics/validate_native_gpu_evidence.py b/tools/graphics/validate_native_gpu_evidence.py
+new file mode 100644
+index 0000000..addde8b
+--- /dev/null
++++ b/tools/graphics/validate_native_gpu_evidence.py
+@@ -0,0 +1,215 @@
++#!/usr/bin/env python3
++"""Validate CI-run Asterinas native-GPU evidence in a VM serial log.
++
++This checks a *runner-controlled log chain*, not cryptographic attestation. A
++host with control of the runner, VM console, or guest can forge every marker and
++benchmark field. In particular, uname reporting Linux is never accepted as
++proof that the guest kernel is Linux or Asterinas.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import math
++import re
++import sys
++from pathlib import Path
++from typing import Any
++
++MAX_COUNT = 16_777_216
++MAX_DISPATCHES = 100
++MAX_TOTAL_INVOCATIONS = 100_000_000
++EXPECTED_NVIDIA_RELEASE = "615.78.08"
++_HEX40 = re.compile(r"^[0-9a-fA-F]{40}$")
++_HEX32 = re.compile(r"^[0-9a-fA-F]{32}$")
++_BOOT = re.compile(
++    r"ASTERINAS_NATIVE_GPU_BOOT\s+commit=([0-9a-fA-F]{40})\s+nonce=([0-9a-fA-F]{32})(?=\s|$)"
++)
++_RESULT = re.compile(r"ASTERINAS_NATIVE_GPU_RESULT\s+nonce=([0-9a-fA-F]{32})\s+(.+?)\s*$")
++_EXIT = re.compile(r"ASTERINAS_NATIVE_GPU_EXIT\s+nonce=([0-9a-fA-F]{32})\s+status=([^\s]+)\s*$")
++_SOFTWARE_HINT = re.compile(
++    r"(?:llvmpipe|lavapipe|swiftshader|software\s+render|cpu\s+device|\bvirtual\s+gpu\b)",
++    re.IGNORECASE,
++)
++_VERSION = re.compile(r"(?<!\d)(\d{3,4}\.\d{1,3}\.\d{1,3})(?!\d)")
++
++
++class EvidenceError(ValueError):
++    """The serial log does not satisfy the evidence contract."""
++
++
++def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
++    result: dict[str, Any] = {}
++    for key, value in pairs:
++        if key in result:
++            raise EvidenceError(f"benchmark JSON has duplicate key: {key}")
++        result[key] = value
++    return result
++
++
++def _reject_json_constant(value: str) -> None:
++    raise EvidenceError(f"benchmark JSON contains non-standard numeric constant {value}")
++
++
++def _positive_integer(record: dict[str, Any], key: str) -> int:
++    value = record.get(key)
++    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
++        raise EvidenceError(f"{key} must be a positive integer (booleans are not integers here)")
++    return value
++
++
++def _positive_finite_number(record: dict[str, Any], key: str) -> int | float:
++    value = record.get(key)
++    if isinstance(value, bool) or not isinstance(value, (int, float)):
++        raise EvidenceError(f"{key} must be a finite positive number")
++    if not math.isfinite(value) or value <= 0:
++        raise EvidenceError(f"{key} must be a finite positive number")
++    return value
++
++
++def _validate_benchmark(raw: str) -> dict[str, Any]:
++    try:
++        record = json.loads(
++            raw,
++            object_pairs_hook=_unique_object,
++            parse_constant=_reject_json_constant,
++        )
++    except EvidenceError:
++        raise
++    except (json.JSONDecodeError, TypeError, ValueError) as exc:
++        raise EvidenceError(f"benchmark result is not valid JSON: {exc}") from exc
++    if not isinstance(record, dict):
++        raise EvidenceError("benchmark result must be a JSON object")
++
++    if record.get("status") != "pass":
++        raise EvidenceError(f"benchmark did not pass (status={record.get('status')!r})")
++    vendor_id = record.get("vendor_id")
++    if not isinstance(vendor_id, str) or vendor_id.lower() != "0x10de":
++        raise EvidenceError("vendor_id must identify NVIDIA (0x10de)")
++    if record.get("device_type") not in ("discrete", "integrated"):
++        raise EvidenceError("device_type must be discrete or integrated; software/other devices are rejected")
++    if record.get("driver_id_name") != "nvidia-proprietary":
++        raise EvidenceError("driver_id_name must be nvidia-proprietary")
++
++    metadata = " ".join(
++        str(record.get(key, "")) for key in ("device", "driver", "driver_info")
++    )
++    if _SOFTWARE_HINT.search(metadata):
++        raise EvidenceError("software/virtual GPU indicators are not accepted")
++
++    # The native port requires matching firmware/userspace. Unknown version is
++    # not a pass: require the dotted release exposed in NVIDIA driver metadata.
++    # Do not reinterpret uname or invent a version from a missing numeric field.
++    driver_info = record.get("driver_info", "")
++    driver_name = record.get("driver", "")
++    if not isinstance(driver_info, str) or not isinstance(driver_name, str):
++        raise EvidenceError("driver and driver_info must be strings when present")
++    disclosed_versions = _VERSION.findall(driver_info + " " + driver_name)
++    if EXPECTED_NVIDIA_RELEASE not in disclosed_versions:
++        raise EvidenceError(
++            f"driver metadata discloses {', '.join(disclosed_versions)}, not expected NVIDIA release "
++            f"{EXPECTED_NVIDIA_RELEASE}"
++        )
++
++    count = _positive_integer(record, "count")
++    dispatches = _positive_integer(record, "dispatches")
++    verified = _positive_integer(record, "verified_outputs")
++    if count > MAX_COUNT:
++        raise EvidenceError(f"count exceeds benchmark limit {MAX_COUNT}")
++    if dispatches > MAX_DISPATCHES:
++        raise EvidenceError(f"dispatches exceeds benchmark limit {MAX_DISPATCHES}")
++    if count * dispatches > MAX_TOTAL_INVOCATIONS:
++        raise EvidenceError(f"count*dispatches exceeds benchmark limit {MAX_TOTAL_INVOCATIONS}")
++    if verified != count:
++        raise EvidenceError("verified_outputs must equal count")
++
++    _positive_finite_number(record, "gpu_elapsed_ns")
++    _positive_finite_number(record, "host_elapsed_ns")
++    return record
++
++
++def validate_serial_log(serial_text: str, commit: str, nonce: str) -> dict[str, Any]:
++    """Validate markers and benchmark content; return a JSON-serializable report."""
++    if not isinstance(commit, str) or not _HEX40.fullmatch(commit):
++        raise EvidenceError("--commit must be exactly 40 hexadecimal characters")
++    if not isinstance(nonce, str) or not _HEX32.fullmatch(nonce):
++        raise EvidenceError("--nonce must be exactly 32 hexadecimal characters")
++    expected_commit = commit.lower()
++    expected_nonce = nonce.lower()
++
++    boots: list[tuple[int, str]] = []
++    results: list[tuple[int, str]] = []
++    exits: list[tuple[int, str]] = []
++    for line_number, line in enumerate(serial_text.splitlines(), start=1):
++        for match in _BOOT.finditer(line):
++            if match.group(2).lower() == expected_nonce:
++                boots.append((line_number, match.group(1).lower()))
++        for match in _RESULT.finditer(line):
++            if match.group(1).lower() == expected_nonce:
++                results.append((line_number, match.group(2)))
++        for match in _EXIT.finditer(line):
++            if match.group(1).lower() == expected_nonce:
++                exits.append((line_number, match.group(2)))
++
++    if not boots:
++        raise EvidenceError("missing ASTERINAS_NATIVE_GPU_BOOT marker for requested nonce")
++    if len(boots) != 1:
++        raise EvidenceError("expected exactly one boot marker for requested nonce")
++    boot_line, boot_commit = boots[0]
++    if boot_commit != expected_commit:
++        raise EvidenceError(
++            f"boot marker commit mismatch: expected {expected_commit}, got {boot_commit}"
++        )
++
++    if not results:
++        raise EvidenceError("missing ASTERINAS_NATIVE_GPU_RESULT marker for requested nonce")
++    if len(results) != 1:
++        raise EvidenceError("expected exactly one benchmark result for requested nonce")
++    result_line, json_text = results[0]
++
++    if not exits:
++        raise EvidenceError("missing ASTERINAS_NATIVE_GPU_EXIT marker for requested nonce")
++    if len(exits) != 1:
++        raise EvidenceError("expected exactly one exit marker for requested nonce")
++    exit_line, exit_status = exits[0]
++    if exit_status != "0":
++        raise EvidenceError(f"guest reported nonzero exit status {exit_status!r}")
++    if not (boot_line < result_line < exit_line):
++        raise EvidenceError("required marker order is boot, benchmark result, then successful exit")
++
++    benchmark = _validate_benchmark(json_text)
++    return {
++        "status": "validated",
++        "commit": expected_commit,
++        "nonce": expected_nonce,
++        "benchmark": benchmark,
++        "serial_lines": {"boot": boot_line, "result": result_line, "exit": exit_line},
++        "trust_boundary": (
++            "Evidence is a runner-controlled serial-log chain, not cryptographic attestation; "
++            "a party controlling the runner, VM console, or guest can forge it. uname is not proof."
++        ),
++    }
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--serial", required=True, type=Path, help="VM serial log path")
++    parser.add_argument("--commit", required=True, help="expected 40-hex CI build commit")
++    parser.add_argument("--nonce", required=True, help="expected 32-hex CI run nonce")
++    parser.add_argument("--output", required=True, type=Path, help="write validated evidence JSON here")
++    args = parser.parse_args(argv)
++    try:
++        serial_text = args.serial.read_text(encoding="utf-8", errors="strict")
++        report = validate_serial_log(serial_text, args.commit, args.nonce)
++        output = json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n"
++        args.output.parent.mkdir(parents=True, exist_ok=True)
++        args.output.write_text(output, encoding="utf-8")
++    except (OSError, UnicodeError, EvidenceError) as exc:
++        print(f"native GPU evidence rejected: {exc}", file=sys.stderr)
++        return 1
++    print(f"native GPU evidence validated: {args.output}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
