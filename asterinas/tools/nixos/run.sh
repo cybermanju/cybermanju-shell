@@ -32,8 +32,18 @@ fi
 # Change to Asterinas root directory to ensure all scripts run from the correct location.
 cd "${ASTERINAS_DIR}"
 
-# Get base QEMU arguments from qemu_args.sh script
-QEMU_ARGS=$(${ASTERINAS_DIR}/tools/qemu_args.sh common 2>/dev/null)
+# Do not depend on nested virtualization being exposed by the hosted runner.
+# Recheck access here as well as CI preflight, before choosing the CPU model.
+if [ "${ENABLE_KVM:-auto}" != "0" ] && [ -c /dev/kvm ] && [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+    ENABLE_KVM=1
+else
+    ENABLE_KVM=0
+fi
+export ENABLE_KVM
+
+# No auxiliary test disks: the install target must be unambiguously /dev/vda.
+# This scheme uses UEFI explicitly, matching the installed removable EFI GRUB.
+QEMU_ARGS=$(${ASTERINAS_DIR}/tools/qemu_args.sh nixos 2>/dev/null)
 
 # Add mode-specific disk and device arguments
 case "$MODE" in
@@ -56,11 +66,27 @@ case "$MODE" in
 
         rm -f "${ASTER_IMAGE_PATH}"
         echo "Creating image at ${ASTER_IMAGE_PATH} of size ${NIXOS_DISK_SIZE_IN_MB}MB......"
-        dd if=/dev/zero of="${ASTER_IMAGE_PATH}" bs=1M count=${NIXOS_DISK_SIZE_IN_MB} status=none
+        # Keep guest capacity without eagerly allocating it on the host.
+        truncate -s "${NIXOS_DISK_SIZE_IN_MB}M" "${ASTER_IMAGE_PATH}"
         echo "Image created successfully!"
 
+        case "${ISO_BOOT_MODE:-cdrom}" in
+            cdrom)
+                ISO_BOOT_ARGS="-cdrom ${ISO_IMAGE_PATH} -boot d"
+                ;;
+            usb)
+                # Boot the identical hybrid ISO, not an extracted kernel/initrd.
+                ISO_BOOT_ARGS="-device qemu-xhci,id=iso-xhci \
+                    -drive if=none,format=raw,readonly=on,id=iso-usb,file=${ISO_IMAGE_PATH} \
+                    -device usb-storage,bus=iso-xhci.0,drive=iso-usb,bootindex=1"
+                ;;
+            *)
+                echo "Error: ISO_BOOT_MODE must be cdrom or usb" >&2
+                exit 1
+                ;;
+        esac
         QEMU_ARGS="${QEMU_ARGS} \
-            -cdrom ${ISO_IMAGE_PATH} -boot d \
+            ${ISO_BOOT_ARGS} \
             -drive if=none,format=raw,id=u0,file=${ASTER_IMAGE_PATH} \
             -device virtio-blk-pci,drive=u0,disable-legacy=on,disable-modern=off \
         "
@@ -72,6 +98,10 @@ esac
 
 if [ "${ENABLE_KVM}" = "1" ]; then
     QEMU_ARGS="${QEMU_ARGS} -accel kvm"
+    echo "QEMU acceleration: kvm (/dev/kvm available)"
+else
+    QEMU_ARGS="${QEMU_ARGS} -accel tcg,thread=multi"
+    echo "QEMU acceleration: tcg (software emulation; KVM absent, inaccessible or disabled)"
 fi
 
 QEMU_BIN=${QEMU_BIN:-qemu-system-${TARGET_ARCH}}

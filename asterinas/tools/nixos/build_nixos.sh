@@ -38,7 +38,7 @@ if [ -e ${ASTER_IMAGE_PATH} ] \
 fi
 if [ ! -e ${ASTER_IMAGE_PATH} ]; then
     echo "Creating image at ${ASTER_IMAGE_PATH} of size ${NIXOS_DISK_SIZE_IN_MB}MB......"
-    fallocate -l ${NIXOS_DISK_SIZE_IN_MB}M ${ASTER_IMAGE_PATH}
+    truncate -s ${NIXOS_DISK_SIZE_IN_MB}M ${ASTER_IMAGE_PATH}
     echo "Image created successfully!"
 fi
 

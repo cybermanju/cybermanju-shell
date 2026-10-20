@@ -85,6 +85,37 @@ else
     CONSOLE_ARGS="-serial chardev:mux"
 fi
 
+# NixOS installation/boot must have exactly one virtio block disk: /dev/vda.
+# Kernel-test data disks (and NVMe fixtures) are irrelevant here and can change
+# Linux enumeration order. Keep the other schemes unchanged.
+if [ "$1" = "nixos" ]; then
+    NIXOS_NETWORK_DEVICE_ARGS=""
+    if [ "$NETDEV" = "user" ] || [ "$NETDEV" = "tap" ]; then
+        NIXOS_NETWORK_DEVICE_ARGS="-device virtio-net-pci,netdev=net01,disable-legacy=on,disable-modern=off$VIRTIO_NET_FEATURES"
+    fi
+    NIXOS_CPU_MODEL="Icelake-Server,+x2apic,-vmx"
+    if [ "${ENABLE_KVM:-0}" = "1" ]; then
+        NIXOS_CPU_MODEL="Icelake-Server,+x2apic,+vmx"
+    fi
+    QEMU_ARGS="\
+        -cpu $NIXOS_CPU_MODEL \
+        -smp ${SMP:-1} -m ${MEM:-8G} \
+        -machine q35,kernel-irqchip=split \
+        --no-reboot -nographic -display $QEMU_DISPLAY \
+        -monitor chardev:mux \
+        -chardev stdio,id=mux,mux=on,signal=off,logfile=qemu.log \
+        -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
+        -object rng-random,id=rng0,filename=/dev/urandom \
+        -device virtio-rng-pci,disable-legacy=on,disable-modern=off,rng=rng0,event_idx=off,indirect_desc=off,queue_reset=off \
+        $NETDEV_ARGS $NIXOS_NETWORK_DEVICE_ARGS \
+        -device virtio-serial-pci,disable-legacy=on,disable-modern=off \
+        $CONSOLE_ARGS \
+        -bios ${OVMF_DIR}/OVMF.fd \
+    "
+    echo $QEMU_ARGS
+    exit 0
+fi
+
 if [ "$INITRAMFS" = "off" ]; then
     ROOTFS_DRIVE_ARGS="-drive if=none,format=raw,id=rootfs,file=./test/initramfs/build/rootfs.img"
 fi

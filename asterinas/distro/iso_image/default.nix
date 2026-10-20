@@ -26,14 +26,27 @@ let
     system.nixos.distroName = "Asterinas NixOS";
     system.nixos.label = "${version}";
     isoImage.appendToMenuLabel = " Installer";
+    # Keep the full minimal installer, nixpkgs source and editable target config.
+    # The live environment uses Linux; Asterinas is the installed target kernel.
+    isoImage.makeBiosBootable = true;
+    isoImage.makeEfiBootable = true;
+    isoImage.makeUsbBootable = true;
+    isoImage.squashfsCompression = "xz -Xdict-size 100%";
+    isoImage.includeSystemBuildDependencies = false;
     isoImage.storeContents = [ (builtins.storePath pkgs.path) ];
 
+    # No copytoram: the compressed store stays on the ISO/USB medium.
+    boot.kernelParams = [ "console=tty0" "console=hvc0" ];
     services.getty.autologinUser = pkgs.lib.mkForce "root";
     environment.systemPackages = [ installer ];
     environment.loginShellInit = ''
       if [ ! -e "$HOME/configuration.nix" ]; then
         # Create an editable copy of configuration.nix in user's home.
         cp -L ${installer}/etc_nixos/configuration.nix $HOME && chmod u+w $HOME/configuration.nix
+      fi
+
+      if [ "$(tty)" == "/dev/hvc0" ]; then
+        echo "CYBERMANJU_LIVE_INSTALLER_READY"
       fi
 
       ${pkgs.lib.optionalString autoInstall ''

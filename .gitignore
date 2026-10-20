@@ -18,3 +18,8 @@
 .env.*
 !.env.example
 !.env.sample
+
+# Generated ISO artifacts and VM diagnostics
+/output/
+/artifacts/
+/asterinas/qemu*.log

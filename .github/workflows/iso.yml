@@ -23,138 +23,207 @@ concurrency:
 
 jobs:
   iso:
-    name: x86_64 ISO / install / boot
-    # Do not execute untrusted fork code inside the privileged VM build image.
+    name: Standard runner / full ISO / USB / install / Asterinas
+    # Never run untrusted fork code inside the privileged build environment.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    # 333 minutes of step maxima plus 17 minutes margin, below the hosted 360-minute cap.
+    timeout-minutes: 350
     env:
-      # Pin the upstream kernel-dev 0.19.0-20261012 multi-architecture image.
       BUILD_IMAGE: asterinas/kernel-dev@sha256:97d370e2260fec73f59d9ee02a128edb84141789248e4c1c4b18f05da8bf4e51
+      # Decimal 14 GB, deliberately not 14 GiB. Reserve includes upload headroom.
+      ISO_DISK_LIMIT_BYTES: '14000000000'
+      ISO_DISK_RESERVE_BYTES: '1073741824'
     steps:
       - uses: actions/checkout@v4
+        timeout-minutes: 5
         with:
           persist-credentials: false
 
-      - name: Validate smoke-test gates
+      - name: Lightweight static regression tests
+        timeout-minutes: 2
         run: |
-          bash -n tools/ci/test-iso.sh
-          python3 tools/ci/test_iso_gate.py -v
+          bash -n tools/ci/test-iso.sh tools/ci/verify-iso.sh
+          bash -n asterinas/tools/nixos/run.sh asterinas/tools/nixos/build_nixos.sh asterinas/tools/qemu_args.sh
+          python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 
-      - name: Prepare hosted runner disk and KVM
+      - name: Establish disk budget and select KVM or TCG (no SDK deletion)
+        timeout-minutes: 2
         shell: bash
         run: |
           set -euo pipefail
-          # These are disposable preinstalled SDKs on this GitHub-hosted runner,
-          # not files on the user's computer. All build tools come from Docker.
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          if [[ -n "${AGENT_TOOLSDIRECTORY:-}" ]]; then
-            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          fi
-          df -h .
-          free_kb=$(df -Pk . | awk 'NR==2 {print $4}')
-          (( free_kb >= 45 * 1024 * 1024 )) || {
-            echo 'At least 45 GiB free is required for the ISO/install test.' >&2
-            exit 1
-          }
-          test -c /dev/kvm || {
-            echo 'This workflow needs a GitHub-hosted x86_64 runner with KVM.' >&2
-            exit 1
-          }
-          sudo chmod a+rw /dev/kvm
-          mkdir -p artifacts
+          mkdir -p artifacts output
+          docker_root=$(docker info --format '{{.DockerRootDir}}')
+          checkout_bytes=$(du -s -B1 "$GITHUB_WORKSPACE" | cut -f1)
+          # Include Docker's compressed layers and writable layer, not just /work.
+          sudo python3 tools/ci/disk_budget.py init artifacts/disk-budget.json \
+            --path "$GITHUB_WORKSPACE" --docker-root "$docker_root" \
+            --initial-bytes "$checkout_bytes" \
+            --limit-bytes "$ISO_DISK_LIMIT_BYTES" \
+            --reserve-bytes "$ISO_DISK_RESERVE_BYTES"
+          # Missing/inaccessible /dev/kvm is normal: select explicit software TCG.
+          vm_exports=$(python3 tools/ci/vm_settings.py shell --record artifacts/acceleration.json)
+          eval "$vm_exports"
+          printf 'ENABLE_KVM=%s\nQEMU_ACCEL=%s\n' "$ENABLE_KVM" "$QEMU_ACCEL" >> "$GITHUB_ENV"
+          printf 'QEMU acceleration: %s\n' "$QEMU_ACCEL" | tee artifacts/acceleration.log
+          df -h . | tee artifacts/disk-start.log
 
-      - name: Start pinned build environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker pull "$BUILD_IMAGE"
-          docker run --detach --name iso-builder --privileged \
-            --volume /dev:/dev \
-            --volume "$GITHUB_WORKSPACE:/work" \
-            --workdir /work/asterinas \
-            --env ENABLE_KVM=1 --env MEM=4G --env SMP=2 \
-            --env QEMU_DISPLAY=none --env CARGO_BUILD_JOBS=2 \
-            --entrypoint /bin/bash "$BUILD_IMAGE" -c 'exec sleep infinity'
-          docker exec iso-builder bash -lc 'set -euo pipefail; test -r /dev/kvm; test -w /dev/kvm; rustc --version; nix-build --version; qemu-system-x86_64 --version'
-
-      - name: Build ISO from this checkout
-        timeout-minutes: 70
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker exec iso-builder bash -lc \
-            'set -euo pipefail; make iso NIXOS_TEST_SUITE=hello AUTO_INSTALL=true' \
-            2>&1 | tee artifacts/build.log
-          # Dereference the Nix-store symlink before uploading the actual ISO.
-          mapfile -t images < <(find -L asterinas/target/nixos/iso_image/iso -maxdepth 1 -type f -name '*.iso')
-          [[ ${#images[@]} -eq 1 ]] || { echo 'Expected exactly one ISO'; exit 1; }
-          docker cp -L "iso-builder:/work/asterinas/target/nixos/iso_image/iso/$(basename "${images[0]}")" artifacts/cybermanju-asterinas-x86_64.iso
-          test -s artifacts/cybermanju-asterinas-x86_64.iso
-          (cd artifacts && sha256sum cybermanju-asterinas-x86_64.iso > SHA256SUMS)
-          printf '%s\n' "$GITHUB_SHA" > artifacts/source-commit.txt
-
-      - name: Boot ISO and verify installation
-        timeout-minutes: 25
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker exec iso-builder bash -lc 'bash /work/tools/ci/test-iso.sh install' \
-            2>&1 | tee artifacts/install.log
-
-      - name: Boot installed Asterinas and run hello test
+      - name: Pull and start pinned builder within budget
         timeout-minutes: 15
         shell: bash
         run: |
           set -euo pipefail
-          docker exec iso-builder bash -lc 'bash /work/tools/ci/test-iso.sh boot' \
-            2>&1 | tee artifacts/boot.log
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker pull --platform linux/amd64 "$BUILD_IMAGE" 2>&1 | tee artifacts/pull.log
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker run --detach --name iso-builder --privileged \
+            --platform linux/amd64 --volume /dev:/dev \
+            --volume "$GITHUB_WORKSPACE:/work" --workdir /work/asterinas \
+            --env ENABLE_KVM="$ENABLE_KVM" --env QEMU_ACCEL="$QEMU_ACCEL" \
+            --env MEM=4G --env SMP=2 \
+            --env QEMU_DISPLAY=none --env CARGO_BUILD_JOBS=2 \
+            --env CARGO_INCREMENTAL=0 --env CARGO_PROFILE_DEV_DEBUG=0 \
+            --env CARGO_PROFILE_RELEASE_DEBUG=0 \
+            --env NIX_CONFIG=$'max-jobs = 1\ncores = 2' \
+            --entrypoint /bin/bash "$BUILD_IMAGE" -c 'exec sleep infinity'
+          docker exec iso-builder bash -lc \
+            'set -euo pipefail; printf "Builder QEMU acceleration: %s (ENABLE_KVM=%s)\n" "$QEMU_ACCEL" "$ENABLE_KVM"; rustc --version; nix-build --version; qemu-system-x86_64 --version; command -v xorriso'
+          docker image inspect "$BUILD_IMAGE" --format 'Image unpacked bytes: {{.Size}}' \
+            | tee artifacts/image-size.log
+          python3 tools/ci/disk_budget.py check artifacts/disk-budget.json
 
-      - name: Publish ISO and checksum
-        # Keep a successfully built ISO even if a later VM test fails. The job
-        # result and logs (not the existence of an artifact) determine acceptance.
-        if: ${{ !cancelled() && hashFiles('artifacts/SHA256SUMS') != '' }}
+      - name: Build the full interactive installer (not a test-only image)
+        timeout-minutes: 75
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker exec iso-builder bash -lc \
+            'set -euo pipefail; make iso AUTO_INSTALL=false' 2>&1 | tee artifacts/build.log
+          touch artifacts/iso-built
+
+      - name: Verify hybrid boot metadata, GRUB and full installer payload
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker exec iso-builder bash /work/tools/ci/verify-iso.sh \
+            2>&1 | tee artifacts/verify.log
+          touch artifacts/verify.passed
+
+      - name: Boot the identical ISO as UEFI USB and test the Linux live installer
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker exec -i iso-builder bash /work/tools/ci/test-iso.sh live-usb \
+            2>&1 | tee artifacts/live-usb.log
+          touch artifacts/live-usb.passed
+
+      - name: Boot ISO as UEFI CD, install and verify installed EFI GRUB
+        timeout-minutes: 100
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker exec -i iso-builder bash /work/tools/ci/test-iso.sh install \
+            2>&1 | tee artifacts/install.log
+          touch artifacts/install.passed
+
+      - name: Boot the installed Asterinas kernel and test hello userspace
+        timeout-minutes: 60
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker exec -i iso-builder bash /work/tools/ci/test-iso.sh boot \
+            2>&1 | tee artifacts/boot.log
+          touch artifacts/boot.passed
+
+      - name: Export ISO to output only after VM work (also on test failure)
+        if: ${{ !cancelled() && hashFiles('artifacts/iso-built') != '' }}
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Copy once at the end, not alongside the peak install/build footprint.
+          # Container Nix-store links cannot be dereferenced on the host.
+          iso=$(docker exec iso-builder bash -lc \
+            'set -euo pipefail; mapfile -t images < <(find -L target/nixos/iso_image/iso -maxdepth 1 -type f -name "*.iso"); [[ ${#images[@]} -eq 1 ]]; realpath "${images[0]}"')
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker cp "iso-builder:$iso" output/cybermanju-asterinas-x86_64.iso \
+            2>&1 | tee artifacts/export.log
+          test -s output/cybermanju-asterinas-x86_64.iso
+          (cd output && sha256sum cybermanju-asterinas-x86_64.iso > SHA256SUMS)
+          printf '%s\n' "$GITHUB_SHA" > output/source-commit.txt
+          python3 tools/ci/disk_budget.py check artifacts/disk-budget.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          gates = {name: Path(f'artifacts/{name}.passed').exists()
+                   for name in ('verify', 'live-usb', 'install', 'boot')}
+          acceleration = {path.stem: json.loads(path.read_text())
+                          for path in Path('artifacts').glob('acceleration*.json')}
+          Path('output/validation.json').write_text(json.dumps({
+              'source_commit': os.environ['GITHUB_SHA'], 'gates': gates,
+              'accepted': all(gates.values()),
+              'acceleration': acceleration,
+              'live_environment': 'Linux NixOS full interactive Asterinas installer',
+              'installed_target': 'Asterinas NixOS, base configuration with hello-asterinas and gitMinimal',
+              'limits': 'Online installation; no integrated desktop, GPU, physical USB or Secure Boot certification; BIOS metadata only',
+          }, indent=2) + '\n')
+          PY
+
+      - name: Publish full ISO and explicit validation status
+        if: ${{ !cancelled() && hashFiles('output/validation.json') != '' }}
+        timeout-minutes: 10
         uses: actions/upload-artifact@v4
         with:
           name: asterinas-iso-${{ github.sha }}
-          path: |
-            artifacts/*.iso
-            artifacts/SHA256SUMS
-            artifacts/source-commit.txt
+          path: output/
           compression-level: 0
           retention-days: 7
           if-no-files-found: error
 
-      - name: Collect VM diagnostics
+      - name: Collect diagnostics without pruning build or user files
         if: always()
+        timeout-minutes: 3
         shell: bash
         run: |
           mkdir -p artifacts
-          sudo find asterinas -maxdepth 2 -name 'qemu*.log' -type f -exec cp {} artifacts/ \; || true
-          sudo chmod -R a+rX artifacts
-          df -h . > artifacts/disk.txt
-          docker rm -f iso-builder || true
+          sudo find asterinas -maxdepth 1 -name 'qemu*.log' -type f -exec cp {} artifacts/ \; || true
+          sudo chmod -R a+rX artifacts output
+          df -h . > artifacts/disk-final.log
+          docker stop --time 10 iso-builder || true
 
-      - name: Publish build and test logs
+      - name: Publish build, disk and VM diagnostics
         if: always()
+        timeout-minutes: 5
         uses: actions/upload-artifact@v4
         with:
           name: iso-test-logs-${{ github.sha }}
-          path: artifacts/*.log
-          retention-days: 14
+          path: artifacts/
+          retention-days: 7
           if-no-files-found: warn
 
-      - name: Record result
+      - name: Record honest acceptance result
         if: always()
-        shell: bash
+        timeout-minutes: 1
         env:
           JOB_STATUS: ${{ job.status }}
         run: |
           {
-            echo '## Asterinas x86_64 ISO'
-            echo "Commit: \`$GITHUB_SHA\`"
-            echo "Job status: **$JOB_STATUS**"
-            echo 'Gates: source build, ISO installation success marker, installed-OS hello test.'
-            echo 'This is the Asterinas NixOS installer, not an integrated GPUI/CyberManju desktop or GPU certification.'
-            echo 'An ISO artifact alone does not mean its VM tests passed; inspect the job result and logs.'
+            echo '## Full Asterinas installer ISO — standard-runner attempt'
+            echo "Commit: \`$GITHUB_SHA\`; job status: **$JOB_STATUS**"
+            echo "Preflight QEMU acceleration: **${QEMU_ACCEL:-not selected}**; phase-specific choices are in validation.json and logs."
+            echo 'KVM only when the device is available and accessible; otherwise explicit TCG software emulation.'
+            echo 'TCG-sized step budgets: build 75m, live USB 35m, install 100m, installed boot 60m; job 350m (<360m hosted maximum).'
+            echo 'Only a successful job establishes fit and all configured VM gates.'
+            echo '14 GB total incremental disk budget, including Docker; no SDK deletion or larger-runner fallback.'
+            echo 'Sparse guest capacity is not host disk consumption. Budget polling is not a hard filesystem quota.'
+            echo 'Gates: <=4 GiB full ISO; BIOS/UEFI hybrid metadata; EFI GRUB; UEFI USB live Linux installer; UEFI CD install; installed GRUB; installed Asterinas hello test.'
+            echo 'BIOS execution, physical USB hardware, offline installation, Secure Boot and an integrated GPUI/CyberManju desktop are NOT certified.'
+            echo 'A retained ISO from a failed job is UNACCEPTED; read validation.json and logs.'
           } >> "$GITHUB_STEP_SUMMARY"
