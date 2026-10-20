@@ -1,0 +1,9 @@
+Incremental patches replay byte-for-byte; both indexes unchanged.
+{
+  "rust": 205,
+  "python": 36,
+  "native_reported": 315,
+  "native_skips": 3,
+  "notes": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+  "manifest": "/workspace/asterinas-gpui/evidence/appearance-density-2121/delivery-manifest.json"
+}

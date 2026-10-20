@@ -1,0 +1,515 @@
+diff --git a/kernel/comps/nvidia-platform/src/lib.rs b/kernel/comps/nvidia-platform/src/lib.rs
+--- a/kernel/comps/nvidia-platform/src/lib.rs
++++ b/kernel/comps/nvidia-platform/src/lib.rs
+@@ -8,6 +8,7 @@
+ 
+ extern crate alloc;
+ pub mod device;
++pub mod worker;
+ 
+ #[cfg(feature = "nvport-runtime")]
+ mod runtime;
+diff --git a/kernel/comps/nvidia-platform/src/worker.rs b/kernel/comps/nvidia-platform/src/worker.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/src/worker.rs
+@@ -0,0 +1,189 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Owned, single-callback deferred execution for a future per-device NVIDIA bottom half.
++//!
++//! This is not the upstream FIFO kthread queue or an RM ISR implementation. A real device
++//! service must inspect/drain its own hardware work on each invocation. Repeated requests
++//! coalesce while pending; a request during execution guarantees another invocation.
++use alloc::sync::Arc;
++
++use ostd::{
++    sync::{LocalIrqDisabled, SpinLock, WaitQueue},
++    task::{Task, TaskOptions, atomic_mode::can_sleep},
++};
++
++/// A rejected operation on the native deferred worker.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum WorkerError {
++    /// Creation and synchronous shutdown require a sleepable, real task context.
++    InvalidContext,
++    /// A callback cannot synchronously wait for its own worker to stop.
++    SelfWait,
++    /// Stop has closed admission; the request was not accepted.
++    Closed,
++    /// OSTD could not allocate/build the actual task and its kernel stack.
++    Task(ostd::Error),
++}
++
++/// Whether this signal installed new pending work or joined an existing request.
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum ScheduleResult {
++    Queued,
++    Coalesced,
++}
++
++struct State {
++    pending: bool,
++    closing: bool,
++    stopped: bool,
++}
++
++struct Shared {
++    state: SpinLock<State, LocalIrqDisabled>,
++    ready: WaitQueue,
++    stopped: WaitQueue,
++}
++
++impl Shared {
++    fn close(&self) {
++        self.state.lock().closing = true;
++        self.ready.wake_one();
++    }
++}
++
++/// Cloneable signaling capability. It cannot run a callback or reopen a closed worker.
++///
++/// `schedule` only touches IRQ-safe state and wakes the OSTD task. It does not allocate
++/// a work item or execute device code inline. Normal maskable IRQ and task context are
++/// supported; this spin-lock-based service is not NMI-safe. No caller may invoke it while
++/// holding a scheduler/WaitQueue internal lock. It does not acknowledge a device IRQ.
++#[derive(Clone)]
++pub struct WorkSignal {
++    shared: Arc<Shared>,
++}
++
++impl WorkSignal {
++    pub fn schedule(&self) -> Result<ScheduleResult, WorkerError> {
++        let result = {
++            let mut state = self.shared.state.lock();
++            if state.closing {
++                return Err(WorkerError::Closed);
++            }
++            let result = if state.pending {
++                ScheduleResult::Coalesced
++            } else {
++                ScheduleResult::Queued
++            };
++            state.pending = true;
++            result
++        };
++        // Release the admission lock before entering scheduler/wait-queue machinery.
++        self.shared.ready.wake_one();
++        Ok(result)
++    }
++}
++
++/// Exclusive lifecycle owner for one real OSTD worker task and its callback captures.
++///
++/// The task owns the callback, not the signal handles. Close and admission serialize on
++/// one IRQ-safe lock. Shutdown drains every accepted/coalesced pending invocation and
++/// drops the callback/captures before reporting completion. It does not wait for arbitrary
++/// tasks spawned by that callback, nor stop DMA, mask a device, or synchronize its IRQs.
++/// The device driver must do that before releasing its resources. Captures must be owned
++/// (`'static`); no borrowed pre-RM resources are smuggled across their PCI reservation.
++///
++/// Drop closes admission without blocking, even in atomic/self-worker context. The task
++/// retains its captures until the accepted work drains; use `shutdown` before releasing
++/// external device state. Shutdown must not hold any lock needed by the callback or by
++/// the callback's capture destructors. A callback that never returns cannot be drained.
++#[must_use = "Keep the worker owner and explicitly shut it down before releasing device state"]
++pub struct DeviceWorker {
++    shared: Arc<Shared>,
++    task: Arc<Task>,
++}
++
++impl DeviceWorker {
++    /// Creates a real scheduled task. No work runs until a signal is accepted.
++    pub fn start<F>(mut callback: F) -> Result<Self, WorkerError>
++    where
++        F: FnMut() + Send + 'static,
++    {
++        if !can_sleep() {
++            return Err(WorkerError::InvalidContext);
++        }
++        let shared = Arc::new(Shared {
++            state: SpinLock::new(State {
++                pending: false,
++                closing: false,
++                stopped: false,
++            }),
++            ready: WaitQueue::new(),
++            stopped: WaitQueue::new(),
++        });
++        let worker_shared = shared.clone();
++        let task = TaskOptions::new(move || {
++            loop {
++                let run = worker_shared.ready.wait_until(|| {
++                    let mut state = worker_shared.state.lock();
++                    // Even after close, work accepted before close must run.
++                    if state.pending {
++                        state.pending = false;
++                        Some(true)
++                    } else if state.closing {
++                        Some(false)
++                    } else {
++                        None
++                    }
++                });
++                if !run {
++                    break;
++                }
++                callback();
++            }
++            // Completion includes capture destruction, outside all our state locks.
++            drop(callback);
++            worker_shared.state.lock().stopped = true;
++            worker_shared.stopped.wake_all();
++        })
++        .build()
++        .map_err(WorkerError::Task)?;
++        let task = Arc::new(task);
++        task.run();
++        Ok(Self { shared, task })
++    }
++
++    /// Creates a signaling handle without handing out ownership of the worker task.
++    pub fn signal(&self) -> WorkSignal {
++        WorkSignal {
++            shared: self.shared.clone(),
++        }
++    }
++
++    /// Closes admission, drains accepted work, and destroys the callback captures.
++    ///
++    /// Repeated shutdown is harmless. Invalid-context and self-wait rejections do not
++    /// close admission. Completion proves callback quiescence, not scheduler task-exit,
++    /// posted-MSI drain, device reset or successful RM/GSP initialization.
++    pub fn shutdown(&mut self) -> Result<(), WorkerError> {
++        if !can_sleep() {
++            return Err(WorkerError::InvalidContext);
++        }
++        let current = Task::current().ok_or(WorkerError::InvalidContext)?;
++        if core::ptr::eq(&*current, &*self.task) {
++            return Err(WorkerError::SelfWait);
++        }
++        self.shared.close();
++        self.shared
++            .stopped
++            .wait_until(|| self.shared.state.lock().stopped.then_some(()));
++        Ok(())
++    }
++}
++
++impl Drop for DeviceWorker {
++    fn drop(&mut self) {
++        self.shared.close();
++    }
++}
++
++#[cfg(ktest)]
++mod tests;
+diff --git a/kernel/comps/nvidia-platform/src/worker/tests.rs b/kernel/comps/nvidia-platform/src/worker/tests.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/comps/nvidia-platform/src/worker/tests.rs
+@@ -0,0 +1,251 @@
++// SPDX-License-Identifier: MPL-2.0
++use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
++
++use ostd::{irq::InterruptLevel, prelude::ktest};
++
++use super::*;
++
++struct Event {
++    signaled: AtomicBool,
++    queue: WaitQueue,
++}
++
++impl Event {
++    fn new() -> Arc<Self> {
++        Arc::new(Self {
++            signaled: AtomicBool::new(false),
++            queue: WaitQueue::new(),
++        })
++    }
++    fn signal(&self) {
++        self.signaled.store(true, Ordering::Release);
++        self.queue.wake_all();
++    }
++    fn wait(&self) {
++        self.queue
++            .wait_until(|| self.signaled.load(Ordering::Acquire).then_some(()));
++    }
++}
++
++struct DropWitness {
++    drops: Arc<AtomicUsize>,
++    done: Arc<Event>,
++}
++
++impl Drop for DropWitness {
++    fn drop(&mut self) {
++        assert!(
++            can_sleep(),
++            "callback captures must be destroyed by the task"
++        );
++        self.drops.fetch_add(1, Ordering::AcqRel);
++        self.done.signal();
++    }
++}
++
++#[ktest]
++fn worker_coalesces_during_execution_and_shutdown_drops_captures() {
++    let parent = Task::current().unwrap().cloned();
++    let started = Event::new();
++    let release = Event::new();
++    let dropped = Event::new();
++    let calls = Arc::new(AtomicUsize::new(0));
++    let drops = Arc::new(AtomicUsize::new(0));
++    let witness = DropWitness {
++        drops: drops.clone(),
++        done: dropped.clone(),
++    };
++    let (worker_calls, worker_started, worker_release) =
++        (calls.clone(), started.clone(), release.clone());
++    let mut worker = DeviceWorker::start(move || {
++        let _ = &witness;
++        assert!(can_sleep());
++        assert!(!core::ptr::eq(&*Task::current().unwrap(), &*parent));
++        if worker_calls.fetch_add(1, Ordering::AcqRel) == 0 {
++            worker_started.signal();
++            worker_release.wait();
++        }
++    })
++    .unwrap();
++    let signal = worker.signal();
++    assert_eq!(calls.load(Ordering::Acquire), 0);
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    started.wait();
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    assert_eq!(signal.clone().schedule(), Ok(ScheduleResult::Coalesced));
++    assert_eq!(calls.load(Ordering::Acquire), 1);
++    assert_eq!(drops.load(Ordering::Acquire), 0);
++    release.signal();
++    worker.shutdown().unwrap();
++    assert_eq!(calls.load(Ordering::Acquire), 2);
++    assert_eq!(drops.load(Ordering::Acquire), 1);
++    assert!(dropped.signaled.load(Ordering::Acquire));
++    assert_eq!(signal.schedule(), Err(WorkerError::Closed));
++    worker.shutdown().unwrap();
++    assert_eq!(drops.load(Ordering::Acquire), 1);
++    ostd::early_println!(
++        "NVIDIA native worker: actual task, pending coalescence, accepted-work drain and capture destruction passed; not RM/GPU"
++    );
++}
++
++#[ktest]
++fn worker_shutdown_rejects_atomic_context_without_closing_admission() {
++    let calls = Arc::new(AtomicUsize::new(0));
++    let worker_calls = calls.clone();
++    let mut worker = DeviceWorker::start(move || {
++        worker_calls.fetch_add(1, Ordering::AcqRel);
++    })
++    .unwrap();
++    let signal = worker.signal();
++    {
++        let guard = ostd::task::disable_preempt();
++        assert_eq!(worker.shutdown(), Err(WorkerError::InvalidContext));
++        assert!(matches!(
++            DeviceWorker::start(|| {}),
++            Err(WorkerError::InvalidContext)
++        ));
++        drop(guard);
++    }
++    {
++        let guard = ostd::irq::disable_local();
++        assert_eq!(worker.shutdown(), Err(WorkerError::InvalidContext));
++        assert!(matches!(
++            DeviceWorker::start(|| {}),
++            Err(WorkerError::InvalidContext)
++        ));
++        // Signaling itself is non-blocking and permitted with maskable IRQs off.
++        assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++        drop(guard);
++    }
++    worker.shutdown().unwrap();
++    assert_eq!(calls.load(Ordering::Acquire), 1);
++    assert_eq!(signal.schedule(), Err(WorkerError::Closed));
++}
++
++#[ktest]
++fn worker_rejects_self_wait_without_closing_admission() {
++    let slot = Arc::new(SpinLock::<Option<DeviceWorker>, LocalIrqDisabled>::new(
++        None,
++    ));
++    let result = Event::new();
++    let worker_slot = slot.clone();
++    let worker_result = result.clone();
++    let worker = DeviceWorker::start(move || {
++        // Never call shutdown while holding the slot spin lock: that would only
++        // exercise the atomic-context rejection rather than actual self-wait.
++        let mut owner = worker_slot.lock().take().unwrap();
++        assert_eq!(owner.shutdown(), Err(WorkerError::SelfWait));
++        assert!(!owner.shared.state.lock().closing);
++        *worker_slot.lock() = Some(owner);
++        worker_result.signal();
++    })
++    .unwrap();
++    let signal = worker.signal();
++    *slot.lock() = Some(worker);
++    signal.schedule().unwrap();
++    result.wait();
++    let mut owner = slot.lock().take().unwrap();
++    owner.shutdown().unwrap();
++    assert_eq!(signal.schedule(), Err(WorkerError::Closed));
++}
++
++#[ktest]
++fn dropping_owner_closes_without_waiting_and_task_still_drains() {
++    let started = Event::new();
++    let release = Event::new();
++    let dropped = Event::new();
++    let calls = Arc::new(AtomicUsize::new(0));
++    let drops = Arc::new(AtomicUsize::new(0));
++    let witness = DropWitness {
++        drops: drops.clone(),
++        done: dropped.clone(),
++    };
++    let (worker_calls, worker_started, worker_release) =
++        (calls.clone(), started.clone(), release.clone());
++    let worker = DeviceWorker::start(move || {
++        let _ = &witness;
++        if worker_calls.fetch_add(1, Ordering::AcqRel) == 0 {
++            worker_started.signal();
++            worker_release.wait();
++        }
++    })
++    .unwrap();
++    let signal = worker.signal();
++    signal.schedule().unwrap();
++    started.wait();
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    // Drop cannot block behind a callback that this same task must release.
++    let guard = ostd::irq::disable_local();
++    drop(worker);
++    drop(guard);
++    assert_eq!(signal.schedule(), Err(WorkerError::Closed));
++    assert_eq!(drops.load(Ordering::Acquire), 0);
++    release.signal();
++    dropped.wait();
++    assert_eq!(calls.load(Ordering::Acquire), 2);
++    assert_eq!(drops.load(Ordering::Acquire), 1);
++}
++
++#[ktest]
++fn callback_can_rearm_itself_without_inline_execution_or_lost_request() {
++    let slot = Arc::new(SpinLock::<Option<WorkSignal>, LocalIrqDisabled>::new(None));
++    let calls = Arc::new(AtomicUsize::new(0));
++    let twice = Event::new();
++    let (worker_slot, worker_calls, worker_twice) = (slot.clone(), calls.clone(), twice.clone());
++    let mut worker = DeviceWorker::start(move || {
++        let invocation = worker_calls.fetch_add(1, Ordering::AcqRel);
++        if invocation == 0 {
++            let signal = worker_slot.lock().take().unwrap();
++            assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++            assert_eq!(signal.schedule(), Ok(ScheduleResult::Coalesced));
++            assert_eq!(worker_calls.load(Ordering::Acquire), 1);
++        } else {
++            assert_eq!(invocation, 1);
++            worker_twice.signal();
++        }
++    })
++    .unwrap();
++    let signal = worker.signal();
++    *slot.lock() = Some(signal.clone());
++    signal.schedule().unwrap();
++    twice.wait();
++    worker.shutdown().unwrap();
++    assert_eq!(calls.load(Ordering::Acquire), 2);
++}
++
++#[ktest]
++fn actual_timer_irq_signals_worker_that_runs_in_sleepable_task() {
++    let completed = Event::new();
++    let irq_observed = Arc::new(AtomicBool::new(false));
++    let calls = Arc::new(AtomicUsize::new(0));
++    let (worker_completed, worker_calls) = (completed.clone(), calls.clone());
++    let mut worker = DeviceWorker::start(move || {
++        assert!(can_sleep());
++        assert!(InterruptLevel::current().is_task_context());
++        worker_calls.fetch_add(1, Ordering::AcqRel);
++        worker_completed.signal();
++    })
++    .unwrap();
++    let slot = Arc::new(SpinLock::<Option<WorkSignal>, LocalIrqDisabled>::new(Some(
++        worker.signal(),
++    )));
++    let timer_observed = irq_observed.clone();
++    // OSTD has no unregister API. The callback becomes inert after taking its
++    // one signal; the retained empty slot contains no worker or device resource.
++    ostd::timer::register_callback_on_cpu(move || {
++        let signal = slot.lock().take();
++        if let Some(signal) = signal {
++            assert!(InterruptLevel::current().is_interrupt_context());
++            assert!(!can_sleep());
++            timer_observed.store(true, Ordering::Release);
++            assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++        }
++    });
++    completed.wait();
++    worker.shutdown().unwrap();
++    assert!(irq_observed.load(Ordering::Acquire));
++    assert_eq!(calls.load(Ordering::Acquire), 1);
++    ostd::early_println!(
++        "NVIDIA native worker: actual APIC timer IRQ to sleepable task handoff passed; not NVIDIA IRQ or GPU"
++    );
++}
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -211,3 +211,36 @@
+ do NVMe existem apenas no teste QEMU, não no caminho de produção. EDU/NVMe/QEMU não são NVIDIA:
+ nenhum desses marcadores é benchmark GPU, inicialização RM/GSP ou aceitação Vulkan/Wayland/GPUI.
+ O workflow permanece preparação local, sem execução remota implícita.
++
++## Worker nativo com posse e drenagem de callback
++
++`worker::DeviceWorker` cria uma tarefa OSTD real para um callback `FnMut + Send + 'static`,
++com proprietário exclusivo e sinais `WorkSignal` clonáveis. `schedule` pode sinalizar de
++tarefa ou IRQ mascarável: não cria um work item por solicitação nem executa o callback
++inline. O estado usa `SpinLock<_, LocalIrqDisabled>`; o wake do OSTD ocorre fora desse lock.
++Não é NMI-safe. Solicitações repetidas coalescem enquanto pendentes; uma solicitação durante
++execução produz uma nova invocação pendente. O callback deve drenar o serviço real do device.
++
++`shutdown` exige tarefa sleepable, recusa autoespera, fecha admissão sob o mesmo lock usado
++por `schedule`, drena a pendência aceita e só publica completion após destruir o callback
++e seus captures. O callback pode reagendar a si mesmo enquanto a admissão estiver aberta.
++Depois do fechamento, sinais sobreviventes retornam `Closed`; não mantêm o serviço aberto.
++Drop apenas fecha e acorda, sem bloquear ou destruir captures em IRQ: a tarefa continua
++possuindo-os até terminar a drenagem. Antes de liberar estado externo do device, o chamador
++deve executar shutdown explícito sem segurar locks usados pelo callback ou seus destrutores.
++Um callback que nunca retorna não tem drenagem finita garantida. Completion não é join da
++tarefa do scheduler, parada DMA, IRQ/MSI drain, reset ou sucesso RM/GSP.
++
++O contrato de coalescência/reagendamento segue o item BH pré-inicializado descrito em
++`kernel-open/common/inc/nv-kthread-q.h` da fonte oficial NVIDIA 615.78.08. Este serviço é
++um callback único, **não** um port completo da fila FIFO multi-item, de `os_queue_work_item`
++ou dos workers RM. `rm_isr`, `rm_isr_bh_unlocked` e `rm_init_adapter` não são chamados.
++A posse PCI/MMIO atual continua emprestada e não pode ser capturada como se fosse `'static`;
++a transferência real para um owner de adapter e os stacks/ABI RM permanecem pendentes.
++
++Seis testes adicionais rodam no kernel OSTD: execução em outra tarefa, coalescência e
++drenagem com destrutores, rejeição de contextos atômicos/autoespera, Drop não bloqueante,
++reagendamento dentro do callback e handoff de uma **interrupção APIC timer real** para tarefa
++sleepable. O teste timer deixa somente um callback inerte com slot vazio porque OSTD ainda
++não expõe unregister para esse timer. Não imita IRQ NVIDIA. O runner usado pelo workflow
++local exige os marcadores de IRQ real e drenagem, sem convertê-los em aceitação GPU.
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -65,6 +65,10 @@
+ if "[ktest runner] All crates tested." not in text:
+     raise SystemExit("Missing final kernel runner marker in " + sys.argv[1])
+ PY
++    if [[ "$suite" == platform ]]; then
++        grep -Fq 'NVIDIA native worker: actual task, pending coalescence, accepted-work drain and capture destruction passed; not RM/GPU' "$log"
++        grep -Fq 'NVIDIA native worker: actual APIC timer IRQ to sleepable task handoff passed; not NVIDIA IRQ or GPU' "$log"
++    fi
+     if [[ "$suite" == pci || "$suite" == pci-iommu ]]; then
+         grep -Fq 'PCI real NVMe MSI-X masked-pending IRQ and quiesced shutdown cycles passed; not GPU validation' "$log"
+         grep -Fq 'PCI legacy MSI-X passed: no implicit BME, checked indices, no handler unmask, no vector replacement' "$log"

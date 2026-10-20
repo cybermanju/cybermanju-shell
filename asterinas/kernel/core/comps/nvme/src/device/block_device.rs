@@ -93,7 +93,8 @@ impl NvmeBlockDevice {
 
         block_device
             .device
-            .setup_msix_handlers(&block_device, io_msix_vectors);
+            .setup_msix_handlers(&block_device, io_msix_vectors)
+            .map_err(|_| NvmeDeviceError::MsixAllocationFailed)?;
 
         aster_block::register(block_device)
             .map_err(|_| NvmeDeviceError::BlockDeviceRegisterFailed)?;
@@ -293,12 +294,12 @@ impl NvmeDeviceInner {
         &self,
         block_device: &Arc<NvmeBlockDevice>,
         io_msix_vectors: IoMsixVectors,
-    ) {
+    ) -> Result<(), NvmeDeviceError> {
         let mut transport = self.transport.lock();
         let msix_manager = transport.msix_manager_mut();
 
         // Admin queue interrupt (vector 0)
-        let (_admin_vec, admin_irq) = msix_manager.admin_irq();
+        let (admin_vec, admin_irq) = msix_manager.admin_irq();
         let device_weak = Arc::downgrade(block_device);
         admin_irq.on_active(move |_| {
             if let Some(block_device) = device_weak.upgrade() {
@@ -318,6 +319,18 @@ impl NvmeDeviceInner {
                 }
             });
         }
+
+        // Every real handler is now registered; only then unmask the vectors
+        // actually routed to the admin and I/O completion queues.
+        msix_manager
+            .enable_vector(admin_vec)
+            .map_err(|_| NvmeDeviceError::MsixAllocationFailed)?;
+        for vector in io_msix_vectors.0.iter().copied() {
+            msix_manager
+                .enable_vector(vector)
+                .map_err(|_| NvmeDeviceError::MsixAllocationFailed)?;
+        }
+        Ok(())
     }
 
     fn read(&self, request: BioRequest) {

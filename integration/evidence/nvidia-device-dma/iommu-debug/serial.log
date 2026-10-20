@@ -1,0 +1,222 @@
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a619000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2624077240 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x1735, current 0x17b46d, init 0x3c73
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+DEBUG: iommu: DMAR: Dmar {
+    header: DmarHeader {
+        header: SdtHeader {
+            signature: "DMAR",
+            length: 0x80,
+            revision: 0x1,
+            checksum: 0xf1,
+            oem_id: [
+                0x42,
+                0x4f,
+                0x43,
+                0x48,
+                0x53,
+                0x20,
+            ],
+            oem_table_id: [
+                0x42,
+                0x58,
+                0x50,
+                0x43,
+                0x20,
+                0x20,
+                0x20,
+                0x20,
+            ],
+            oem_revision: 0x1,
+            creator_id: 0x43505842,
+            creator_revision: 0x1,
+        },
+        host_address_width: 0x26,
+        flags: 0x1,
+        reserved: [
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+            0x0,
+        ],
+    },
+    remapping_structures: [
+        Drhd(
+            Drhd {
+                header: DrhdHeader {
+                    typ: 0x0,
+                    length: 0x50,
+                    flags: 0x0,
+                    size: 0x0,
+                    segment_num: 0x0,
+                    register_base_addr: 0xfed90000,
+                },
+                device_scopes: [
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x3,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0xff,
+                        },
+                        path: [
+                            (
+                                0x0,
+                                0x0,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x0,
+                                0x0,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x1,
+                                0x0,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x2,
+                                0x0,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x3,
+                                0x0,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x1f,
+                                0x0,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x1f,
+                                0x2,
+                            ),
+                        ],
+                    },
+                    DeviceScope {
+                        header: DeviceScopeHeader {
+                            typ: 0x1,
+                            length: 0x8,
+                            flags: 0x0,
+                            reserved: 0x0,
+                            enum_id: 0x0,
+                            start_bus_number: 0x0,
+                        },
+                        path: [
+                            (
+                                0x1f,
+                                0x3,
+                            ),
+                        ],
+                    },
+                ],
+            },
+        ),
+    ],
+}
+DEBUG: iommu: base address: 0xfed90000

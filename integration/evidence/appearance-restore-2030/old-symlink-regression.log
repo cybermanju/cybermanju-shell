@@ -1,0 +1,18 @@
+test_terminal_symlinks_are_rejected_before_display (__main__.AppearanceCliTests.test_terminal_symlinks_are_rejected_before_display) ... FAIL
+
+======================================================================
+FAIL: test_terminal_symlinks_are_rejected_before_display (__main__.AppearanceCliTests.test_terminal_symlinks_are_rejected_before_display)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/asterinas-gpui/gpui-shell/scripts/test_appearance_profile.py", line 119, in test_terminal_symlinks_are_rejected_before_display
+    self.assertNotEqual(result.returncode, 0, result.stdout)
+AssertionError: 0 == 0 : CyberManju appearance v1: theme=os-graphite and accent token projection; retained, NOT applied: wallpaper, shellStyle, panelDocked, density, glass, motion, glow. No live sync or Asterinas/GPU certification.
+/tmp/nix-shell.ObLAg3/gpui-appearance-cli-vo9qlqy1/config/gpuishell/config.toml: absent, defaults apply
+/tmp/nix-shell.ObLAg3/gpui-appearance-cli-vo9qlqy1/config/gpuishell/theme.toml: absent, defaults apply
+/tmp/nix-shell.ObLAg3/gpui-appearance-cli-vo9qlqy1/config/gpuishell/state.toml: absent, defaults apply
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.150s
+
+FAILED (failures=1)

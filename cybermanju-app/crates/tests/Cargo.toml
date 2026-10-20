@@ -1,0 +1,30 @@
+[package]
+name = "cybermanju-tests"
+version = "0.1.1"
+edition = "2021"
+description = "Comprehensive test suite for all CyberManju OS crates"
+
+[dependencies]
+cybermanju-types = { path = "../types" }
+cybermanju-compression = { path = "../compression" }
+cybermanju-crypto = { path = "../crypto" }
+cybermanju-db = { path = "../db" }
+cybermanju-search = { path = "../search" }
+cybermanju-web = { path = "../web" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+blake3 = "1"
+# P0-14 regression test builds a pre-fix (raw-slice) artifact by hand.
+chacha20poly1305 = "0.10"
+redb = "2"
+tempfile = "3"
+# AGENT-4 item 10 — backend contract tests talk to a local mock HTTP server
+# through the real `reqwest` client, and the auth matrix mints JWTs with the
+# same library the web crate verifies them with.
+cybermanju-sync = { path = "../sync" }
+cybermanju-disk = { path = "../disk" }
+cybermanju-erasure = { path = "../erasure" }
+cybermanju-os = { path = "../os" }
+base64 = "0.22"
+jsonwebtoken = "9"

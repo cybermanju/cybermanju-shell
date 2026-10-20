@@ -1,0 +1,194 @@
+{
+  "gpui_rust_passed": 205,
+  "python_passed": 36,
+  "native_reported_passed": 315,
+  "explicit_native_skips": 3,
+  "native_gpu_acceptance": false,
+  "files": [
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/index-before.txt",
+      "bytes": 45869,
+      "sha256": "453d1781c1c86394a8d4a979d3be10a122030d7af668ab9a396810509893ecf0"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/validate_gpui.sh",
+      "bytes": 972,
+      "sha256": "a467b15d46a6b73fe7ea4938110843117a45c40c435050869e671b9dad833ce5"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-rust-tests.log",
+      "bytes": 18645,
+      "sha256": "e27ce34e863179d7e3fce37685edd16235120426322a5e4b4a131d720187762c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/hardware.json",
+      "bytes": 181,
+      "sha256": "62b1ce120cb8487d039c01f091e4cea1d484ae98be98a2c4a282322006062710"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/app-index-before.txt",
+      "bytes": 55081,
+      "sha256": "f01f555aaa13f6ecc38eb7c496a02c95deceef05cabc5d45e1b5c460206890c8"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-build.log",
+      "bytes": 395,
+      "sha256": "100a975dd9920e2bd76510fc18750a9b428f450457e7c4e40d7898456aa68132"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-python-tests.log",
+      "bytes": 6175,
+      "sha256": "2024f68810a16cbf92f42f3aec388239f33961925809b1b4103bc5d0bcfff722"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-clippy.log",
+      "bytes": 1186,
+      "sha256": "95b5524258a79fc86aa418d1a2ed9fc3f7bb80b2ed54b3b8778b6320b9ce6be0"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/make_patches.py",
+      "bytes": 1560,
+      "sha256": "e901fb16589f5d270e1e7f30ffc62afcbdf0e9a2e1471cb72c0c6a9b54c2f25c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/upstream-sources.md",
+      "bytes": 1006,
+      "sha256": "962389b7bf6a9bc91c2416ff320736e2636c6c636814f9d9cf08e5978c5414ad"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/app-version-check.log",
+      "bytes": 1206,
+      "sha256": "08fd3c10e65e65613f4a3ea6990aa237324603776e3ecbdbde0604973f4ed5ca"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/app-headers-check.log",
+      "bytes": 32,
+      "sha256": "4168d8f0a32dc7c013bc5b5c6fd4891bf8923493fe427f477c44f7cbafe3df31"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/cache-space-recovery.json",
+      "bytes": 1897,
+      "sha256": "cae19e9a021d48ee6bf46a874a18a480879855f8d71ac1bac27a9b94a6ff1f35"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/summarize_tests.py",
+      "bytes": 1463,
+      "sha256": "ef53faeae0b9c20e439dede9e3b350365424733d27cdc8b4ddf62748ba77305b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/test-summary.json",
+      "bytes": 665,
+      "sha256": "7244b08d7ab28c80b78bbf3017a602fd091e92ea8f26326059e61ab987844fe4"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/record-run.log",
+      "bytes": 66,
+      "sha256": "3a5397ed59aa42dfe0339ed8e119b82217ca29f4e0c4111be01b7ba829d3b0ab"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/continuation-notes.md",
+      "bytes": 2694,
+      "sha256": "bed1fb72a2698d1206b29f78a1286cc97e79fdd531ec81f92e1c4d33802e9d0d"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/record_run.py",
+      "bytes": 6673,
+      "sha256": "8ab2ace541ef024cbaf250ab7f835392bfbf74807baa4dd00579396f12eaef36"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-cybermanju-launcher-density.patch",
+      "bytes": 16091,
+      "sha256": "71eb7f5e396197c131e84b30b3977abaf72d898dab4d8318eaeaee494bf3cae7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/cybermanju-launcher-density-docs.patch",
+      "bytes": 4877,
+      "sha256": "659dfc6d31049dfbee05cf876d56def580ac6738db55d66a9b6edb01c0de543b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/patch-validation.json",
+      "bytes": 2986,
+      "sha256": "a731034313e1113a5df37db5f555aaf1035714736c44c1f5905f2eaecb8420ba"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/app-before/worklog.md",
+      "bytes": 293526,
+      "sha256": "33fe9a304f252d555637ac076328805aad47d0898d99b2eda95a9f525d0168f7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/initial-success/gpui-build.log",
+      "bytes": 468,
+      "sha256": "f03f64fd356face77409461dfd65dbbe983aa0f048dfe8bafdc8e5286a557918"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/initial-success/gpui-clippy.log",
+      "bytes": 1187,
+      "sha256": "fe0a2a634cb4de30ce4071b1d5de85e4ac6683f47eadf5c227ce951d1614418c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/initial-success/gpui-python-tests.log",
+      "bytes": 6175,
+      "sha256": "d270eeb6c635aae08819ff83615b59c92d60364122917e0a60f9e1c22f406e2b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/initial-success/gpui-rust-tests.log",
+      "bytes": 18558,
+      "sha256": "ea68fceec0421fa82080272d9342fdf87bcf243551787fddfa698ab5d63be8b3"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/before/crates/ui/src/ui.rs",
+      "bytes": 1250,
+      "sha256": "c4563e2fcaadf3a10e1c1a24365251a58478eca75a3a837efe20bdc55296118f"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/before/crates/ui/src/theme/mod.rs",
+      "bytes": 8120,
+      "sha256": "07ef195baca9835038a31da35995aa04a006d19f2c7eb685a9289f18bbe9a832"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/before/crates/ui/src/patterns/launcher.rs",
+      "bytes": 6629,
+      "sha256": "c0e1f3c803120ddb75364ee11b11f53ca1a85277197c3b64b3c75888ead9c909"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/before/crates/app/src/config/appearance.rs",
+      "bytes": 17042,
+      "sha256": "5372a86a15c413d46e27904b0d783b328acc7e55c79844292ad9bb4b72a3dac5"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/before/crates/app/src/config/appearance_live.rs",
+      "bytes": 10278,
+      "sha256": "717d9b5e9b171f7c7bad191ac5712273473ae786e7c99029e6521fc4ce629fe8"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/before/docs/src/content/docs/developer/cybermanju-appearance.md",
+      "bytes": 9060,
+      "sha256": "b4beef1ddecfb54058ff8d84b4fd73a810ba96af037453a0cc601de6e8a0db35"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/app-before/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "bytes": 9355,
+      "sha256": "efb22e23d0afe847774de66e34bd9fc43a7a5af3e2afc57b495dbf4c9a1c9e4d"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "bytes": 128303,
+      "sha256": "04c77af4c23392560c6b68a6c75c2edfef1afc3fec73191b9e9abb80c0bf8b62"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-postirq-drain.patch",
+      "bytes": 6012,
+      "sha256": "a69fc5b046855acc80def80e660b35fb10a6167aa6cb5752e7c6ac24259cb09f"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-2121/test-summary.json",
+      "bytes": 707,
+      "sha256": "8514ddecf4b3554f07b383d570dbde743d26843f954b2bbeb8506efd8b68d7ba"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-2121/REPORT.md",
+      "bytes": 3651,
+      "sha256": "9e143183fc5f6310590787467e1161473ef9bdbd7174022affd6662c1ad0d984"
+    }
+  ]
+}

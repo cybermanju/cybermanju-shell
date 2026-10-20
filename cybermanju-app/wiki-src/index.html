@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- CyberManju OS — wiki app shell (wiki-src/index.html). -->
+<!-- Role: mounts the Three.js scenery + reader panels + the 2D graphify graph overlay; data comes from subjects.json. -->
+<!-- Exports: #scene canvas mount, #rail, #panel, #tooltip, #toggle2d, #graph2d iframe mounts. -->
+<!-- Integrates: built by vite.config.wiki.ts into dist-wasm/wiki/; fetches ./subjects.json; the hidden #toggle2d/#graph2d pair activates only when the graph payload exists (engine: graphify) and lazy-loads ./graph.html. -->
+<!-- Contracts: fully static, no backend; hash routes (#/id) mirror wiki/<id>.html. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CyberManju OS — 3D wiki</title>
+    <meta
+      name="description"
+      content="Interactive Three.js wiki for CyberManju OS: orbit the manju, click a module, read the docs. Static pages + llms.txt for agents."
+    />
+    <meta name="theme-color" content="#0d0714" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="scene" aria-hidden="true"></div>
+    <div id="vignette" aria-hidden="true"></div>
+    <div id="tooltip" hidden></div>
+
+    <header class="top">
+      <a class="brand" href="#/">
+        <span class="manju" aria-hidden="true"></span>
+        <span>CyberManju <b>wiki</b></span>
+      </a>
+      <input id="search" type="search" placeholder="Search modules + symbols…" autocomplete="off" />
+      <nav class="toplinks">
+        <a href="./agent.html">static</a>
+        <button id="toggle2d" hidden aria-pressed="false" title="Switch between the 3D wiki and the 2D graphify knowledge graph">2D graph</button>
+        <a href="../llms.txt">llms.txt</a>
+        <a href="../">app</a>
+      </nav>
+    </header>
+
+    <!-- 2D knowledge graph (graphify's interactive graph.html) overlay:
+         lazy-loaded once on first toggle; hidden until then so the 3D
+         scene never pays for it. Only unhidden when subjects.json carries
+         a graph payload (engine: graphify). -->
+    <div id="graph2d" hidden aria-hidden="true">
+      <iframe
+        id="graph2dframe"
+        title="Knowledge graph (graphify, 2D)"
+        src="about:blank"
+        loading="lazy"
+      ></iframe>
+    </div>
+
+    <aside class="rail" id="rail" aria-label="Wiki subjects"></aside>
+
+    <section class="panel" id="panel" aria-live="polite"></section>
+
+    <footer class="hint">drag to orbit · scroll to zoom · hover magnetically · click a module or its orbiting sub-files · <code>/</code> search · double-click empty space to go home</footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

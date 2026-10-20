@@ -18,6 +18,12 @@ disabled and configure startup yourself if your compositor uses another
 session mechanism. Override `programs.gpuishell.package` to install a different
 package.
 
+The module does not import compositor variables or configure a compositor. For
+Niri, the user service manager must also inherit `NIRI_SOCKET` or
+`NIRI_SOCKET_PATH` so compositor IPC works. Make sure your session setup imports
+the required variables before starting `graphical-session.target`; other
+compositor integrations may likewise need their session-specific IPC variables.
+
 ## With Nix (recommended)
 
 ```bash
@@ -57,6 +63,9 @@ scripts/heaptrack.sh              # heap profile
 A running shell owns the IPC socket, so a second `cargo run` only toggles
 the launcher of the first one. Stop your installed shell before running a
 dev build.
+
+For frame-telemetry interpretation and performance-measurement limits, see
+[Rendering and performance evidence](../performance/).
 
 ## Checks
 

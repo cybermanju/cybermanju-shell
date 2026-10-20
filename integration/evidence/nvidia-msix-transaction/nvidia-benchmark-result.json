@@ -1,0 +1,8 @@
+{
+  "exit": 1,
+  "passed": false,
+  "output_empty": true,
+  "native_asterinas": false,
+  "gpu_acceptance": false,
+  "scope": "Negative Linux-host hardware-selection check only"
+}

@@ -118,6 +118,10 @@ impl VirtioPciLegacyTransport {
             return Err((BusProbeError::ConfigurationSpaceError, common_device));
         };
         let msix_manager = VirtioMsixManager::new(msix);
+        // DMA remains an explicit transport policy, not an IRQ-acquisition side effect.
+        common_device.write_command_raw(
+            common_device.location().read16(4) | aster_pci::cfg_space::Command::BUS_MASTER.bits(),
+        );
 
         Ok(Self {
             device_type,
@@ -293,6 +297,9 @@ impl VirtioTransport for VirtioPciLegacyTransport {
         self.config_bar
             .write_once(QUEUE_MSIX_VECTOR_OFFSET, vector)
             .unwrap();
+        self.msix_manager
+            .enable_vector(vector)
+            .map_err(|_| VirtioTransportError::InvalidArgs)?;
         Ok(())
     }
 
@@ -306,6 +313,9 @@ impl VirtioTransport for VirtioPciLegacyTransport {
         self.config_bar
             .write_once(CONFIG_MSIX_VECTOR_OFFSET, vector)
             .unwrap();
+        self.msix_manager
+            .enable_vector(vector)
+            .map_err(|_| VirtioTransportError::InvalidArgs)?;
         Ok(())
     }
 

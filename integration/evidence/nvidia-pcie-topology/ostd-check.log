@@ -1,0 +1,18 @@
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+error[E0618]: expected function, found `vtd_policy::VtdPolicy`
+   --> ostd/src/arch/x86/kernel/acpi/vtd_policy.rs:671:30
+    |
+613 |     fn policy(flags: u8, scopes: &[u8]) -> Result<VtdPolicy, VtdPolicyError> {
+    |     ------------------------------------------------------------------------ this function of the same name is available here, but it's shadowed by the local binding
+...
+663 |         let policy = policy(0, &scopes).unwrap();
+    |             ------ `policy` has type `vtd_policy::VtdPolicy`
+...
+671 |         let nonzero_bridge = policy(0, &scope(2, 2, &[(5, 0)])).unwrap();
+    |                              ^^^^^^----------------------------
+    |                              |
+    |                              call expression requires function
+
+For more information about this error, try `rustc --explain E0618`.
+error: could not compile `ostd` (lib) due to 1 previous error
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest) --cfg ktest" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" failed with status: ExitStatus(unix_wait_status(25856))

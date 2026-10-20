@@ -1,0 +1,55 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:363:20
+    |
+363 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+363 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+363 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:364:20
+    |
+364 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+364 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+364 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-test-base)
+warning: `ostd-nvidia-nvport-osdk-bin` (bin "ostd-nvidia-nvport-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.43s
+[Error]: Executable "rust-strip" cannot be found in PATH, please install the corresponding package

@@ -12,6 +12,12 @@ The snapshot does not call `Bar::acquire`, resize BARs, map MMIO, claim/reserve 
 
 The crate is a workspace/default member and is optionally linked into the kernel by `nvidia-pci-diagnostics` (also enabled by `native-gpu-ci`). Its component runs after its PCI dependency and logs actual resources or explicitly says no unclaimed NVIDIA display controller was found. Component initialization returning `Ok(())` means the diagnostic ran, not that a GPU driver initialized; no `PciDriver` is registered.
 
+## Native callback worker
+
+`worker::DeviceWorker` owns one real OSTD task and one callback. `WorkSignal::schedule` coalesces requests while pending; a request during callback execution installs one subsequent invocation. `DeviceWorker::flush` takes a lock-protected snapshot of accepted invocation generations and waits only through that snapshot. Coalesced pending requests count as one invocation, while requests accepted after the snapshot do not extend it. Flush is sleepable-task-only, rejects self-wait, does not close admission, and does not destroy callback captures; use `shutdown` when capture destruction and admission closure are required. This deliberately is not full upstream multi-item or double-barrier `kthread_q_flush` compatibility. Generation overflow closes admission rather than wrapping. The worker is a primitive only: it does not call RM or implement an NVIDIA ISR/BH.
+
+When an IRQ callback can signal the worker, the owner may use `shutdown_after_irq` to retire that `IrqLine` handle's callbacks before closing admission and draining accepted work. The passed handle must own every producer for this worker. Mask/quiesce the actual device interrupt source first; this software callback-dispatch barrier does not mask hardware, prove cross-CPU APIC/IRTE drain, or stop DMA. Other callback handles/producers require their own retirement before resources are released.
+
 ## Tests
 
 Three pure validation tests cover NVIDIA/display identity checks, zero/overflow range validation, and config-read bounds/alignment. All three ran successfully inside OSTD under QEMU TCG via `cargo osdk test`; they do not validate NVIDIA BAR/config I/O against a real GPU. The ordinary CI entrypoint `bash tools/graphics/run_cpu_kernel_tests.sh OUTPUT_DIRECTORY` runs this suite as well as NVport and OSTD without KVM or device passthrough.
@@ -211,3 +217,36 @@ Casos negativos cobrem ACS ausente/desligado e EDU atrás de bridge legada. Escr
 do NVMe existem apenas no teste QEMU, não no caminho de produção. EDU/NVMe/QEMU não são NVIDIA:
 nenhum desses marcadores é benchmark GPU, inicialização RM/GSP ou aceitação Vulkan/Wayland/GPUI.
 O workflow permanece preparação local, sem execução remota implícita.
+
+## Worker nativo com posse e drenagem de callback
+
+`worker::DeviceWorker` cria uma tarefa OSTD real para um callback `FnMut + Send + 'static`,
+com proprietário exclusivo e sinais `WorkSignal` clonáveis. `schedule` pode sinalizar de
+tarefa ou IRQ mascarável: não cria um work item por solicitação nem executa o callback
+inline. O estado usa `SpinLock<_, LocalIrqDisabled>`; o wake do OSTD ocorre fora desse lock.
+Não é NMI-safe. Solicitações repetidas coalescem enquanto pendentes; uma solicitação durante
+execução produz uma nova invocação pendente. O callback deve drenar o serviço real do device.
+
+`shutdown` exige tarefa sleepable, recusa autoespera, fecha admissão sob o mesmo lock usado
+por `schedule`, drena a pendência aceita e só publica completion após destruir o callback
+e seus captures. O callback pode reagendar a si mesmo enquanto a admissão estiver aberta.
+Depois do fechamento, sinais sobreviventes retornam `Closed`; não mantêm o serviço aberto.
+Drop apenas fecha e acorda, sem bloquear ou destruir captures em IRQ: a tarefa continua
+possuindo-os até terminar a drenagem. Antes de liberar estado externo do device, o chamador
+deve executar shutdown explícito sem segurar locks usados pelo callback ou seus destrutores.
+Um callback que nunca retorna não tem drenagem finita garantida. Completion não é join da
+tarefa do scheduler, parada DMA, IRQ/MSI drain, reset ou sucesso RM/GSP.
+
+O contrato de coalescência/reagendamento segue o item BH pré-inicializado descrito em
+`kernel-open/common/inc/nv-kthread-q.h` da fonte oficial NVIDIA 615.78.08. Este serviço é
+um callback único, **não** um port completo da fila FIFO multi-item, de `os_queue_work_item`
+ou dos workers RM. `rm_isr`, `rm_isr_bh_unlocked` e `rm_init_adapter` não são chamados.
+A posse PCI/MMIO atual continua emprestada e não pode ser capturada como se fosse `'static`;
+a transferência real para um owner de adapter e os stacks/ABI RM permanecem pendentes.
+
+Seis testes adicionais rodam no kernel OSTD: execução em outra tarefa, coalescência e
+drenagem com destrutores, rejeição de contextos atômicos/autoespera, Drop não bloqueante,
+reagendamento dentro do callback e handoff de uma **interrupção APIC timer real** para tarefa
+sleepable. O teste timer deixa somente um callback inerte com slot vazio porque OSTD ainda
+não expõe unregister para esse timer. Não imita IRQ NVIDIA. O runner usado pelo workflow
+local exige os marcadores de IRQ real e drenagem, sem convertê-los em aceitação GPU.

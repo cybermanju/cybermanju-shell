@@ -1,0 +1,293 @@
+diff --git a/src/utils/appearanceProfile.ts b/src/utils/appearanceProfile.ts
+--- a/src/utils/appearanceProfile.ts
++++ b/src/utils/appearanceProfile.ts
+@@ -1,8 +1,8 @@
+ // CyberManju OS — AppearanceProfile (src/utils/appearanceProfile.ts).
+-// Role: versioned, secret-free appearance export for the native GPUI consumer.
+-// Exports: AppearanceProfileV1, buildAppearanceProfileV1, serializeAppearanceProfileV1, parseAppearanceProfileV1.
+-// Integrates: useTheme state, custom wallpaper validation, UI tokens.
+-// Contracts: strict allowlist only; local wallpaper exports metadata, never bytes or a device URL.
++// Role: strict v1 cosmetic export, parser, and staged restore for app/GPUI.
++// Exports: AppearanceProfileV1 and validated build/serialize/parse/restore helpers.
++// Integrates: existing theme persistence, custom wallpaper validation, UI tokens.
++// Contracts: strict allowlist; local wallpaper metadata has no restorable bytes.
+ import {
+   DEFAULT_SETTINGS,
+   LEGACY_THEME_ALIASES,
+@@ -265,3 +265,36 @@
+     wallpaper,
+   }
+ }
++
++/** Validate an import before showing its preview or touching live preferences. */
++export function prepareAppearanceProfileRestore(json: string): AppearanceProfileV1 {
++  const profile = parseAppearanceProfileV1(json)
++  if (profile.wallpaper.kind === 'local-file') {
++    throw new Error('This profile describes a local wallpaper, but does not contain its image bytes. The current wallpaper was not changed; choose an image on this device or import a URL/preset profile.')
++  }
++  return profile
++}
++
++export interface AppearanceProfileRestoreActions {
++  /** Use the existing wallpaper service; false means it made no change. */
++  applyWallpaper(wallpaper: Extract<AppearanceWallpaperV1, { kind: 'preset' | 'url' }>): Promise<boolean>
++  /** Synchronous mutation through the app's existing preference owners. */
++  applyPreferences(profile: AppearanceProfileV1): void
++}
++
++/** Apply an already-previewed profile only after its wallpaper operation succeeds. */
++export async function applyAppearanceProfileRestore(
++  candidate: AppearanceProfileV1,
++  actions: AppearanceProfileRestoreActions,
++): Promise<boolean> {
++  // Re-parse the preview object too: callers cannot bypass the strict v1 contract
++  // by mutating it between preview and confirmation.
++  const profile = prepareAppearanceProfileRestore(JSON.stringify(candidate))
++  if (profile.wallpaper.kind === 'local-file') {
++    throw new Error('A local wallpaper cannot be restored without its image bytes.')
++  }
++  const wallpaperApplied = await actions.applyWallpaper(profile.wallpaper)
++  if (!wallpaperApplied) return false
++  actions.applyPreferences(profile)
++  return true
++}
+diff --git a/src/components/SettingsPage.vue b/src/components/SettingsPage.vue
+--- a/src/components/SettingsPage.vue
++++ b/src/components/SettingsPage.vue
+@@ -299,6 +299,32 @@
+           <UiButton size="sm" icon="solar:download-bold" :disabled="customWallpaper.busy.value" @click="exportAppearanceProfile">
+             Export appearance profile
+           </UiButton>
++          <input
++            ref="appearanceImportInput"
++            type="file"
++            accept="application/json,.json"
++            class="st-hidden"
++            aria-label="Choose appearance profile JSON"
++            @change="handleAppearanceProfileFile"
++          />
++          <div class="st-actions">
++            <UiButton size="sm" icon="solar:upload-bold" :disabled="customWallpaper.busy.value || appearanceImportBusy" @click="openAppearanceProfilePicker">
++              Import appearance profile
++            </UiButton>
++            <UiButton
++              v-if="pendingAppearanceProfile"
++              size="sm"
++              variant="primary"
++              :loading="appearanceImportBusy"
++              :disabled="customWallpaper.busy.value || appearanceImportBusy"
++              @click="applyAppearanceProfile"
++            >Apply preview</UiButton>
++          </div>
++          <p v-if="pendingAppearanceProfile" class="st-wallpaper-note">
++            Preview: {{ pendingAppearanceProfile.settings.theme }} · {{ pendingAppearanceProfile.shellStyle }} shell ·
++            {{ pendingAppearanceProfile.wallpaper.kind === 'url' ? 'URL wallpaper' : pendingAppearanceProfile.wallpaper.kind === 'preset' ? `preset ${pendingAppearanceProfile.wallpaper.id}` : 'local image (unsupported)' }}.
++            Preferences apply only after the existing wallpaper service succeeds.
++          </p>
+           <p class="st-wallpaper-note">
+             Versioned JSON keeps appearance preferences. The native GPUI consumer initially applies theme colors and accent only; density, shell style, panel position, wallpaper, and other settings are retained but not applied. This is not OS live sync or evidence of Asterinas GUI acceptance.
+           </p>
+@@ -307,6 +333,9 @@
+           </p>
+           <p v-if="appearanceExportStatus" class="st-wallpaper-note" role="status" aria-live="polite">
+             {{ appearanceExportStatus }}
++          </p>
++          <p v-if="appearanceImportStatus" class="st-wallpaper-note" role="status" aria-live="polite">
++            {{ appearanceImportStatus }}
+           </p>
+         </div>
+         <div class="st-row">
+@@ -615,7 +644,12 @@
+ import { useTouchConfig, type GestureType, type TouchAction } from '@/composables/useTouchConfig'
+ import { useTheme } from '@/composables/useTheme'
+ import { ACCENT_CHOICES, WALLPAPERS, type ShellStyle } from '@/ui/tokens'
+-import { serializeAppearanceProfileV1 } from '@/utils/appearanceProfile'
++import {
++  applyAppearanceProfileRestore,
++  prepareAppearanceProfileRestore,
++  serializeAppearanceProfileV1,
++  type AppearanceProfileV1,
++} from '@/utils/appearanceProfile'
+ import { lockMobileVaultMirror, mobileVaultMirrorState, supportsNativeScopedStorage, syncMobileVaultMirrorNow, unlockMobileVaultMirror } from '@/utils/mobileScopedStorage'
+ import { LOCALES, getLocale, t, useLocale, type Locale } from '@/utils/i18n'
+ import pkg from '../../package.json'
+@@ -655,7 +689,11 @@
+ const customWallpaper = useCustomWallpaper()
+ const wallpaperUrlDraft = ref('')
+ const wallpaperFileInput = ref<HTMLInputElement | null>(null)
++const appearanceImportInput = ref<HTMLInputElement | null>(null)
+ const appearanceExportStatus = ref('')
++const appearanceImportStatus = ref('')
++const pendingAppearanceProfile = ref<AppearanceProfileV1 | null>(null)
++const appearanceImportBusy = ref(false)
+ const nativeMirrorAvailable = supportsNativeScopedStorage()
+ const mirrorPassphrase = ref('')
+ const mirrorActionBusy = ref(false)
+@@ -785,6 +823,65 @@
+   }
+ }
+ 
++function openAppearanceProfilePicker() {
++  if (!customWallpaper.busy.value && !appearanceImportBusy.value) {
++    appearanceImportInput.value?.click()
++  }
++}
++
++async function handleAppearanceProfileFile(event: Event) {
++  const input = event.currentTarget as HTMLInputElement
++  const file = input.files?.[0]
++  pendingAppearanceProfile.value = null
++  if (!file) return
++  try {
++    if (file.size > 64 * 1024) throw new Error('Appearance profile exceeds the 64 KiB limit.')
++    const profile = prepareAppearanceProfileRestore(await file.text())
++    pendingAppearanceProfile.value = profile
++    appearanceImportStatus.value = 'Profile validated. Review its preview, then explicitly apply it.'
++  } catch (cause) {
++    appearanceImportStatus.value = cause instanceof Error
++      ? `Profile import refused: ${cause.message}`
++      : 'Profile import refused because it could not be validated.'
++  } finally {
++    input.value = ''
++  }
++}
++
++async function applyAppearanceProfile() {
++  const profile = pendingAppearanceProfile.value
++  if (!profile || customWallpaper.busy.value || appearanceImportBusy.value) return
++  appearanceImportBusy.value = true
++  appearanceImportStatus.value = ''
++  try {
++    const applied = await applyAppearanceProfileRestore(profile, {
++      async applyWallpaper(wallpaper) {
++        if (wallpaper.kind === 'url') return customWallpaper.setUrl(wallpaper.url)
++        await customWallpaper.load()
++        return customWallpaper.kind.value ? customWallpaper.clear() : true
++      },
++      applyPreferences(validated) {
++        Object.assign(theme.settings, validated.settings)
++        theme.setShellStyle(validated.shellStyle)
++        setPanelDocked(validated.panelDocked ? '1' : '0')
++        wallpaperUrlDraft.value = customWallpaper.kind.value === 'url' ? customWallpaper.url.value : ''
++      },
++    })
++    if (!applied) {
++      appearanceImportStatus.value = 'Restore not applied: wallpaper storage failed. Existing preferences were left unchanged.'
++      return
++    }
++    pendingAppearanceProfile.value = null
++    appearanceImportStatus.value = 'Applied to this session through the existing preference and wallpaper services. Preference persistence remains subject to each existing store’s storage availability and limits.'
++  } catch (cause) {
++    appearanceImportStatus.value = cause instanceof Error
++      ? `Restore failed before preference changes: ${cause.message}`
++      : 'Restore failed before preference changes.'
++  } finally {
++    appearanceImportBusy.value = false
++  }
++}
++
+ onMounted(async () => {
+   await customWallpaper.load()
+   if (!wallpaperUrlDraft.value && customWallpaper.url.value) {
+diff --git a/tests/frontend/appearance-profile.test.ts b/tests/frontend/appearance-profile.test.ts
+--- a/tests/frontend/appearance-profile.test.ts
++++ b/tests/frontend/appearance-profile.test.ts
+@@ -7,8 +7,10 @@
+ import { readFileSync } from 'node:fs'
+ import { fileURLToPath } from 'node:url'
+ import {
++  applyAppearanceProfileRestore,
+   buildAppearanceProfileV1,
+   parseAppearanceProfileV1,
++  prepareAppearanceProfileRestore,
+   serializeAppearanceProfileV1,
+   type AppearanceProfileSource,
+ } from '@/utils/appearanceProfile'
+@@ -157,4 +159,87 @@
+     expect(() => parseAppearanceProfileV1(`${fixture.trimEnd()}${' '.repeat(64 * 1024)}`)).toThrow(/64 KiB/)
+     expect(() => parseAppearanceProfileV1('{')).toThrow(/valid JSON/)
+   })
++
++  it('normalizes legacy glass levels during strict v1 import parsing', () => {
++    const profile = JSON.parse(readFileSync(fixturePath, 'utf8'))
++    profile.settings.glass = 3
++    expect(parseAppearanceProfileV1(JSON.stringify(profile)).settings.glass).toBe(2)
++  })
++
++  it('refuses local-file restore because exports contain no bytes and leaves wallpaper untouched', async () => {
++    let stored: CustomWallpaperRecord | null = { kind: 'url', url: 'https://old.example.test/wallpaper.png' }
++    const controller = createCustomWallpaperController({
++      async read() { return stored },
++      async write(record) { stored = record },
++      async remove() { stored = null },
++    }, {
++      createObjectURL() { return 'blob:local-file' },
++      revokeObjectURL() {},
++    })
++    await controller.load()
++    const before = { source: controller.source.value, kind: controller.kind.value, url: controller.url.value }
++    const json = serializeAppearanceProfileV1(source({
++      customWallpaper: { kind: 'file', name: 'wallpaper.png', mimeType: 'image/png', size: 4096 },
++    }))
++    const currentPreferences = { theme: 'os-dark' }
++    await expect(Promise.resolve().then(() => prepareAppearanceProfileRestore(json))).rejects.toThrow(/does not contain its image bytes/)
++    expect(controller.source.value).toBe(before.source)
++    expect(controller.kind.value).toBe(before.kind)
++    expect(controller.url.value).toBe(before.url)
++    expect(currentPreferences).toEqual({ theme: 'os-dark' })
++  })
++
++  it('keeps preferences and the active wallpaper unchanged when the existing wallpaper service fails', async () => {
++    let stored: CustomWallpaperRecord | null = { kind: 'url', url: 'https://old.example.test/wallpaper.png' }
++    const controller = createCustomWallpaperController({
++      async read() { return stored },
++      async write() { throw new Error('simulated storage failure') },
++      async remove() { stored = null },
++    }, {
++      createObjectURL() { return 'blob:unused' },
++      revokeObjectURL() {},
++    })
++    await controller.load()
++    const beforeWallpaper = { source: controller.source.value, kind: controller.kind.value, url: controller.url.value }
++    const preferences = { theme: 'os-dark', shellStyle: 'macos', panelDocked: false }
++    const beforePreferences = { ...preferences }
++    const candidate = buildAppearanceProfileV1(source({
++      customWallpaper: { kind: 'url', url: 'https://new.example.test/wallpaper.png' },
++    }))
++    const restored = await applyAppearanceProfileRestore(candidate, {
++      applyWallpaper: (wallpaper) => wallpaper.kind === 'url'
++        ? controller.setUrl(wallpaper.url)
++        : Promise.resolve(controller.clear()),
++      applyPreferences(profile) {
++        preferences.theme = profile.settings.theme
++        preferences.shellStyle = profile.shellStyle
++        preferences.panelDocked = profile.panelDocked
++      },
++    })
++    expect(restored).toBe(false)
++    expect(preferences).toEqual(beforePreferences)
++    expect(controller.source.value).toBe(beforeWallpaper.source)
++    expect(controller.kind.value).toBe(beforeWallpaper.kind)
++    expect(controller.url.value).toBe(beforeWallpaper.url)
++    expect(controller.error.value).toMatch(/could not be saved/)
++  })
++
++  it('restores a URL profile through the wallpaper service before applying normalized preferences', async () => {
++    const candidate = buildAppearanceProfileV1(source({
++      customWallpaper: { kind: 'url', url: 'https://cdn.example.test/image.png' },
++      settings: { ...source().settings, glass: 3 as 0 },
++    }))
++    const events: string[] = []
++    const restored = await applyAppearanceProfileRestore(candidate, {
++      async applyWallpaper(wallpaper) {
++        events.push(`wallpaper:${wallpaper.kind}`)
++        return true
++      },
++      applyPreferences(profile) {
++        events.push(`preferences:${profile.settings.glass}`)
++      },
++    })
++    expect(restored).toBe(true)
++    expect(events).toEqual(['wallpaper:url', 'preferences:2'])
++  })
+ })

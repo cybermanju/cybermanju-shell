@@ -1,0 +1,32 @@
+{
+  "status": "Real reversible PCI/MMIO prerequisite implemented; full NVIDIA driver/GPU/GPUI acceptance NOT met",
+  "source_release": "615.78.08",
+  "source_commit": "1a82fbfda8f321b056eb3568850f9316c5e465c5",
+  "files": {
+    "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-resource-ownership.patch",
+    "notes": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+    "validation": "/workspace/asterinas-gpui/evidence/nvidia-ownership/patch-validation.json",
+    "test_counts": "/workspace/asterinas-gpui/evidence/nvidia-ownership/test-counts.json",
+    "cpu_boot_result": "/workspace/asterinas-gpui/evidence/nvidia-ownership/cpu-boot/result.json",
+    "cpu_boot_serial": "/workspace/asterinas-gpui/evidence/nvidia-ownership/cpu-boot/serial.log",
+    "pci_serial": "/workspace/asterinas-gpui/evidence/nvidia-ownership/final-native-suites/native-pci-tests.log",
+    "graphics_tests": "/workspace/asterinas-gpui/evidence/nvidia-ownership/graphics-tests.log",
+    "reproducer": "/workspace/asterinas-gpui/evidence/nvidia-ownership/run_cpu_boot.py"
+  },
+  "local_only": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "gpu_benchmark_pass": false,
+  "firmware_loaded_or_executed": false,
+  "remaining": [
+    "per-device PCI DMA mask and IOMMU domain contract",
+    "RM-private state and supported-chip/BAR-firewall integration",
+    "real power/IRQ/work/RM/GSP startup and shutdown",
+    "authenticated matching firmware and userspace",
+    "NVIDIA ioctl/mmap and GPU submission/fences/reset",
+    "accelerated DRM/Vulkan/Wayland/GPUI",
+    "physical NVIDIA hardware running Asterinas and correct native benchmark output"
+  ]
+}

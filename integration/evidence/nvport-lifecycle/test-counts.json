@@ -1,0 +1,23 @@
+{
+  "reported_native_counts": {
+    "native-nvidia-nvport-tests.log": [
+      20
+    ],
+    "native-nvidia-platform-tests.log": [
+      4
+    ],
+    "native-ostd-tests.log": [
+      227
+    ]
+  },
+  "reported_total": 251,
+  "hardware_condition_skips": {
+    "native-nvidia-nvport-tests.log": [],
+    "native-nvidia-platform-tests.log": [],
+    "native-ostd-tests.log": [
+      "test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] ok",
+      "test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] ok",
+      " [skipped: VMX/EPT invalidation unavailable] ok"
+    ]
+  }
+}

@@ -1,0 +1,114 @@
+--- a/kernel/comps/nvidia-platform/src/worker.rs
++++ b/kernel/comps/nvidia-platform/src/worker.rs
+@@ -27,6 +27,8 @@
+     GenerationOverflow,
+     /// OSTD could not allocate/build the actual task and its kernel stack.
+     Task(ostd::Error),
++    /// The transactional MSI-X guard could not complete safe teardown.
++    Msix(ostd::Error),
+ }
+ 
+ /// Whether this signal installed new pending work or joined an existing request.
+@@ -244,7 +246,7 @@
+         Ok(())
+     }
+ 
+-    fn validate_shutdown_context(&self) -> Result<(), WorkerError> {
++    pub(crate) fn validate_shutdown_context(&self) -> Result<(), WorkerError> {
+         if !can_sleep() {
+             return Err(WorkerError::InvalidContext);
+         }
+@@ -268,5 +270,93 @@
+     }
+ }
+ 
++/// Owns the transactional MSI-X lease and the bottom-half worker as one lifecycle.
++///
++/// Every registered interrupt callback receives this owner's `WorkSignal`. Shutdown
++/// first masks MSI-X and runs the caller's real device-source stop/drain protocol through
++/// `PciMsixGuard::shutdown`; that guard then synchronously retires the IRQ callbacks.
++/// Only after the guard returns does this owner close and drain the worker. The source
++/// callback is mandatory because MSI-X masking alone cannot stop a device interrupt source.
++/// It must not claim success until the hardware source is stopped and its pending work
++/// drained. This wrapper does not implement an NVIDIA-specific source mask or RM callback.
++#[must_use = "Keep the IRQ/worker owner and explicitly shut it down before releasing device state"]
++pub struct NvidiaInterruptWorker<'a> {
++    msix: Option<aster_pci::msix_transaction::PciMsixGuard<'a>>,
++    worker: DeviceWorker,
++}
++
++impl<'a> NvidiaInterruptWorker<'a> {
++    /// Acquire a fresh, masked MSI-X lease and create its deferred worker.
++    ///
++    /// This rejects non-sleepable or non-task context before accessing the device resources.
++    /// If task creation fails after MSI-X preparation, the unused unactivated guard is dropped
++    /// and performs its normal rollback; no pre-existing callbacks can be adopted.
++    pub fn prepare<F>(
++        resources: &'a crate::device::NvidiaDeviceResources<'_>,
++        vector_count: u16,
++        callback: F,
++    ) -> Result<Self, WorkerError>
++    where
++        F: FnMut() + Send + 'static,
++    {
++        if !can_sleep() || Task::current().is_none() {
++            return Err(WorkerError::InvalidContext);
++        }
++        let msix = resources
++            .prepare_msix(vector_count)
++            .map_err(WorkerError::Msix)?;
++        let worker = DeviceWorker::start(callback)?;
++        Ok(Self {
++            msix: Some(msix),
++            worker,
++        })
++    }
++
++    /// Register a handler coupled to this worker's signaling capability.
++    pub fn register_handler<F>(&mut self, index: u16, callback: F) -> Result<(), ostd::Error>
++    where
++        F: Fn(&ostd::arch::trap::TrapFrame, &WorkSignal) + Send + Sync + 'static,
++    {
++        let signal = self.worker.signal();
++        self.msix
++            .as_mut()
++            .ok_or(ostd::Error::AccessDenied)?
++            .register_handler(index, move |frame| callback(frame, &signal))
++    }
++
++    /// Activate vectors only after real callbacks have been installed by the MSI-X guard.
++    pub fn activate(&mut self) -> Result<(), ostd::Error> {
++        self.msix
++            .as_mut()
++            .ok_or(ostd::Error::AccessDenied)?
++            .activate()
++    }
++
++    /// Stop the device source, retire IRQ callbacks, then close and drain deferred work.
++    ///
++    /// The caller must provide the actual device-specific source mask/acknowledgement and
++    /// producer quiescence; this component cannot infer NVIDIA register semantics before
++    /// the RM device protocol is implemented. The operation requires a sleepable task
++    /// context and must not hold locks needed by handlers, the worker, or the quiesce code.
++    /// On MSI-X shutdown failure the worker remains open and resources remain owned for
++    /// retry. After MSI-X succeeds, worker shutdown is validated in advance and is
++    /// idempotent; completion still does not prove GPU reset or RM/GSP shutdown.
++    pub fn shutdown(
++        &mut self,
++        quiesce_source: impl FnOnce() -> Result<(), ostd::Error>,
++    ) -> Result<(), WorkerError> {
++        self.worker.validate_shutdown_context()?;
++        if let Some(mut msix) = self.msix.take() {
++            if let Err(error) = msix.shutdown(quiesce_source) {
++                self.msix = Some(msix);
++                return Err(WorkerError::Msix(error));
++            }
++            // The closed guard's Drop releases its lease; activated IRQ numbers remain
++            // retired sinks as required by the PCI API's delayed-message contract.
++        }
++        self.worker.shutdown()
++    }
++}
++
+ #[cfg(ktest)]
+ mod tests;

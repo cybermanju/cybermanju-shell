@@ -1,0 +1,306 @@
+--- a/kernel/comps/nvidia-platform/src/worker.rs
++++ b/kernel/comps/nvidia-platform/src/worker.rs
+@@ -4,6 +4,8 @@
+ //! This is not the upstream FIFO kthread queue or an RM ISR implementation. A real device
+ //! service must inspect/drain its own hardware work on each invocation. Repeated requests
+ //! coalesce while pending; a request during execution guarantees another invocation.
++//! `flush` waits for the invocation generation accepted at its snapshot, without closing
++//! admission or waiting for callback-capture destruction.
+ use alloc::sync::Arc;
+ 
+ use ostd::{
+@@ -14,12 +16,14 @@
+ /// A rejected operation on the native deferred worker.
+ #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+ pub enum WorkerError {
+-    /// Creation and synchronous shutdown require a sleepable, real task context.
++    /// A blocking operation requires a sleepable, real task context.
+     InvalidContext,
+-    /// A callback cannot synchronously wait for its own worker to stop.
++    /// A callback cannot synchronously wait for its own worker.
+     SelfWait,
+     /// Stop has closed admission; the request was not accepted.
+     Closed,
++    /// Generation accounting would overflow; admission was closed fail-safe.
++    GenerationOverflow,
+     /// OSTD could not allocate/build the actual task and its kernel stack.
+     Task(ostd::Error),
+ }
+@@ -33,6 +37,8 @@
+ 
+ struct State {
+     pending: bool,
++    accepted_generation: u64,
++    completed_generation: u64,
+     closing: bool,
+     stopped: bool,
+ }
+@@ -40,7 +46,7 @@
+ struct Shared {
+     state: SpinLock<State, LocalIrqDisabled>,
+     ready: WaitQueue,
+-    stopped: WaitQueue,
++    progress: WaitQueue,
+ }
+ 
+ impl Shared {
+@@ -68,17 +74,25 @@
+             if state.closing {
+                 return Err(WorkerError::Closed);
+             }
+-            let result = if state.pending {
+-                ScheduleResult::Coalesced
++            if state.pending {
++                Ok(ScheduleResult::Coalesced)
++            } else if let Some(generation) = state.accepted_generation.checked_add(1) {
++                state.pending = true;
++                state.accepted_generation = generation;
++                Ok(ScheduleResult::Queued)
+             } else {
+-                ScheduleResult::Queued
+-            };
+-            state.pending = true;
+-            result
++                // Wrapping could make a flush mistake later work for its snapshot.
++                state.closing = true;
++                Err(WorkerError::GenerationOverflow)
++            }
+         };
++        if result == Err(WorkerError::GenerationOverflow) {
++            self.shared.ready.wake_one();
++            return result;
++        }
+         // Release the admission lock before entering scheduler/wait-queue machinery.
+         self.shared.ready.wake_one();
+-        Ok(result)
++        result
+     }
+ }
+ 
+@@ -113,11 +127,13 @@
+         let shared = Arc::new(Shared {
+             state: SpinLock::new(State {
+                 pending: false,
++                accepted_generation: 0,
++                completed_generation: 0,
+                 closing: false,
+                 stopped: false,
+             }),
+             ready: WaitQueue::new(),
+-            stopped: WaitQueue::new(),
++            progress: WaitQueue::new(),
+         });
+         let worker_shared = shared.clone();
+         let task = TaskOptions::new(move || {
+@@ -138,11 +154,21 @@
+                     break;
+                 }
+                 callback();
++                let mut state = worker_shared.state.lock();
++                // A callback can only run for an accepted generation.
++                match state.completed_generation.checked_add(1) {
++                    Some(generation) if generation <= state.accepted_generation => {
++                        state.completed_generation = generation;
++                    }
++                    _ => state.closing = true,
++                }
++                drop(state);
++                worker_shared.progress.wake_all();
+             }
+             // Completion includes capture destruction, outside all our state locks.
+             drop(callback);
+             worker_shared.state.lock().stopped = true;
+-            worker_shared.stopped.wake_all();
++            worker_shared.progress.wake_all();
+         })
+         .build()
+         .map_err(WorkerError::Task)?;
+@@ -158,6 +184,31 @@
+         }
+     }
+ 
++    /// Waits for callback work accepted in the generation snapshot taken by this call.
++    ///
++    /// Requests coalesced while pending account for one invocation. Work accepted after
++    /// the snapshot, including while a callback is running, does not extend this wait.
++    /// Admission remains open and callback captures remain alive. This is deliberately a
++    /// single callback-generation snapshot, not the upstream multi-item FIFO
++    /// `kthread_q_flush` or its double-barrier behavior.
++    ///
++    /// Requires a sleepable task context and cannot be called by the worker callback.
++    /// Rejection leaves admission unchanged.
++    pub fn flush(&self) -> Result<(), WorkerError> {
++        if !can_sleep() {
++            return Err(WorkerError::InvalidContext);
++        }
++        let current = Task::current().ok_or(WorkerError::InvalidContext)?;
++        if core::ptr::eq(&*current, &*self.task) {
++            return Err(WorkerError::SelfWait);
++        }
++        let snapshot = self.shared.state.lock().accepted_generation;
++        self.shared.progress.wait_until(|| {
++            (self.shared.state.lock().completed_generation >= snapshot).then_some(())
++        });
++        Ok(())
++    }
++
+     /// Closes admission, drains accepted work, and destroys the callback captures.
+     ///
+     /// Repeated shutdown is harmless. Invalid-context and self-wait rejections do not
+@@ -173,7 +224,7 @@
+         }
+         self.shared.close();
+         self.shared
+-            .stopped
++            .progress
+             .wait_until(|| self.shared.state.lock().stopped.then_some(()));
+         Ok(())
+     }
+--- a/kernel/comps/nvidia-platform/src/worker/tests.rs
++++ b/kernel/comps/nvidia-platform/src/worker/tests.rs
+@@ -27,6 +27,13 @@
+     }
+ }
+ 
++fn spawn_task<F>(task_fn: F)
++where
++    F: FnOnce() + Send + 'static,
++{
++    Arc::new(TaskOptions::new(task_fn).build().unwrap()).run();
++}
++
+ struct DropWitness {
+     drops: Arc<AtomicUsize>,
+     done: Arc<Event>,
+@@ -100,6 +107,7 @@
+     {
+         let guard = ostd::task::disable_preempt();
+         assert_eq!(worker.shutdown(), Err(WorkerError::InvalidContext));
++        assert_eq!(worker.flush(), Err(WorkerError::InvalidContext));
+         assert!(matches!(
+             DeviceWorker::start(|| {}),
+             Err(WorkerError::InvalidContext)
+@@ -109,6 +117,7 @@
+     {
+         let guard = ostd::irq::disable_local();
+         assert_eq!(worker.shutdown(), Err(WorkerError::InvalidContext));
++        assert_eq!(worker.flush(), Err(WorkerError::InvalidContext));
+         assert!(matches!(
+             DeviceWorker::start(|| {}),
+             Err(WorkerError::InvalidContext)
+@@ -135,6 +144,7 @@
+         // exercise the atomic-context rejection rather than actual self-wait.
+         let mut owner = worker_slot.lock().take().unwrap();
+         assert_eq!(owner.shutdown(), Err(WorkerError::SelfWait));
++        assert_eq!(owner.flush(), Err(WorkerError::SelfWait));
+         assert!(!owner.shared.state.lock().closing);
+         *worker_slot.lock() = Some(owner);
+         worker_result.signal();
+@@ -249,3 +259,94 @@
+         "NVIDIA native worker: actual APIC timer IRQ to sleepable task handoff passed; not NVIDIA IRQ or GPU"
+     );
+ }
++
++#[ktest]
++fn worker_flush_waits_for_snapshot_and_preserves_later_work_and_captures() {
++    let first_started = Event::new();
++    let first_release = Event::new();
++    let second_started = Event::new();
++    let second_release = Event::new();
++    let flush_entered = Event::new();
++    let flush_returned = Event::new();
++    let third_completed = Event::new();
++    let captures_dropped = Event::new();
++    let calls = Arc::new(AtomicUsize::new(0));
++    let drops = Arc::new(AtomicUsize::new(0));
++    let witness = DropWitness {
++        drops: drops.clone(),
++        done: captures_dropped.clone(),
++    };
++    let (callback_calls, callback_first_started, callback_first_release) =
++        (calls.clone(), first_started.clone(), first_release.clone());
++    let (callback_second_started, callback_second_release, callback_third_completed) = (
++        second_started.clone(),
++        second_release.clone(),
++        third_completed.clone(),
++    );
++    let worker = DeviceWorker::start(move || {
++        let _ = &witness;
++        match callback_calls.fetch_add(1, Ordering::AcqRel) {
++            0 => {
++                callback_first_started.signal();
++                callback_first_release.wait();
++            }
++            1 => {
++                callback_second_started.signal();
++                callback_second_release.wait();
++            }
++            2 => callback_third_completed.signal(),
++            n => panic!("unexpected worker invocation {n}"),
++        }
++    })
++    .unwrap();
++    let worker = Arc::new(worker);
++    let signal = worker.signal();
++
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    first_started.wait();
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Coalesced));
++
++    let flushing_worker = worker.clone();
++    let (task_flush_entered, task_flush_returned) = (flush_entered.clone(), flush_returned.clone());
++    spawn_task(move || {
++        task_flush_entered.signal();
++        assert_eq!(flushing_worker.flush(), Ok(()));
++        task_flush_returned.signal();
++    });
++    flush_entered.wait();
++    first_release.signal();
++    second_started.wait();
++    assert!(
++        !flush_returned.signaled.load(Ordering::Acquire),
++        "flush returned before the pending snapshot invocation completed"
++    );
++    second_release.signal();
++    flush_returned.wait();
++    assert_eq!(calls.load(Ordering::Acquire), 2);
++    assert_eq!(drops.load(Ordering::Acquire), 0, "flush destroyed captures");
++
++    // A completed flush is a point-in-time barrier, not a close: later requests are
++    // still admitted and the callback remains owned until shutdown/Drop.
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    third_completed.wait();
++    assert_eq!(calls.load(Ordering::Acquire), 3);
++    assert_eq!(drops.load(Ordering::Acquire), 0);
++    drop(worker);
++    captures_dropped.wait();
++    assert_eq!(drops.load(Ordering::Acquire), 1);
++}
++
++#[ktest]
++fn generation_overflow_closes_admission_without_wrapping() {
++    let mut worker = DeviceWorker::start(|| {}).unwrap();
++    let signal = worker.signal();
++    {
++        let mut state = worker.shared.state.lock();
++        state.accepted_generation = u64::MAX;
++        state.completed_generation = u64::MAX;
++    }
++    assert_eq!(signal.schedule(), Err(WorkerError::GenerationOverflow));
++    assert_eq!(signal.schedule(), Err(WorkerError::Closed));
++    worker.shutdown().unwrap();
++}
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -12,6 +12,10 @@
+ 
+ The crate is a workspace/default member and is optionally linked into the kernel by `nvidia-pci-diagnostics` (also enabled by `native-gpu-ci`). Its component runs after its PCI dependency and logs actual resources or explicitly says no unclaimed NVIDIA display controller was found. Component initialization returning `Ok(())` means the diagnostic ran, not that a GPU driver initialized; no `PciDriver` is registered.
+ 
++## Native callback worker
++
++`worker::DeviceWorker` owns one real OSTD task and one callback. `WorkSignal::schedule` coalesces requests while pending; a request during callback execution installs one subsequent invocation. `DeviceWorker::flush` takes a lock-protected snapshot of accepted invocation generations and waits only through that snapshot. Coalesced pending requests count as one invocation, while requests accepted after the snapshot do not extend it. Flush is sleepable-task-only, rejects self-wait, does not close admission, and does not destroy callback captures; use `shutdown` when capture destruction and admission closure are required. This deliberately is not full upstream multi-item or double-barrier `kthread_q_flush` compatibility. Generation overflow closes admission rather than wrapping. The worker is a primitive only: it does not call RM or implement an NVIDIA ISR/BH.
++
+ ## Tests
+ 
+ Three pure validation tests cover NVIDIA/display identity checks, zero/overflow range validation, and config-read bounds/alignment. All three ran successfully inside OSTD under QEMU TCG via `cargo osdk test`; they do not validate NVIDIA BAR/config I/O against a real GPU. The ordinary CI entrypoint `bash tools/graphics/run_cpu_kernel_tests.sh OUTPUT_DIRECTORY` runs this suite as well as NVport and OSTD without KVM or device passthrough.

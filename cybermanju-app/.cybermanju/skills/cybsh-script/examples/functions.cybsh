@@ -1,0 +1,47 @@
+# cybsh: 1
+# functions.cybsh — dicts, defs, match, pipes, with, structured shell output.
+# Usage: `run /scripts/functions.cybsh`
+# See also: lib.cybsh (importable defs), tour.cybsh (the full tour).
+
+def summarize(files):
+  let counts = {}
+  for f in files:
+    let ext = f
+    counts = set(counts, ext, int(str(len(ext))))
+  return counts
+
+let inventory = summarize(["notes", "report", "data"])
+print inventory
+print keys(inventory)
+
+try:
+  let st = sh("sync status --json")
+  print "jobs: " + str(len(st))
+catch:
+  print "sync status unavailable here — continuing"
+
+def pick(d, key, fallback):
+  try:
+    return d[key]
+  catch:
+    return fallback
+
+print pick({a: 1}, "b", "missing")
+
+match sh("echo structured"):
+  ok(v):
+    print "echoed: " + v
+  err(e):
+    print "unexpected: " + e
+
+print "a,b,c" |> split(",") |> len
+
+def shout(s):
+  return s + "!"
+
+print "hi" |> shout
+
+with snapshot = inventory:
+  print "scoped keys: " + str(len(snapshot))
+print "outer kept: " + str(len(inventory))
+print "functions done"

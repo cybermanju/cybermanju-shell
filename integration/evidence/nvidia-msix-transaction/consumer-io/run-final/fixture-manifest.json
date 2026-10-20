@@ -1,0 +1,26 @@
+{
+  "fixture_bytes": 1048576,
+  "verified_bytes_at_offset_0": 4096,
+  "scratch_bytes_at_offset_4096": 4096,
+  "patterns": {
+    "nvme": {
+      "seed": 35,
+      "byte_formula": "(i * 37 + seed) & 0xff"
+    },
+    "virtio-modern": {
+      "seed": 123,
+      "byte_formula": "(i * 37 + seed) & 0xff"
+    },
+    "virtio-legacy": {
+      "seed": 209,
+      "byte_formula": "(i * 37 + seed) & 0xff"
+    }
+  },
+  "disk_sha256_before_guest": {
+    "nvme": "c36028e418b890b6316a21a09aea15ef9356680e90398902c7db1fca1eff689d",
+    "virtio-modern": "44c55ded0eead231c9c5b7f8dd8e2b983b7ca4d43f81389a7bfcae709a25aa51",
+    "virtio-legacy": "0d4c081e29070586783b119ca3cac389db38c2867c280edeebf7dbdcb570da05"
+  },
+  "init_sha256": "e991f904e4ec5fd1c2f23c329d53dc7d8d0291e873d158348735ef3542001a15",
+  "initramfs_sha256": "015eae9c436332681c650d82e34650ca7ca8545e9c72cfe34d102dacfb7cde56"
+}

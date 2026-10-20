@@ -1,0 +1,13 @@
+# Native launcher density is now applied
+
+CyberManju's existing exported `settings.density` now drives actual GPUI launcher query/body/footer semantic padding and gaps. Compact spacing uses the existing app unit factor 0.9, comfortable uses 1.0. With no profile, comfortable preserves every original native spacing token. Nine real launcher spacing consumers now use this runtime density, rather than retaining it as unapplied metadata.
+
+Native font size, icons, explicit hit-target dimensions, bar geometry and compositor placement are not scaled. Wallpaper, shell style/docking, motion/glass/glow and density outside launcher chrome remain unimplemented. The profile report states **launcher spacing only**. There is still no automatic Vue/Tauri-to-shell transport: the user must opt into an exported file and, for live changes, the watch flag.
+
+The same validated appearance overlay handles density during live inotify changes, malformed-save retention, recovery and native-theme reload. Imported density survives palette changes but is not serialized into native `theme.toml`; the original profile remains its owner. No app source, preference schema, dependencies or existing stores were changed.
+
+Final actual checks: 205 Rust tests and 36 Python tests pass, with successful real binary build and all-target Clippy. New tests cover unchanged default spacing, bounded monotonic compact spacing, native typography preservation, runtime-only serialization behavior, palette/native-theme reload and genuine atomic/inotify save rejection/recovery. The existing CLI binary suite remains intact. App version and file-header checks also passed. This run did not re-run the frontend test suite or render a new host-window screenshot; older host-only color captures must not be relabeled as density verification.
+
+Critical disk pressure developed during a separate active Android build. After all GPUI compilation finished, only idle, reproducible GPUI incremental cache entries were removed; sources, dependencies, binaries, test binaries and evidence were retained. Recovery details are in `cache-space-recovery.json`. New native lifecycle patch20 validation was resumed only after recovering space; see the separate `evidence/native-2121` results for its final status.
+
+Hardware again exposes no display-class PCI GPU, `/dev/dri`, `/dev/nvidia*` or `/dev/kvm`. Neither GPUI tests nor QEMU/NVMe/EDU establish native GPU acceleration or an Asterinas desktop. Full NVIDIA RM/GSP/Vulkan, native AMD and target Wayland/Tauri runtimes and correct physical-GPU end-to-end benchmarks remain gates. No tokens, credentials, authentication, staging, commit, push/PR/publication or remote Actions were used.

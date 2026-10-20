@@ -1,0 +1,38 @@
+    Blocking waiting for file lock on build directory
+   Compiling zerocopy v0.8.54
+    Checking ostd-pod v0.4.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-pod)
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+error[E0603]: function `flush` is private
+  --> ostd/src/arch/x86/iommu/invalidate/queue.rs:26:48
+   |
+26 | ...   super::super::dma_remapping::isolated::flush(self.segment.paddr(),...
+   |                                              ^^^^^ private function
+   |
+note: the function `flush` is defined here
+  --> ostd/src/arch/x86/iommu/dma_remapping/isolated.rs:42:1
+   |
+42 | pub(super) fn flush(paddr: usize, size: usize) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: the item `HasSize` is imported redundantly
+ --> ostd/src/arch/x86/iommu/invalidate/queue.rs:4:29
+  |
+4 |     mm::{FrameAllocOptions, HasSize, PAGE_SIZE, Segment, VmIo},
+  |                             ^^^^^^^
+5 |     prelude::*,
+  |     ---------- the item `HasSize` is already imported here
+  |
+  = note: requested on the command line with `-W redundant-imports`
+
+warning: unnecessary `unsafe` block
+  --> ostd/src/arch/x86/iommu/dma_remapping/isolated.rs:74:12
+   |
+74 |         if unsafe { core::arch::x86_64::__cpuid(1) }.edx & (1 << 19) == 0 {
+   |            ^^^^^^ unnecessary `unsafe` block
+   |
+   = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0603`.
+warning: `ostd` (lib) generated 2 warnings
+error: could not compile `ostd` (lib) due to 1 previous error; 2 warnings emitted
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest)" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" "-p" "ostd" failed with status: ExitStatus(unix_wait_status(25856))

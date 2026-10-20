@@ -1,0 +1,30 @@
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `id-alloc` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+error[E0282]: type annotations needed for `io::io_mem::IoMem<_>`
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/io/io_mem/mod.rs:481:13
+    |
+481 |         let io_mem = IoMem {
+    |             ^^^^^^
+...
+493 |             phantom: core::marker::PhantomData,
+    |                      ------------------------- type must be known at this point
+    |
+help: consider giving `io_mem` an explicit type, where the type for type parameter `T` is specified
+    |
+481 |         let io_mem: io::io_mem::IoMem<SecuritySensitivity> = IoMem {
+    |                   ++++++++++++++++++++++++++++++++++++++++
+
+For more information about this error, try `rustc --explain E0282`.
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+error: could not compile `ostd` (lib) due to 1 previous error; 1 warning emitted
+[Error]: Cargo build failed

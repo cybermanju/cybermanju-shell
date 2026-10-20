@@ -1,0 +1,600 @@
+# CyberManju OS — GitLab CI/CD, mirror of .github/workflows/{ci,release}.yml.
+#
+# What runs where (gitlab.com SaaS runners are Linux-only):
+# - SaaS Linux runners build: meta, rust, audit, wasm, linux (deb+AppImage+rpm),
+#   rpm re-pack, flatpak, arch, android, docker, pages, release + cli (Go cyb).
+# - Windows / macOS have NO SaaS runners: those two jobs are manual +
+#   allow_failure and need self-hosted runners tagged `cybermanju-windows` /
+#   `cybermanju-macos`. The GitLab release ships every family its pipeline
+#   produced (exe/dmg attach when the manual jobs run first).
+# - Secrets (GitLab → Settings → CI/CD → Variables, masked + protected):
+#   TAURI_SIGNING_PRIVATE_KEY, ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD, VITE_SUPABASE_URL,
+#   VITE_SUPABASE_ANON_KEY.
+#   Android release signing is REQUIRE_SIGNING=1: without the keystore that
+#   job fails by design, same as GitHub. The Supabase vars are baked into
+#   every frontend bundle at build time (Pages, desktop installers, docker
+#   image — project/group CI variables are inherited automatically by every
+#   job, so no same-name assignment is needed); empty when unset — the app
+#   falls back to the manual Settings paste.
+# - gitlab.com SaaS runners require the account to pass identity verification
+#   (credit/debit card or phone). Until that is done every pipeline fails
+#   with "Identity verification is required in order to run CI jobs" before
+#   any job starts — no YAML change can bypass it. Verify at
+#   https://gitlab.com/-/profile/account, then retry the pipeline.
+#   Alternative: attach a self-hosted runner to this project (any machine
+#   with docker) and remove the SaaS-only dependency.
+# - Prose-only pushes (**.md, docs/**, LICENSE) skip the heavy jobs, tags and
+#   MRs always run everything. Redundant pipelines auto-cancel.
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+variables:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Same rationale as ci.yml: cold runners + caches that drop incremental
+  # artifacts ⇒ incremental only buys thrown-away compiler time.
+  CARGO_INCREMENTAL: "0"
+  GIT_DEPTH: "0"
+  NDK_VERSION: 28.2.13676358
+  DEBIAN_FRONTEND: noninteractive
+
+stages:
+  - lint
+  - build
+  - package
+  - deploy
+  - release
+
+# Prose-only pushes skip heavy jobs (mirrors ci.yml paths-ignore).
+.code-rules:
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: on_success
+    - changes:
+        - "**/*.md"
+        - "docs/**/*"
+        - LICENSE
+      when: never
+    - when: on_success
+
+# ─── lint ────────────────────────────────────────────────────────────
+meta-check:
+  stage: lint
+  image: debian:bookworm-slim
+  interruptible: true
+  extends: .code-rules
+  script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        bash scripts/check-version.sh --tag "$CI_COMMIT_TAG"
+      else
+        bash scripts/check-version.sh
+      fi
+    - test -f LICENSE
+
+rust-check:
+  stage: lint
+  image: rust:latest
+  interruptible: true
+  extends: .code-rules
+  cache:
+    key:
+      files: [Cargo.lock]
+      prefix: cargo-rust-check
+    paths: [target/, $HOME/.cargo/registry/, $HOME/.cargo/git/]
+  before_script:
+    - apt-get update && apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+      libglib2.0-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
+      libjavascriptcoregtk-4.1-dev pkg-config build-essential libssl-dev
+    # Stale mirror indexes 404 mid-install (GitHub CI 2026-10-11) — retry
+    # once with a fresh index instead of failing the whole pipeline.
+    - pkg-config --exists 'glib-2.0 >= 2.70' || (apt-get update && apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libglib2.0-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev pkg-config build-essential libssl-dev)
+    - pkg-config --modversion glib-2.0
+  script:
+    - cargo fmt --all -- --check
+    - cargo clippy --workspace --all-targets -- -D warnings
+    - cargo test --workspace --no-fail-fast
+
+audit:
+  stage: lint
+  image: rust:latest
+  interruptible: true
+  extends: .code-rules
+  # Blocking — mirrors GitHub's audit job (advisory list cleaned 2026-10-18:
+  # quinn-proto 0.11.19 / rustls 0.23.46 / ruzstd 0.9.1 lock bump fixed the
+  # 10 RustSec vulns; npm production audit is clean).
+  before_script:
+    - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+    - apt-get install -y nodejs
+  script:
+    # Prebuilt binary; `cargo install cargo-audit --locked` compiles ~300
+    # crates from source on every run for no reason.
+    - curl -sSfL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+    - cargo binstall -y cargo-audit || cargo install cargo-audit --locked
+    - cargo audit
+    - npm ci
+    - npm audit --omit=dev
+
+# ─── build ───────────────────────────────────────────────────────────
+cli-build:
+  stage: build
+  image: golang:bookworm
+  interruptible: true
+  extends: .code-rules
+  cache:
+    key:
+      files: [cli/go.sum]
+      prefix: go-cli
+    paths: [$HOME/go/pkg/mod/, $HOME/.cache/go-build/]
+  script:
+    - cd cli
+    - test -z "$(gofmt -l .)"
+    - go vet ./...
+    - go test -race -count=1 ./...
+    # Root package.json is the version source of truth (no node here).
+    - PKG_VER="$(grep -m1 '"version"' ../package.json | cut -d'"' -f4)"
+    - mkdir -p dist-cli
+    - |
+      for target in "linux amd64" "linux arm64" "darwin amd64" "darwin arm64" "windows amd64" "windows arm64"; do
+        set -- $target
+        bin="cyb"
+        [ "$1" = "windows" ] && bin="cyb.exe"
+        CGO_ENABLED=0 GOOS="$1" GOARCH="$2" go build -trimpath -ldflags "-s -w -X main.version=v$PKG_VER -X github.com/cybermanju/cybermanju.github.io/cli/internal/supa.BakedURL=$VITE_SUPABASE_URL -X github.com/cybermanju/cybermanju.github.io/cli/internal/supa.BakedKey=$VITE_SUPABASE_ANON_KEY" -o "build-$1-$2/$bin" .
+        tar -czf "dist-cli/cyb-$1-$2.tar.gz" -C "build-$1-$2" "$bin"
+      done
+    - ls dist-cli/
+    - bash ../scripts/cyb-deb.sh "$PKG_VER" . dist-cli
+  artifacts:
+    paths: [cli/dist-cli/]
+    expire_in: 1 week
+
+wasm-build:
+  stage: build
+  image: rust:latest
+  interruptible: true
+  extends: .code-rules
+  # GitLab project/group CI variables are inherited automatically by WASM and
+  # Android jobs; avoid same-name assignments that can recursively expand.
+  # If unset, the app falls back to the manual Settings paste (useSupabase.ts).
+  cache:
+    key:
+      files: [Cargo.lock, package-lock.json]
+      prefix: cargo-wasm
+    paths: [target/, $HOME/.cargo/registry/, $HOME/.cargo/git/, $HOME/.npm/]
+  before_script:
+    - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+    - apt-get install -y nodejs
+    # Targets come from rust-toolchain.toml (rustup auto-installs them).
+    - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - export PATH="$HOME/.cargo/bin:$PATH"
+  script:
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    # No separate `cargo check`: wasm-pack compiles the same crate below.
+    - wasm-pack build crates/os-wasm --target web --out-dir pkg
+    - npm ci
+    - npx vue-tsc --noEmit
+    - npm test
+    # Keep the freshly built pkg in place so the vite alias to
+    # crates/os-wasm/pkg resolves to the wasm backend.
+    - npm run build:wasm:frontend
+    - test -f dist-wasm/index.html
+  artifacts:
+    paths: [dist-wasm/]
+    expire_in: 1 week
+
+linux-build:
+  stage: build
+  image: rust:latest
+  interruptible: true
+  extends: .code-rules
+  cache:
+    key:
+      files: [Cargo.lock, package-lock.json]
+      prefix: cargo-linux
+    paths: [target/, $HOME/.cargo/registry/, $HOME/.cargo/git/, $HOME/.npm/]
+  before_script:
+    - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+    - apt-get update && apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+      libglib2.0-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
+      libjavascriptcoregtk-4.1-dev pkg-config build-essential libssl-dev nodejs
+    # Stale mirror indexes 404 mid-install (GitHub CI 2026-10-11) — retry
+    # once with a fresh index instead of failing the whole pipeline.
+    - pkg-config --exists 'glib-2.0 >= 2.70' || (apt-get update && apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libglib2.0-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev pkg-config build-essential libssl-dev nodejs)
+    - pkg-config --modversion glib-2.0
+  script:
+    - npm ci
+    # VITE_SUPABASE_* project variables are inherited automatically, so the
+    # desktop bundle bakes the OAuth broker (empty ⇒ Settings paste on device).
+    - npm run tauri build
+    - mkdir -p ship/linux/deb ship/linux/appimage ship/linux/rpm
+    - cp target/release/bundle/deb/*.deb ship/linux/deb/
+    - cp target/release/bundle/appimage/*.AppImage ship/linux/appimage/
+    - cp target/release/bundle/rpm/*.rpm ship/linux/rpm/
+  artifacts:
+    paths: [ship/linux/]
+    expire_in: 1 week
+
+android-build:
+  stage: build
+  # temurin 17 + bookworm tools; SDK/NDK installed fresh below.
+  image: eclipse-temurin:17-jdk-noble
+  interruptible: true
+  extends: .code-rules
+  variables:
+    ANDROID_HOME: /opt/android-sdk
+    ANDROID_SDK_ROOT: /opt/android-sdk
+    # ort-sys `download-binaries` extracts ONNX Runtime OUTSIDE target/ —
+    # same correctness-critical pin as ci.yml (`$HOME/.cache/ort`; cold dir +
+    # warm build-script output = "could not find native static library
+    # onnxruntime" at link time). GitLab does NOT shell-expand `variables:`
+    # values, so the script re-exports the expanded path at startup.
+    ORT_CACHE_DIR: $HOME/.cache/ort
+  cache:
+    key:
+      files: [Cargo.lock, package-lock.json]
+      prefix: cargo-android
+    paths: [target/, $HOME/.cargo/registry/, $HOME/.cargo/git/, $HOME/.npm/, $HOME/.gradle/, $HOME/.cache/ort/]
+  # Runs even when the job fails: a failed verify/abort above must not leave
+  # a decoded keystore on a (potentially long-lived) runner — same shred as
+  # the GitHub `Shred Android signing secrets` step (`if: always()`).
+  after_script:
+    - bash scripts/android-signing.sh cleanup || true
+  before_script:
+    # python3 is NOT in eclipse-temurin:17-jdk-noble and android-configure.sh
+    # runs python3 heredocs — without this the job dies at the first patch.
+    - apt-get update && apt-get install -y curl unzip zip pkg-config build-essential libssl-dev python3
+    - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+    - apt-get install -y nodejs
+    - curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    # Targets (incl. android triples) come from rust-toolchain.toml.
+    - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - mkdir -p /opt/android-sdk/cmdline-tools
+    - curl -sSfL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdtools.zip
+    - unzip -q /tmp/cmdtools.zip -d /opt/android-sdk/cmdline-tools
+    - mv /opt/android-sdk/cmdline-tools/cmdline-tools /opt/android-sdk/cmdline-tools/latest
+    - export PATH="/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:$PATH"
+    - yes | sdkmanager --licenses > /dev/null || true
+    - sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
+  script:
+    # GitLab passes `variables:` literally (no shell expansion), so the
+    # `$HOME` in ORT_CACHE_DIR must be expanded here for ort-sys.
+    - export ORT_CACHE_DIR="$HOME/.cache/ort"
+    - export PATH="$HOME/.cargo/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:$PATH"
+    - export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+    - export NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+    - npm ci
+    - npm run build:wasm:pkg
+    - npm run tauri android init
+    # `tauri android init` stamps the template's DEFAULT launcher icons —
+    # sync the real mark (same as GitHub CI) before configuring + building.
+    - bash scripts/android-icons.sh
+    # A release APK must be installable: missing keystore is a hard failure
+    # here (REQUIRE_SIGNING), same as GitHub — signing secrets required.
+    # Ordering mirrors GitHub (ci.yml / release.yml): configure → gradle
+    # harden → signing prepare → build → verify → smoke → upload.
+    - |
+      export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+      export NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+      bash scripts/android-configure.sh
+      bash scripts/android-gradle-harden.sh
+      REQUIRE_SIGNING=1 bash scripts/android-signing.sh prepare
+      npx tauri android build --target aarch64 --apk --aab --split-per-abi
+      REQUIRE_SIGNING=1 bash scripts/android-signing.sh verify
+      bash scripts/android-smoke.sh || echo "smoke skipped/failed (non-blocking)"
+    - mkdir -p ship/android && find src-tauri/gen/android/app/build/outputs \( -name '*.apk' -o -name '*.aab' \) -exec cp {} ship/android/ \;
+    - ls ship/android/
+  artifacts:
+    paths: [ship/android/]
+    expire_in: 1 week
+
+# No SaaS runners for these two: manual + allow_failure, needs self-hosted
+# runners tagged cybermanju-windows / cybermanju-macos.
+windows-build:
+  stage: build
+  tags: [cybermanju-windows]
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: true
+    - when: never
+  script:
+    - npm ci
+    - npm run tauri build
+    - New-Item -ItemType Directory -Force -Path ship/windows
+    - Copy-Item target/release/bundle/msi/*.msi ship/windows/ -ErrorAction SilentlyContinue
+    - Copy-Item target/release/bundle/nsis/*.exe ship/windows/ -ErrorAction SilentlyContinue
+  artifacts:
+    paths: [ship/windows/]
+    expire_in: 1 week
+
+macos-build:
+  stage: build
+  tags: [cybermanju-macos]
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: true
+    - when: never
+  script:
+    - npm ci
+    - npm run tauri build
+    - mkdir -p ship/macos
+    - cp target/release/bundle/dmg/*.dmg ship/macos/
+    - cp -R target/release/bundle/macos/*.app ship/macos/ 2>/dev/null || true
+  artifacts:
+    paths: [ship/macos/]
+    expire_in: 1 week
+
+docker-build:
+  stage: build
+  image: docker:27
+  services: [docker:27-dind]
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: /certs
+  interruptible: true
+  extends: .code-rules
+  script:
+    # OAuth broker build-args (public URL + anon key); empty when unset —
+    # the app then takes the Settings paste. Project variables inherited
+    # automatically, no same-name `variables:` assignment (see wasm-build).
+    - docker build -t cybermanju-os:latest -f ./Dockerfile --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL" --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" .
+    - docker images cybermanju-os:latest
+
+# ─── package ─────────────────────────────────────────────────────────
+rpm-build:
+  stage: package
+  image: debian:bookworm-slim
+  interruptible: true
+  extends: .code-rules
+  needs: [linux-build]
+  script:
+    - mkdir -p ship/rpm && cp ship/linux/rpm/*.rpm ship/rpm/
+    - ls ship/rpm/*.rpm
+  artifacts:
+    paths: [ship/rpm/]
+    expire_in: 1 week
+
+flatpak-build:
+  stage: package
+  image: debian:bookworm-slim
+  interruptible: true
+  extends: .code-rules
+  needs: [linux-build]
+  before_script:
+    - apt-get update && apt-get install -y flatpak flatpak-builder git curl ca-certificates
+    - flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    - flatpak install -y --noninteractive flathub org.gnome.Platform//47 org.gnome.Sdk//47
+  script:
+    - flatpak-builder --force-clean --repo=repo build-dir src-tauri/flatpak/com.cybermanju.os.yml
+    - flatpak build-bundle repo cybermanju-os.flatpak com.cybermanju.os
+    - mkdir -p ship/flatpak && mv cybermanju-os.flatpak ship/flatpak/
+    - ls ship/flatpak/*.flatpak
+  artifacts:
+    paths: [ship/flatpak/]
+    expire_in: 1 week
+
+arch-build:
+  stage: package
+  # Arch container directly (no docker-in-docker like GitHub): pacman +
+  # rustup + node, same NO_STRIP / APPIMAGE_EXTRACT_AND_RUN workarounds
+  # (linuxdeploy can't read Arch .relr.dyn; no /dev/fuse in containers).
+  image: archlinux:latest
+  interruptible: true
+  extends: .code-rules
+  cache:
+    key:
+      files: [Cargo.lock, package-lock.json]
+      prefix: cargo-arch
+    paths: [target/, $HOME/.cargo/registry/, $HOME/.cargo/git/, $HOME/.npm/]
+  before_script:
+    - pacman -Syu --noconfirm
+    - pacman -S --noconfirm base-devel git webkit2gtk-4.1 gtk3 libayatana-appindicator
+      librsvg libsoup3 pkg-config openssl curl sudo xdg-utils rpm-tools fuse2
+      dpkg patchelf desktop-file-utils nodejs npm
+    - mkdir -p /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders
+    - curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+  script:
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    - export NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1
+    - npm ci
+    # VITE_SUPABASE_* project variables are inherited automatically, so the
+    # Arch bundle bakes the OAuth broker (empty ⇒ Settings paste on device).
+    - npm run tauri build || npm run tauri -- build --verbose
+    - mkdir -p ship/arch
+    - cp target/release/bundle/deb/*.deb ship/arch/ 2>/dev/null || true
+    - cp target/release/bundle/appimage/*.AppImage ship/arch/ 2>/dev/null || true
+    - ls ship/arch/
+  artifacts:
+    paths: [ship/arch/]
+    expire_in: 1 week
+
+# ─── deploy ──────────────────────────────────────────────────────────
+pages:
+  stage: deploy
+  image: debian:bookworm-slim
+  interruptible: true
+  needs: [wasm-build]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - mkdir -p public && cp -r dist-wasm/. public/
+    - 'test -f public/index.html || { echo "ERROR: public/index.html missing (wasm-build produced no bundle)"; exit 1; }'
+    - ls public/ | head -n 20
+  artifacts:
+    paths: [public/]
+    expire_in: 1 week
+
+docker-push:
+  stage: deploy
+  image: docker:27
+  services: [docker:27-dind]
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: /certs
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD"
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG" -t "$CI_REGISTRY_IMAGE:latest" -f ./Dockerfile .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+    - docker pull "$CI_REGISTRY_IMAGE:latest"
+
+# ─── release (tags v*) ───────────────────────────────────────────────
+release:
+  stage: release
+  image: debian:bookworm-slim
+  interruptible: false
+  rules:
+    - if: $CI_COMMIT_TAG
+  needs:
+    - rust-check
+    - wasm-build
+    - linux-build
+    - rpm-build
+    - flatpak-build
+    - arch-build
+    - android-build
+    - docker-push
+  before_script:
+    - apt-get update && apt-get install -y git zip curl ca-certificates python3
+  script:
+    # Collect every family the pipeline produced into release/ dirs.
+    - mkdir -p release/release-linux release/release-rpm release/release-flatpak
+      release/release-arch release/release-android release/release-windows release/release-macos release/release-cli
+    - cp ship/linux/deb/*.deb ship/linux/appimage/*.AppImage release/release-linux/
+    - cp ship/rpm/*.rpm release/release-rpm/
+    - cp ship/flatpak/*.flatpak release/release-flatpak/
+    - cp ship/arch/* release/release-arch/ 2>/dev/null || true
+    - cp ship/android/*.apk ship/android/*.aab release/release-android/ 2>/dev/null || cp ship/android/*.apk release/release-android/
+    - cp ship/windows/* release/release-windows/ 2>/dev/null || true
+    - cp ship/macos/* release/release-macos/ 2>/dev/null || true
+    - cp cli/dist-cli/*.tar.gz release/release-cli/
+    # A job can go green while producing nothing: fail here instead of
+    # shipping a release with a hole (windows/macos are best-effort —
+    # manual jobs — so they only warn).
+    - |
+      missing=0
+      check() {
+        local dir="$1"; shift
+        local optional="${OPTIONAL:-0}"
+        local pat
+        for pat in "$@"; do
+          if ! find "release/$dir" -name "$pat" -print -quit | grep -q .; then
+            if [ "$optional" = "1" ]; then
+              echo "WARNING: release '$dir' contains no $pat (manual job not run?)"
+            else
+              echo "ERROR: release '$dir' contains no $pat"
+              missing=1
+            fi
+          fi
+        done
+      }
+      check release-linux "*.deb" "*.AppImage"
+      check release-rpm "*.rpm"
+      check release-flatpak "*.flatpak"
+      check release-arch "*.AppImage"
+      check release-android "*.apk" "*.aab"
+      check release-cli "cyb-*.tar.gz"
+      test -f dist-wasm/index.html || { echo "ERROR: dist-wasm/index.html missing"; missing=1; }
+      OPTIONAL=1 check release-windows "*.exe" "*.msi"
+      OPTIONAL=1 check release-macos "*.dmg"
+      exit $missing
+    # Notes: changelog from git history + shared feature atlas/status.
+    - |
+      PREV_TAG=$(git tag --sort=-creatordate | grep -vx "$CI_COMMIT_TAG" | head -1 || true)
+      {
+        echo "## What's Changed"
+        echo ""
+        if [ -n "$PREV_TAG" ]; then
+          echo "### Changes since $PREV_TAG"
+          echo ""
+          git log --pretty=format:"- %s (%h)" "$PREV_TAG".."$CI_COMMIT_TAG"
+        else
+          echo "### Initial Release"
+          echo ""
+          git log --pretty=format:"- %s (%h)"
+        fi
+        echo ""
+        echo ""
+        cat docs/RELEASE_NOTES.md
+        echo ""
+        echo "## Downloads"
+        echo ""
+        echo "| Platform | File |"
+        echo "|----------|------|"
+        echo "| Windows | \`dist-windows.zip\` (MSI/NSIS installers) |"
+        echo "| Linux | \`dist-linux.zip\` (deb + AppImage) |"
+        echo "| Linux (RPM) | \`dist-rpm.zip\` (RPM for Fedora/RHEL) |"
+        echo "| Linux (Flatpak) | \`dist-flatpak.zip\` (Universal Linux) |"
+        echo "| Linux (Arch) | \`dist-arch.zip\` (deb + AppImage on Arch) |"
+        echo "| macOS | \`dist-macos.zip\` (DMG) |"
+        echo "| Android | \`dist-android.zip\` (signed APK + AAB, arm64-v8a) |"
+        echo "| Terminal | \`dist-cli.zip\` (cyb universal CLI for linux/darwin/windows) |"
+        echo "| Web (WASM) | \`dist-wasm.zip\` (static files for any web server) |"
+        echo "| Docker | \`docker pull $CI_REGISTRY_IMAGE:latest\` |"
+        echo ""
+        echo "### Docker"
+        echo ""
+        echo '```bash'
+        echo "# LAN-only by default; publish on your NAS address with -p 192.168.x.x:3456:3456"
+        echo "docker run -d -p 127.0.0.1:3456:3456 -v /DATA/AppData/cybermanju-os/config:/data $CI_REGISTRY_IMAGE:latest"
+        echo '```'
+        echo ""
+        echo "### Verify downloads"
+        echo ""
+        echo '```bash'
+        echo "sha256sum -c SHA256SUMS.txt"
+        echo '```'
+      } > release_notes.md
+    # Zip every family + checksums.
+    - |
+      mkdir -p packages
+      for fam in windows linux rpm flatpak arch macos android cli; do
+        if [ -d "release/release-$fam" ]; then
+          (cd "release/release-$fam" && zip -r "../../packages/dist-$fam.zip" .)
+        fi
+      done
+      if [ -d dist-wasm ]; then (cd dist-wasm && zip -r ../packages/dist-wasm.zip .); fi
+      ls -la packages/
+      (cd packages && sha256sum * > SHA256SUMS.txt)
+      cat packages/SHA256SUMS.txt
+    # Publish zips as permanent Generic Packages, then create the Release
+    # with asset links (job artifacts expire — packages do not).
+    - |
+      for f in packages/*; do
+        asset=$(basename "$f")
+        curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$f" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/cybermanju-os/$CI_COMMIT_TAG/$asset"
+      done
+    - |
+      NOTES_JSON=$(python3 -c "import json; print(json.dumps(open('release_notes.md').read()))")
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --header 'Content-Type: application/json' \
+        --data "{\"tag_name\": \"$CI_COMMIT_TAG\", \"name\": \"CyberManju OS $CI_COMMIT_TAG\", \"description\": $NOTES_JSON}" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+    - |
+      for f in packages/*; do
+        asset=$(basename "$f")
+        link_url="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/cybermanju-os/$CI_COMMIT_TAG/$asset"
+        payload=$(python3 -c "import json,sys; print(json.dumps({'name': sys.argv[1], 'url': sys.argv[2], 'link_type': 'package'}))" "$asset" "$link_url")
+        curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --header 'Content-Type: application/json' \
+          --data "$payload" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/$CI_COMMIT_TAG/assets/links"
+      done
+  artifacts:
+    paths: [packages/, release_notes.md]
+    expire_in: 30 days

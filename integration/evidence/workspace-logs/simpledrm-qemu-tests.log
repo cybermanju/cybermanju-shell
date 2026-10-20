@@ -1,0 +1,311 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+    Updating git repository `https://github.com/asterinas/smoltcp`
+     Locking 192 packages to latest Rust 1.99.0-nightly compatible versions
+ Downloading crates ...
+  Downloaded ptr_meta v0.3.2
+  Downloaded ptr_meta_derive v0.3.2
+  Downloaded powerfmt v0.2.1
+  Downloaded inventory v0.3.25
+  Downloaded equivalent v1.0.3
+  Downloaded defmt-parser v1.1.0
+  Downloaded lazy_static v1.5.1
+  Downloaded defmt v0.3.101
+  Downloaded cfg-if v1.0.5
+  Downloaded quote v1.0.47
+  Downloaded deranged v0.5.9
+  Downloaded defmt-macros v1.2.0
+  Downloaded owo-colors v4.4.0
+  Downloaded either v1.19.0
+  Downloaded bitflags v2.13.2
+  Downloaded thiserror v2.0.21
+  Downloaded thiserror-impl v2.0.21
+  Downloaded smallvec v1.16.3
+  Downloaded log v0.4.34
+  Downloaded proc-macro2 v1.0.107
+  Downloaded defmt v1.2.0
+  Downloaded unicode-ident v1.0.27
+  Downloaded serde_core v1.0.229
+  Downloaded serde v1.0.229
+  Downloaded indexmap v2.14.2
+  Downloaded zerocopy-derive v0.8.63
+  Downloaded syn v3.0.9
+  Downloaded time v0.3.55
+  Downloaded syn v2.0.119
+  Downloaded zerocopy v0.8.63
+  Downloaded libc v0.2.191
+    Blocking waiting for file lock on build directory
+   Compiling compiler_builtins v0.1.160 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/compiler-builtins/compiler-builtins)
+   Compiling core v0.0.0 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core)
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling zerocopy v0.8.63
+   Compiling libc v0.2.191
+   Compiling cfg-if v1.0.5
+   Compiling thiserror v2.0.21
+   Compiling radium v0.7.0
+   Compiling x86 v0.52.0
+   Compiling num-traits v0.2.19
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+   Compiling either v1.19.0
+   Compiling equivalent v1.0.3
+   Compiling indexmap v2.14.2
+   Compiling itertools v0.10.5
+   Compiling memoffset v0.9.1
+   Compiling heapless v0.8.0
+   Compiling smoltcp v0.11.0 (https://github.com/asterinas/smoltcp?tag=r_2026-08-11_1b7629c#56ab8379)
+   Compiling syn v2.0.119
+   Compiling syn v1.0.109
+   Compiling syn v3.0.9
+   Compiling getrandom v0.3.4
+   Compiling rand_core v0.9.5
+   Compiling ahash v0.8.12
+   Compiling const_format_proc_macros v0.2.34
+   Compiling toml_datetime v0.6.11
+   Compiling serde_spanned v0.6.9
+   Compiling toml_edit v0.19.15
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.5
+   Compiling darling_core v0.13.4
+   Compiling thiserror-impl v2.0.21
+   Compiling ptr_meta_derive v0.3.2
+   Compiling toml v0.7.8
+   Compiling zerocopy-derive v0.8.63
+   Compiling int-to-c-enum-derive v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/int-to-c-enum/derive)
+   Compiling padding-struct v0.2.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/padding-struct)
+   Compiling ostd-pod-macros v0.4.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-pod/macros)
+   Compiling ostd-macros v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-macros)
+   Compiling typeflags v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/typeflags)
+   Compiling aster-rights-proc v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-rights-proc)
+   Compiling short-vis-path v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/short-vis-path)
+   Compiling atomic-integer-wrapper v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/atomic-integer-wrapper)
+   Compiling darling_macro v0.13.4
+   Compiling component-macro v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/comp-sys/component-macro)
+   Compiling ext-trait-proc_macros v1.0.1
+   Compiling darling v0.13.4
+   Compiling inherit-methods-macro v0.1.0 (https://github.com/asterinas/inherit-methods-macro?rev=98f7e3e#98f7e3eb)
+   Compiling nougat-proc_macros v0.2.4
+   Compiling lending-iterator-proc_macros v0.1.7
+   Compiling getset v0.1.7
+   Compiling alloc v0.0.0 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc)
+   Compiling bitflags v2.13.2
+   Compiling bitflags v1.3.2
+   Compiling scopeguard v1.2.0
+   Compiling log v0.4.34
+   Compiling uguid v2.2.1
+   Compiling bit_field v0.10.3
+   Compiling lock_api v0.4.14
+   Compiling tap v1.0.1
+   Compiling wyz v0.5.1
+   Compiling raw-cpuid v10.7.0
+   Compiling volatile v0.4.6
+   Compiling spin v0.9.9
+   Compiling funty v2.0.0
+   Compiling ptr_meta v0.3.2
+   Compiling multiboot2-common v0.3.0
+   Compiling x86_64 v0.15.5
+   Compiling uefi-raw v0.14.0
+   Compiling lazy_static v1.5.1
+   Compiling uefi-raw v0.12.0
+   Compiling iced-x86 v1.21.0
+   Compiling int-to-c-enum v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/int-to-c-enum)
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+   Compiling gimli v0.34.0
+   Compiling bitvec v1.1.1
+   Compiling smallvec v1.16.3
+   Compiling unwinding v0.2.10
+   Compiling acpi v5.2.0
+   Compiling ostd-test v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-test)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+   Compiling multiboot2 v0.24.1
+   Compiling align_ext v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/align_ext)
+   Compiling volatile v0.6.1
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+   Compiling linux-boot-params v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/boot-params)
+   Compiling gimli v0.28.1
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+   Compiling id-alloc v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/id-alloc)
+   Compiling tdx-guest v0.5.0
+   Compiling ostd-pod v0.4.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-pod)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+   Compiling inventory v0.3.25
+   Compiling typeflags-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/typeflags-util)
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+   Compiling component v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/comp-sys/component)
+   Compiling aster-rights v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-rights)
+warning: `typeflags-util` (lib) generated 1 warning (1 duplicate)
+   Compiling intrusive-collections v0.9.7
+   Compiling byteorder v1.5.0
+warning: `aster-rights` (lib) generated 1 warning (1 duplicate)
+   Compiling stable_deref_trait v1.2.1
+   Compiling managed v0.8.0
+   Compiling io-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/io-util)
+   Compiling ext-trait v1.0.1
+   Compiling macro_rules_attribute v0.1.3
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+   Compiling hash32 v0.3.1
+   Compiling allocator-api2 v0.2.21
+   Compiling jhash v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/jhash)
+   Compiling takeable v0.2.2
+warning: `jhash` (lib) generated 1 warning (1 duplicate)
+   Compiling nougat v0.2.4
+   Compiling extension-traits v1.0.1
+   Compiling owo-colors v4.4.0
+warning: `io-util` (lib) generated 1 warning (1 duplicate)
+   Compiling once_cell v1.21.4
+   Compiling never-say-never v6.6.666
+   Compiling konst_macro_rules v0.2.19
+   Compiling polonius-the-crab v0.2.1
+   Compiling foldhash v0.2.0
+   Compiling konst v0.2.20
+warning: `component` (lib) generated 1 warning (1 duplicate)
+   Compiling lending-iterator v0.1.7
+   Compiling hashbrown v0.16.1
+   Compiling zero v0.1.3
+   Compiling font8x8 v0.2.7
+   Compiling powerfmt v0.2.1
+   Compiling deranged v0.5.9
+   Compiling num-conv v0.2.2
+   Compiling adler2 v2.0.1
+   Compiling time-core v0.1.9
+   Compiling miniz_oxide v0.8.9
+   Compiling lru v0.16.4
+   Compiling xmas-elf v0.10.0
+   Compiling cpio-decoder v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/cpio-decoder)
+warning: `cpio-decoder` (lib) generated 1 warning (1 duplicate)
+   Compiling const_format v0.2.36
+   Compiling sparse-id-alloc v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/sparse-id-alloc)
+   Compiling logo-ascii-art v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/logo-ascii-art)
+warning: `logo-ascii-art` (lib) generated 1 warning (1 duplicate)
+   Compiling time v0.3.55
+   Compiling keyable-arc v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/keyable-arc)
+warning: `keyable-arc` (lib) generated 1 warning (1 duplicate)
+   Compiling hashbrown v0.14.5
+warning: `sparse-id-alloc` (lib) generated 1 warning (1 duplicate)
+   Compiling osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+   Compiling aster-console v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/console)
+   Compiling aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+   Compiling aster-fuse v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-fuse)
+   Compiling aster-input v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/input)
+   Compiling aster-cmdline v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline)
+   Compiling aster-framebuffer v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer)
+warning: `aster-console` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-util)
+warning: `aster-input` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-logger v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger)
+warning: `aster-framebuffer` (lib) generated 1 warning (1 duplicate)
+   Compiling xarray v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/xarray)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-softirq v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq)
+warning: `aster-logger` (lib) generated 1 warning (1 duplicate)
+   Compiling device-id v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/device-id)
+warning: `device-id` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-systree v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree)
+warning: `aster-util` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-time v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/time)
+warning: `aster-cmdline` (lib) generated 1 warning (1 duplicate)
+   Compiling dma-pool v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/dma-pool)
+warning: `xarray` (lib) generated 1 warning (1 duplicate)
+   Compiling osdk-frame-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/frame-allocator)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-bigtcp v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-bigtcp)
+warning: `aster-time` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-block v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/block)
+warning: `aster-softirq` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-device v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/device)
+warning: `aster-fuse` (lib) generated 1 warning (1 duplicate)
+   Compiling ring-buffer v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/ring-buffer)
+warning: `dma-pool` (lib) generated 1 warning (1 duplicate)
+   Compiling osdk-test-kernel v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/test-kernel)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-nvme v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme)
+warning: `ring-buffer` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-network v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/network)
+warning: `aster-systree` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-virtio v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `aster-block` (lib) generated 1 warning (1 duplicate)
+warning: `aster-network` (lib) generated 1 warning (1 duplicate)
+warning: `aster-bigtcp` (lib) generated 1 warning (1 duplicate)
+warning: `aster-device` (lib) generated 1 warning (1 duplicate)
+warning: `aster-nvme` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-core v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core)
+warning: `aster-virtio` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-drm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/drm)
+   Compiling aster-simpledrm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm)
+warning: `aster-simpledrm` (lib) generated 1 warning (1 duplicate)
+warning: `aster-drm` (lib) generated 1 warning (1 duplicate)
+warning: `aster-core` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-simpledrm-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-simpledrm-test-base)
+warning: `aster-simpledrm-osdk-bin` (bin "aster-simpledrm-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5m 55s
+  Installing linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)
+warning: default toolchain implicitly overridden with `nightly-2026-07-21-x86_64-unknown-linux-gnu` by environment variable
+  |
+  = help: use `cargo +stable install` if you meant to use the stable toolchain
+  = note: rustup selects the toolchain based on the parent environment and not the environment of the package being installed
+    Updating crates.io index
+     Locking 33 packages to latest compatible versions
+      Adding miniz_oxide v0.8.9 (available: v0.9.1)
+      Adding uart_16550 v0.3.2 (available: v0.9.0)
+      Adding uefi v0.37.0 (available: v0.41.0)
+      Adding uefi-raw v0.14.0 (available: v0.17.0)
+   Compiling compiler_builtins v0.1.160 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/compiler-builtins/compiler-builtins)
+   Compiling core v0.0.0 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core)
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling rustversion v1.0.23
+   Compiling const_fn v0.4.12
+   Compiling x86 v0.52.0
+   Compiling linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)
+   Compiling syn v3.0.9
+   Compiling syn v2.0.119
+   Compiling uefi-macros v0.19.0
+   Compiling ptr_meta_derive v0.3.2
+   Compiling alloc v0.0.0 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc)
+   Compiling bit_field v0.10.3
+   Compiling bitflags v2.13.2
+   Compiling bitflags v1.3.2
+   Compiling uguid v2.2.1
+   Compiling spin v0.9.9
+   Compiling volatile v0.4.6
+   Compiling log v0.4.34
+   Compiling raw-cpuid v10.7.0
+   Compiling zero v0.1.3
+   Compiling lazy_static v1.5.1
+   Compiling ucs2 v0.3.3
+   Compiling uefi-raw v0.14.0
+   Compiling iced-x86 v1.21.0
+   Compiling x86_64 v0.15.5
+   Compiling ptr_meta v0.3.2
+   Compiling qemu-exit v3.0.2
+   Compiling adler2 v2.0.1
+   Compiling cfg-if v1.0.5
+   Compiling xmas-elf v0.10.0
+   Compiling miniz_oxide v0.8.9
+   Compiling linux-boot-params v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/boot-params)
+   Compiling uart_16550 v0.3.2
+   Compiling uefi v0.37.0
+   Compiling tdx-guest v0.5.0
+    Finished `release` profile [optimized] target(s) in 1m 26s
+  Installing /workspace/asterinas-gpui/asterinas/target/osdk/bin/linux-bzimage-setup
+   Installed package `linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)` (executable `linux-bzimage-setup`)
+warning: be sure to add `/workspace/asterinas-gpui/asterinas/target/osdk/bin` to your PATH to be able to run the installed binaries
+install_path: "/workspace/asterinas-gpui/asterinas/target/osdk/aster-simpledrm-osdk-bin"
+c[?7l[2J[0mSeaBIOS (version 1.16.3-debian-1.16.3-2)
+
+
+iPXE (https://ipxe.org) 00:02.0 CA00 PCI2.10 PnP PMM+1EFCAB90+1EF0AB90 CA00
+Press Ctrl-B to configure iPXE (PCI 00:02.0)...                                                                               
+
+
+Booting from ROM..qemu-system-x86_64: terminating on signal 15 from pid 205610 (timeout)

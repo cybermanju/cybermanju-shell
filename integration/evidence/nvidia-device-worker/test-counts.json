@@ -1,0 +1,49 @@
+{
+  "native_suites": [
+    {
+      "name": "nvidia-nvport",
+      "reported_passed": 20,
+      "explicit_skips": [],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/native-suites/native-nvidia-nvport-tests.log",
+      "log_sha256": "7dc484d2b1ee42e3cd5ff0be737966c6e3256f78e04f99400f94309aaf6f8892"
+    },
+    {
+      "name": "nvidia-platform",
+      "reported_passed": 10,
+      "explicit_skips": [],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/native-suites/native-nvidia-platform-tests.log",
+      "log_sha256": "e9c707ca689b8cf76deefbc73d6376f99dae496a900be4d89b6681ce6d868947"
+    },
+    {
+      "name": "pci",
+      "reported_passed": 13,
+      "explicit_skips": [],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/native-suites/native-pci-tests.log",
+      "log_sha256": "7ce9b07ef250537871b403362bd0ebd2daf18ebe1cd000517b4a811153d51051"
+    },
+    {
+      "name": "pci-iommu",
+      "reported_passed": 13,
+      "explicit_skips": [],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/native-suites/native-pci-iommu-tests.log",
+      "log_sha256": "0c4f27b7f31534809a38ef3504435e5ebc0f72c6e5fc3f7980bd924b1172a71a"
+    },
+    {
+      "name": "ostd",
+      "reported_passed": 256,
+      "explicit_skips": [
+        "[skipped: VMX unavailable]",
+        "[skipped: VMX unavailable]",
+        "[skipped: VMX/EPT invalidation unavailable]"
+      ],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/native-suites/native-ostd-tests.log",
+      "log_sha256": "ab8e5e87d660fa35d582e868c345bd2a849a8fda3c026c67b6e3e52e581ebd69"
+    }
+  ],
+  "host_graphics_tests": 38,
+  "negative_regression_verified": true,
+  "source_restored": true,
+  "worker_source_sha256": "22378883a73b3643c6de94b596892aaaafeaf428b4a1e45e4a3a8b81ca5d7d9a",
+  "hardware_gpu_acceptance": false,
+  "rm_gsp_initialized": false
+}

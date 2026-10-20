@@ -1,0 +1,13 @@
+    Checking aster-core v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core)
+warning: function `register_subsystem` is never used
+  --> kernel/core/src/fs/fs_impls/configfs/mod.rs:30:15
+   |
+30 | pub(crate) fn register_subsystem(subsystem: Arc<dyn SysBranchNode>) -> R...
+   |               ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `aster-core` (lib) generated 1 warning
+    Checking aster-drm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/drm)
+    Checking aster-simpledrm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 26s

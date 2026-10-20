@@ -1,0 +1,9 @@
+GPUI graphics readiness (prerequisite probe; not integration certification)
+FAIL  DRM nodes: /dev/dri is absent or not a directory.
+      Action: Expose the host's real DRM device nodes (usually /dev/dri/cardN and renderDNNN) to this session.
+FAIL  Vulkan device: Only CPU-type Vulkan device(s) were confirmed: GPU0 llvmpipe (LLVM 20.1.2, 256 bits). A software Vulkan implementation (for example, llvmpipe) is not a non-CPU GPU candidate.
+      Action: Check all device records with vulkaninfo --summary, install/configure the intended non-CPU Vulkan ICD, and rerun this diagnostic.
+FAIL  Wayland layer-shell: wayland-info could not query the compositor (exit 255): failed to create display: No such file or directory.
+      Action: Run inside the target user's active Wayland session and check WAYLAND_DISPLAY/XDG_RUNTIME_DIR and socket permissions.
+
+Not ready: 3 required check(s) failed.

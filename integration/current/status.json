@@ -1,0 +1,66 @@
+{
+  "snapshot_type": "current-source-including-untested-changes",
+  "initial_target_commit": "0832aead043cf34d06b51dbe72c732dedefe2a28",
+  "branch": "main",
+  "push_performed": false,
+  "remote_actions_performed": false,
+  "visibility_changed": false,
+  "visibility_basis": "Existing private target as supplied; no visibility API/settings changes made",
+  "new_functional_tests_executed": 0,
+  "heavy_builds_performed": false,
+  "source_deletions_performed": false,
+  "historical_tested_baselines": {
+    "asterinas_patch21": {
+      "reported_passed": 315,
+      "reported_failed": 0,
+      "explicit_vmx_body_skips": 3,
+      "scope": "CPU/QEMU/PCI/NVMe lifecycle, not GPU"
+    },
+    "gpui_launcher_density": {
+      "rust_passed": 205,
+      "python_passed": 36,
+      "binary_build": true,
+      "all_target_clippy": true,
+      "scope": "earlier launcher-only source/binary, not current shared-list extension"
+    },
+    "app_frontend": {
+      "files": 125,
+      "tests": 1207,
+      "profile_cases": 11,
+      "rerun_in_later_native_followups": false
+    }
+  },
+  "uncompiled_untested": {
+    "change": "GPUI shared ListItem density",
+    "new_rust_tests_not_executed": 3,
+    "compiled": false,
+    "rendered": false,
+    "earlier_binary_includes_change": false,
+    "evidence": "integration/evidence/list-density-lowdisk-2139/patch-validation.json"
+  },
+  "not_performed": [
+    "fresh functional suites during consolidation",
+    "aarch64 build/runtime",
+    "live NixOS/systemd acceptance",
+    "rendered current density",
+    "browser profile click-through",
+    "native Tauri/GTK/WebKit acceptance",
+    "Asterinas GPUI/Wayland runtime acceptance"
+  ],
+  "hardware_blocked": [
+    "physical NVIDIA/AMD GPU benchmark",
+    "native RM/GSP/Vulkan acceptance",
+    "matched physical hardware Linux parity"
+  ],
+  "integration_acceptance": false,
+  "full_os_gpu_acceptance": false,
+  "preparation_result": "VALIDATED_WITH_AUTHORIZED_UNTRACKED_CACHE_EXCEPTION",
+  "target_local_cache_exception": {
+    "count": 9,
+    "bytes": 106264,
+    "untouched": true,
+    "untracked_and_excluded": true,
+    "record": "integration/current/retained-local-cache.json"
+  },
+  "commit_strategy": "One local commit on main; no push or publication"
+}

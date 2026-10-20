@@ -1,0 +1,13 @@
+{
+  "pass": true,
+  "scope": "CPU-only Asterinas boot, real userspace write/reboot and PCI diagnostic; not GPU evidence",
+  "qemu_exit": 33,
+  "nvport_selftest": true,
+  "userspace_executed": true,
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "tcg_clock_warning": true,
+  "image_sha256": "2f496433413e8644f7e0384cb4c19d13e98f7545b84fc7d10550575c2d17e4ec",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "9f615ca8ffac510f56ca52c95d156a22e4fbdb85daffbdce19821ed91c144bc7"
+}

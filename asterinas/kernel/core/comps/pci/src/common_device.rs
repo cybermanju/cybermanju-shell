@@ -2,6 +2,8 @@
 
 //! PCI device common definitions or functions.
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use ostd::Result;
 
 use crate::{
@@ -20,9 +22,27 @@ pub struct PciCommonDevice {
     header_type: PciHeaderType,
     bar_manager: BarManager,
     capabilities: RawCapabilities,
+    irq_quarantined: AtomicBool,
 }
 
 impl PciCommonDevice {
+    pub(crate) fn msix_descriptor(&self) -> Option<(u16, u16, u32, u32)> {
+        let raw = self.capabilities.msix.as_ref()?;
+        Some((
+            raw.cap_ptr,
+            self.location.read16(raw.cap_ptr + 2),
+            raw.table_info,
+            raw.pba_info,
+        ))
+    }
+
+    pub(crate) fn quarantine_irqs(&self) {
+        self.irq_quarantined.store(true, Ordering::Release);
+    }
+    pub(crate) fn irqs_quarantined(&self) -> bool {
+        self.irq_quarantined.load(Ordering::Acquire)
+    }
+
     /// Returns the PCI device ID.
     pub fn device_id(&self) -> &PciDeviceId {
         &self.device_id
@@ -132,6 +152,7 @@ impl PciCommonDevice {
             header_type,
             bar_manager,
             capabilities,
+            irq_quarantined: AtomicBool::new(false),
         };
 
         // While setting up the BARs, we need to ensure that
@@ -225,12 +246,12 @@ pub struct BarManager {
 impl BarManager {
     /// Gains access to the BAR space and returns `None` if that BAR is absent.
     pub fn bar(&self, idx: u8) -> Option<&Bar> {
-        self.bars[idx as usize].as_ref()
+        self.bars.get(idx as usize)?.as_ref()
     }
 
     /// Gains mutable access to the BAR space and returns `None` if that BAR is absent.
     pub fn bar_mut(&mut self, idx: u8) -> Option<&mut Bar> {
-        self.bars[idx as usize].as_mut()
+        self.bars.get_mut(idx as usize)?.as_mut()
     }
 
     /// Parses the BAR space by PCI device location.

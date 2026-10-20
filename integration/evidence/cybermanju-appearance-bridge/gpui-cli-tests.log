@@ -1,0 +1,11 @@
+test_existing_config_validation_does_not_require_a_profile (__main__.AppearanceCliTests.test_existing_config_validation_does_not_require_a_profile) ... ok
+test_invalid_profiles_fail_before_wayland_or_ipc (__main__.AppearanceCliTests.test_invalid_profiles_fail_before_wayland_or_ipc) ... ok
+test_ordinary_secondary_launcher_still_sends_existing_ipc_command (__main__.AppearanceCliTests.test_ordinary_secondary_launcher_still_sends_existing_ipc_command) ... ok
+test_oversized_file_is_rejected (__main__.AppearanceCliTests.test_oversized_file_is_rejected) ... ok
+test_secondary_profile_refused_without_sending_launcher_or_claiming_import (__main__.AppearanceCliTests.test_secondary_profile_refused_without_sending_launcher_or_claiming_import) ... ok
+test_shared_app_export_validates_without_wayland_or_mutating_preferences (__main__.AppearanceCliTests.test_shared_app_export_validates_without_wayland_or_mutating_preferences) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.184s
+
+OK

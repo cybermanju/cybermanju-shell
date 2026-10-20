@@ -1,0 +1,114 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+   Compiling osdk-frame-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/frame-allocator)
+   Compiling osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+   Compiling osdk-test-kernel v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/test-kernel)
+warning: the item `AtomicU32` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:672:30
+    |
+672 |     use core::sync::atomic::{AtomicU32, Ordering};
+    |                              ^^^^^^^^^
+...
+676 |     use super::*;
+    |         -------- the item `AtomicU32` is already imported here
+    |
+    = note: requested on the command line with `-W redundant-imports`
+
+warning: the item `Ordering` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:672:41
+    |
+672 |     use core::sync::atomic::{AtomicU32, Ordering};
+    |                                         ^^^^^^^^
+...
+676 |     use super::*;
+    |         -------- the item `Ordering` is already imported here
+
+warning: the item `irq` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:674:16
+    |
+674 |     use ostd::{irq, sync::WaitQueue, task::TaskOptions};
+    |                ^^^
+675 |
+676 |     use super::*;
+    |         -------- the item `irq` is already imported here
+
+warning: the item `WaitQueue` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:674:21
+    |
+674 |     use ostd::{irq, sync::WaitQueue, task::TaskOptions};
+    |                     ^^^^^^^^^^^^^^^
+675 |
+676 |     use super::*;
+    |         -------- the item `WaitQueue` is already imported here
+
+warning: use of deprecated method `core::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:340:10
+    |
+340 | ...   .fetch_update(Ordering::Release, Ordering::Relaxed, |n| n.checked...
+    |        ^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+help: replace the use of the deprecated method
+    |
+340 -         .fetch_update(Ordering::Release, Ordering::Relaxed, |n| n.checked_add(1))
+340 +         .try_update(Ordering::Release, Ordering::Relaxed, |n| n.checked_add(1))
+    |
+
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 6 warnings (1 duplicate) (run `cargo fix --lib -p ostd-nvidia-nvport` to apply 1 suggestion)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-test-base)
+error: linking with `rust-lld` failed: exit status: 1
+  |
+  = note:  "rust-lld" "-flavor" "gnu" "/workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/rustc4JTJIm/symbols.o" "<4 object files omitted>" "--as-needed" "-Bstatic" "/workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/{libosdk_heap_allocator-b8ad732652a0b54c,libosdk_frame_allocator-2e0ac91f8597db5d,libosdk_test_kernel-5dd9c073662f9dd2,libowo_colors-fe6a550e41415579,libostd_nvidia_nvport-90fa2d14ccde5ffd,libostd-b7151467d2f21172,libnum_traits-cb49f3e7b47cfc18,libostd_test-3ab8abb6fa9bbbd6,libsmallvec-50d960482fd1eb70,libunwinding-87cf32f86edf39dc,libgimli-22276ae4cf436df5,libtdx_guest-746dd04e9daabb0b,libuefi_raw-a078084a2a42c7b9,libiced_x86-d1f00ed9b41a4be2,liblazy_static-1c6be03318e10a58,libid_alloc-cba1150e3dba16e9,libbitvec-17041517e9e0f905,libwyz-1e5616ebed55260b,libtap-4ccfd10ed139db00,libradium-74b2a9f53e1c9054,libfunty-2103c94995aca79d,libvolatile-cb7d80726b7662ad,libalign_ext-8b6fdfc0c846fc63,libx86_64-840c39a3ff40b42b,libvolatile-4e4bae2716e4ea00,libx86-6711ea9c149222ff,libraw_cpuid-4045daa5bea6339f,libbitflags-19907c4834849912,libacpi-277cfa83858da0d8,libbit_field-35e5a29454406afe,libint_to_c_enum-08cca1719d3eaeaf,libmultiboot2-3f8a6482c5fc7043,liblog-1bd57b386506c1c1,libuefi_raw-890338248f267f03,libuguid-8d704b683bb1794d,libmultiboot2_common-94bef119a6510a72,libthiserror-080fb7cae5769693,libptr_meta-53ef635d41c257da,libbitflags-3c258d1d7fa6aecc,liblinux_boot_params-59018039b1e43de8,libgimli-fd7e2f4b1370e254,libostd_pod-d4223d3ad2dac786,libzerocopy-0159ed2305e18e90,libspin-1d58d264ae886dac,liblock_api-b871310d4df0081d,libscopeguard-9fc61dd1b064b1a4,liballoc-8207069e0cc3a52c,libcore-bd4b3e963d565a57,libcompiler_builtins-1055776b7b59168c}.rlib" "-L" "/workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/rustc4JTJIm/raw-dylibs" "-Bdynamic" "--eh-frame-hdr" "-z" "noexecstack" "-L" "/workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/build/ostd-nvidia-nvport-0b477288a9024d93/out" "-o" "/workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/ostd_nvidia_nvport_osdk_bin-dcce674d743e0956" "--gc-sections" "-z" "norelro" "-Tx86_64.ld"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: undefined symbol: out_string
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portDbgPrintString) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          
+          rust-lld: error: undefined symbol: _portMemAllocatorFree
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncSpinlockDestroy) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncMutexDestroy) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncSemaphoreDestroy) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced 5 more times
+          
+          rust-lld: error: undefined symbol: os_dbg_breakpoint
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncMutexAcquire) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncSemaphoreAcquire) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncRwLockAcquireRead) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced 1 more times
+          
+          rust-lld: error: undefined symbol: _portMemAllocatorAlloc
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncSpinlockCreate) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncMutexCreate) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced by sync_unix_kernel_os.c
+          >>>               sync_unix_kernel_os.o:(portSyncSemaphoreCreate) in archive /workspace/asterinas-gpui/asterinas/target/x86_64-unknown-none/debug/deps/libostd_nvidia_nvport-90fa2d14ccde5ffd.rlib
+          >>> referenced 1 more times
+          
+
+warning: `ostd-nvidia-nvport-osdk-bin` (bin "ostd-nvidia-nvport-osdk-bin") generated 1 warning (1 duplicate)
+error: could not compile `ostd-nvidia-nvport-osdk-bin` (bin "ostd-nvidia-nvport-osdk-bin") due to 1 previous error; 1 warning emitted
+[Error]: Cargo build failed

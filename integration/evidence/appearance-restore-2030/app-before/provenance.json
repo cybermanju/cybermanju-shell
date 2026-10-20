@@ -1,0 +1,6 @@
+{
+  "source": "previous verified source patch reconstructs exact v1 baseline",
+  "patch": "/workspace/asterinas-gpui/evidence/cybermanju-appearance-bridge/cybermanju-appearance-export.patch",
+  "patch_sha256": "32460623ff60c8e4c29555e3e9b2309a4396b9960ad324ba94d3d5e8e633a404",
+  "agent_captured_profile_matches_reconstructed_baseline": true
+}

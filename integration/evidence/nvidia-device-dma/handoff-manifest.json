@@ -1,0 +1,56 @@
+{
+  "files": {
+    "patch": {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-device-dma.patch",
+      "sha256": "264ca863c8fd0c733b49cf84cf12abc4f1198ef610fc0072e2a917f7327416a1",
+      "bytes": 57721
+    },
+    "notes": {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "sha256": "e80220ea6dacbbc802819864d61cd27cd2a814071a1739b2352da94249bf758a",
+      "bytes": 49654
+    },
+    "tests": {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-device-dma/test-counts.json",
+      "sha256": "d6e7cff3f455ca6e8f5c22ed1dec6d694d39152e5b84ccfa350ea7e9114eda1c",
+      "bytes": 1181
+    },
+    "incremental_patch_validation": {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-device-dma/patch-validation.json",
+      "sha256": "5d6c246ce72092c59d82b0c8e9959003af3245d85525f4d7e9f85498c77c8889",
+      "bytes": 4589
+    },
+    "full_stack_validation": {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-device-dma/full-stack-validation.json",
+      "sha256": "bbad486390f152b3f4ea84d1bcc58cd8fd67eaf350c90bb1763e0c879e336de4",
+      "bytes": 1972
+    },
+    "borrow_checks": {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-device-dma/lifetime-checks/result.json",
+      "sha256": "33a9467da59cd901a10466494555ee656c8175e300dd911e3e199aaec7ec7d8b",
+      "bytes": 443
+    },
+    "cpu_boot": {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-device-dma/cpu-boot/result.json",
+      "sha256": "5372bfe04fdb3f741caf3ae3c7f86f7765f5397d80a90376efe3a6736f04f2c1",
+      "bytes": 542
+    },
+    "graphics_tests": {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-device-dma/graphics-tests-final.log",
+      "sha256": "86805ca3f74b4375f70a4c3d40735e18f7c0be38ccf419bdd6550e579fad9d60",
+      "bytes": 6026
+    }
+  },
+  "index_unchanged": true,
+  "local_only": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "gpu_acceptance": false,
+  "remaining": [
+    "isolated per-requester IOMMU backend",
+    "real RM/GSP initialization with authentic matching firmware",
+    "accelerated DRM/display and native GPU/GPUI benchmark on real NVIDIA hardware"
+  ]
+}

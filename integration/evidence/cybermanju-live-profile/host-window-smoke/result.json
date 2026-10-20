@@ -1,0 +1,108 @@
+{
+  "test": "host nested Niri Wayland GPUI live appearance-profile smoke",
+  "hardware_acceleration_verified": false,
+  "rendering": "host Mesa lavapipe software renderer only; not Asterinas/GPU acceptance",
+  "source_edits_or_builds": false,
+  "screenshots_are_unmodified_host_captures": true,
+  "binary": "/workspace/asterinas-gpui/gpui-shell/target/debug/gpuishell",
+  "niri": "/nix/store/wj38g0fzvv0nic72hh3svpq0jsk85dcd-niri-26.04/bin/niri",
+  "mesa_cache": "/nix/store/3967gykw3wcyq3svf238nk31jlhxnl7c-mesa-26.1.5",
+  "library_path_cache": "/workspace/asterinas-gpui/evidence/nested-library-path.txt",
+  "software_vulkan_icd": "/nix/store/3967gykw3wcyq3svf238nk31jlhxnl7c-mesa-26.1.5/share/vulkan/icd.d/lvp_icd.x86_64.json",
+  "profile_file": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/appearance-profile-live.json",
+  "initial_theme": "os-dark",
+  "replacement_theme": "os-light",
+  "recovery_theme": "os-dark",
+  "isolated_runtime_created": true,
+  "initial_layers_before_gpui": [],
+  "wayland_layer_shell_protocol": "zwlr_layer_shell_v1 present in wayland-info",
+  "shell_command": [
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/gpuishell",
+    "--appearance-profile",
+    "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/appearance-profile-live.json",
+    "--watch-appearance-profile"
+  ],
+  "gpui_bar_layer_observed": [
+    {
+      "namespace": "bar",
+      "output": "winit",
+      "layer": "Background",
+      "keyboard_interactivity": "None"
+    }
+  ],
+  "startup_screenshot": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/01-startup-dark.png",
+  "startup_log_proof": "GPUI reported CyberManju appearance v1 theme=os-dark",
+  "atomic_replacement_dark_to_light": true,
+  "replacement_screenshot": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/02-live-os-light.png",
+  "dark_to_light_pixel_comparison": {
+    "dimensions_px": [
+      1280,
+      800
+    ],
+    "full_image_changed_pixel_fraction": 0.0555732421875,
+    "top_100px_changed_pixel_fraction": 0.2400234375,
+    "mean_absolute_rgb_difference": 11.233538411458333
+  },
+  "invalid_json_atomic_replacement": true,
+  "invalid_state_screenshot": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/03-invalid-profile-error-state.png",
+  "invalid_state_pixel_comparison_to_light": {
+    "dimensions_px": [
+      1280,
+      800
+    ],
+    "full_image_changed_pixel_fraction": 0.073271484375,
+    "top_100px_changed_pixel_fraction": 0.0587421875,
+    "mean_absolute_rgb_difference": 12.195213541666666
+  },
+  "invalid_state_visual_note": "Unmodified host screenshot visibly shows the GPUI Shell notification stating the profile was not loaded and invalid appearance-profile JSON; the process remained alive. The last-good os-light bar remains light.",
+  "valid_recovery_atomic_replacement": true,
+  "recovery_screenshot": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/04-recovered-os-dark.png",
+  "light_to_recovered_dark_pixel_comparison": {
+    "dimensions_px": [
+      1280,
+      800
+    ],
+    "full_image_changed_pixel_fraction": 0.08244140625,
+    "top_100px_changed_pixel_fraction": 0.2558828125,
+    "mean_absolute_rgb_difference": 14.522797200520833
+  },
+  "initial_to_recovered_dark_pixel_comparison": {
+    "dimensions_px": [
+      1280,
+      800
+    ],
+    "full_image_changed_pixel_fraction": 0.05515625,
+    "top_100px_changed_pixel_fraction": 0.2316171875,
+    "mean_absolute_rgb_difference": 3.4171585286458335
+  },
+  "final_layers": [
+    {
+      "namespace": "bar",
+      "output": "winit",
+      "layer": "Top",
+      "keyboard_interactivity": "None"
+    },
+    {
+      "namespace": "dock",
+      "output": "winit",
+      "layer": "Top",
+      "keyboard_interactivity": "None"
+    },
+    {
+      "namespace": "notification-popup",
+      "output": "winit",
+      "layer": "Overlay",
+      "keyboard_interactivity": "None"
+    }
+  ],
+  "result": "PASS: actual nested host GPUI surface stayed alive; initial os-dark, hot-reloaded os-light, invalid JSON retained process/last-good palette, then valid os-dark recovery; captured real Niri screen output and measured pixel changes.",
+  "limitations": "Host Linux nested Niri/Xvfb only. Mesa lavapipe is software rendering, not physical GPU, hardware acceleration, Asterinas kernel, GPU acceptance, input interaction, or complete desktop validation. No benchmark/latency claim.",
+  "cleanup": {
+    "gpui_stopped": true,
+    "niri_stopped": true,
+    "xvfb_stopped": true,
+    "isolated_xdg_and_wayland_runtime_removed": true
+  },
+  "appearance_error_evidence": "03-invalid-profile-error-state.png visibly displays the real GPUI notification: appearance-profile-live.json was not loaded; invalid appearance profile JSON.",
+  "recovery_evidence": "After replacing the same file atomically with valid os-dark, the process remained alive and real bar pixels returned to dark; screenshot 04-recovered-os-dark.png."
+}

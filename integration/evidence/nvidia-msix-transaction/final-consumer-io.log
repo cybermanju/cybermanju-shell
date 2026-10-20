@@ -1,0 +1,33 @@
++ /usr/bin/gcc -std=c11 -O2 -Wall -Wextra -Werror -ffreestanding -fno-stack-protector -fno-pie -nostdlib -static -no-pie -Wl,-e,_start /workspace/asterinas-gpui/evidence/nvidia-msix-transaction/consumer-io/init.c -o /workspace/asterinas-gpui/evidence/nvidia-msix-transaction/consumer-io/run-final/init
++ cpio --null -o --format=newc --owner=0:0
+22 blocks
+Building complete kernel + custom initramfs; storage fixtures are disposable; no GPU/firmware.
++ cargo osdk build --features nvidia-nvport-selftest,nvidia-pci-diagnostics --boot-method grub-rescue-iso --grub-boot-protocol multiboot2 --strip-elf --initramfs /workspace/asterinas-gpui/evidence/nvidia-msix-transaction/consumer-io/run-final/consumer-io-initramfs.cpio --kcmd-args=earlycon console=ttyS0 rdinit=/init
+Booting full local kernel under TCG; NVMe + VirtIO modern and legacy have raw fixtures.
+{
+  "passed": true,
+  "qemu_exit": 33,
+  "errors": [],
+  "scope": "Full Asterinas kernel; real block reads and writes under QEMU TCG; not GPU/firmware/performance evidence",
+  "hardware_gpu": false,
+  "gpu_firmware_loaded": false,
+  "devices": {
+    "nvme": "/dev/nvme0n1",
+    "virtio_modern": "/dev/vda",
+    "virtio_legacy": "/dev/vdb"
+  },
+  "verified": "4096 known patterned bytes at offset 0 plus 4096-byte scratch write/read at offset 4096 per device",
+  "iso_sha256": "d05c4c7b3752b168528ee4d78809832519a42d5d099283e33566d92bae26153e",
+  "initramfs_sha256": "015eae9c436332681c650d82e34650ca7ca8545e9c72cfe34d102dacfb7cde56",
+  "serial_sha256": "2e1ba703e99bdd6eac790b26c45aca36c7134bf4ceeb3495a06c5447441622a3",
+  "host_raw_disk_bytes_verified": {
+    "nvme": true,
+    "virtio-modern": true,
+    "virtio-legacy": true
+  },
+  "disks_sha256_after_guest": {
+    "nvme": "ca493a27912c7fec46f5e6e1a6050e65c5c1d074a1ce4430d244641097eea3be",
+    "virtio-modern": "56668e728417d75c68ee2f4ee1ca59cd6f37e8daa4bf14e735ab9b22226d39cf",
+    "virtio-legacy": "155c211e035f30da50a228dce04c9e3d9b664fdcbc1e670f08a811a0389bd329"
+  }
+}

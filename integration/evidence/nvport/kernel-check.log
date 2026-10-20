@@ -1,0 +1,9 @@
+    Checking aster-virtio v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio)
+    Checking aster-uart v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/uart)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+    Checking aster-core v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core)
+    Checking aster-drm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/drm)
+    Checking aster-i8042 v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/i8042)
+    Checking aster-simpledrm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm)
+    Checking asterinas v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 52.49s

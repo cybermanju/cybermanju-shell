@@ -1,0 +1,604 @@
+diff --git a/src/components/SettingsPage.vue b/src/components/SettingsPage.vue
+--- a/src/components/SettingsPage.vue
++++ b/src/components/SettingsPage.vue
+@@ -295,6 +295,20 @@
+             @update:model-value="store.sidebarCollapsed = !$event"
+           />
+         </div>
++        <div class="st-appearance-export">
++          <UiButton size="sm" icon="solar:download-bold" :disabled="customWallpaper.busy.value" @click="exportAppearanceProfile">
++            Export appearance profile
++          </UiButton>
++          <p class="st-wallpaper-note">
++            Versioned JSON keeps appearance preferences. The native GPUI consumer initially applies theme colors and accent only; density, shell style, panel position, wallpaper, and other settings are retained but not applied. This is not OS live sync or evidence of Asterinas GUI acceptance.
++          </p>
++          <p v-if="customWallpaper.kind.value === 'file'" class="st-wallpaper-note">
++            The selected local file remains on this device and is not included in the export. Native GPUI import will report this wallpaper as unsupported.
++          </p>
++          <p v-if="appearanceExportStatus" class="st-wallpaper-note" role="status" aria-live="polite">
++            {{ appearanceExportStatus }}
++          </p>
++        </div>
+         <div class="st-row">
+           <UiText as="span" variant="label" tone="muted">{{ t('settings.language') }}</UiText>
+           <UiSelect
+@@ -601,6 +615,7 @@
+ import { useTouchConfig, type GestureType, type TouchAction } from '@/composables/useTouchConfig'
+ import { useTheme } from '@/composables/useTheme'
+ import { ACCENT_CHOICES, WALLPAPERS, type ShellStyle } from '@/ui/tokens'
++import { serializeAppearanceProfileV1 } from '@/utils/appearanceProfile'
+ import { lockMobileVaultMirror, mobileVaultMirrorState, supportsNativeScopedStorage, syncMobileVaultMirrorNow, unlockMobileVaultMirror } from '@/utils/mobileScopedStorage'
+ import { LOCALES, getLocale, t, useLocale, type Locale } from '@/utils/i18n'
+ import pkg from '../../package.json'
+@@ -640,6 +655,7 @@
+ const customWallpaper = useCustomWallpaper()
+ const wallpaperUrlDraft = ref('')
+ const wallpaperFileInput = ref<HTMLInputElement | null>(null)
++const appearanceExportStatus = ref('')
+ const nativeMirrorAvailable = supportsNativeScopedStorage()
+ const mirrorPassphrase = ref('')
+ const mirrorActionBusy = ref(false)
+@@ -734,6 +750,39 @@
+   try {
+     localStorage.setItem('cybermanju_panel_docked', panelDocked.value)
+   } catch { /* session-only */ }
++}
++
++function exportAppearanceProfile() {
++  try {
++    const custom = customWallpaper.kind.value === 'url'
++      ? { kind: 'url' as const, url: customWallpaper.url.value }
++      : customWallpaper.kind.value === 'file'
++        ? {
++            kind: 'file' as const,
++            name: customWallpaper.fileName.value,
++            mimeType: customWallpaper.fileMimeType.value,
++            size: customWallpaper.fileSize.value,
++          }
++        : { kind: null as null }
++    const json = serializeAppearanceProfileV1({
++      settings: theme.settings,
++      shellStyle: theme.shellStyle.value,
++      panelDocked: panelDocked.value === '1',
++      customWallpaper: custom,
++    })
++    const data = new Blob([json], { type: 'application/json' })
++    const objectUrl = URL.createObjectURL(data)
++    const link = document.createElement('a')
++    link.href = objectUrl
++    link.download = 'cybermanju-appearance-v1.json'
++    link.click()
++    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
++    appearanceExportStatus.value = 'Appearance profile exported.'
++  } catch (cause) {
++    appearanceExportStatus.value = cause instanceof Error
++      ? `Profile export failed: ${cause.message}`
++      : 'Profile export failed because appearance state could not be validated.'
++  }
+ }
+ 
+ onMounted(async () => {
+diff --git a/src/composables/useCustomWallpaper.ts b/src/composables/useCustomWallpaper.ts
+--- a/src/composables/useCustomWallpaper.ts
++++ b/src/composables/useCustomWallpaper.ts
+@@ -22,6 +22,8 @@
+   const kind = ref<'url' | 'file' | null>(null)
+   const url = ref('')
+   const fileName = ref('')
++  const fileMimeType = ref('')
++  const fileSize = ref(0)
+   const error = ref('')
+   const busy = ref(false)
+   let activeObjectUrl: string | null = null
+@@ -53,6 +55,8 @@
+           activeObjectUrl = objectUrls.createObjectURL(saved.blob)
+           source.value = activeObjectUrl
+           fileName.value = saved.name
++          fileMimeType.value = saved.mimeType
++          fileSize.value = saved.blob.size
+           kind.value = 'file'
+         }
+         error.value = ''
+@@ -85,6 +89,8 @@
+       source.value = safeUrl
+       url.value = safeUrl
+       fileName.value = ''
++      fileMimeType.value = ''
++      fileSize.value = 0
+       kind.value = 'url'
+       error.value = ''
+       return true
+@@ -122,6 +128,8 @@
+       source.value = nextObjectUrl
+       url.value = ''
+       fileName.value = file.name
++      fileMimeType.value = file.type.toLowerCase()
++      fileSize.value = file.size
+       kind.value = 'file'
+       error.value = ''
+       return true
+@@ -143,6 +151,8 @@
+       source.value = null
+       url.value = ''
+       fileName.value = ''
++      fileMimeType.value = ''
++      fileSize.value = 0
+       kind.value = null
+       error.value = ''
+       loaded = true
+@@ -161,7 +171,7 @@
+     error.value = 'The wallpaper image could not be loaded. Check its URL or choose another image.'
+   }
+ 
+-  return { source, kind, url, fileName, error, busy, load, setUrl, setFile, clear, imageFailed }
++  return { source, kind, url, fileName, fileMimeType, fileSize, error, busy, load, setUrl, setFile, clear, imageFailed }
+ }
+ 
+ const customWallpaper = createCustomWallpaperController(
+diff --git a/src/utils/appearanceProfile.ts b/src/utils/appearanceProfile.ts
+new file mode 100644
+--- /dev/null
++++ b/src/utils/appearanceProfile.ts
+@@ -0,0 +1,267 @@
++// CyberManju OS — AppearanceProfile (src/utils/appearanceProfile.ts).
++// Role: versioned, secret-free appearance export for the native GPUI consumer.
++// Exports: AppearanceProfileV1, buildAppearanceProfileV1, serializeAppearanceProfileV1, parseAppearanceProfileV1.
++// Integrates: useTheme state, custom wallpaper validation, UI tokens.
++// Contracts: strict allowlist only; local wallpaper exports metadata, never bytes or a device URL.
++import {
++  DEFAULT_SETTINGS,
++  LEGACY_THEME_ALIASES,
++  THEMES,
++  WALLPAPERS,
++  type ShellStyle,
++  type ThemeId,
++  type ThemeSettings,
++} from '@/ui/tokens'
++import {
++  MAX_CUSTOM_WALLPAPER_BYTES,
++  normalizeCustomWallpaperUrl,
++  validateCustomWallpaperFile,
++} from '@/utils/customWallpaper'
++
++export type AppearanceWallpaperV1 =
++  | { kind: 'preset'; id: string }
++  | { kind: 'url'; url: string }
++  | { kind: 'local-file'; name: string; mimeType: string; size: number }
++
++export interface AppearanceProfileV1 {
++  schema: 'com.cybermanju.appearance'
++  version: 1
++  settings: ThemeSettings
++  shellStyle: ShellStyle
++  panelDocked: boolean
++  wallpaper: AppearanceWallpaperV1
++}
++
++export interface AppearanceProfileSource {
++  settings: ThemeSettings
++  shellStyle: ShellStyle
++  panelDocked: boolean
++  customWallpaper:
++    | { kind: null }
++    | { kind: 'url'; url: string }
++    | { kind: 'file'; name: string; mimeType: string; size: number }
++}
++
++const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
++const MOTIONS = new Set(['auto', 'full', 'reduced'])
++const DENSITIES = new Set(['compact', 'comfortable'])
++const SHELLS = new Set(['macos', 'plasma'])
++const WALLPAPER_IDS = new Set(WALLPAPERS.map(({ id }) => id))
++const SETTINGS_KEYS = new Set([
++  'theme', 'shell', 'accent', 'accents', 'density', 'glass', 'motion',
++  'followSystem', 'wallpaper', 'glow',
++])
++const PROFILE_KEYS = new Set(['schema', 'version', 'settings', 'shellStyle', 'panelDocked', 'wallpaper'])
++const SOURCE_KEYS = new Set(['settings', 'shellStyle', 'panelDocked', 'customWallpaper'])
++const SOURCE_PRESET_KEYS = new Set(['kind'])
++const SOURCE_URL_KEYS = new Set(['kind', 'url'])
++const SOURCE_FILE_KEYS = new Set(['kind', 'name', 'mimeType', 'size'])
++const URL_WALLPAPER_KEYS = new Set(['kind', 'url'])
++const PRESET_WALLPAPER_KEYS = new Set(['kind', 'id'])
++const FILE_WALLPAPER_KEYS = new Set(['kind', 'name', 'mimeType', 'size'])
++const SECRET_QUERY_KEY = /(?:token|key|secret|auth|password|credential|signature|^sig$)/i
++const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/
++
++function isObject(value: unknown): value is Record<string, unknown> {
++  return value !== null && typeof value === 'object' && !Array.isArray(value)
++}
++
++function exactKeys(value: Record<string, unknown>, allowed: Set<string>, label: string): void {
++  for (const key of Object.keys(value)) {
++    if (!allowed.has(key)) throw new Error(`${label} contains unsupported field: ${key}`)
++  }
++}
++
++function knownTheme(value: unknown): value is ThemeId {
++  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(THEMES, value)
++}
++
++function validAccent(value: unknown): value is string {
++  return typeof value === 'string' && HEX.test(value)
++}
++
++function normalizedSettings(input: ThemeSettings, strict = false): ThemeSettings {
++  if (!isObject(input)) throw new Error('Appearance settings must be an object.')
++  exactKeys(input, SETTINGS_KEYS, 'Appearance settings')
++
++  let theme: ThemeId
++  if (knownTheme(input.theme)) theme = input.theme
++  else if (!strict && typeof input.theme === 'string' && LEGACY_THEME_ALIASES[input.theme]) {
++    theme = LEGACY_THEME_ALIASES[input.theme]
++  } else {
++    throw new Error('Appearance theme is not recognized.')
++  }
++  if (input.shell !== undefined && !SHELLS.has(input.shell as string)) {
++    throw new Error('Appearance shell mirror is not recognized.')
++  }
++  if (input.accent !== null && !validAccent(input.accent)) {
++    throw new Error('Appearance accent must be a 3- or 6-digit hex color or null.')
++  }
++  if (!isObject(input.accents)) throw new Error('Per-theme accents must be an object.')
++  const accents: Record<string, string> = {}
++  for (const [id, color] of Object.entries(input.accents)) {
++    if (!validAccent(color)) throw new Error(`Per-theme accent for ${id} is invalid.`)
++    accents[id] = color
++  }
++  if (!DENSITIES.has(input.density as string)) throw new Error('Appearance density is not recognized.')
++  // Existing persisted legacy levels 1 and 3 resolve to translucent level 2.
++  const glass = input.glass === 1 || input.glass === 3 ? 2 : input.glass
++  if (glass !== 0 && glass !== 2) throw new Error('Appearance glass level is not recognized.')
++  if (!MOTIONS.has(input.motion as string)) throw new Error('Appearance motion preference is not recognized.')
++  if (typeof input.followSystem !== 'boolean') throw new Error('Appearance followSystem must be boolean.')
++  if (typeof input.glow !== 'boolean') throw new Error('Appearance glow must be boolean.')
++  if (strict && !WALLPAPER_IDS.has(input.wallpaper as string)) {
++    throw new Error('Appearance preset wallpaper is not recognized.')
++  }
++  const preset = WALLPAPER_IDS.has(input.wallpaper as string)
++    ? input.wallpaper as string
++    : DEFAULT_SETTINGS.wallpaper
++
++  const settings: ThemeSettings = {
++    theme,
++    accent: input.accent as string | null,
++    accents,
++    density: input.density as ThemeSettings['density'],
++    glass: glass as ThemeSettings['glass'],
++    motion: input.motion as ThemeSettings['motion'],
++    followSystem: input.followSystem,
++    wallpaper: preset,
++    glow: input.glow,
++  }
++  if (input.shell !== undefined) settings.shell = input.shell as ShellStyle
++  return settings
++}
++
++function safeWallpaperUrl(raw: string): string {
++  if (new TextEncoder().encode(raw).byteLength > 8192) throw new Error('Wallpaper URL exceeds the 8192-byte limit.')
++  if (raw !== raw.trim() || CONTROL_CHARACTERS.test(raw)) {
++    throw new Error('Wallpaper URL cannot contain surrounding whitespace or control characters.')
++  }
++  const normalized = normalizeCustomWallpaperUrl(raw)
++  const url = new URL(normalized)
++  for (const key of url.searchParams.keys()) {
++    if (SECRET_QUERY_KEY.test(key)) {
++      throw new Error('Wallpaper URL contains a credential-like query parameter and cannot be exported.')
++    }
++  }
++  return normalized
++}
++
++function validateWallpaper(value: unknown): AppearanceWallpaperV1 {
++  if (!isObject(value)) throw new Error('Appearance wallpaper must be an object.')
++  if (value.kind === 'preset') {
++    exactKeys(value, PRESET_WALLPAPER_KEYS, 'Preset wallpaper')
++    if (typeof value.id !== 'string' || !WALLPAPER_IDS.has(value.id)) {
++      throw new Error('Preset wallpaper id is not recognized.')
++    }
++    return { kind: 'preset', id: value.id }
++  }
++  if (value.kind === 'url') {
++    exactKeys(value, URL_WALLPAPER_KEYS, 'URL wallpaper')
++    if (typeof value.url !== 'string') throw new Error('Wallpaper URL must be a string.')
++    const safeUrl = safeWallpaperUrl(value.url)
++    if (safeUrl !== value.url) throw new Error('Wallpaper URL must be normalized before import.')
++    return { kind: 'url', url: safeUrl }
++  }
++  if (value.kind === 'local-file') {
++    exactKeys(value, FILE_WALLPAPER_KEYS, 'Local wallpaper')
++    if (typeof value.name !== 'string' || value.name.trim() === '' || new TextEncoder().encode(value.name).byteLength > 255 || /[\\/]/.test(value.name) || CONTROL_CHARACTERS.test(value.name)) {
++      throw new Error('Local wallpaper name must be a filename only, without a path.')
++    }
++    if (typeof value.mimeType !== 'string' || value.mimeType !== value.mimeType.toLowerCase()) {
++      throw new Error('Local wallpaper MIME type is invalid.')
++    }
++    if (typeof value.size !== 'number' || !Number.isSafeInteger(value.size) || value.size <= 0 || value.size > MAX_CUSTOM_WALLPAPER_BYTES) {
++      throw new Error('Local wallpaper metadata size is outside the supported range.')
++    }
++    validateCustomWallpaperFile({ size: value.size, type: value.mimeType })
++    return { kind: 'local-file', name: value.name, mimeType: value.mimeType, size: value.size }
++  }
++  throw new Error('Appearance wallpaper kind is not recognized.')
++}
++
++/** Build a JSON-safe v1 profile from already-live, normalized application state. */
++export function buildAppearanceProfileV1(source: AppearanceProfileSource): AppearanceProfileV1 {
++  if (!isObject(source)) throw new Error('Appearance export source must be an object.')
++  exactKeys(source, SOURCE_KEYS, 'Appearance export source')
++  if (!SHELLS.has(source.shellStyle)) throw new Error('Shell style is not recognized.')
++  if (typeof source.panelDocked !== 'boolean') throw new Error('Panel docked state must be boolean.')
++  if (!isObject(source.customWallpaper)) throw new Error('Custom wallpaper state must be an object.')
++
++  const settings = normalizedSettings(source.settings)
++  // `shellStyle` is the live source of truth; keep the optional legacy mirror coherent.
++  if (settings.shell !== undefined) settings.shell = source.shellStyle
++  let wallpaper: AppearanceWallpaperV1
++  if (source.customWallpaper.kind === 'url') {
++    exactKeys(source.customWallpaper, SOURCE_URL_KEYS, 'Custom URL wallpaper source')
++    wallpaper = { kind: 'url', url: safeWallpaperUrl(source.customWallpaper.url) }
++  } else if (source.customWallpaper.kind === 'file') {
++    exactKeys(source.customWallpaper, SOURCE_FILE_KEYS, 'Custom file wallpaper source')
++    wallpaper = validateWallpaper({
++      kind: 'local-file',
++      name: source.customWallpaper.name,
++      mimeType: source.customWallpaper.mimeType,
++      size: source.customWallpaper.size,
++    })
++  } else if (source.customWallpaper.kind === null) {
++    exactKeys(source.customWallpaper, SOURCE_PRESET_KEYS, 'Preset wallpaper source')
++    const id = WALLPAPER_IDS.has(settings.wallpaper) ? settings.wallpaper : DEFAULT_SETTINGS.wallpaper
++    wallpaper = { kind: 'preset', id }
++  } else {
++    throw new Error('Custom wallpaper state is not recognized.')
++  }
++  return {
++    schema: 'com.cybermanju.appearance',
++    version: 1,
++    settings,
++    shellStyle: source.shellStyle,
++    panelDocked: source.panelDocked,
++    wallpaper,
++  }
++}
++
++/** Serialize only a validated, allowlisted profile; no browser storage is consulted. */
++export function serializeAppearanceProfileV1(source: AppearanceProfileSource): string {
++  const json = JSON.stringify(buildAppearanceProfileV1(source), null, 2)
++  if (new TextEncoder().encode(json).byteLength > 64 * 1024) {
++    throw new Error('Appearance profile exceeds the 64 KiB limit.')
++  }
++  return json
++}
++
++/** Strictly parse a v1 profile, rejecting unknown fields and malformed variants. */
++export function parseAppearanceProfileV1(json: string): AppearanceProfileV1 {
++  if (typeof json !== 'string' || new TextEncoder().encode(json).byteLength > 64 * 1024) {
++    throw new Error('Appearance profile exceeds the 64 KiB limit.')
++  }
++  let raw: unknown
++  try {
++    raw = JSON.parse(json)
++  } catch {
++    throw new Error('Appearance profile is not valid JSON.')
++  }
++  if (!isObject(raw)) throw new Error('Appearance profile must be an object.')
++  exactKeys(raw, PROFILE_KEYS, 'Appearance profile')
++  if (raw.schema !== 'com.cybermanju.appearance' || raw.version !== 1) {
++    throw new Error('Appearance profile schema or version is unsupported.')
++  }
++  if (!SHELLS.has(raw.shellStyle as string)) throw new Error('Shell style is not recognized.')
++  if (typeof raw.panelDocked !== 'boolean') throw new Error('Panel docked state must be boolean.')
++  if (!isObject(raw.settings)) throw new Error('Appearance settings must be an object.')
++  const settings = normalizedSettings(raw.settings as unknown as ThemeSettings, true)
++  if (settings.shell !== undefined && settings.shell !== raw.shellStyle) {
++    throw new Error('Settings shell mirror must match shellStyle.')
++  }
++  const wallpaper = validateWallpaper(raw.wallpaper)
++  if (wallpaper.kind === 'preset' && wallpaper.id !== settings.wallpaper) {
++    throw new Error('Preset wallpaper descriptor must match settings.wallpaper.')
++  }
++  return {
++    schema: 'com.cybermanju.appearance',
++    version: 1,
++    settings,
++    shellStyle: raw.shellStyle as ShellStyle,
++    panelDocked: raw.panelDocked,
++    wallpaper,
++  }
++}
+diff --git a/tests/frontend/appearance-profile.test.ts b/tests/frontend/appearance-profile.test.ts
+new file mode 100644
+--- /dev/null
++++ b/tests/frontend/appearance-profile.test.ts
+@@ -0,0 +1,160 @@
++// CyberManju OS — AppearanceProfile tests (tests/frontend/appearance-profile.test.ts).
++// Role: verify the secret-free, versioned appearance export contract and its strict parser.
++// Exports: Vitest tests for canonical fields, accents, URLs, local-file metadata, and round trips.
++// Integrates: appearanceProfile, theme tokens, custom wallpaper validation.
++// Contracts: local wallpaper bytes and device URLs never enter exported JSON.
++import { describe, expect, it } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { fileURLToPath } from 'node:url'
++import {
++  buildAppearanceProfileV1,
++  parseAppearanceProfileV1,
++  serializeAppearanceProfileV1,
++  type AppearanceProfileSource,
++} from '@/utils/appearanceProfile'
++import { DEFAULT_SETTINGS } from '@/ui/tokens'
++import { createCustomWallpaperController } from '@/composables/useCustomWallpaper'
++import type { CustomWallpaperRecord } from '@/utils/customWallpaper'
++
++const fixturePath = fileURLToPath(new URL('../fixtures/appearance-profile-v1.json', import.meta.url))
++
++function source(overrides: Partial<AppearanceProfileSource> = {}): AppearanceProfileSource {
++  return {
++    settings: {
++      ...DEFAULT_SETTINGS,
++      theme: 'os-graphite',
++      shell: 'plasma',
++      accent: '#abcdef',
++      accents: { 'plasma-light': '#123456', 'os-dark': '#aa11bb' },
++      density: 'compact',
++      glass: 0,
++      motion: 'reduced',
++      followSystem: false,
++      wallpaper: 'dunes',
++      glow: false,
++    },
++    shellStyle: 'plasma',
++    panelDocked: true,
++    customWallpaper: { kind: null },
++    ...overrides,
++  }
++}
++
++describe('appearance profile v1', () => {
++  it('exports the complete canonical ThemeSettings and current shell/panel state', () => {
++    const profile = buildAppearanceProfileV1(source())
++    expect(profile).toEqual(JSON.parse(readFileSync(fixturePath, 'utf8')))
++    expect(profile).toMatchObject({
++      schema: 'com.cybermanju.appearance',
++      version: 1,
++      shellStyle: 'plasma',
++      panelDocked: true,
++      settings: {
++        theme: 'os-graphite', accent: '#abcdef',
++        accents: { 'plasma-light': '#123456', 'os-dark': '#aa11bb' },
++        density: 'compact', glass: 0, motion: 'reduced', followSystem: false,
++        wallpaper: 'dunes', glow: false, shell: 'plasma',
++      },
++      wallpaper: { kind: 'preset', id: 'dunes' },
++    })
++    expect(Object.keys(profile.settings).sort()).toEqual([
++      'accent', 'accents', 'density', 'followSystem', 'glass', 'glow', 'motion',
++      'shell', 'theme', 'wallpaper',
++    ])
++  })
++
++  it('preserves global and per-theme accent overrides independently', () => {
++    const result = buildAppearanceProfileV1(source())
++    expect(result.settings.accent).toBe('#abcdef')
++    expect(result.settings.accents).toEqual({ 'plasma-light': '#123456', 'os-dark': '#aa11bb' })
++  })
++
++  it('normalizes safe wallpaper URLs and refuses non-HTTP(S), credentials, and credential-like query keys', () => {
++    const profile = buildAppearanceProfileV1(source({
++      customWallpaper: { kind: 'url', url: 'HTTPS://cdn.example.test/wallpaper.png' },
++    }))
++    expect(profile.wallpaper).toEqual({ kind: 'url', url: 'https://cdn.example.test/wallpaper.png' })
++    for (const url of [
++      'file:///tmp/wallpaper.png',
++      'blob:https://example.test/local-image',
++      ' https://example.test/image.png',
++      `https://example.test/${'a'.repeat(8200)}`,
++      'https://example.test/image.png\n',
++      'https://user:pass@example.test/image.png',
++      'https://example.test/image.png?access_token=private',
++      'https://example.test/image.png?api_key=private',
++    ]) {
++      expect(() => buildAppearanceProfileV1(source({ customWallpaper: { kind: 'url', url } }))).toThrow()
++    }
++  })
++
++  it('exports local-file metadata only and never leaks object URLs, file URLs, paths, or bytes', () => {
++    const profile = buildAppearanceProfileV1(source({
++      customWallpaper: { kind: 'file', name: 'wallpaper.png', mimeType: 'image/png', size: 4096 },
++    }))
++    const json = JSON.stringify(profile)
++    expect(profile.wallpaper).toEqual({
++      kind: 'local-file', name: 'wallpaper.png', mimeType: 'image/png', size: 4096,
++    })
++    expect(json).not.toMatch(/blob:|file:|data:|\/home\/|\/tmp\//i)
++    expect(json).not.toMatch(/"blob"|"source"|"path"|"bytes"/i)
++    for (const metadata of [
++      { name: '/home/user/private.png', mimeType: 'image/png', size: 4096 },
++      { name: `${'é'.repeat(128)}.png`, mimeType: 'image/png', size: 4096 },
++      { name: 'bad\nname.png', mimeType: 'image/png', size: 4096 },
++      { name: 'empty.png', mimeType: 'image/png', size: 0 },
++      { name: 'huge.png', mimeType: 'image/png', size: 20 * 1024 * 1024 + 1 },
++      { name: 'bad.svg', mimeType: 'image/svg+xml', size: 100 },
++    ]) {
++      expect(() => buildAppearanceProfileV1(source({ customWallpaper: { kind: 'file', ...metadata } }))).toThrow()
++    }
++  })
++
++  it('reads device-local file metadata from the existing wallpaper controller without exporting its blob URL or bytes', async () => {
++    let stored: CustomWallpaperRecord | null = null
++    const controller = createCustomWallpaperController({
++      async read() { return stored },
++      async write(record) { stored = record },
++      async remove() { stored = null },
++    }, {
++      createObjectURL() { return 'blob:device-local-preview-only' },
++      revokeObjectURL() {},
++    })
++    const file = new File(['private wallpaper bytes'], 'wallpaper.png', { type: 'image/png' })
++    expect(await controller.setFile(file)).toBe(true)
++    expect(controller.source.value).toBe('blob:device-local-preview-only')
++    const json = serializeAppearanceProfileV1(source({
++      customWallpaper: {
++        kind: 'file',
++        name: controller.fileName.value,
++        mimeType: controller.fileMimeType.value,
++        size: controller.fileSize.value,
++      },
++    }))
++    expect(json).toContain('"mimeType": "image/png"')
++    expect(json).toContain('"size": 23')
++    expect(json).not.toMatch(/blob:|private wallpaper bytes|"blob"/)
++  })
++
++  it('rejects injected secret/config fields and malformed caller input instead of silently succeeding', () => {
++    const withExtra = {
++      ...source(),
++      settings: { ...source().settings, serverUrl: 'https://private.example.test', apiKey: 'secret' },
++    } as unknown as AppearanceProfileSource
++    expect(() => buildAppearanceProfileV1(withExtra)).toThrow(/unsupported field/)
++    expect(() => buildAppearanceProfileV1(source({ panelDocked: 'yes' as unknown as boolean }))).toThrow()
++  })
++
++  it('strictly validates parsed JSON and round-trips the shared fixture', () => {
++    const fixture = readFileSync(fixturePath, 'utf8')
++    const parsed = parseAppearanceProfileV1(fixture)
++    expect(parseAppearanceProfileV1(serializeAppearanceProfileV1(source()))).toEqual(parsed)
++    expect(() => parseAppearanceProfileV1(fixture.replace('"version": 1', '"version": 2'))).toThrow(/schema or version/)
++    expect(() => parseAppearanceProfileV1(fixture.replace('"panelDocked": true', '"panelDocked": "yes"'))).toThrow()
++    expect(() => parseAppearanceProfileV1(fixture.replace('"shell": "plasma"', '"shell": "macos"'))).toThrow(/must match shellStyle/)
++    expect(() => parseAppearanceProfileV1(fixture.replace('"id": "dunes"', '"id": "slopes-dark"'))).toThrow(/must match settings.wallpaper/)
++    expect(() => parseAppearanceProfileV1(fixture.replace('"shellStyle": "plasma"', '"shellStyle": "plasma", "authToken": "nope"'))).toThrow(/unsupported field/)
++    expect(() => parseAppearanceProfileV1(`${fixture.trimEnd()}${' '.repeat(64 * 1024)}`)).toThrow(/64 KiB/)
++    expect(() => parseAppearanceProfileV1('{')).toThrow(/valid JSON/)
++  })
++})
+diff --git a/tests/fixtures/appearance-profile-v1.json b/tests/fixtures/appearance-profile-v1.json
+new file mode 100644
+--- /dev/null
++++ b/tests/fixtures/appearance-profile-v1.json
+@@ -0,0 +1,25 @@
++{
++  "schema": "com.cybermanju.appearance",
++  "version": 1,
++  "settings": {
++    "theme": "os-graphite",
++    "accent": "#abcdef",
++    "accents": {
++      "plasma-light": "#123456",
++      "os-dark": "#aa11bb"
++    },
++    "density": "compact",
++    "glass": 0,
++    "motion": "reduced",
++    "followSystem": false,
++    "wallpaper": "dunes",
++    "glow": false,
++    "shell": "plasma"
++  },
++  "shellStyle": "plasma",
++  "panelDocked": true,
++  "wallpaper": {
++    "kind": "preset",
++    "id": "dunes"
++  }
++}

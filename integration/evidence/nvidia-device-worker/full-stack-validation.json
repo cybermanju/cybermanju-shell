@@ -1,0 +1,96 @@
+{
+  "base": "00a4842d976db6723b8224be2e57ac8105f13ee2",
+  "patches": [
+    {
+      "name": "asterinas-dumb-buffer-layout.patch",
+      "sha256": "7723cdb8c3157f058f42d4663ad9ded56ddaf47eb3b7525908bc634e12586d2e",
+      "applied": true
+    },
+    {
+      "name": "asterinas-simpledrm-exact-pixel-format.patch",
+      "sha256": "d10747d1489f5bbca3c4361e8d11f454f028608a9097ac268d1624260912bba5",
+      "applied": true
+    },
+    {
+      "name": "asterinas-graphics-prerequisite-check.patch",
+      "sha256": "25e3652cda3730463cc3d6ae666a6efabc19aac7243c3ccb61e98d1cbf87e77d",
+      "applied": true
+    },
+    {
+      "name": "asterinas-vulkan-compute-ci.patch",
+      "sha256": "56f959d37605aad2af8d47c4622be677822b59b7d70b2167ec947f0019743e1e",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-nvport-native-ci.patch",
+      "sha256": "03e239cb623d9c05d6ece48a6ab1f06ca23756ed43668a8e068c229cfe71bfb7",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-boot-pci-tcg.patch",
+      "sha256": "8ffef89f8987416e4899c84a83cb67912f3693e4e1f0378fedffea2a0ed89cde",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-rm-os-services.patch",
+      "sha256": "e1203b8a5ceacfa91e6de35aa45c7187a6daee9ab86f4279b1e0039137a93978",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-resource-ownership.patch",
+      "sha256": "8acd7fc2d103d4ce15df0c6780314a5e38a817c932da70fe2c3184b676153135",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-device-dma.patch",
+      "sha256": "264ca863c8fd0c733b49cf84cf12abc4f1198ef610fc0072e2a917f7327416a1",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-isolated-vtd.patch",
+      "sha256": "0826ad1aaf9601eacb66ee38da0ef11e595a87f5e157216b6898c30936a3af21",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-pcie-topology.patch",
+      "sha256": "93f5b99723e3c7ebaec0eb1c4b6ac39cc0774b823f8301c4059d7aebbe396734",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-multifunction.patch",
+      "sha256": "0fc97c2906d6cf96e98a6ab7526ac287f5a8f31d3c31afae0b7a8484b0404b61",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-irq-callbacks.patch",
+      "sha256": "3cb3000c5ef15318cca8417882ff1bac3a2eb6f727db9413a622b0029493c035",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-msix-transaction.patch",
+      "sha256": "ae4b4d8401319bddb185b353204a45534f0cc0c222a024e18d5c361bae49fd5e",
+      "applied": true
+    },
+    {
+      "name": "asterinas-irq-retire-storage.patch",
+      "sha256": "90f119b1f28aa8b4aba77c5fbcd2d1097a5655c48014eee1c51ba698b2315875",
+      "applied": true
+    },
+    {
+      "name": "asterinas-nvidia-device-worker.patch",
+      "sha256": "95d6978fd8c528c8a4176de66066c345f023137efa1997dc9492be4e72aa6d2f",
+      "applied": true
+    }
+  ],
+  "files_compared": 99,
+  "byte_equal_files": 98,
+  "source_byte_equality": false,
+  "known_preexisting_import_order_only": [
+    "kernel/comps/drm/src/ioctl/gem.rs"
+  ],
+  "unexpected_mismatches": [],
+  "original_index_unchanged": true,
+  "commits_created": false,
+  "remote_actions_run": false,
+  "gpu_acceptance": false
+}

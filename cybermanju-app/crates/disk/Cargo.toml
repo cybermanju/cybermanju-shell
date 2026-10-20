@@ -1,0 +1,27 @@
+[package]
+name = "cybermanju-disk"
+version = "0.1.1"
+edition = "2021"
+description = ".cybermanju virtual disks: superblock, block allocator, volume merge, mount"
+
+[dependencies]
+anyhow = "1"
+blake3 = "1"
+ctor = "0.8"
+cybermanju-compression = { path = "../compression" }
+cybermanju-crypto = { path = "../crypto" }
+cybermanju-db = { path = "../db" }
+cybermanju-sync = { path = "../sync" }
+cybermanju-types = { path = "../types" }
+log = "0.4"
+redb = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+uuid = { version = "1", features = ["v4"] }
+
+# FUSE is a linux-only, runtime-probed extra: `fuser` without `libfuse`
+# refuses to build anywhere but linux, and Termux/Android has no /dev/fuse
+# either. Everywhere else the HTTP block API is the mount (AGENT-6 item 9).
+[target.'cfg(target_os = "linux")'.dependencies]
+fuser = { version = "0.14", default-features = false }

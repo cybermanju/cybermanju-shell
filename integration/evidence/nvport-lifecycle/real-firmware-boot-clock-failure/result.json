@@ -1,0 +1,62 @@
+{
+  "pass": false,
+  "scope": "CPU-only actual Asterinas firmware-file service, C ABI lease/readback/release, runtime and /init boot; not GPU acceptance",
+  "qemu_exit": 65,
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "firmware_executed_on_gpu": false,
+  "image_sha256": "7748296501f995e0696f4593b16dac541a87bcb7f37ded3d7fe10f7a7a04dbed",
+  "archive_sha256": "ef879c939c3ced13273799fb51ea19ed1a88cda5e4a8cc60b102048ad23df78c",
+  "serial_sha256": "8ab33407d6aed3632e653030c850e3e20c0096ede8a782c336820f2f9ea748f7",
+  "official_nvidia_source_commit": "1a82fbfda8f321b056eb3568850f9316c5e465c5",
+  "firmware_installer_download_complete": false,
+  "firmware_archive_integrity_checked": false,
+  "firmware_vendor_signature_verified": false,
+  "firmware_provenance_sha256": "7487c9bb819053d245364213ace11112894a98343e6ff8d42690c5e14641195b",
+  "firmware_expected": {
+    "nvidia/615.78.08/gsp_ga10x.bin": {
+      "size": 27043992,
+      "fnv1a64": "cf7436af6e868c2c",
+      "sha256": "a20100cafd5a85e22b3e13188339730c6ced94bd5f654984dd2ed274ed58d584"
+    },
+    "nvidia/615.78.08/gsp_tu10x.bin": {
+      "size": 22901632,
+      "fnv1a64": "72656e9b858593f3",
+      "sha256": "0c6124c11d59900a05ab5461e5fc7087fc6687a1badead49a7eeca6ed13eeb3b"
+    },
+    "nvidia/615.78.08/ucodes_ga10x.bin": {
+      "size": 58215936,
+      "fnv1a64": "e2068f4b832b7252",
+      "sha256": "eed53d76248582d71c629e8b6230aee48ce673c91d782301c94e98ac6a6db7aa"
+    },
+    "nvidia/615.78.08/ucodes_tu10x.bin": {
+      "size": 8837632,
+      "fnv1a64": "c24eaf33dedbc0e5",
+      "sha256": "6027ab3736f733b5a06e6e61aaae957d1f990426a263849ebcfa8a49eeb4a5d0"
+    }
+  },
+  "firmware_observed": {
+    "nvidia/615.78.08/gsp_tu10x.bin": {
+      "size": 22901632,
+      "fnv1a64": "72656e9b858593f3"
+    },
+    "nvidia/615.78.08/ucodes_tu10x.bin": {
+      "size": 8837632,
+      "fnv1a64": "c24eaf33dedbc0e5"
+    },
+    "nvidia/615.78.08/gsp_ga10x.bin": {
+      "size": 27043992,
+      "fnv1a64": "cf7436af6e868c2c"
+    },
+    "nvidia/615.78.08/ucodes_ga10x.bin": {
+      "size": 58215936,
+      "fnv1a64": "e2068f4b832b7252"
+    }
+  },
+  "errors": [
+    "Unexpected QEMU debug-exit status 65",
+    "Guest panicked",
+    "Real static /init did not complete",
+    "Real C clock/thread/yield service missing"
+  ]
+}

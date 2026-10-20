@@ -1,0 +1,2 @@
+error: the package 'aster-nvidia-platform-osdk-bin' does not contain this feature: dropping_owner_closes_without_waiting_and_task_still_drains
+[Error]: Cargo build failed

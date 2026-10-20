@@ -1,0 +1,13 @@
+
+> cybermanju-os@0.1.1 pretypecheck
+> npm run icons
+
+
+> cybermanju-os@0.1.1 icons
+> node scripts/generate-icon-set.mjs
+
+iconify-local.json: 174 icon(s) from 1 set(s) (190.5 KB)
+
+> cybermanju-os@0.1.1 typecheck
+> vue-tsc --noEmit
+

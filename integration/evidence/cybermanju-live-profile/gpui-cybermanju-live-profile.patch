@@ -1,0 +1,1132 @@
+diff --git a/crates/app/src/args.rs b/crates/app/src/args.rs
+--- a/crates/app/src/args.rs
++++ b/crates/app/src/args.rs
+@@ -11,6 +11,8 @@
+     pub validate: bool,
+     /// Explicit CyberManju cosmetic snapshot; never an auto-discovered secret store.
+     pub appearance_profile: Option<PathBuf>,
++    /// Watch only the explicitly supplied cosmetic file; never discover app stores.
++    pub watch_appearance_profile: bool,
+ }
+ 
+ impl Args {
+@@ -31,6 +33,12 @@
+                     parsed.input = Some(args.next().ok_or("--input requires a value")?);
+                 }
+                 "--validate" => parsed.validate = true,
++                "--watch-appearance-profile" => {
++                    if parsed.watch_appearance_profile {
++                        return Err("--watch-appearance-profile may only be supplied once");
++                    }
++                    parsed.watch_appearance_profile = true;
++                }
+                 "--appearance-profile" => {
+                     if parsed.appearance_profile.is_some() {
+                         return Err("--appearance-profile may only be supplied once");
+@@ -44,6 +52,9 @@
+                 // Preserve the existing handling of unrelated/legacy options.
+                 _ => {}
+             }
++        }
++        if parsed.watch_appearance_profile && parsed.appearance_profile.is_none() {
++            return Err("--watch-appearance-profile requires --appearance-profile FILE");
+         }
+         Ok(parsed)
+     }
+@@ -88,4 +99,27 @@
+         }
+         assert!(parse(&["--input"]).is_err());
+     }
++
++    #[test]
++    fn live_import_requires_an_explicit_file_and_does_not_change_default_mode() {
++        assert!(parse(&["--watch-appearance-profile"]).is_err());
++        assert!(parse(&["--appearance-profile", "a"]).is_ok_and(|a| !a.watch_appearance_profile));
++        let args = parse(&[
++            "--watch-appearance-profile",
++            "--appearance-profile",
++            "a",
++            "--validate",
++        ])
++        .unwrap();
++        assert!(args.watch_appearance_profile && args.validate);
++        assert!(
++            parse(&[
++                "--watch-appearance-profile",
++                "--appearance-profile",
++                "a",
++                "--watch-appearance-profile"
++            ])
++            .is_err()
++        );
++    }
+ }
+diff --git a/crates/app/src/main.rs b/crates/app/src/main.rs
+--- a/crates/app/src/main.rs
++++ b/crates/app/src/main.rs
+@@ -1,13 +1,8 @@
+ //! GPUi Shell - A Wayland status bar built with GPUI.
+ //!
+-//! Supports single-instance mode: if the app is already running,
+-//! subsequent invocations will signal the existing instance to open the launcher.
+-//!
+-//! Usage:
+-//!   gpuishell              - Start the shell or open launcher if already running
+-//!   gpuishell --input "x"  - Open launcher with prefilled input
+-//!   gpuishell --validate   - Check the config files and exit
+-//!   gpuishell --appearance-profile FILE - Apply a cosmetic snapshot at startup
++//! Subsequent ordinary invocations open the existing launcher's input. Cosmetic
++//! imports require the primary instance; --watch-appearance-profile additionally
++//! follows an explicitly supplied file, never browser storage or credentials.
+ 
+ use crate::ipc::IpcSubscriber;
+ use assets::Assets;
+@@ -23,7 +18,7 @@
+ mod frame_telemetry;
+ pub mod icons;
+ mod ipc;
+-mod keybinds;
++pub mod keybinds;
+ pub mod launcher;
+ pub mod notification;
+ pub mod osd;
+@@ -38,18 +33,23 @@
+     #[cfg(not(target_os = "linux"))]
+     compile_error!("This application requires a Linux system with Wayland.");
+ 
+-    // Initialize tracing with RUST_LOG env var support
+     tracing_subscriber::fmt()
+         .with_env_filter(EnvFilter::from_default_env())
+         .init();
+-
+-    // Parse command-line arguments
+     let args = args::Args::parse();
+-
+-    // Explicit opt-in only; reject malformed input before IPC or display setup.
+-    // This is a startup snapshot, not a live service or credential transport.
+-    let appearance = match args
++    let appearance_path = match args
+         .appearance_profile
++        .as_deref()
++        .map(std::path::absolute)
++        .transpose()
++    {
++        Ok(path) => path,
++        Err(error) => {
++            eprintln!("Cannot resolve explicit appearance path: {error:#}");
++            std::process::exit(1);
++        }
++    };
++    let mut appearance = match appearance_path
+         .as_deref()
+         .map(config::appearance::AppearanceProfile::load)
+         .transpose()
+@@ -60,40 +60,33 @@
+             std::process::exit(1);
+         }
+     };
+-    let appearance_theme = match appearance
+-        .as_ref()
+-        .map(|profile| profile.project_theme(&ui::Theme::default()))
+-        .transpose()
++    if let Some(profile) = &appearance
++        && let Err(error) = profile.project_theme(&ui::Theme::default())
+     {
+-        Ok(theme) => theme,
+-        Err(error) => {
+-            eprintln!("Appearance token projection failed: {error:#}");
+-            std::process::exit(1);
+-        }
+-    };
++        eprintln!("Appearance token projection failed: {error:#}");
++        std::process::exit(1);
++    }
+ 
+-    // Before the single-instance check: a running shell must not swallow this.
++    // Renderer-free, no watcher, writes or secondary-instance commands.
+     if args.validate {
+         if let Some(profile) = &appearance {
+             println!("{}", profile.report());
+         }
++        if args.watch_appearance_profile {
++            println!("Live-file watch requested; validation only, no watcher or UI was started.");
++        }
+         std::process::exit(if config::validate() { 0 } else { 1 });
+     }
+ 
+-    // Try to acquire single-instance lock or signal existing instance.
+-    // Secondary path exits immediately after signaling the primary instance.
+     let Some(ipc) = IpcSubscriber::init(&args) else {
+         if appearance.is_some() {
+             eprintln!(
+-                "Appearance profile was NOT applied; startup-only import requires an available primary shell instance."
++                "Appearance profile was NOT applied; import requires an available primary shell instance."
+             );
+             std::process::exit(1);
+         }
+         return;
+     };
+-
+-    // Layer-shell surfaces cannot run via an implicit X11/headless fallback.
+-    // Validation and IPC-only secondary invocations do not need a session.
+     if std::env::var_os("WAYLAND_DISPLAY").is_none_or(|display| display.is_empty()) {
+         eprintln!(
+             "GPUi Shell requires WAYLAND_DISPLAY from a running Wayland session (Hyprland, Niri or Mango)."
+@@ -102,7 +95,33 @@
+         std::process::exit(1);
+     }
+ 
+-    // Initialize services (requires async)
++    // Register before rereading: saves between initial validation and watch setup
++    // are covered by the reread, and later changes remain queued for the UI task.
++    let appearance_watch = if args.watch_appearance_profile {
++        let path = appearance_path.expect("argument parser requires an explicit profile");
++        let rx = match services::FileWatcher::try_watch(path.clone()) {
++            Ok(rx) => rx,
++            Err(error) => {
++                eprintln!("Cannot watch appearance profile: {error:#}");
++                drop(ipc);
++                std::process::exit(1);
++            }
++        };
++        appearance = match config::appearance::AppearanceProfile::load(&path) {
++            Ok(profile) => Some(profile),
++            Err(error) => {
++                eprintln!(
++                    "Appearance profile changed during watch setup and was rejected: {error:#}"
++                );
++                drop(ipc);
++                std::process::exit(1);
++            }
++        };
++        Some((path, rx))
++    } else {
++        None
++    };
++
+     let services = match state::init_services().await {
+         Ok(services) => services,
+         Err(error) => {
+@@ -112,34 +131,29 @@
+             std::process::exit(1);
+         }
+     };
+-
+-    // Create and run the GPUI application
+     let app = application().with_assets(Assets {});
+     app.run(move |cx| {
+         config::Config::init(cx);
+-        if let Some(mut theme) = appearance_theme {
+-            theme.font_size = ui::Theme::global(cx).font_size;
+-            ui::Theme::set(theme, cx);
+-            if let Some(profile) = &appearance {
+-                tracing::info!("{}", profile.report());
++        if let Some(profile) = appearance {
++            tracing::info!("{}", profile.report());
++            if let Err(error) = config::appearance_live::AppearanceOverlay::install(profile, cx) {
++                tracing::error!("Appearance token projection failed: {error:#}");
++                cx.quit();
++                return;
+             }
+         }
+-        // Registers the TextField / Menu keybindings the component set needs.
+         ui::init(cx);
+         state::AppState::init(services, cx);
+-
+-        // Register keybindings
+         keybinds::register(cx);
+-
+         bar::init(cx);
+         dock::init(cx);
+         notification::init(cx);
+         osd::init(cx);
+         launcher::init(cx);
+-
+-        // Now that the notification service is up, say what didn't parse.
+         config::report_load_errors(cx);
+-
++        if let Some((path, rx)) = appearance_watch {
++            config::appearance_live::AppearanceOverlay::start_watch(path, rx, cx);
++        }
+         ipc.start(cx);
+     });
+ }
+diff --git a/crates/app/src/config/mod.rs b/crates/app/src/config/mod.rs
+--- a/crates/app/src/config/mod.rs
++++ b/crates/app/src/config/mod.rs
+@@ -1,6 +1,7 @@
+ //! Application configuration stored as a GPUI global.
+ 
+ pub mod appearance;
++pub mod appearance_live;
+ mod persistence;
+ mod state;
+ mod theme;
+@@ -117,7 +118,9 @@
+ 
+     /// Reload theme from disk and replace the global theme.
+     fn reload_theme(cx: &mut App) {
+-        match theme::persistence::load_theme() {
++        match theme::persistence::load_theme()
++            .and_then(|theme| appearance_live::AppearanceOverlay::over_native_theme(theme, cx))
++        {
+             Ok(theme) => {
+                 Theme::set(theme, cx);
+                 AppState::notification(cx).clear_local(LocalSlot::ThemeError);
+diff --git a/crates/app/src/config/appearance.rs b/crates/app/src/config/appearance.rs
+--- a/crates/app/src/config/appearance.rs
++++ b/crates/app/src/config/appearance.rs
+@@ -290,7 +290,7 @@
+             retained.push("followSystem (snapshot theme only)");
+         }
+         format!(
+-            "CyberManju appearance v1: theme={} and accent token projection; retained, NOT applied: {}. No live sync or Asterinas/GPU certification.",
++            "CyberManju appearance v1: theme={} and accent token projection; retained, NOT applied: {}. Explicit live-file import requires --watch-appearance-profile; no automatic app sync or Asterinas/GPU certification.",
+             self.settings.theme.name(),
+             retained.join(", ")
+         )
+@@ -338,7 +338,7 @@
+             }
+         }
+         assert!(profile.report().contains("retained, NOT applied"));
+-        assert!(profile.report().contains("No live sync"));
++        assert!(profile.report().contains("no automatic app sync"));
+     }
+ 
+     #[test]
+diff --git a/crates/app/src/ipc/service.rs b/crates/app/src/ipc/service.rs
+--- a/crates/app/src/ipc/service.rs
++++ b/crates/app/src/ipc/service.rs
+@@ -58,6 +58,7 @@
+                     input: None,
+                     validate: false,
+                     appearance_profile: None,
++                    watch_appearance_profile: false,
+                 };
+                 match Self::acquire(&retry_args) {
+                     AcquireResult::Primary(subscriber) => Some(subscriber),
+diff --git a/crates/services/src/notification/mod.rs b/crates/services/src/notification/mod.rs
+--- a/crates/services/src/notification/mod.rs
++++ b/crates/services/src/notification/mod.rs
+@@ -72,6 +72,7 @@
+ pub enum LocalSlot {
+     ConfigError,
+     ThemeError,
++    AppearanceError,
+ }
+ 
+ impl LocalSlot {
+@@ -720,6 +721,29 @@
+     }
+ 
+     #[test]
++    fn appearance_error_has_an_independent_sticky_slot() {
++        let notifications = NotificationSubscriber::new();
++        notifications.post_local(LocalSlot::ConfigError, "config".into(), "bad config".into());
++        notifications.post_local(LocalSlot::ThemeError, "theme".into(), "bad theme".into());
++        notifications.post_local(
++            LocalSlot::AppearanceError,
++            "profile".into(),
++            "bad profile".into(),
++        );
++        assert_eq!(notifications.get().notifications.len(), 3);
++        notifications.clear_local(LocalSlot::AppearanceError);
++        let ids: Vec<_> = notifications
++            .get()
++            .notifications
++            .iter()
++            .map(|n| n.id)
++            .collect();
++        assert_eq!(ids.len(), 2);
++        assert!(ids.contains(&LocalSlot::ConfigError.id()));
++        assert!(ids.contains(&LocalSlot::ThemeError.id()));
++    }
++
++    #[test]
+     fn plain_path_unchanged() {
+         assert_eq!(
+             normalize_path("/home/user/pic.png"),
+diff --git a/crates/services/src/watcher.rs b/crates/services/src/watcher.rs
+--- a/crates/services/src/watcher.rs
++++ b/crates/services/src/watcher.rs
+@@ -1,79 +1,159 @@
+ //! File watcher service using inotify.
+-
+ use std::ffi::OsString;
+ use std::path::{Path, PathBuf};
+-use std::thread;
+-use std::time::{Duration, Instant};
+-
++use std::time::Duration;
++
++use anyhow::Context as _;
++use futures_util::StreamExt as _;
+ use inotify::{EventMask, Inotify, WatchMask};
+ use tokio::sync::mpsc;
+-
+-const DEBOUNCE_MS: u64 = 200;
++use tokio::time::Instant;
++
++const DEBOUNCE: Duration = Duration::from_millis(200);
++const NOTIFICATION_CAPACITY: usize = 1;
++const EVENT_BUFFER_SIZE: usize = 4096;
+ 
+ pub struct FileWatcher;
+ 
+ impl FileWatcher {
+-    pub fn watch(path: PathBuf) -> mpsc::UnboundedReceiver<()> {
+-        let (tx, rx) = mpsc::unbounded_channel();
+-        thread::spawn(move || {
+-            if let Err(err) = watch_file(path, tx) {
+-                tracing::warn!("File watcher stopped: {}", err);
+-            }
+-        });
+-        rx
+-    }
+-}
+-
+-fn watch_file(path: PathBuf, tx: mpsc::UnboundedSender<()>) -> anyhow::Result<()> {
+-    let mut inotify = Inotify::init()?;
+-    let (watch_dir, watch_name) = watch_target(&path)?;
+-
+-    inotify.watches().add(
+-        watch_dir,
+-        WatchMask::MODIFY
+-            | WatchMask::CLOSE_WRITE
+-            | WatchMask::CREATE
+-            | WatchMask::DELETE
+-            | WatchMask::MOVED_TO
+-            | WatchMask::MOVE_SELF
+-            | WatchMask::DELETE_SELF,
+-    )?;
+-
+-    let mut buffer = [0u8; 4096];
+-    let mut last_sent: Option<Instant> = None;
++    /// Start watching `path` and return a bounded stream of reload notifications.
++    ///
++    /// Registration is completed before this function returns, so path, inotify,
++    /// and runtime errors are reported to the caller instead of being deferred to
++    /// a background thread. A Tokio runtime must be active on the calling thread.
++    pub fn try_watch(path: PathBuf) -> anyhow::Result<mpsc::Receiver<()>> {
++        let runtime = tokio::runtime::Handle::try_current()
++            .context("FileWatcher::try_watch requires an active Tokio runtime")?;
++        let (watch_dir, watch_name) = watch_target(&path)?;
++
++        // Register synchronously: callers can decide whether a watcher is
++        // optional before accepting a receiver that can never produce events.
++        let inotify = Inotify::init().context("failed to initialize inotify")?;
++        inotify
++            .watches()
++            .add(
++                watch_dir,
++                WatchMask::MODIFY
++                    | WatchMask::CLOSE_WRITE
++                    | WatchMask::CREATE
++                    | WatchMask::DELETE
++                    | WatchMask::MOVED_FROM
++                    | WatchMask::MOVED_TO
++                    | WatchMask::ATTRIB
++                    | WatchMask::MOVE_SELF
++                    | WatchMask::DELETE_SELF,
++            )
++            .with_context(|| format!("failed to watch directory {}", watch_dir.display()))?;
++        let stream = inotify
++            .into_event_stream([0; EVENT_BUFFER_SIZE])
++            .context("failed to create inotify event stream")?;
++
++        let (tx, rx) = mpsc::channel(NOTIFICATION_CAPACITY);
++        runtime.spawn(watch_events(stream, watch_name, tx));
++        Ok(rx)
++    }
++
++    /// Compatibility entrypoint for existing config/theme callers.
++    ///
++    /// Registration failures are logged and represented as a closed bounded
++    /// receiver; callers needing to distinguish that case should use `try_watch`.
++    pub fn watch(path: PathBuf) -> mpsc::Receiver<()> {
++        match Self::try_watch(path) {
++            Ok(receiver) => receiver,
++            Err(error) => {
++                tracing::warn!("File watcher could not start: {error:#}");
++                let (tx, rx) = mpsc::channel(NOTIFICATION_CAPACITY);
++                drop(tx);
++                rx
++            }
++        }
++    }
++}
++
++async fn watch_events(
++    mut stream: inotify::EventStream<[u8; EVENT_BUFFER_SIZE]>,
++    watch_name: OsString,
++    tx: mpsc::Sender<()>,
++) {
++    let mut debounce_deadline: Option<Instant> = None;
+ 
+     loop {
+-        let events = inotify.read_events_blocking(&mut buffer)?;
+-        let mut should_reload = false;
+-
+-        for event in events {
+-            let renamed_or_deleted = event.mask.contains(EventMask::MOVE_SELF)
+-                || event.mask.contains(EventMask::DELETE_SELF);
+-            let same_file = event
+-                .name
+-                .map(|name| name == watch_name.as_os_str())
+-                .unwrap_or(false);
+-            if renamed_or_deleted || same_file {
+-                should_reload = true;
+-                break;
+-            }
+-        }
+-
+-        if should_reload {
+-            let now = Instant::now();
+-            let debounce_elapsed = last_sent
+-                .map(|last| now.duration_since(last) >= Duration::from_millis(DEBOUNCE_MS))
+-                .unwrap_or(true);
+-            if debounce_elapsed {
+-                if tx.send(()).is_err() {
++        let timer = async {
++            match debounce_deadline {
++                Some(deadline) => tokio::time::sleep_until(deadline).await,
++                None => std::future::pending::<()>().await,
++            }
++        };
++
++        tokio::select! {
++            // Fair branch selection lets the deadline fire even if unrelated
++            // files in the watched directory are changing continuously.
++            _ = tx.closed() => break,
++            event = stream.next() => {
++                let Some(event) = event else {
++                    // Unexpected stream exhaustion means the watch is no longer
++                    // trustworthy; prompt a final reload and close the channel.
++                    notify(&tx);
++                    break;
++                };
++                let event = match event {
++                    Ok(event) => event,
++                    Err(error) => {
++                        tracing::warn!("File watcher event stream failed: {error}");
++                        notify(&tx);
++                        break;
++                    }
++                };
++
++                let mask = event.mask;
++                if mask.intersects(
++                    EventMask::Q_OVERFLOW
++                        | EventMask::MOVE_SELF
++                        | EventMask::DELETE_SELF
++                        | EventMask::UNMOUNT
++                        | EventMask::IGNORED,
++                ) {
++                    // Events may have been lost, or the watched directory has
++                    // disappeared. Reload once, then fail closed rather than
++                    // silently watching a stale directory forever.
++                    notify(&tx);
+                     break;
+                 }
+-                last_sent = Some(now);
+-            }
+-        }
+-    }
+-
+-    Ok(())
++
++                let is_target = event.name.as_deref() == Some(watch_name.as_os_str());
++                if is_target
++                    && mask.intersects(
++                        EventMask::MODIFY
++                            | EventMask::CLOSE_WRITE
++                            | EventMask::CREATE
++                            | EventMask::DELETE
++                            | EventMask::MOVED_FROM
++                            | EventMask::MOVED_TO
++                            | EventMask::ATTRIB,
++                    )
++                {
++                    debounce_deadline = Some(Instant::now() + DEBOUNCE);
++                }
++            }
++            _ = timer => {
++                debounce_deadline = None;
++                match tx.try_send(()) {
++                    Ok(()) | Err(mpsc::error::TrySendError::Full(())) => {
++                        // A queued notification already represents a reload of
++                        // the latest state. Capacity one coalesces bursts without
++                        // blocking event draining or allocating an unbounded queue.
++                    }
++                    Err(mpsc::error::TrySendError::Closed(())) => break,
++                }
++            }
++        }
++    }
++}
++
++fn notify(tx: &mpsc::Sender<()>) {
++    // On a full channel, its pending pulse will be received after the event
++    // batch was observed, and therefore still prompts a current-state reload.
++    let _ = tx.try_send(());
+ }
+ 
+ fn watch_target(path: &Path) -> anyhow::Result<(&Path, OsString)> {
+@@ -88,3 +168,156 @@
+     })?;
+     Ok((parent, name.to_os_string()))
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::fs;
++    use std::sync::atomic::{AtomicUsize, Ordering};
++    use tokio::time::{sleep, timeout};
++
++    static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
++
++    struct TempDir(PathBuf);
++
++    impl TempDir {
++        fn new() -> Self {
++            let id = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
++            let path =
++                std::env::temp_dir().join(format!("gpui-file-watcher-{}-{id}", std::process::id()));
++            fs::create_dir(&path).expect("create temporary watcher directory");
++            Self(path)
++        }
++
++        fn path(&self) -> &Path {
++            &self.0
++        }
++    }
++
++    impl Drop for TempDir {
++        fn drop(&mut self) {
++            let _ = fs::remove_dir_all(&self.0);
++        }
++    }
++
++    #[test]
++    fn registration_requires_a_runtime_and_reports_invalid_target() {
++        let error = FileWatcher::try_watch(PathBuf::from("/"))
++            .expect_err("no-runtime registration must fail rather than panic");
++        assert!(error.to_string().contains("active Tokio runtime"));
++    }
++
++    #[tokio::test]
++    async fn registration_errors_are_synchronous_for_bad_targets() {
++        assert!(FileWatcher::try_watch(PathBuf::from("/")).is_err());
++
++        let missing_parent = std::env::temp_dir()
++            .join(format!("gpui-file-watcher-missing-{}", std::process::id()))
++            .join("settings.toml");
++        let error = FileWatcher::try_watch(missing_parent)
++            .expect_err("missing parent must fail during registration");
++        assert!(error.to_string().contains("failed to watch directory"));
++    }
++
++    #[tokio::test]
++    async fn atomic_replacement_delivers_one_trailing_edge_for_final_valid_file() {
++        let dir = TempDir::new();
++        let path = dir.path().join("appearance.toml");
++        fs::write(&path, b"invalid = [\n").unwrap();
++        let mut rx = FileWatcher::try_watch(path.clone()).unwrap();
++
++        for partial in [b"invalid = [\n".as_slice(), b"invalid = {\n", b"[partial\n"] {
++            fs::write(&path, partial).unwrap();
++            sleep(Duration::from_millis(25)).await;
++        }
++        let replacement = dir.path().join("appearance.toml.tmp");
++        fs::write(&replacement, b"[profile]\nname = \"valid\"\n").unwrap();
++        let final_event_at = Instant::now();
++        fs::rename(&replacement, &path).unwrap();
++
++        assert_eq!(
++            timeout(Duration::from_secs(3), rx.recv()).await.unwrap(),
++            Some(())
++        );
++        assert_eq!(fs::read(&path).unwrap(), b"[profile]\nname = \"valid\"\n");
++        assert!(Instant::now().duration_since(final_event_at) >= Duration::from_millis(150));
++        assert!(
++            timeout(Duration::from_millis(300), rx.recv())
++                .await
++                .is_err()
++        );
++    }
++
++    #[tokio::test]
++    async fn unrelated_files_are_filtered() {
++        let dir = TempDir::new();
++        let path = dir.path().join("appearance.toml");
++        fs::write(&path, b"initial").unwrap();
++        let mut rx = FileWatcher::try_watch(path).unwrap();
++
++        fs::write(dir.path().join("unrelated.txt"), b"not the profile").unwrap();
++        assert!(
++            timeout(Duration::from_millis(300), rx.recv())
++                .await
++                .is_err()
++        );
++    }
++
++    #[tokio::test]
++    async fn parent_rename_notifies_then_closes_the_watcher() {
++        let base = TempDir::new();
++        let watched_dir = base.path().join("watched");
++        fs::create_dir(&watched_dir).unwrap();
++        let path = watched_dir.join("appearance.toml");
++        fs::write(&path, b"initial").unwrap();
++        let mut rx = FileWatcher::try_watch(path).unwrap();
++
++        fs::rename(&watched_dir, base.path().join("renamed")).unwrap();
++        assert_eq!(
++            timeout(Duration::from_secs(2), rx.recv()).await.unwrap(),
++            Some(())
++        );
++        assert_eq!(
++            timeout(Duration::from_secs(2), rx.recv()).await.unwrap(),
++            None
++        );
++    }
++
++    #[tokio::test]
++    async fn dropping_receiver_releases_inotify_descriptor() {
++        let dir = TempDir::new();
++        let path = dir.path().join("appearance.toml");
++        fs::write(&path, b"initial").unwrap();
++        let before = inotify_fd_count();
++        let rx = FileWatcher::try_watch(path).unwrap();
++        timeout(Duration::from_secs(2), async {
++            while inotify_fd_count() <= before {
++                sleep(Duration::from_millis(10)).await;
++            }
++        })
++        .await
++        .expect("registered inotify descriptor should be visible");
++
++        drop(rx);
++        timeout(Duration::from_secs(2), async {
++            while inotify_fd_count() > before {
++                sleep(Duration::from_millis(10)).await;
++            }
++        })
++        .await
++        .expect("dropping receiver should stop the task and close its descriptor");
++    }
++
++    fn inotify_fd_count() -> usize {
++        fs::read_dir("/proc/self/fd")
++            .into_iter()
++            .flatten()
++            .flatten()
++            .filter(|entry| {
++                fs::read_link(entry.path())
++                    .map(|target| target.to_string_lossy().contains("inotify"))
++                    .unwrap_or(false)
++            })
++            .count()
++    }
++}
+diff --git a/scripts/test_appearance_profile.py b/scripts/test_appearance_profile.py
+--- a/scripts/test_appearance_profile.py
++++ b/scripts/test_appearance_profile.py
+@@ -44,7 +44,7 @@
+         self.assertEqual(result.returncode, 0, result.stdout)
+         self.assertIn('CyberManju appearance v1:', result.stdout)
+         self.assertIn('retained, NOT applied:', result.stdout)
+-        self.assertIn('No live sync or Asterinas/GPU certification', result.stdout)
++        self.assertIn('no automatic app sync or Asterinas/GPU certification', result.stdout)
+         self.assertEqual(before, self.profile.read_bytes())
+         self.assertFalse((self.runtime / 'gpuishell.sock').exists())
+         self.assertEqual(list(self.config.rglob('*.toml')), [])
+@@ -144,6 +144,46 @@
+                 self.assertIn('Appearance profile rejected:', result.stdout)
+                 self.assertFalse((self.runtime / 'gpuishell.sock').exists())
+ 
++    def test_live_file_validation_is_explicit_and_starts_no_watcher_or_ui(self):
++        before = self.profile.read_bytes()
++        result = self.run_shell('--validate', '--watch-appearance-profile', '--appearance-profile', str(self.profile))
++        self.assertEqual(result.returncode, 0, result.stdout)
++        self.assertIn('validation only, no watcher or UI was started', result.stdout)
++        self.assertEqual(self.profile.read_bytes(), before)
++        self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++        self.assertEqual(list(self.config.rglob('*.toml')), [])
++
++    def test_live_file_mode_requires_a_profile_and_rejects_duplicate_opt_in(self):
++        for args in [
++            ['--validate', '--watch-appearance-profile'],
++            ['--validate', '--appearance-profile', str(self.profile), '--watch-appearance-profile', '--watch-appearance-profile'],
++        ]:
++            result = self.run_shell(*args)
++            self.assertNotEqual(result.returncode, 0, result.stdout)
++            self.assertIn('Error:', result.stdout)
++            self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++
++    def test_live_file_mode_still_requires_a_real_wayland_session(self):
++        result = self.run_shell('--appearance-profile', str(self.profile), '--watch-appearance-profile')
++        self.assertNotEqual(result.returncode, 0, result.stdout)
++        self.assertIn('requires WAYLAND_DISPLAY', result.stdout)
++        self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++
++    def test_secondary_live_import_refuses_without_sending_a_launcher_command(self):
++        path = self.runtime / 'gpuishell.sock'
++        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
++            server.bind(str(path))
++            server.listen(2)
++            server.settimeout(2)
++            result = self.run_shell('--appearance-profile', str(self.profile), '--watch-appearance-profile')
++            connection, _ = server.accept()
++            with connection:
++                connection.settimeout(2)
++                self.assertEqual(connection.recv(4096), b'')
++            self.assertNotEqual(result.returncode, 0, result.stdout)
++            self.assertIn('NOT applied', result.stdout)
++            self.assertTrue(path.exists())
++
+ 
+ if __name__ == '__main__':
+     unittest.main()
+diff --git a/docs/src/content/docs/developer/cybermanju-appearance.md b/docs/src/content/docs/developer/cybermanju-appearance.md
+--- a/docs/src/content/docs/developer/cybermanju-appearance.md
++++ b/docs/src/content/docs/developer/cybermanju-appearance.md
+@@ -7,7 +7,7 @@
+ 
+ The CyberManju app retains its existing personalization controls and stores. Its Settings appearance section can export a versioned **cosmetic snapshot**. GPUi Shell now reads that file with `--appearance-profile FILE`, validates it before IPC/display initialization, and projects its theme and accent into the real GPUI `Theme` global before opening the shell windows. No settings service, new preference database, compositor, GPU device, or browser transport is introduced.
+ 
+-This is a startup-only import. Supply the file again after restarting the shell. A running primary shell cannot receive profiles through the launcher IPC: the secondary invocation exits unsuccessfully and explicitly says the profile was **not applied**, without sending a launcher command. `--validate` remains available even when a shell is running, without Wayland or a renderer.
++By default this is a startup-only import. Add `--watch-appearance-profile` to follow subsequent saves to that explicitly supplied file. Supply the path again after restarting the shell. A running primary shell cannot receive new import paths through launcher IPC: a secondary invocation exits unsuccessfully and explicitly says the profile was **not applied**, without sending a launcher command. `--validate` remains available even when a shell is running, without Wayland or a renderer; it does not start a watcher.
+ 
+ ```sh
+ # Export from CyberManju Settings, then inspect without a display:
+@@ -15,6 +15,9 @@
+ 
+ # With no primary shell running, on an otherwise supported Wayland session:
+ gpuishell --appearance-profile /path/to/cybermanju-appearance-v1.json
++
++# Opt in to subsequent replacements/saves of that same file:
++gpuishell --appearance-profile /path/to/cybermanju-appearance-v1.json --watch-appearance-profile
+ ```
+ 
+ No Tauri/Vue process has been made native to Asterinas by this change. Linux-host parser/build tests are not proof that GPUI runs on Asterinas. The older `/workspace/cybermanju-shell` snapshot does not acquire these changes automatically.
+@@ -25,7 +28,13 @@
+ 
+ `settings` contains the existing resolved canonical theme, optional legacy shell preference, global accent, per-theme accents, density, glass level, motion, follow-system flag, preset wallpaper identifier and glow flag. Five themes are accepted: `os-dark`, `os-light`, `os-graphite`, `plasma-dark`, and `plasma-light`. Legacy aliases/auto are resolved by the app's existing settings normalization before export; `followSystem` is retained but GPUI does not watch Vue/browser system-preference events. Both `#RGB` and `#RRGGBB` accents are supported, with the existing global → per-theme → built-in precedence.
+ 
+-GPUI applies a semantic native Base16 palette and accent, **not an exact reproduction of Vue chrome**. Its existing font size is preserved; old native color overrides cannot defeat the explicitly imported colors. No `config.toml`, `state.toml`, `theme.toml`, localStorage or IndexedDB settings are rewritten by the importer. Later deliberate native theme/config changes follow the existing shell behavior; there is no live synchronization with the snapshot file or the CyberManju app.
++GPUI applies a semantic native Base16 palette and accent, **not an exact reproduction of Vue chrome**. Its existing font size is preserved; old native color overrides cannot defeat the explicitly imported colors. Native `theme.toml` reloads retain the cached imported colors while adopting the new native font size. No `config.toml`, `state.toml`, `theme.toml`, localStorage or IndexedDB settings are rewritten by the importer.
++
++## Live-file import is explicit, not an app transport
++
++With the watch flag, startup registers the file's parent watch before rereading the initial profile, covering saves during setup. Each later file event loads the bounded profile off the GPUI foreground, validates and projects the complete replacement before changing cached/global state, then requests real window redraws. Invalid JSON, missing files, disallowed terminal symlinks and projection errors retain the last good palette and show a dedicated sticky appearance-error card. A good update clears only that card, not unrelated config/theme errors. Watch registration errors refuse startup; a stopped watcher is surfaced rather than silently claiming live synchronization.
++
++The existing inotify watcher is reused with bounded pending notifications and trailing-edge coalescing so rapid/atomic saves do not lose the final replacement. Export or replace the same file to update it. The app still does not automatically write to that path or communicate with the shell: browser downloads, Tauri/native IPC, authenticated remote synchronization and an OS settings daemon are not provided. There is no automatic path discovery, profile write-back or preference-store migration.
+ 
+ Wallpaper, shell style, panel docking, density, glass, motion and glow are retained in the snapshot and explicitly reported as **not applied**. Live follow-system tracking is also unavailable. Geometry, theme-owned accent variants not currently selected, app keybindings/gestures/locale, and compositor workspace policy are not silently translated into invented native controls.
+ 
+@@ -45,8 +54,12 @@
+ 
+ `cargo test --workspace --locked --offline` exercises the native parser, shared app-export fixture, five real palette projections, accent precedence, preference retention, unknown-field/version/type/conflict rejection and wallpaper bounds. It also preserves the existing IPC and presentation parser/lifecycle tests.
+ 
++Additional tests use real files, symlinks, atomic replacements and inotify to feed actual native `Theme` values through accepted changes, rejected saves and recovery. Native font changes preserve imported colors, invalid projections cannot replace the cached profile, and appearance error recovery leaves native config/theme cards alone. These exercise the live-file data path, not rendered Wayland windows.
++
+ After building `gpuishell`, `python3 scripts/test_appearance_profile.py -v` runs the actual binary against isolated configuration/runtime directories and real Unix sockets. It verifies renderer-free validation, oversized/unsafe profile refusal, terminal-symlink rejection, no-writer FIFO refusal with a subprocess deadline, directory/socket rejection, no preference writes, secondary import refusal and unchanged ordinary launcher IPC. A negative baseline reproduces the old binary accepting a terminal symlink; the corrected binary rejects it. These are parser/CLI tests, not a compositor or GPU benchmark.
+ 
+ The shared fixture is `crates/app/src/config/appearance/fixtures/appearance-profile-v1.json`, copied byte-for-byte from the app repository's `tests/fixtures/appearance-profile-v1.json`; keep both synchronized when deliberately evolving the contract.
+ 
++A separate real-window smoke test started the built shell under isolated nested Niri/Xvfb with forced Mesa lavapipe. The bar visibly changed from `os-dark` to `os-light` after atomic file replacement, invalid JSON showed the actual appearance-error notification without killing the shell, and valid `os-dark` recovered. Unmodified captures and the finite reproducer are in `/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/`. This proves host software-rendered live color updates, **not** a native Asterinas desktop, GPU acceleration, complete CyberManju app integration or a performance benchmark.
++
+ Asterinas boot/userspace ABI → native per-GPU driver and Vulkan → Wayland compositor/presentation → GPUI runtime → Tauri/GTK/WebKit runtime and secure app/API boundary remain independently unproven gates. Full appearance propagation, media migration, restart/restore and physical-GPU performance must not be inferred from successful profile validation.
+diff --git a/crates/app/src/config/appearance_live.rs b/crates/app/src/config/appearance_live.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/app/src/config/appearance_live.rs
+@@ -0,0 +1,287 @@
++//! Explicit cosmetic-file overlay; no preference writes or implicit app-store access.
++//! Invalid updates retain the last good palette. File watching is opt-in, not an
++//! automatic browser/Tauri transport or proof of an Asterinas desktop session.
++
++use std::path::PathBuf;
++
++use anyhow::Result;
++use gpui::{App, Global};
++use services::LocalSlot;
++use tokio::sync::mpsc;
++use ui::Theme;
++
++use super::appearance::AppearanceProfile;
++use crate::state::AppState;
++
++/// Ephemeral, validated import; the original app remains the preference owner.
++pub struct AppearanceOverlay {
++    profile: AppearanceProfile,
++}
++
++impl Global for AppearanceOverlay {}
++
++impl AppearanceOverlay {
++    /// Prepare the complete replacement before mutating cached/global state.
++    fn replace_loaded(&mut self, loaded: Result<AppearanceProfile>, base: &Theme) -> Result<Theme> {
++        let profile = loaded?;
++        let projected = profile.project_theme(base)?;
++        self.profile = profile;
++        Ok(projected)
++    }
++
++    /// Imported colors take precedence, while native typography remains native.
++    fn project(&self, base: &Theme) -> Result<Theme> {
++        self.profile.project_theme(base)
++    }
++
++    pub fn install(profile: AppearanceProfile, cx: &mut App) -> Result<()> {
++        let theme = profile.project_theme(Theme::global(cx))?;
++        cx.set_global(Self { profile });
++        Theme::set(theme, cx);
++        Ok(())
++    }
++
++    /// Preserve the imported palette when theme.toml reloads; do not discard a
++    /// valid import merely because an unrelated native font setting changes.
++    pub fn over_native_theme(base: Theme, cx: &App) -> Result<Theme> {
++        match cx.try_global::<Self>() {
++            Some(overlay) => overlay.project(&base),
++            None => Ok(base),
++        }
++    }
++
++    /// The caller registers the watch before rereading the startup profile, so
++    /// a save between the initial validation and watch setup cannot be lost.
++    pub fn start_watch(path: PathBuf, mut rx: mpsc::Receiver<()>, cx: &mut App) {
++        cx.spawn(async move |cx| {
++            while rx.recv().await.is_some() {
++                let read_path = path.clone();
++                // At most one bounded load is in flight; regular filesystem I/O
++                // may still wait, but it does not run on the GPUI foreground.
++                let loaded = cx
++                    .background_executor()
++                    .spawn(async move { AppearanceProfile::load(&read_path) })
++                    .await;
++                cx.update(|cx| {
++                    let base = Theme::global(cx).clone();
++                    let result = cx.global_mut::<Self>().replace_loaded(loaded, &base);
++                    match result {
++                        Ok(theme) => {
++                            Theme::set(theme, cx);
++                            AppState::notification(cx).clear_local(LocalSlot::AppearanceError);
++                            cx.refresh_windows();
++                        }
++                        Err(error) => super::notify_parse_failure(
++                            LocalSlot::AppearanceError,
++                            &path.display().to_string(),
++                            &error,
++                            cx,
++                        ),
++                    }
++                });
++            }
++            // A lost watcher must be visible, not silently advertised as live.
++            let error = anyhow::anyhow!(
++                "appearance file watcher stopped; restart the shell to resume live-file import"
++            );
++            cx.update(|cx| {
++                super::notify_parse_failure(
++                    LocalSlot::AppearanceError,
++                    &path.display().to_string(),
++                    &error,
++                    cx,
++                )
++            });
++        })
++        .detach();
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use serde_json::{Value, json};
++    use std::{
++        fs,
++        path::Path,
++        time::{SystemTime, UNIX_EPOCH},
++    };
++
++    fn fixture() -> Value {
++        serde_json::from_slice(include_bytes!(
++            "appearance/fixtures/appearance-profile-v1.json"
++        ))
++        .unwrap()
++    }
++
++    fn parsed(value: Value) -> AppearanceProfile {
++        AppearanceProfile::parse(&serde_json::to_vec(&value).unwrap()).unwrap()
++    }
++
++    struct Directory(PathBuf);
++    impl Directory {
++        fn new() -> Self {
++            let nonce = SystemTime::now()
++                .duration_since(UNIX_EPOCH)
++                .unwrap()
++                .as_nanos();
++            let path = std::env::temp_dir()
++                .join(format!("gpui-live-profile-{}-{nonce}", std::process::id()));
++            fs::create_dir(&path).unwrap();
++            Self(path)
++        }
++        fn file(&self) -> PathBuf {
++            self.0.join("appearance.json")
++        }
++    }
++    impl Drop for Directory {
++        fn drop(&mut self) {
++            let _ = fs::remove_dir_all(&self.0);
++        }
++    }
++    fn write(path: &Path, value: &Value) {
++        fs::write(path, serde_json::to_vec(value).unwrap()).unwrap();
++    }
++
++    #[test]
++    fn real_file_invalid_delete_symlink_and_recovery_keep_last_good_tokens() {
++        let dir = Directory::new();
++        let path = dir.file();
++        write(&path, &fixture());
++        let mut overlay = AppearanceOverlay {
++            profile: AppearanceProfile::load(&path).unwrap(),
++        };
++        let base = Theme::default();
++        let initial = overlay.project(&base).unwrap();
++        fs::write(&path, b"{partial").unwrap();
++        assert!(
++            overlay
++                .replace_loaded(AppearanceProfile::load(&path), &base)
++                .is_err()
++        );
++        assert_eq!(
++            overlay.project(&base).unwrap().colors().accent,
++            initial.colors().accent
++        );
++        fs::remove_file(&path).unwrap();
++        assert!(
++            overlay
++                .replace_loaded(AppearanceProfile::load(&path), &base)
++                .is_err()
++        );
++        let target = dir.0.join("target.json");
++        write(&target, &fixture());
++        std::os::unix::fs::symlink(&target, &path).unwrap();
++        assert!(
++            overlay
++                .replace_loaded(AppearanceProfile::load(&path), &base)
++                .is_err()
++        );
++        assert_eq!(
++            overlay.project(&base).unwrap().palette.base00,
++            initial.palette.base00
++        );
++        fs::remove_file(&path).unwrap();
++        let mut changed = fixture();
++        changed["settings"]["accent"] = json!("#12ab34");
++        write(&target, &changed);
++        fs::rename(&target, &path).unwrap();
++        let recovered = overlay
++            .replace_loaded(AppearanceProfile::load(&path), &base)
++            .unwrap();
++        assert_ne!(recovered.colors().accent, initial.colors().accent);
++        assert_eq!(
++            overlay.project(&base).unwrap().colors().accent,
++            recovered.colors().accent
++        );
++    }
++
++    #[test]
++    fn native_theme_reload_preserves_imported_colors_but_updates_native_font() {
++        let overlay = AppearanceOverlay {
++            profile: parsed(fixture()),
++        };
++        let before = overlay.project(&Theme::default()).unwrap();
++        let native = Theme {
++            font_size: gpui::px(19.0),
++            ..Theme::default()
++        };
++        let after = overlay.project(&native).unwrap();
++        assert_eq!(after.colors().accent, before.colors().accent);
++        assert_eq!(after.palette.base00, before.palette.base00);
++        assert_eq!(after.font_size, gpui::px(19.0));
++    }
++
++    #[tokio::test]
++    async fn real_file_watch_feeds_theme_updates_and_keeps_bad_saves_out() {
++        let dir = Directory::new();
++        let path = dir.file();
++        write(&path, &fixture());
++        let mut overlay = AppearanceOverlay {
++            profile: AppearanceProfile::load(&path).unwrap(),
++        };
++        let mut rx = services::FileWatcher::try_watch(path.clone()).unwrap();
++        let base = Theme::default();
++        let initial = overlay.project(&base).unwrap();
++        let replacement = dir.0.join("replacement.json");
++        let mut changed = fixture();
++        changed["settings"]["accent"] = json!("#12ab34");
++        write(&replacement, &changed);
++        fs::rename(&replacement, &path).unwrap();
++        assert!(
++            tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv())
++                .await
++                .unwrap()
++                .is_some()
++        );
++        let accepted = overlay
++            .replace_loaded(AppearanceProfile::load(&path), &base)
++            .unwrap();
++        assert_ne!(accepted.colors().accent, initial.colors().accent);
++        fs::write(&path, b"{incomplete").unwrap();
++        assert!(
++            tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv())
++                .await
++                .unwrap()
++                .is_some()
++        );
++        assert!(
++            overlay
++                .replace_loaded(AppearanceProfile::load(&path), &base)
++                .is_err()
++        );
++        assert_eq!(
++            overlay.project(&base).unwrap().colors().accent,
++            accepted.colors().accent
++        );
++        changed["settings"]["accent"] = json!("#ef0012");
++        write(&replacement, &changed);
++        fs::rename(&replacement, &path).unwrap();
++        assert!(
++            tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv())
++                .await
++                .unwrap()
++                .is_some()
++        );
++        let recovered = overlay
++            .replace_loaded(AppearanceProfile::load(&path), &base)
++            .unwrap();
++        assert_ne!(recovered.colors().accent, accepted.colors().accent);
++    }
++
++    #[test]
++    fn failed_projection_cannot_replace_a_previously_valid_profile() {
++        let mut overlay = AppearanceOverlay {
++            profile: parsed(fixture()),
++        };
++        let base = Theme::default();
++        let previous = overlay.project(&base).unwrap();
++        let mut invalid = parsed(fixture());
++        invalid.settings.accent = Some("not-a-color".into());
++        assert!(overlay.replace_loaded(Ok(invalid), &base).is_err());
++        assert_eq!(
++            overlay.project(&base).unwrap().colors().accent,
++            previous.colors().accent
++        );
++    }
++}

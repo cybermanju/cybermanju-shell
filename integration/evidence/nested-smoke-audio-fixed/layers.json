@@ -1,0 +1,8 @@
+[
+  {
+    "namespace": "bar",
+    "output": "winit",
+    "layer": "Background",
+    "keyboard_interactivity": "None"
+  }
+]

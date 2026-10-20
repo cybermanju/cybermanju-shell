@@ -1,0 +1,27 @@
+Diff in /workspace/asterinas-gpui/asterinas/kernel/core/comps/pci/src/multifunction_tests.rs:1:
+ // SPDX-License-Identifier: MPL-2.0
+ //! Real QEMU multifunction PCIe/NVMe tests. This is not NVIDIA/GPU validation.
+[31m-use core::sync::atomic::{fence, Ordering};
+(B[m[32m+use core::sync::atomic::{Ordering, fence};
+(B[m 
+ #[cfg(target_arch = "x86_64")]
+ use ostd::mm::dma::IsolatedDmaContext;
+Diff in /workspace/asterinas-gpui/asterinas/kernel/core/comps/pci/src/multifunction_tests.rs:7:
+ use ostd::{
+     mm::{
+[32m+        HasDaddr, PAGE_SIZE, VmIo, VmIoOnce,
+(B[m         dma::{DeviceDmaError, DmaMask},
+[31m-        HasDaddr, VmIo, VmIoOnce, PAGE_SIZE,
+(B[m     },
+     prelude::ktest,
+ };
+Diff in /workspace/asterinas-gpui/asterinas/kernel/core/comps/pci/src/multifunction_tests.rs:14:
+ 
+ use crate::{
+[32m+    PCI_BUS, PciDeviceLocation,
+(B[m     cfg_space::{Bar, Command},
+     pcie_tests::init_pci_for_tests,
+[31m-    PciDeviceLocation, PCI_BUS,
+(B[m };
+ 
+ const NVME_VENDOR: u16 = 0x1b36;

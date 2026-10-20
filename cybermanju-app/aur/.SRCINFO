@@ -1,0 +1,22 @@
+pkgbase = cybermanju-os
+	pkgdesc = Encrypted file sync and management with post-quantum cryptography
+	pkgver = 0.1.1
+	pkgrel = 1
+	url = https://github.com/cybermanju/cybermanju.github.io
+	arch = x86_64
+	license = MIT
+	makedepends = cargo
+	makedepends = nodejs
+	makedepends = npm
+	makedepends = pkg-config
+	makedepends = base-devel
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	depends = libayatana-appindicator
+	depends = librsvg
+	depends = libsoup3
+	depends = openssl
+	source = cybermanju-os::git+https://github.com/cybermanju/cybermanju.github.io.git#tag=v0.1.1
+	sha256sums = SKIP
+
+pkgname = cybermanju-os

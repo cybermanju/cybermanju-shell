@@ -1,0 +1,16 @@
+# cybsh: 1
+# lib.cybsh — shared `def`s for `import "/scripts/lib.cybsh" [as ns]`.
+# Only `def`s travel; caps and frontmatter stay with the importing file.
+# Run it directly too (`run /scripts/lib.cybsh`) — it just defines.
+# See also: tour.cybsh (imports this file), functions.cybsh.
+
+def greet(name):
+  return "hi " + name + "!"
+
+def shout(s):
+  return s + "!"
+
+def first(items, fallback):
+  if len(items) == 0:
+    return fallback
+  return items[0]

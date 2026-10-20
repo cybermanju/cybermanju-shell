@@ -1,0 +1,21 @@
+{
+  "suites_reported_passed": {
+    "native-nvidia-nvport-tests.log": 20,
+    "native-nvidia-platform-tests.log": 13,
+    "native-ostd-tests.log": 256,
+    "native-pci-iommu-tests.log": 13,
+    "native-pci-tests.log": 13
+  },
+  "reported_passed": 315,
+  "failed": 0,
+  "explicit_skips": [
+    "test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] ok",
+    "test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] ok",
+    " [skipped: VMX/EPT invalidation unavailable] ok"
+  ],
+  "negative_test_summary": "12 passed, 1 failed with old activation predicate",
+  "negative_outer_cargo_exit": "not reliably captured; do not claim a measured process exit",
+  "real_qemu_nvme_error_and_retry_path": true,
+  "nvidia_hardware_exercised": false,
+  "physical_gpu_acceptance": false
+}

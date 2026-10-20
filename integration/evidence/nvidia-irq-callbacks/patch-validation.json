@@ -1,0 +1,22 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-irq-callbacks.patch",
+  "patch_sha256": "3cb3000c5ef15318cca8417882ff1bac3a2eb6f727db9413a622b0029493c035",
+  "files": [
+    {
+      "path": "ostd/src/irq/top_half.rs",
+      "old_sha256": "0482b21c0c8ebe53ecc1aa2f5fafe02b3d307c8119e05c056ee9444a9dc1dcd1",
+      "new_sha256": "6e485e3f832b0a69d8faccc7556713f9c2d09a0c20dc64f6debb2dcb97c24046",
+      "new_file": false
+    }
+  ],
+  "prerequisite": "All twelve Asterinas patches through asterinas-nvidia-multifunction.patch",
+  "exact_incremental_round_trip": true,
+  "index_unchanged": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "hardware_gpu_test": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false
+}

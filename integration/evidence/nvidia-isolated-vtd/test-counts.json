@@ -1,0 +1,40 @@
+{
+  "native-nvidia-nvport-tests.log": {
+    "reported_passed_counts": [
+      20
+    ],
+    "final_runner_marker": true
+  },
+  "native-nvidia-platform-tests.log": {
+    "reported_passed_counts": [
+      4
+    ],
+    "final_runner_marker": true
+  },
+  "native-ostd-tests.log": {
+    "reported_passed_counts": [
+      244
+    ],
+    "final_runner_marker": true
+  },
+  "native-pci-iommu-tests.log": {
+    "reported_passed_counts": [
+      5
+    ],
+    "final_runner_marker": true
+  },
+  "native-pci-tests.log": {
+    "reported_passed_counts": [
+      5
+    ],
+    "final_runner_marker": true
+  },
+  "device_execution": {
+    "real_edu_round_trips": 8,
+    "bytes_per_round_trip": 4096,
+    "simultaneous_requesters": 2,
+    "same_iova_different_domain_verified": true,
+    "actual_revoked_iova_write_faults": 8,
+    "nvidia_gpu": false
+  }
+}

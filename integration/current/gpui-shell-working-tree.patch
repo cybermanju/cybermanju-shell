@@ -1,0 +1,1530 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index eb90ff0..00b2b86 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2522,14 +2522,19 @@ dependencies = [
+  "gpui_platform",
+  "hyprland",
+  "image",
++ "libc",
+  "serde",
++ "serde_json",
+  "services",
+  "tokio",
+  "toml 1.1.3+spec-1.1.0",
+  "tracing",
+  "tracing-subscriber",
+  "ui",
++ "url",
+  "uuid",
++ "wayland-client",
++ "wayland-protocols",
+  "zbus",
+ ]
+ 
+diff --git a/crates/app/Cargo.toml b/crates/app/Cargo.toml
+index d8240ce..c3ee7e9 100644
+--- a/crates/app/Cargo.toml
++++ b/crates/app/Cargo.toml
+@@ -24,6 +24,14 @@ chrono.workspace = true
+ hyprland.workspace = true
+ tokio.workspace = true
+ serde = { version = "1.0", features = ["derive"] }
++serde_json.workspace = true
+ toml = "1.1"
+ image.workspace = true
+ uuid.workspace = true
++url = "=2.5.8"
++libc = "=0.2.187"
++
++[dev-dependencies]
++# Compile parser fixtures against the real protocol API; no runtime connection.
++wayland-client = "=0.31.14"
++wayland-protocols = { version = "=0.32.13", features = ["client"] }
+diff --git a/crates/app/src/args.rs b/crates/app/src/args.rs
+index c9f976a..3a531e1 100644
+--- a/crates/app/src/args.rs
++++ b/crates/app/src/args.rs
+@@ -1,36 +1,125 @@
+ //! Command-line argument parsing for GPUi Shell.
+ 
++use std::path::PathBuf;
++
+ /// Command-line arguments.
++#[derive(Debug, Default)]
+ pub struct Args {
+     /// Optional input to prefill in the launcher.
+     pub input: Option<String>,
+     /// Parse the config files, report, and exit without starting the shell.
+     pub validate: bool,
++    /// Explicit CyberManju cosmetic snapshot; never an auto-discovered secret store.
++    pub appearance_profile: Option<PathBuf>,
++    /// Watch only the explicitly supplied cosmetic file; never discover app stores.
++    pub watch_appearance_profile: bool,
+ }
+ 
+ impl Args {
+     /// Parse command-line arguments from `std::env::args()`.
+     pub fn parse() -> Self {
+-        let args: Vec<String> = std::env::args().collect();
+-        let mut input = None;
+-        let mut validate = false;
+-
+-        let mut i = 1;
+-        while i < args.len() {
+-            if args[i] == "--input" || args[i] == "-i" {
+-                if i + 1 < args.len() {
+-                    input = Some(args[i + 1].clone());
+-                    i += 2;
+-                } else {
+-                    eprintln!("Error: --input requires a value");
+-                    std::process::exit(1);
++        Self::parse_from(std::env::args().skip(1)).unwrap_or_else(|error| {
++            eprintln!("Error: {error}");
++            std::process::exit(1)
++        })
++    }
++
++    fn parse_from(args: impl IntoIterator<Item = String>) -> Result<Self, &'static str> {
++        let mut parsed = Self::default();
++        let mut args = args.into_iter();
++        while let Some(arg) = args.next() {
++            match arg.as_str() {
++                "--input" | "-i" => {
++                    parsed.input = Some(args.next().ok_or("--input requires a value")?);
++                }
++                "--validate" => parsed.validate = true,
++                "--watch-appearance-profile" => {
++                    if parsed.watch_appearance_profile {
++                        return Err("--watch-appearance-profile may only be supplied once");
++                    }
++                    parsed.watch_appearance_profile = true;
+                 }
+-            } else {
+-                validate |= args[i] == "--validate";
+-                i += 1;
++                "--appearance-profile" => {
++                    if parsed.appearance_profile.is_some() {
++                        return Err("--appearance-profile may only be supplied once");
++                    }
++                    let path = args.next().ok_or("--appearance-profile requires a path")?;
++                    if path.is_empty() || path.starts_with("--") {
++                        return Err("--appearance-profile requires a path");
++                    }
++                    parsed.appearance_profile = Some(path.into());
++                }
++                // Preserve the existing handling of unrelated/legacy options.
++                _ => {}
+             }
+         }
++        if parsed.watch_appearance_profile && parsed.appearance_profile.is_none() {
++            return Err("--watch-appearance-profile requires --appearance-profile FILE");
++        }
++        Ok(parsed)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn parse(args: &[&str]) -> Result<Args, &'static str> {
++        Args::parse_from(args.iter().map(|s| s.to_string()))
++    }
++
++    #[test]
++    fn explicit_profile_and_validation_do_not_steal_launcher_input() {
++        let args = parse(&[
++            "--validate",
++            "--appearance-profile",
++            "/tmp/my profile.json",
++            "-i",
++            "hello",
++        ])
++        .unwrap();
++        assert!(args.validate);
++        assert_eq!(args.input.as_deref(), Some("hello"));
++        assert_eq!(
++            args.appearance_profile,
++            Some(PathBuf::from("/tmp/my profile.json"))
++        );
++        assert!(parse(&[]).unwrap().appearance_profile.is_none());
++    }
++
++    #[test]
++    fn missing_and_ambiguous_profile_paths_fail_closed() {
++        for args in [
++            vec!["--appearance-profile"],
++            vec!["--appearance-profile", ""],
++            vec!["--appearance-profile", "--validate"],
++            vec!["--appearance-profile", "a", "--appearance-profile", "b"],
++        ] {
++            assert!(parse(&args).is_err());
++        }
++        assert!(parse(&["--input"]).is_err());
++    }
+ 
+-        Args { input, validate }
++    #[test]
++    fn live_import_requires_an_explicit_file_and_does_not_change_default_mode() {
++        assert!(parse(&["--watch-appearance-profile"]).is_err());
++        assert!(parse(&["--appearance-profile", "a"]).is_ok_and(|a| !a.watch_appearance_profile));
++        let args = parse(&[
++            "--watch-appearance-profile",
++            "--appearance-profile",
++            "a",
++            "--validate",
++        ])
++        .unwrap();
++        assert!(args.watch_appearance_profile && args.validate);
++        assert!(
++            parse(&[
++                "--watch-appearance-profile",
++                "--appearance-profile",
++                "a",
++                "--watch-appearance-profile"
++            ])
++            .is_err()
++        );
+     }
+ }
+diff --git a/crates/app/src/bar/view.rs b/crates/app/src/bar/view.rs
+index 0a84e3f..b8624ad 100644
+--- a/crates/app/src/bar/view.rs
++++ b/crates/app/src/bar/view.rs
+@@ -19,6 +19,7 @@ struct Bar {
+     start_widgets: Vec<Widget>,
+     center_widgets: Vec<Widget>,
+     end_widgets: Vec<Widget>,
++    frame_telemetry: Option<crate::frame_telemetry::FrameTelemetry>,
+ }
+ 
+ impl Bar {
+@@ -31,12 +32,17 @@ impl Bar {
+             start_widgets: Widget::create_many(&config.start, cx),
+             center_widgets: Widget::create_many(&config.center, cx),
+             end_widgets: Widget::create_many(&config.end, cx),
++            frame_telemetry: crate::frame_telemetry::FrameTelemetry::from_env(),
+         }
+     }
+ }
+ 
+ impl Render for Bar {
+     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
++        let entry = self
++            .frame_telemetry
++            .as_ref()
++            .map(|_| std::time::Instant::now());
+         window.set_rem_size(cx.theme().font_size);
+         let bar = &cx.config().bar;
+ 
+@@ -44,12 +50,16 @@ impl Render for Bar {
+         let center: Vec<AnyElement> = self.center_widgets.iter().map(|w| w.render()).collect();
+         let end: Vec<AnyElement> = self.end_widgets.iter().map(|w| w.render()).collect();
+ 
+-        BarSurface::new(self.position.edge())
++        let surface = BarSurface::new(self.position.edge())
+             .border(bar.show_border)
+             .padding(px(bar.padding))
+             .start(start)
+             .center(center)
+-            .end(end)
++            .end(end);
++        if let (Some(telemetry), Some(entry)) = (&mut self.frame_telemetry, entry) {
++            telemetry.record(entry, window);
++        }
++        surface
+     }
+ }
+ 
+@@ -145,6 +155,7 @@ pub fn init(cx: &mut App) {
+ pub fn open_with_config(display_id: Option<DisplayId>, cx: &mut App) -> bool {
+     match cx.open_window(window_options(display_id, cx), move |window, cx| {
+         crate::state::record_window_display(window.window_handle(), display_id);
++        crate::frame_telemetry::report_renderer(window);
+         cx.new(Bar::new)
+     }) {
+         Ok(_) => true,
+diff --git a/crates/app/src/config/mod.rs b/crates/app/src/config/mod.rs
+index 5b02ab7..7ddae87 100644
+--- a/crates/app/src/config/mod.rs
++++ b/crates/app/src/config/mod.rs
+@@ -1,5 +1,7 @@
+ //! Application configuration stored as a GPUI global.
+ 
++pub mod appearance;
++pub mod appearance_live;
+ mod persistence;
+ mod state;
+ mod theme;
+@@ -116,7 +118,9 @@ impl Config {
+ 
+     /// Reload theme from disk and replace the global theme.
+     fn reload_theme(cx: &mut App) {
+-        match theme::persistence::load_theme() {
++        match theme::persistence::load_theme()
++            .and_then(|theme| appearance_live::AppearanceOverlay::over_native_theme(theme, cx))
++        {
+             Ok(theme) => {
+                 Theme::set(theme, cx);
+                 AppState::notification(cx).clear_local(LocalSlot::ThemeError);
+diff --git a/crates/app/src/ipc/service.rs b/crates/app/src/ipc/service.rs
+index becc7ea..4efbe07 100644
+--- a/crates/app/src/ipc/service.rs
++++ b/crates/app/src/ipc/service.rs
+@@ -46,6 +46,10 @@ impl IpcSubscriber {
+         match Self::acquire(args) {
+             AcquireResult::Primary(subscriber) => Some(subscriber),
+             AcquireResult::Secondary => None,
++            AcquireResult::Error(err) if args.appearance_profile.is_some() => {
++                error!("Appearance startup refused: {err}");
++                None
++            }
+             AcquireResult::Error(err) => {
+                 error!("IPC service error: {}", err);
+                 warn!("Retrying IPC acquire without initial input");
+@@ -53,6 +57,8 @@ impl IpcSubscriber {
+                 let retry_args = Args {
+                     input: None,
+                     validate: false,
++                    appearance_profile: None,
++                    watch_appearance_profile: false,
+                 };
+                 match Self::acquire(&retry_args) {
+                     AcquireResult::Primary(subscriber) => Some(subscriber),
+@@ -84,6 +90,11 @@ impl IpcSubscriber {
+ 
+         // Try to connect to existing instance (fast, synchronous path)
+         if let Ok(mut stream) = UnixStream::connect(&path) {
++            if args.appearance_profile.is_some() {
++                return AcquireResult::Error(
++                    "a shell is already running; appearance profiles are startup-only and were not sent over IPC".into(),
++                );
++            }
+             // Set a short timeout for the write
+             let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
+ 
+diff --git a/crates/app/src/main.rs b/crates/app/src/main.rs
+index a0f6e50..46d03ab 100644
+--- a/crates/app/src/main.rs
++++ b/crates/app/src/main.rs
+@@ -1,12 +1,8 @@
+ //! GPUi Shell - A Wayland status bar built with GPUI.
+ //!
+-//! Supports single-instance mode: if the app is already running,
+-//! subsequent invocations will signal the existing instance to open the launcher.
+-//!
+-//! Usage:
+-//!   gpuishell              - Start the shell or open launcher if already running
+-//!   gpuishell --input "x"  - Open launcher with prefilled input
+-//!   gpuishell --validate   - Check the config files and exit
++//! Subsequent ordinary invocations open the existing launcher's input. Cosmetic
++//! imports require the primary instance; --watch-appearance-profile additionally
++//! follows an explicitly supplied file, never browser storage or credentials.
+ 
+ use crate::ipc::IpcSubscriber;
+ use assets::Assets;
+@@ -18,13 +14,18 @@ mod bar;
+ pub mod config;
+ pub mod control_center;
+ pub mod dock;
++mod frame_metrics;
++mod frame_telemetry;
+ pub mod icons;
+ mod ipc;
+-mod keybinds;
++pub mod keybinds;
+ pub mod launcher;
+ pub mod notification;
+ pub mod osd;
+ mod panel;
++// Parser/lifecycle prototype only; not a live protocol subscription.
++#[cfg(test)]
++mod presentation_contract;
+ pub mod state;
+ 
+ #[tokio::main]
+@@ -32,50 +33,127 @@ async fn main() {
+     #[cfg(not(target_os = "linux"))]
+     compile_error!("This application requires a Linux system with Wayland.");
+ 
+-    // Initialize tracing with RUST_LOG env var support
+     tracing_subscriber::fmt()
+         .with_env_filter(EnvFilter::from_default_env())
+         .init();
+-
+-    // Parse command-line arguments
+     let args = args::Args::parse();
++    let appearance_path = match args
++        .appearance_profile
++        .as_deref()
++        .map(std::path::absolute)
++        .transpose()
++    {
++        Ok(path) => path,
++        Err(error) => {
++            eprintln!("Cannot resolve explicit appearance path: {error:#}");
++            std::process::exit(1);
++        }
++    };
++    let mut appearance = match appearance_path
++        .as_deref()
++        .map(config::appearance::AppearanceProfile::load)
++        .transpose()
++    {
++        Ok(profile) => profile,
++        Err(error) => {
++            eprintln!("Appearance profile rejected: {error:#}");
++            std::process::exit(1);
++        }
++    };
++    if let Some(profile) = &appearance
++        && let Err(error) = profile.project_theme(&ui::Theme::default())
++    {
++        eprintln!("Appearance token projection failed: {error:#}");
++        std::process::exit(1);
++    }
+ 
+-    // Before the single-instance check: a running shell must not swallow this.
++    // Renderer-free, no watcher, writes or secondary-instance commands.
+     if args.validate {
++        if let Some(profile) = &appearance {
++            println!("{}", profile.report());
++        }
++        if args.watch_appearance_profile {
++            println!("Live-file watch requested; validation only, no watcher or UI was started.");
++        }
+         std::process::exit(if config::validate() { 0 } else { 1 });
+     }
+ 
+-    // Try to acquire single-instance lock or signal existing instance.
+-    // Secondary path exits immediately after signaling the primary instance.
+     let Some(ipc) = IpcSubscriber::init(&args) else {
++        if appearance.is_some() {
++            eprintln!(
++                "Appearance profile was NOT applied; import requires an available primary shell instance."
++            );
++            std::process::exit(1);
++        }
+         return;
+     };
++    if std::env::var_os("WAYLAND_DISPLAY").is_none_or(|display| display.is_empty()) {
++        eprintln!(
++            "GPUi Shell requires WAYLAND_DISPLAY from a running Wayland session (Hyprland, Niri or Mango)."
++        );
++        drop(ipc);
++        std::process::exit(1);
++    }
+ 
+-    // Initialize services (requires async)
+-    let services = state::init_services()
+-        .await
+-        .expect("Failed to initialize services");
++    // Register before rereading: saves between initial validation and watch setup
++    // are covered by the reread, and later changes remain queued for the UI task.
++    let appearance_watch = if args.watch_appearance_profile {
++        let path = appearance_path.expect("argument parser requires an explicit profile");
++        let rx = match services::FileWatcher::try_watch(path.clone()) {
++            Ok(rx) => rx,
++            Err(error) => {
++                eprintln!("Cannot watch appearance profile: {error:#}");
++                drop(ipc);
++                std::process::exit(1);
++            }
++        };
++        appearance = match config::appearance::AppearanceProfile::load(&path) {
++            Ok(profile) => Some(profile),
++            Err(error) => {
++                eprintln!(
++                    "Appearance profile changed during watch setup and was rejected: {error:#}"
++                );
++                drop(ipc);
++                std::process::exit(1);
++            }
++        };
++        Some((path, rx))
++    } else {
++        None
++    };
+ 
+-    // Create and run the GPUI application
++    let services = match state::init_services().await {
++        Ok(services) => services,
++        Err(error) => {
++            tracing::error!("Failed to initialize compositor services: {error:#}");
++            eprintln!("GPUi Shell could not connect to a supported compositor: {error:#}");
++            drop(ipc);
++            std::process::exit(1);
++        }
++    };
+     let app = application().with_assets(Assets {});
+     app.run(move |cx| {
+         config::Config::init(cx);
+-        // Registers the TextField / Menu keybindings the component set needs.
++        if let Some(profile) = appearance {
++            tracing::info!("{}", profile.report());
++            if let Err(error) = config::appearance_live::AppearanceOverlay::install(profile, cx) {
++                tracing::error!("Appearance token projection failed: {error:#}");
++                cx.quit();
++                return;
++            }
++        }
+         ui::init(cx);
+         state::AppState::init(services, cx);
+-
+-        // Register keybindings
+         keybinds::register(cx);
+-
+         bar::init(cx);
+         dock::init(cx);
+         notification::init(cx);
+         osd::init(cx);
+         launcher::init(cx);
+-
+-        // Now that the notification service is up, say what didn't parse.
+         config::report_load_errors(cx);
+-
++        if let Some((path, rx)) = appearance_watch {
++            config::appearance_live::AppearanceOverlay::start_watch(path, rx, cx);
++        }
+         ipc.start(cx);
+     });
+ }
+diff --git a/crates/services/src/audio/mod.rs b/crates/services/src/audio/mod.rs
+index ccee0d5..c1ea801 100644
+--- a/crates/services/src/audio/mod.rs
++++ b/crates/services/src/audio/mod.rs
+@@ -195,18 +195,32 @@ fn volume_to_percent(volume: Volume) -> u8 {
+ /// connection until the next audio event. Its writes are gated on the token,
+ /// so it stays silent in the meantime.
+ fn start_listener(data: Mutable<AudioData>, token: RunToken) {
+-    thread::spawn(move || {
+-        let mut proplist = Proplist::new().expect("Failed to create PulseAudio proplist");
+-        let _ = proplist.set_str(APPLICATION_NAME, "gpuishell");
++    start_listener_with_server(data, token, None);
++}
+ 
+-        let mut mainloop = Mainloop::new().expect("Failed to create PulseAudio mainloop");
++/// Start a listener using an optional explicit server. The explicit server is
++/// also used by tests so they do not depend on the process-wide PulseAudio
++/// environment or a running audio daemon.
++fn start_listener_with_server(data: Mutable<AudioData>, token: RunToken, server: Option<String>) {
++    thread::spawn(move || {
++        if !token.alive() {
++            return;
++        }
+ 
+-        let mut context = Context::new_with_proplist(&mainloop, "gpuishell", &proplist)
+-            .expect("Failed to create PulseAudio context");
++        let (mut mainloop, mut context) = match initialize_connection(server.as_deref()) {
++            Ok(connection) => connection,
++            Err(message) => {
++                error!("{message}");
++                token.error(message);
++                return;
++            }
++        };
+ 
+-        context
+-            .connect(None, FlagSet::NOFLAGS, None)
+-            .expect("Failed to connect to PulseAudio");
++        // A stop/restart may have happened while the connection was being
++        // initialized. Do not let this run proceed to readiness or writes.
++        if !token.alive() {
++            return;
++        }
+ 
+         // Wait for context to be ready
+         while token.alive() {
+@@ -228,6 +242,10 @@ fn start_listener(data: Mutable<AudioData>, token: RunToken) {
+             }
+         }
+ 
++        if !token.alive() {
++            return;
++        }
++
+         debug!("PulseAudio connection established");
+         token.active();
+ 
+@@ -290,11 +308,14 @@ fn start_listener(data: Mutable<AudioData>, token: RunToken) {
+         };
+ 
+         // Fetch initial audio data
++        if !token.alive() {
++            return;
++        }
+         query_sink();
+         query_source();
+ 
+         // Process initial queries with non-blocking iterations
+-        while pending_queries.get() > 0 {
++        while token.alive() && pending_queries.get() > 0 {
+             match mainloop.iterate(false) {
+                 IterateResult::Quit(_) | IterateResult::Err(_) => {
+                     error!("PulseAudio mainloop error during initial query, stopping listener");
+@@ -305,6 +326,10 @@ fn start_listener(data: Mutable<AudioData>, token: RunToken) {
+             }
+         }
+ 
++        if !token.alive() {
++            return;
++        }
++
+         // Update shared state with initial data
+         {
+             let current = local_data.borrow().clone();
+@@ -380,3 +405,56 @@ fn start_listener(data: Mutable<AudioData>, token: RunToken) {
+         }
+     });
+ }
++
++/// Construct and connect a PulseAudio context, returning startup failures to
++/// the listener so they can be reflected in the service lifecycle.
++fn initialize_connection(server: Option<&str>) -> Result<(Mainloop, Context), String> {
++    let mut proplist =
++        Proplist::new().ok_or_else(|| "Failed to create PulseAudio proplist".to_owned())?;
++    proplist
++        .set_str(APPLICATION_NAME, "gpuishell")
++        .map_err(|_| "Failed to set PulseAudio application name".to_owned())?;
++
++    let mainloop =
++        Mainloop::new().ok_or_else(|| "Failed to create PulseAudio mainloop".to_owned())?;
++    let mut context = Context::new_with_proplist(&mainloop, "gpuishell", &proplist)
++        .ok_or_else(|| "Failed to create PulseAudio context".to_owned())?;
++    context
++        .connect(server, FlagSet::NOFLAGS, None)
++        .map_err(|error| format!("Failed to connect to PulseAudio: {error:?}"))?;
++
++    Ok((mainloop, context))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::{ServiceStatus, lifecycle::ServiceMode};
++
++    #[test]
++    fn missing_pulse_socket_sets_lifecycle_error_without_panicking() {
++        let lifecycle = Lifecycle::new(ServiceMode::Eager);
++        let token = lifecycle.begin();
++        let socket = format!(
++            "unix:/tmp/gpuishell-pulse-missing-{}-{}.sock",
++            std::process::id(),
++            thread::current().name().unwrap_or("test")
++        );
++
++        start_listener_with_server(Mutable::new(AudioData::default()), token, Some(socket));
++
++        // The listener reports connection startup failures asynchronously.
++        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
++        loop {
++            if matches!(lifecycle.status(), ServiceStatus::Error(_)) {
++                break;
++            }
++            assert!(
++                std::time::Instant::now() < deadline,
++                "listener did not report the missing PulseAudio socket"
++            );
++            thread::sleep(std::time::Duration::from_millis(10));
++        }
++        assert!(matches!(lifecycle.status(), ServiceStatus::Error(_)));
++    }
++}
+diff --git a/crates/services/src/notification/mod.rs b/crates/services/src/notification/mod.rs
+index 20cd42c..be1b205 100644
+--- a/crates/services/src/notification/mod.rs
++++ b/crates/services/src/notification/mod.rs
+@@ -72,6 +72,7 @@ impl NotificationData {
+ pub enum LocalSlot {
+     ConfigError,
+     ThemeError,
++    AppearanceError,
+ }
+ 
+ impl LocalSlot {
+@@ -719,6 +720,29 @@ mod tests {
+         assert_eq!(surviving, vec![LocalSlot::ThemeError.id(), 7]);
+     }
+ 
++    #[test]
++    fn appearance_error_has_an_independent_sticky_slot() {
++        let notifications = NotificationSubscriber::new();
++        notifications.post_local(LocalSlot::ConfigError, "config".into(), "bad config".into());
++        notifications.post_local(LocalSlot::ThemeError, "theme".into(), "bad theme".into());
++        notifications.post_local(
++            LocalSlot::AppearanceError,
++            "profile".into(),
++            "bad profile".into(),
++        );
++        assert_eq!(notifications.get().notifications.len(), 3);
++        notifications.clear_local(LocalSlot::AppearanceError);
++        let ids: Vec<_> = notifications
++            .get()
++            .notifications
++            .iter()
++            .map(|n| n.id)
++            .collect();
++        assert_eq!(ids.len(), 2);
++        assert!(ids.contains(&LocalSlot::ConfigError.id()));
++        assert!(ids.contains(&LocalSlot::ThemeError.id()));
++    }
++
+     #[test]
+     fn plain_path_unchanged() {
+         assert_eq!(
+diff --git a/crates/services/src/watcher.rs b/crates/services/src/watcher.rs
+index abf6d3d..ab8fe6a 100644
+--- a/crates/services/src/watcher.rs
++++ b/crates/services/src/watcher.rs
+@@ -1,79 +1,159 @@
+ //! File watcher service using inotify.
+-
+ use std::ffi::OsString;
+ use std::path::{Path, PathBuf};
+-use std::thread;
+-use std::time::{Duration, Instant};
++use std::time::Duration;
+ 
++use anyhow::Context as _;
++use futures_util::StreamExt as _;
+ use inotify::{EventMask, Inotify, WatchMask};
+ use tokio::sync::mpsc;
++use tokio::time::Instant;
+ 
+-const DEBOUNCE_MS: u64 = 200;
++const DEBOUNCE: Duration = Duration::from_millis(200);
++const NOTIFICATION_CAPACITY: usize = 1;
++const EVENT_BUFFER_SIZE: usize = 4096;
+ 
+ pub struct FileWatcher;
+ 
+ impl FileWatcher {
+-    pub fn watch(path: PathBuf) -> mpsc::UnboundedReceiver<()> {
+-        let (tx, rx) = mpsc::unbounded_channel();
+-        thread::spawn(move || {
+-            if let Err(err) = watch_file(path, tx) {
+-                tracing::warn!("File watcher stopped: {}", err);
++    /// Start watching `path` and return a bounded stream of reload notifications.
++    ///
++    /// Registration is completed before this function returns, so path, inotify,
++    /// and runtime errors are reported to the caller instead of being deferred to
++    /// a background thread. A Tokio runtime must be active on the calling thread.
++    pub fn try_watch(path: PathBuf) -> anyhow::Result<mpsc::Receiver<()>> {
++        let runtime = tokio::runtime::Handle::try_current()
++            .context("FileWatcher::try_watch requires an active Tokio runtime")?;
++        let (watch_dir, watch_name) = watch_target(&path)?;
++
++        // Register synchronously: callers can decide whether a watcher is
++        // optional before accepting a receiver that can never produce events.
++        let inotify = Inotify::init().context("failed to initialize inotify")?;
++        inotify
++            .watches()
++            .add(
++                watch_dir,
++                WatchMask::MODIFY
++                    | WatchMask::CLOSE_WRITE
++                    | WatchMask::CREATE
++                    | WatchMask::DELETE
++                    | WatchMask::MOVED_FROM
++                    | WatchMask::MOVED_TO
++                    | WatchMask::ATTRIB
++                    | WatchMask::MOVE_SELF
++                    | WatchMask::DELETE_SELF,
++            )
++            .with_context(|| format!("failed to watch directory {}", watch_dir.display()))?;
++        let stream = inotify
++            .into_event_stream([0; EVENT_BUFFER_SIZE])
++            .context("failed to create inotify event stream")?;
++
++        let (tx, rx) = mpsc::channel(NOTIFICATION_CAPACITY);
++        runtime.spawn(watch_events(stream, watch_name, tx));
++        Ok(rx)
++    }
++
++    /// Compatibility entrypoint for existing config/theme callers.
++    ///
++    /// Registration failures are logged and represented as a closed bounded
++    /// receiver; callers needing to distinguish that case should use `try_watch`.
++    pub fn watch(path: PathBuf) -> mpsc::Receiver<()> {
++        match Self::try_watch(path) {
++            Ok(receiver) => receiver,
++            Err(error) => {
++                tracing::warn!("File watcher could not start: {error:#}");
++                let (tx, rx) = mpsc::channel(NOTIFICATION_CAPACITY);
++                drop(tx);
++                rx
+             }
+-        });
+-        rx
++        }
+     }
+ }
+ 
+-fn watch_file(path: PathBuf, tx: mpsc::UnboundedSender<()>) -> anyhow::Result<()> {
+-    let mut inotify = Inotify::init()?;
+-    let (watch_dir, watch_name) = watch_target(&path)?;
+-
+-    inotify.watches().add(
+-        watch_dir,
+-        WatchMask::MODIFY
+-            | WatchMask::CLOSE_WRITE
+-            | WatchMask::CREATE
+-            | WatchMask::DELETE
+-            | WatchMask::MOVED_TO
+-            | WatchMask::MOVE_SELF
+-            | WatchMask::DELETE_SELF,
+-    )?;
+-
+-    let mut buffer = [0u8; 4096];
+-    let mut last_sent: Option<Instant> = None;
++async fn watch_events(
++    mut stream: inotify::EventStream<[u8; EVENT_BUFFER_SIZE]>,
++    watch_name: OsString,
++    tx: mpsc::Sender<()>,
++) {
++    let mut debounce_deadline: Option<Instant> = None;
+ 
+     loop {
+-        let events = inotify.read_events_blocking(&mut buffer)?;
+-        let mut should_reload = false;
+-
+-        for event in events {
+-            let renamed_or_deleted = event.mask.contains(EventMask::MOVE_SELF)
+-                || event.mask.contains(EventMask::DELETE_SELF);
+-            let same_file = event
+-                .name
+-                .map(|name| name == watch_name.as_os_str())
+-                .unwrap_or(false);
+-            if renamed_or_deleted || same_file {
+-                should_reload = true;
+-                break;
++        let timer = async {
++            match debounce_deadline {
++                Some(deadline) => tokio::time::sleep_until(deadline).await,
++                None => std::future::pending::<()>().await,
+             }
+-        }
++        };
++
++        tokio::select! {
++            // Fair branch selection lets the deadline fire even if unrelated
++            // files in the watched directory are changing continuously.
++            _ = tx.closed() => break,
++            event = stream.next() => {
++                let Some(event) = event else {
++                    // Unexpected stream exhaustion means the watch is no longer
++                    // trustworthy; prompt a final reload and close the channel.
++                    notify(&tx);
++                    break;
++                };
++                let event = match event {
++                    Ok(event) => event,
++                    Err(error) => {
++                        tracing::warn!("File watcher event stream failed: {error}");
++                        notify(&tx);
++                        break;
++                    }
++                };
+ 
+-        if should_reload {
+-            let now = Instant::now();
+-            let debounce_elapsed = last_sent
+-                .map(|last| now.duration_since(last) >= Duration::from_millis(DEBOUNCE_MS))
+-                .unwrap_or(true);
+-            if debounce_elapsed {
+-                if tx.send(()).is_err() {
++                let mask = event.mask;
++                if mask.intersects(
++                    EventMask::Q_OVERFLOW
++                        | EventMask::MOVE_SELF
++                        | EventMask::DELETE_SELF
++                        | EventMask::UNMOUNT
++                        | EventMask::IGNORED,
++                ) {
++                    // Events may have been lost, or the watched directory has
++                    // disappeared. Reload once, then fail closed rather than
++                    // silently watching a stale directory forever.
++                    notify(&tx);
+                     break;
+                 }
+-                last_sent = Some(now);
++
++                let is_target = event.name.as_deref() == Some(watch_name.as_os_str());
++                if is_target
++                    && mask.intersects(
++                        EventMask::MODIFY
++                            | EventMask::CLOSE_WRITE
++                            | EventMask::CREATE
++                            | EventMask::DELETE
++                            | EventMask::MOVED_FROM
++                            | EventMask::MOVED_TO
++                            | EventMask::ATTRIB,
++                    )
++                {
++                    debounce_deadline = Some(Instant::now() + DEBOUNCE);
++                }
++            }
++            _ = timer => {
++                debounce_deadline = None;
++                match tx.try_send(()) {
++                    Ok(()) | Err(mpsc::error::TrySendError::Full(())) => {
++                        // A queued notification already represents a reload of
++                        // the latest state. Capacity one coalesces bursts without
++                        // blocking event draining or allocating an unbounded queue.
++                    }
++                    Err(mpsc::error::TrySendError::Closed(())) => break,
++                }
+             }
+         }
+     }
++}
+ 
+-    Ok(())
++fn notify(tx: &mpsc::Sender<()>) {
++    // On a full channel, its pending pulse will be received after the event
++    // batch was observed, and therefore still prompts a current-state reload.
++    let _ = tx.try_send(());
+ }
+ 
+ fn watch_target(path: &Path) -> anyhow::Result<(&Path, OsString)> {
+@@ -88,3 +168,156 @@ fn watch_target(path: &Path) -> anyhow::Result<(&Path, OsString)> {
+     })?;
+     Ok((parent, name.to_os_string()))
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::fs;
++    use std::sync::atomic::{AtomicUsize, Ordering};
++    use tokio::time::{sleep, timeout};
++
++    static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
++
++    struct TempDir(PathBuf);
++
++    impl TempDir {
++        fn new() -> Self {
++            let id = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
++            let path =
++                std::env::temp_dir().join(format!("gpui-file-watcher-{}-{id}", std::process::id()));
++            fs::create_dir(&path).expect("create temporary watcher directory");
++            Self(path)
++        }
++
++        fn path(&self) -> &Path {
++            &self.0
++        }
++    }
++
++    impl Drop for TempDir {
++        fn drop(&mut self) {
++            let _ = fs::remove_dir_all(&self.0);
++        }
++    }
++
++    #[test]
++    fn registration_requires_a_runtime_and_reports_invalid_target() {
++        let error = FileWatcher::try_watch(PathBuf::from("/"))
++            .expect_err("no-runtime registration must fail rather than panic");
++        assert!(error.to_string().contains("active Tokio runtime"));
++    }
++
++    #[tokio::test]
++    async fn registration_errors_are_synchronous_for_bad_targets() {
++        assert!(FileWatcher::try_watch(PathBuf::from("/")).is_err());
++
++        let missing_parent = std::env::temp_dir()
++            .join(format!("gpui-file-watcher-missing-{}", std::process::id()))
++            .join("settings.toml");
++        let error = FileWatcher::try_watch(missing_parent)
++            .expect_err("missing parent must fail during registration");
++        assert!(error.to_string().contains("failed to watch directory"));
++    }
++
++    #[tokio::test]
++    async fn atomic_replacement_delivers_one_trailing_edge_for_final_valid_file() {
++        let dir = TempDir::new();
++        let path = dir.path().join("appearance.toml");
++        fs::write(&path, b"invalid = [\n").unwrap();
++        let mut rx = FileWatcher::try_watch(path.clone()).unwrap();
++
++        for partial in [b"invalid = [\n".as_slice(), b"invalid = {\n", b"[partial\n"] {
++            fs::write(&path, partial).unwrap();
++            sleep(Duration::from_millis(25)).await;
++        }
++        let replacement = dir.path().join("appearance.toml.tmp");
++        fs::write(&replacement, b"[profile]\nname = \"valid\"\n").unwrap();
++        let final_event_at = Instant::now();
++        fs::rename(&replacement, &path).unwrap();
++
++        assert_eq!(
++            timeout(Duration::from_secs(3), rx.recv()).await.unwrap(),
++            Some(())
++        );
++        assert_eq!(fs::read(&path).unwrap(), b"[profile]\nname = \"valid\"\n");
++        assert!(Instant::now().duration_since(final_event_at) >= Duration::from_millis(150));
++        assert!(
++            timeout(Duration::from_millis(300), rx.recv())
++                .await
++                .is_err()
++        );
++    }
++
++    #[tokio::test]
++    async fn unrelated_files_are_filtered() {
++        let dir = TempDir::new();
++        let path = dir.path().join("appearance.toml");
++        fs::write(&path, b"initial").unwrap();
++        let mut rx = FileWatcher::try_watch(path).unwrap();
++
++        fs::write(dir.path().join("unrelated.txt"), b"not the profile").unwrap();
++        assert!(
++            timeout(Duration::from_millis(300), rx.recv())
++                .await
++                .is_err()
++        );
++    }
++
++    #[tokio::test]
++    async fn parent_rename_notifies_then_closes_the_watcher() {
++        let base = TempDir::new();
++        let watched_dir = base.path().join("watched");
++        fs::create_dir(&watched_dir).unwrap();
++        let path = watched_dir.join("appearance.toml");
++        fs::write(&path, b"initial").unwrap();
++        let mut rx = FileWatcher::try_watch(path).unwrap();
++
++        fs::rename(&watched_dir, base.path().join("renamed")).unwrap();
++        assert_eq!(
++            timeout(Duration::from_secs(2), rx.recv()).await.unwrap(),
++            Some(())
++        );
++        assert_eq!(
++            timeout(Duration::from_secs(2), rx.recv()).await.unwrap(),
++            None
++        );
++    }
++
++    #[tokio::test]
++    async fn dropping_receiver_releases_inotify_descriptor() {
++        let dir = TempDir::new();
++        let path = dir.path().join("appearance.toml");
++        fs::write(&path, b"initial").unwrap();
++        let before = inotify_fd_count();
++        let rx = FileWatcher::try_watch(path).unwrap();
++        timeout(Duration::from_secs(2), async {
++            while inotify_fd_count() <= before {
++                sleep(Duration::from_millis(10)).await;
++            }
++        })
++        .await
++        .expect("registered inotify descriptor should be visible");
++
++        drop(rx);
++        timeout(Duration::from_secs(2), async {
++            while inotify_fd_count() > before {
++                sleep(Duration::from_millis(10)).await;
++            }
++        })
++        .await
++        .expect("dropping receiver should stop the task and close its descriptor");
++    }
++
++    fn inotify_fd_count() -> usize {
++        fs::read_dir("/proc/self/fd")
++            .into_iter()
++            .flatten()
++            .flatten()
++            .filter(|entry| {
++                fs::read_link(entry.path())
++                    .map(|target| target.to_string_lossy().contains("inotify"))
++                    .unwrap_or(false)
++            })
++            .count()
++    }
++}
+diff --git a/crates/ui/src/components/list.rs b/crates/ui/src/components/list.rs
+index a25d9b8..eb78fe5 100644
+--- a/crates/ui/src/components/list.rs
++++ b/crates/ui/src/components/list.rs
+@@ -2,7 +2,7 @@
+ 
+ use std::rc::Rc;
+ 
+-use crate::theme::{ActiveTheme, Color, Radius, Spacing};
++use crate::theme::{ActiveTheme, Color, LayoutDensity, Radius, Spacing};
+ use gpui::{
+     AnyElement, AnyView, App, ClickEvent, CursorStyle, ElementId, IntoElement, MouseButton,
+     MouseDownEvent, ParentElement, Pixels, RenderOnce, SharedString, Window, div, prelude::*, px,
+@@ -29,6 +29,16 @@ pub enum ListItemSpacing {
+     ExtraDense,
+ }
+ 
++/// Default rows follow the runtime profile; explicit vertical spacing remains authored.
++fn row_vertical_padding(spacing: Option<ListItemSpacing>, density: LayoutDensity) -> Pixels {
++    match spacing {
++        None => density.spacing(Spacing::XSmall),
++        Some(ListItemSpacing::ExtraDense) => Spacing::None.pixels(),
++        Some(ListItemSpacing::Dense) => Spacing::XXSmall.pixels(),
++        Some(ListItemSpacing::Sparse) => Spacing::XSmall.pixels(),
++    }
++}
++
+ /// Controls when a [`ListItem`]'s end slot is shown.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+ pub enum EndSlotVisibility {
+@@ -50,7 +60,7 @@ pub struct ListItem {
+     id: ElementId,
+     disabled: bool,
+     selected: bool,
+-    spacing: ListItemSpacing,
++    spacing: Option<ListItemSpacing>,
+     indent_level: usize,
+     indent_step_size: Pixels,
+     inset: bool,
+@@ -73,7 +83,7 @@ impl ListItem {
+             id: id.into(),
+             disabled: false,
+             selected: false,
+-            spacing: ListItemSpacing::default(),
++            spacing: None,
+             indent_level: 0,
+             indent_step_size: px(12.0),
+             inset: false,
+@@ -102,9 +112,10 @@ impl ListItem {
+         self
+     }
+ 
+-    /// Set the row's vertical density.
++    /// Pin vertical spacing independently of profile density. Unpinned rows
++    /// follow profile density; horizontal semantic spacing still follows it.
+     pub fn spacing(mut self, spacing: ListItemSpacing) -> Self {
+-        self.spacing = spacing;
++        self.spacing = Some(spacing);
+         self
+     }
+ 
+@@ -201,16 +212,13 @@ impl ParentElement for ListItem {
+ 
+ impl RenderOnce for ListItem {
+     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
++        let density = cx.theme().density;
+         let colors = cx.theme().colors();
+         let interactive = !self.disabled;
+         let indent = self.indent_level as f32 * self.indent_step_size;
+         let group_name: SharedString = HOVER_GROUP.into();
+ 
+-        let py = match self.spacing {
+-            ListItemSpacing::ExtraDense => Spacing::None.pixels(),
+-            ListItemSpacing::Dense => Spacing::XXSmall.pixels(),
+-            ListItemSpacing::Sparse => Spacing::XSmall.pixels(),
+-        };
++        let py = row_vertical_padding(self.spacing, density);
+ 
+         let background = if self.selected {
+             Some(colors.element_selected)
+@@ -229,8 +237,8 @@ impl RenderOnce for ListItem {
+             .id(self.id)
+             .group(group_name)
+             .w_full()
+-            .gap(Spacing::Small.pixels())
+-            .px(Spacing::Medium.pixels())
++            .gap(density.spacing(Spacing::Small))
++            .px(density.spacing(Spacing::Medium))
+             .py(py)
+             .when(!self.inset && self.indent_level > 0, |this| this.ml(indent))
+             .when(self.rounded, |this| this.rounded(Radius::XSmall.pixels()))
+@@ -249,7 +257,7 @@ impl RenderOnce for ListItem {
+             .child(
+                 h_flex()
+                     .flex_grow(1.)
+-                    .gap(Spacing::Small.pixels())
++                    .gap(density.spacing(Spacing::Small))
+                     .children(self.children),
+             )
+             .when_some(self.end_slot, |this, slot| {
+@@ -361,3 +369,48 @@ impl RenderOnce for List {
+             })
+     }
+ }
++
++#[cfg(test)]
++mod density_tests {
++    use super::*;
++
++    #[test]
++    fn default_rows_follow_density_without_changing_comfortable_spacing() {
++        assert_eq!(
++            row_vertical_padding(None, LayoutDensity::Comfortable),
++            Spacing::XSmall.pixels()
++        );
++        assert_eq!(
++            row_vertical_padding(None, LayoutDensity::Compact),
++            LayoutDensity::Compact.spacing(Spacing::XSmall)
++        );
++        assert!(
++            row_vertical_padding(None, LayoutDensity::Compact)
++                < row_vertical_padding(None, LayoutDensity::Comfortable)
++        );
++    }
++
++    #[test]
++    fn explicit_vertical_spacing_is_not_reinterpreted_by_the_profile() {
++        for (spacing, step) in [
++            (ListItemSpacing::ExtraDense, Spacing::None),
++            (ListItemSpacing::Dense, Spacing::XXSmall),
++            (ListItemSpacing::Sparse, Spacing::XSmall),
++        ] {
++            for density in [LayoutDensity::Compact, LayoutDensity::Comfortable] {
++                assert_eq!(row_vertical_padding(Some(spacing), density), step.pixels());
++            }
++        }
++    }
++
++    #[test]
++    fn builders_distinguish_an_explicit_override_from_the_default() {
++        assert_eq!(ListItem::new("default-row").spacing, None);
++        assert_eq!(
++            ListItem::new("explicit-row")
++                .spacing(ListItemSpacing::Sparse)
++                .spacing,
++            Some(ListItemSpacing::Sparse)
++        );
++    }
++}
+diff --git a/crates/ui/src/patterns/launcher.rs b/crates/ui/src/patterns/launcher.rs
+index d913ec8..5fb1431 100644
+--- a/crates/ui/src/patterns/launcher.rs
++++ b/crates/ui/src/patterns/launcher.rs
+@@ -64,6 +64,7 @@ impl ParentElement for LauncherFrame {
+ 
+ impl RenderOnce for LauncherFrame {
+     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
++        let density = cx.theme().density;
+         let colors = cx.theme().colors();
+         let (text, muted, disabled) = (colors.text, colors.text_muted, colors.text_disabled);
+         let (background, border, badge_bg) =
+@@ -85,11 +86,11 @@ impl RenderOnce for LauncherFrame {
+             .child(
+                 div()
+                     .w_full()
+-                    .px(Spacing::XLarge.pixels())
+-                    .py(Spacing::Large.pixels())
++                    .px(density.spacing(Spacing::XLarge))
++                    .py(density.spacing(Spacing::Large))
+                     .flex()
+                     .items_center()
+-                    .gap(Spacing::Large.pixels())
++                    .gap(density.spacing(Spacing::Large))
+                     .child(
+                         Icon::new(self.icon)
+                             .size(IconSize::Medium)
+@@ -104,7 +105,7 @@ impl RenderOnce for LauncherFrame {
+                     .when_some(self.badge, |el, badge| {
+                         el.child(
+                             div()
+-                                .px(Spacing::Medium.pixels())
++                                .px(density.spacing(Spacing::Medium))
+                                 .py(px(3.))
+                                 .rounded(Radius::Small.pixels())
+                                 .bg(badge_bg)
+@@ -123,19 +124,19 @@ impl RenderOnce for LauncherFrame {
+                     .flex()
+                     .flex_col()
+                     .overflow_hidden()
+-                    .py(Spacing::XSmall.pixels())
++                    .py(density.spacing(Spacing::XSmall))
+                     .children(self.body),
+             )
+             .when(has_footer, |el| {
+                 el.child(hairline()).child(
+                     div()
+                         .w_full()
+-                        .px(Spacing::XLarge.pixels())
+-                        .py(Spacing::Medium.pixels())
++                        .px(density.spacing(Spacing::XLarge))
++                        .py(density.spacing(Spacing::Medium))
+                         .flex()
+                         .items_center()
+                         .justify_between()
+-                        .gap(Spacing::XLarge.pixels())
++                        .gap(density.spacing(Spacing::XLarge))
+                         .child(
+                             // Hints yield to the actions: clip rather than
+                             // push them off the edge.
+@@ -156,6 +157,7 @@ impl RenderOnce for LauncherFrame {
+ 
+ /// Render `(action, key)` pairs as the footer's right-hand hints - `Open ⏎ Close Esc`.
+ pub fn footer_hints(actions: Vec<(&'static str, &'static str)>, cx: &App) -> AnyElement {
++    let density = cx.theme().density;
+     let colors = cx.theme().colors();
+     let muted = colors.text_muted;
+     let key_bg = colors.element_background;
+@@ -163,7 +165,7 @@ pub fn footer_hints(actions: Vec<(&'static str, &'static str)>, cx: &App) -> Any
+     div()
+         .flex()
+         .items_center()
+-        .gap(Spacing::XLarge.pixels())
++        .gap(density.spacing(Spacing::XLarge))
+         .text_size(TextSize::Small.rems())
+         .text_color(muted)
+         .children(actions.into_iter().map(|(action, key)| {
+diff --git a/crates/ui/src/theme/mod.rs b/crates/ui/src/theme/mod.rs
+index 9ded58a..b4378cb 100644
+--- a/crates/ui/src/theme/mod.rs
++++ b/crates/ui/src/theme/mod.rs
+@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
+ mod base16;
+ mod color_string;
+ mod colors;
++mod density;
+ #[macro_use]
+ mod refineable;
+ mod refinement;
+@@ -14,6 +15,7 @@ mod tokens;
+ 
+ pub use base16::Base16Palette;
+ pub use colors::{Color, StatusColors, ThemeColors};
++pub use density::LayoutDensity;
+ pub use refinement::{StatusColorsRefinement, ThemeColorsRefinement};
+ pub use schemes::{ThemeScheme, builtin_schemes};
+ pub use tokens::{IconSize, Radius, Spacing, TextSize};
+@@ -55,6 +57,8 @@ pub struct Theme {
+     pub overrides: ThemeColorsRefinement,
+     /// Base font size.
+     pub font_size: Pixels,
++    /// Runtime profile overlay for launcher and shared list-row spacing. Not persisted.
++    pub density: LayoutDensity,
+ }
+ 
+ impl Global for Theme {}
+@@ -73,6 +77,7 @@ impl Theme {
+             palette,
+             overrides: ThemeColorsRefinement::default(),
+             font_size: Self::DEFAULT_FONT_SIZE,
++            density: LayoutDensity::default(),
+         }
+     }
+ 
+@@ -256,6 +261,20 @@ mod tests {
+         assert!(encoded.contains("base00"), "{encoded}");
+     }
+ 
++    #[test]
++    fn profile_density_is_runtime_only_and_survives_a_palette_change() {
++        let mut theme = Theme {
++            density: LayoutDensity::Compact,
++            ..Theme::default()
++        };
++        theme.set_palette("Other", Base16Palette::default());
++        assert_eq!(theme.density, LayoutDensity::Compact);
++        let encoded = toml::to_string_pretty(&StoredTheme::from_theme(&theme)).unwrap();
++        assert!(!encoded.contains("density"));
++        let restored: StoredTheme = toml::from_str(&encoded).unwrap();
++        assert_eq!(restored.into_theme().density, LayoutDensity::Comfortable);
++    }
++
+     #[test]
+     fn font_size_is_independent_of_the_palette() {
+         let mut theme = Theme {
+diff --git a/crates/ui/src/ui.rs b/crates/ui/src/ui.rs
+index 737851d..888f11e 100644
+--- a/crates/ui/src/ui.rs
++++ b/crates/ui/src/ui.rs
+@@ -13,9 +13,9 @@ pub use components::*;
+ // primitive set. See the module docs.
+ pub use styles::ElevationIndex;
+ pub use theme::{
+-    ActiveTheme, Appearance, Base16Palette, Color, IconSize, Radius, Spacing, StatusColors,
+-    StatusColorsRefinement, StoredTheme, TextSize, Theme, ThemeColors, ThemeColorsRefinement,
+-    ThemeScheme, builtin_schemes,
++    ActiveTheme, Appearance, Base16Palette, Color, IconSize, LayoutDensity, Radius, Spacing,
++    StatusColors, StatusColorsRefinement, StoredTheme, TextSize, Theme, ThemeColors,
++    ThemeColorsRefinement, ThemeScheme, builtin_schemes,
+ };
+ pub use traits::*;
+ 
+diff --git a/docs/src/content/docs/developer/setup.md b/docs/src/content/docs/developer/setup.md
+index 3749055..0dab393 100644
+--- a/docs/src/content/docs/developer/setup.md
++++ b/docs/src/content/docs/developer/setup.md
+@@ -6,6 +6,24 @@ description: Build, run, test and profile GPUi Shell from source.
+ To run the shell, you need a Wayland session on Hyprland, Niri or Mango.
+ Building works anywhere.
+ 
++## NixOS installation
++
++The flake exports `nixosModules.default`. Add it to your NixOS flake's modules
++and enable `programs.gpuishell.enable = true;` to install `gpuishell` in the
++system profile. The module does not configure a compositor. Autostart is
++opt-in (`programs.gpuishell.autostart = true;`) and uses a user service wanted
++by `graphical-session.target` with a `WAYLAND_DISPLAY` condition; the session
++manager must start that target and provide its Wayland environment. Leave it
++disabled and configure startup yourself if your compositor uses another
++session mechanism. Override `programs.gpuishell.package` to install a different
++package.
++
++The module does not import compositor variables or configure a compositor. For
++Niri, the user service manager must also inherit `NIRI_SOCKET` or
++`NIRI_SOCKET_PATH` so compositor IPC works. Make sure your session setup imports
++the required variables before starting `graphical-session.target`; other
++compositor integrations may likewise need their session-specific IPC variables.
++
+ ## With Nix (recommended)
+ 
+ ```bash
+@@ -46,6 +64,9 @@ A running shell owns the IPC socket, so a second `cargo run` only toggles
+ the launcher of the first one. Stop your installed shell before running a
+ dev build.
+ 
++For frame-telemetry interpretation and performance-measurement limits, see
++[Rendering and performance evidence](../performance/).
++
+ ## Checks
+ 
+ CI runs these on every pull request:
+diff --git a/flake.nix b/flake.nix
+index ece97c3..f22ed14 100644
+--- a/flake.nix
++++ b/flake.nix
+@@ -80,6 +80,12 @@
+         };
+       });
+ 
++      nixosModules.default = import ./nix/nixos-module.nix { inherit self; };
++
++      checks = forAllSystems (pkgs: {
++        nixos-module-evaluation = import ./nix/nixos-module-test.nix { inherit pkgs; };
++      });
++
+       overlays.default = final: prev: {
+         gpuishell = mkBuild final;
+         matugen = inputs.matugen.packages.${final.system}.default;
+diff --git a/nix/build.nix b/nix/build.nix
+index 6132510..befa1fe 100644
+--- a/nix/build.nix
++++ b/nix/build.nix
+@@ -53,8 +53,11 @@ let
+     rec {
+       inherit pname;
+       version = mgsCargoLock.package.version;
+-      src = builtins.path {
+-        path = ../.;
++      # Crane's findCargoFiles must traverse the original tree during read-only
++      # evaluation (flake check --no-build). A bare builtins.path can point at a
++      # filtered store path that has not been materialized in that mode.
++      src = lib.cleanSourceWith {
++        src = ../.;
+         filter = mkIncludeFilter ../.;
+         name = "source";
+       };
+diff --git a/nix/nixos-module-test.nix b/nix/nixos-module-test.nix
+new file mode 100644
+index 0000000..f79b7b2
+--- /dev/null
++++ b/nix/nixos-module-test.nix
+@@ -0,0 +1,58 @@
++{ pkgs }:
++let
++  inherit (pkgs) lib;
++  system = pkgs.stdenv.hostPlatform.system;
++  defaultPackage = pkgs.writeShellScriptBin "gpuishell" "exit 0";
++  overridePackage = pkgs.writeShellScriptBin "gpuishell-override" "exit 0";
++  fakeSelf.packages.${system}.default = defaultPackage;
++  module = import ./nixos-module.nix { self = fakeSelf; };
++
++  evaluate =
++    moduleConfig:
++    import (pkgs.path + "/nixos/lib/eval-config.nix") {
++      inherit system;
++      modules = [
++        module
++        ({ ... }: {
++          nixpkgs.pkgs = pkgs;
++          system.stateVersion = "24.11";
++        })
++        moduleConfig
++      ];
++    };
++
++  disabled = evaluate { };
++  enabled = evaluate { programs.gpuishell.enable = true; };
++  sessionEnabled = evaluate {
++    programs.gpuishell = {
++      enable = true;
++      autostart = true;
++    };
++  };
++  autostartWithoutEnable = evaluate { programs.gpuishell.autostart = true; };
++  overridden = evaluate {
++    programs.gpuishell = {
++      enable = true;
++      package = overridePackage;
++    };
++  };
++
++  sessionService = sessionEnabled.config.systemd.user.services.gpuishell;
++  sessionUnit = sessionEnabled.config.systemd.user.units."gpuishell.service".text;
++in
++assert !(builtins.elem defaultPackage disabled.config.environment.systemPackages);
++assert !(builtins.hasAttr "gpuishell" disabled.config.systemd.user.services);
++assert builtins.elem defaultPackage enabled.config.environment.systemPackages;
++assert !(builtins.hasAttr "gpuishell" enabled.config.systemd.user.services);
++assert !(builtins.hasAttr "gpuishell" autostartWithoutEnable.config.systemd.user.services);
++assert sessionService.wantedBy == [ "graphical-session.target" ];
++assert sessionService.unitConfig.ConditionEnvironment == "WAYLAND_DISPLAY";
++assert sessionService.unitConfig.PartOf == "graphical-session.target";
++assert sessionService.serviceConfig.ExecStart == "${defaultPackage}/bin/gpuishell";
++assert lib.hasInfix "ConditionEnvironment=WAYLAND_DISPLAY" sessionUnit;
++assert lib.hasInfix "PartOf=graphical-session.target" sessionUnit;
++assert lib.hasInfix "ExecStart=" sessionUnit;
++assert builtins.elem overridePackage overridden.config.environment.systemPackages;
++assert !(builtins.elem defaultPackage overridden.config.environment.systemPackages);
++assert !(builtins.hasAttr "gpuishell" overridden.config.systemd.user.services);
++pkgs.runCommand "gpuishell-nixos-module-evaluation" { } "touch $out"
+diff --git a/nix/nixos-module.nix b/nix/nixos-module.nix
+new file mode 100644
+index 0000000..63e3281
+--- /dev/null
++++ b/nix/nixos-module.nix
+@@ -0,0 +1,38 @@
++{ self }:
++{
++  config,
++  lib,
++  pkgs,
++  ...
++}:
++let
++  cfg = config.programs.gpuishell;
++in
++{
++  options.programs.gpuishell = {
++    enable = lib.mkEnableOption "GPUi Shell";
++
++    autostart = lib.mkEnableOption "starting GPUi Shell in the Wayland graphical session";
++
++    package = lib.mkOption {
++      type = lib.types.package;
++      default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
++      defaultText = lib.literalExpression "gpuishell.packages.\${pkgs.system}.default";
++      description = "The GPUi Shell package to install.";
++    };
++  };
++
++  config = lib.mkIf cfg.enable {
++    environment.systemPackages = [ cfg.package ];
++
++    systemd.user.services.gpuishell = lib.mkIf cfg.autostart {
++      description = "GPUi Shell Wayland session shell";
++      wantedBy = [ "graphical-session.target" ];
++      unitConfig = {
++        ConditionEnvironment = "WAYLAND_DISPLAY";
++        PartOf = "graphical-session.target";
++      };
++      serviceConfig.ExecStart = lib.getExe cfg.package;
++    };
++  };
++}

@@ -1,0 +1,23 @@
+{
+  "runs": [
+    {
+      "mode": "old-order",
+      "exit": 1,
+      "expected": true,
+      "test_passed": false,
+      "baseline_failed": true,
+      "log_sha256": "7d869636588dfa4704df0e487d695ff3b3ecbc689e0a7a90e31b587451572a00"
+    },
+    {
+      "mode": "fixed-order",
+      "exit": 0,
+      "expected": true,
+      "test_passed": true,
+      "baseline_failed": false,
+      "log_sha256": "d347863221400343f708858843c65e9c49f7a2017374ac38c047b9c9c3890a41"
+    }
+  ],
+  "source_restored": true,
+  "source_sha256": "0482b21c0c8ebe53ecc1aa2f5fafe02b3d307c8119e05c056ee9444a9dc1dcd1",
+  "validation": "Saved actual QEMU logs revalidated after fixing ANSI escape parsing; no kernel rerun or result substitution"
+}

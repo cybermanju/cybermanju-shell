@@ -1,0 +1,4 @@
+3e787d17f7997cbbd0127bcafee564451e891f932923ef79efa8711ad35f2eae  /workspace/asterinas-gpui/evidence/native-integration-followup/before/device.rs
+2ed1de778f946bb62e403dc31e42ec4c7339797bec740ce17e29fc75a7e62b5f  /workspace/asterinas-gpui/evidence/native-integration-followup/before/msix_transaction.rs
+efcedc71a69b63988191c0a3566ff05d7fa965854e72e0e4d0916bf928ad2b7e  /workspace/asterinas-gpui/evidence/native-integration-followup/before/worker-tests.rs
+93a32b1764a804d2d8c4b546586ba072c962b5f832dd5f7ffd5bc9e37393d8f3  /workspace/asterinas-gpui/evidence/native-integration-followup/before/worker.rs

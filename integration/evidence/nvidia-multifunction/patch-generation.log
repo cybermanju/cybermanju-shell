@@ -1,0 +1,88 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-multifunction.patch",
+  "patch_sha256": "0fc97c2906d6cf96e98a6ab7526ac287f5a8f31d3c31afae0b7a8484b0404b61",
+  "files": [
+    {
+      "path": "kernel/core/comps/pci/src/bus.rs",
+      "old_sha256": "cb07a83947760c0d293124130e41e305952adb2398a11afea2168b33f0b9e291",
+      "new_sha256": "9ceadf71c64deabc8499113591bb48caaca71e0acef42aaeb5ec6896da48fa54",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/reservation.rs",
+      "old_sha256": "50d6d29a6db801faf76439661ea7fedcfa55d4111fd208119b8426bc36b6bcd2",
+      "new_sha256": "88cc4bf74fce53c43e2472cf42691e9d4f3d7b162ea667fe0330c20311b28f47",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/mmio.rs",
+      "old_sha256": "93f58a077ea640d5d77343b787184ddfee17fd5ca9fe9faae22b283091229b45",
+      "new_sha256": "c362ef86f660af129ea7bc9872e56179df10b3fd0554d3ceb22b7b0ee812967b",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/topology.rs",
+      "old_sha256": "176ad777572881af13a951d25df8eef2618f373704a623d8808ad6b0e033b184",
+      "new_sha256": "e2d7850536e76e88cc72f7f126b7a0ddd596545db2ce4b4d340403259624d330",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/dma.rs",
+      "old_sha256": "3eb8337a85665f8731c307569f4f8ae4afb4115ee77c68aaaf749b93efa2ad0e",
+      "new_sha256": "df0ad564a6d317d631e53e1ea7489cd713accda8661ba6c6bdbc59f16d73a25c",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/lib.rs",
+      "old_sha256": "2ea7a790e0a9f4f815d759a45c610bad56d708f88b8fffe24debe068fc11b75a",
+      "new_sha256": "42beb6650135abf2c049c10c8e61d1e6f29050ccb18ab77a4c42cf636cc05b88",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/multifunction_tests.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "cabe06f291a1923cfda894bc818a573033b11320b5e41d3bcbe66c46b31b7696",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/dma_remapping/isolated.rs",
+      "old_sha256": "3f57210ba8c662a411f9ffd2cf7729345820918d8e788eb90374f7dd64b400c4",
+      "new_sha256": "f00f6bb53f19d7dfd57ea1c25be420020af6aab59c5f3611d2dbfa3ee1fe543d",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/mm/dma/isolated.rs",
+      "old_sha256": "de8bcdcdaee8c4df6b16a74559b23cfdd45e6a275e51f88959f924ccaac723b8",
+      "new_sha256": "59bb840e92468a546f85ed7359850de389bf0792f08160531a5a6014ff8b669d",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/irq/top_half.rs",
+      "old_sha256": "1f21e751dc6ec7594143a1accdf3d42482f5f9c2f4bba8f0ebc40d4291523a90",
+      "new_sha256": "0482b21c0c8ebe53ecc1aa2f5fafe02b3d307c8119e05c056ee9444a9dc1dcd1",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/run_cpu_kernel_tests.sh",
+      "old_sha256": "1130c7b4060488e6d2b1e980a42500929cad6b17dcc7457fbb4aed4d7eb585c7",
+      "new_sha256": "1c62655c7612f2fd64678e0a85089cce14982da140dbf30c5485545155b37ab8",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/NATIVE_NVIDIA.md",
+      "old_sha256": "4853a533e79fa59c9bddde6761f31bffa16b136f29f52aee09a12d529130294c",
+      "new_sha256": "ef7753e1e206de93900b6cdb7d1e7750057654ea62b536a0c7b310de0d0eecf7",
+      "new_file": false
+    }
+  ],
+  "prerequisite": "All eleven Asterinas patches through asterinas-nvidia-pcie-topology.patch",
+  "exact_incremental_round_trip": true,
+  "index_unchanged": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "hardware_gpu_test": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false
+}

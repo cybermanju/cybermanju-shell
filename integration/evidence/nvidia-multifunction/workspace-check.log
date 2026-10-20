@@ -1,0 +1,15 @@
+warning: feature `iter_advance_by` is declared but not used
+  --> ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 1 warning
+    Checking aster-core v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core)
+    Checking aster-drm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/drm)
+    Checking aster-i8042 v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/i8042)
+    Checking aster-simpledrm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm)
+    Checking asterinas v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 39.77s

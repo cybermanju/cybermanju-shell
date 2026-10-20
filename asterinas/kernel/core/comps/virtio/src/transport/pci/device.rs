@@ -249,6 +249,9 @@ impl VirtioTransport for VirtioPciModernTransport {
         field_ptr!(&self.common_cfg, VirtioPciCommonCfg, queue_msix_vector)
             .write_once(&vector)
             .unwrap();
+        self.msix_manager
+            .enable_vector(vector)
+            .map_err(|_| VirtioTransportError::InvalidArgs)?;
         Ok(())
     }
 
@@ -256,8 +259,11 @@ impl VirtioTransport for VirtioPciModernTransport {
         &mut self,
         func: Box<IrqCallbackFunction>,
     ) -> Result<(), VirtioTransportError> {
-        let (_, irq) = self.msix_manager.config_msix_irq();
+        let (vector, irq) = self.msix_manager.config_msix_irq();
         irq.on_active(func);
+        self.msix_manager
+            .enable_vector(vector)
+            .map_err(|_| VirtioTransportError::InvalidArgs)?;
         Ok(())
     }
 
@@ -320,6 +326,10 @@ impl VirtioPciModernTransport {
         // TODO: Support interrupt without MSI-X.
         let msix = common_device.acquire_msix_capability().unwrap().unwrap();
         let msix_manager = VirtioMsixManager::new(msix);
+        // Preserve the existing transport DMA policy, explicitly at the driver boundary.
+        common_device.write_command_raw(
+            common_device.location().read16(4) | aster_pci::cfg_space::Command::BUS_MASTER.bits(),
+        );
 
         Ok(Self {
             device_type,

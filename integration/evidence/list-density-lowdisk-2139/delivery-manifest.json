@@ -1,0 +1,121 @@
+{
+  "completed_utc": "2026-10-20T21:44:13.742429+00:00",
+  "native_canonical_patch_count": 21,
+  "new_native_patch_created": false,
+  "new_source_compiled": false,
+  "new_tests_executed": 0,
+  "new_rust_tests_unexecuted": 3,
+  "built_gpui_binary_unchanged": true,
+  "built_binary_sha256": "15c510c9b3de89a7f5ad68bd8288178e3534ae5dec2db2855b663c5de15b1309",
+  "no_deletions_or_cleanup": true,
+  "no_build_or_iso": true,
+  "physical_gpu_acceptance": false,
+  "free_bytes": 1164537856,
+  "files": [
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/gpui-index-before.txt",
+      "bytes": 45869,
+      "sha256": "453d1781c1c86394a8d4a979d3be10a122030d7af668ab9a396810509893ecf0"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/app-index-before.txt",
+      "bytes": 55081,
+      "sha256": "f01f555aaa13f6ecc38eb7c496a02c95deceef05cabc5d45e1b5c460206890c8"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/constraints.json",
+      "bytes": 262,
+      "sha256": "380dc072614c9b34d90913a800b461e42ad24683df13d828fabbd9b4f9f0511a"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/patch-validation.log",
+      "bytes": 2560,
+      "sha256": "41e576211eacc49efa11b11532fd2091291fdec7fb2f2856034dc0674f7fde82"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/record_run.py",
+      "bytes": 2907,
+      "sha256": "ad8a27906e0c2b8b1fa5a0b3bdac04d6599a18e2f3443d2d4bda7d543272b6cb"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/verify_patches.py",
+      "bytes": 3215,
+      "sha256": "ba43eb03c72e325ce0b3e8fd837cb5419a88a780c34bd663d0dde3833f69f9de"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/gpui-shared-list-density-source-only.patch",
+      "bytes": 10280,
+      "sha256": "63055aa7e193dceeb9299b464809d1dd3bd08bc7cd6bd488361a24dd9846cbe2"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/cybermanju-shared-list-density-contract.patch",
+      "bytes": 1972,
+      "sha256": "3446c5c4303fbd96557ae9ff2d0eeca6b720c50edd711078f4dcd94bdb29082b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/patch-validation.json",
+      "bytes": 2560,
+      "sha256": "41e576211eacc49efa11b11532fd2091291fdec7fb2f2856034dc0674f7fde82"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/record-run.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/continuation-notes.md",
+      "bytes": 4043,
+      "sha256": "373253a5be4285873a60b4c47bf955307afe85dcd4d4352d2a6f25a9f69a873f"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/before/crates/ui/src/components/list.rs",
+      "bytes": 11885,
+      "sha256": "8d0a5962295d46375310d78e3ed37f290e28607092e97535ceabccaa2fffcde0"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/before/crates/ui/src/theme/mod.rs",
+      "bytes": 8944,
+      "sha256": "38df52042af1e8c95a06b63b896bc8da624a6e2729e3b7b2a1ae0fe62267bca2"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/before/crates/app/src/config/appearance.rs",
+      "bytes": 18450,
+      "sha256": "fdaa4e4cab4dfda1222d1876ca3835b967cc224a4e7e93b1be7d2d203f349582"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/before/docs/src/content/docs/developer/cybermanju-appearance.md",
+      "bytes": 9687,
+      "sha256": "c84d593fab56138a8984a36b65acd3926dc10bb33cbeeab37060c1af01a55ae8"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/app-before/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "bytes": 9819,
+      "sha256": "1992ac3d321c0569746f57f0e59fe0780e742917fa52b22c4fa644aadbf8f84b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "bytes": 135858,
+      "sha256": "1b79ad8d80685ab3240b4cb24956eac65c104835cf03a25dfdd6a75398383738"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-lowdisk-2139/REVIEW.md",
+      "bytes": 3891,
+      "sha256": "8096f214622a4d9d3dedf3cc2629b967037b9b8fdb9ea5c117dd785f3a3017de"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/gpui-shell/crates/ui/src/components/list.rs",
+      "bytes": 13804,
+      "sha256": "2a28022bca5f7ad45601607d86d6918f4668fcb25ca98a6477c10e5fdb64f8dc"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/gpui-shell/crates/app/src/config/appearance.rs",
+      "bytes": 18573,
+      "sha256": "e587b97995c053569de2a82fd03e40999b81b44517e1c31a5a079555e09b6bbb"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/gpui-shell/crates/ui/src/theme/mod.rs",
+      "bytes": 8951,
+      "sha256": "f0126e45992f98414e02f80286c30b9e74ce9da9991ae355cc34e8c394ff4d52"
+    }
+  ]
+}

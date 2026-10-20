@@ -1,0 +1,82 @@
+--- a/kernel/core/comps/pci/src/msix_transaction.rs
++++ b/kernel/core/comps/pci/src/msix_transaction.rs
+@@ -238,6 +238,7 @@
+         task_context()?;
+         if self.closed
+             || self.activated
++            || self.irqs.is_empty()
+             || self.irqs.iter().any(IrqLine::is_empty)
+         {
+             return Err(Error::AccessDenied);
+--- a/kernel/core/comps/pci/src/msix_tests.rs
++++ b/kernel/core/comps/pci/src/msix_tests.rs
+@@ -441,6 +441,69 @@
+     let table_size = (original_msix_control & 0x07ff) + 1;
+     assert!(table_size > 0);
+ 
++    // The dedicated QEMU controller was stopped with RDY=0 and BME off above, so
++    // these empty callbacks are valid only for this provably idle source. Exercise
++    // the fallible post-IRQ path before any queues or device work are started.
++    {
++        let mut retired = regs.prepare_msix(1).expect("prepare idle NVMe vector");
++        assert_eq!(retired.vector_count(), 1);
++        let handler_drops = Arc::new(AtomicUsize::new(0));
++        let probe = HandlerDropProbe(handler_drops.clone());
++        retired
++            .register_handler(0, move |_: &TrapFrame| {
++                let _keep_probe_live = &probe;
++            })
++            .expect("register callback before activation");
++        let failed = retired.shutdown_with_post_irq(
++            || {
++                assert_eq!(regs.read32(0x1c).unwrap() & 1, 0, "idle NVMe is not ready");
++                assert_eq!(loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++                Ok(())
++            },
++            || {
++                assert_eq!(
++                    handler_drops.load(Ordering::SeqCst),
++                    1,
++                    "IRQ callback is retired before deferred drain"
++                );
++                assert_eq!(
++                    loc.read16(capability + 2) & 0xc000,
++                    0xc000,
++                    "drain failure leaves MSI-X enabled and masked"
++                );
++                Err(Error::IoError)
++            },
++        );
++        assert_eq!(failed, Err(Error::IoError));
++        assert_eq!(
++            retired.vector_count(),
++            0,
++            "failed drain keeps retired IRQs retired"
++        );
++        assert_eq!(
++            retired.activate(),
++            Err(Error::AccessDenied),
++            "activation must fail closed after all owned IRQs were retired"
++        );
++        assert_eq!(
++            loc.read16(capability + 2) & 0xc000,
++            0xc000,
++            "rejected activation leaves MSI-X masked"
++        );
++        retired
++            .shutdown_with_post_irq(
++                || {
++                    assert_eq!(regs.read32(0x1c).unwrap() & 1, 0, "NVMe remains idle");
++                    assert_eq!(loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++                    Ok(())
++                },
++                || Ok(()),
++            )
++            .expect("successful idle shutdown retry restores MSI-X state");
++        assert_eq!(loc.read16(capability + 2), original_msix_control);
++        assert_eq!(loc.read16(4), prepared_command);
++    }
++
+     // Invalid requests are transactional: neither MSI-X control nor PCI command may change.
+     assert!(
+         regs.prepare_msix(0).is_err(),

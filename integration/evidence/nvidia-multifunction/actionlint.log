@@ -1,0 +1,72 @@
+.github/workflows/publish_aster_nixos.yml:14:14: label "ubuntu-4-cores-150GB-ssd" is unknown. available labels are "windows-latest", "windows-latest-8-cores", "windows-2025", "windows-2022", "windows-2019", "ubuntu-latest", "ubuntu-latest-4-cores", "ubuntu-latest-8-cores", "ubuntu-latest-16-cores", "ubuntu-24.04", "ubuntu-24.04-arm", "ubuntu-22.04", "ubuntu-22.04-arm", "ubuntu-20.04", "macos-latest", "macos-latest-xl", "macos-latest-xlarge", "macos-latest-large", "macos-15-xlarge", "macos-15-large", "macos-15", "macos-14-xl", "macos-14-xlarge", "macos-14-large", "macos-14", "macos-13-xl", "macos-13-xlarge", "macos-13-large", "macos-13", "self-hosted", "x64", "arm", "arm64", "linux", "macos", "windows", "nvidia-gpu", "nvidia-vfio". if it is a custom label for self-hosted runner, set list of labels in actionlint.yaml config file [runner-label]
+   |
+14 |     runs-on: ubuntu-4-cores-150GB-ssd
+   |              ^~~~~~~~~~~~~~~~~~~~~~~~
+.github/workflows/publish_website.yml:24:15: the runner of "actions/checkout@v2" action is too old to run on GitHub Actions. update the action's version to fix this issue [action]
+   |
+24 |       - uses: actions/checkout@v2
+   |               ^~~~~~~~~~~~~~~~~~~
+.github/workflows/push_cachix_dev.yml:20:14: label "ubuntu-4-cores-150GB-ssd" is unknown. available labels are "windows-latest", "windows-latest-8-cores", "windows-2025", "windows-2022", "windows-2019", "ubuntu-latest", "ubuntu-latest-4-cores", "ubuntu-latest-8-cores", "ubuntu-latest-16-cores", "ubuntu-24.04", "ubuntu-24.04-arm", "ubuntu-22.04", "ubuntu-22.04-arm", "ubuntu-20.04", "macos-latest", "macos-latest-xl", "macos-latest-xlarge", "macos-latest-large", "macos-15-xlarge", "macos-15-large", "macos-15", "macos-14-xl", "macos-14-xlarge", "macos-14-large", "macos-14", "macos-13-xl", "macos-13-xlarge", "macos-13-large", "macos-13", "self-hosted", "x64", "arm", "arm64", "linux", "macos", "windows", "nvidia-gpu", "nvidia-vfio". if it is a custom label for self-hosted runner, set list of labels in actionlint.yaml config file [runner-label]
+   |
+20 |     runs-on: ubuntu-4-cores-150GB-ssd
+   |              ^~~~~~~~~~~~~~~~~~~~~~~~
+.github/workflows/test_cargo_component.yml:13:12: "paths" section must be sequence node but got alias node with "" tag [syntax-check]
+   |
+13 |     paths: *cargo_component_paths
+   |            ^~~~~~~~~~~~~~~~~~~~~~
+.github/workflows/test_iso_image.yml:20:14: label "ubuntu-4-cores-150GB-ssd" is unknown. available labels are "windows-latest", "windows-latest-8-cores", "windows-2025", "windows-2022", "windows-2019", "ubuntu-latest", "ubuntu-latest-4-cores", "ubuntu-latest-8-cores", "ubuntu-latest-16-cores", "ubuntu-24.04", "ubuntu-24.04-arm", "ubuntu-22.04", "ubuntu-22.04-arm", "ubuntu-20.04", "macos-latest", "macos-latest-xl", "macos-latest-xlarge", "macos-latest-large", "macos-15-xlarge", "macos-15-large", "macos-15", "macos-14-xl", "macos-14-xlarge", "macos-14-large", "macos-14", "macos-13-xl", "macos-13-xlarge", "macos-13-large", "macos-13", "self-hosted", "x64", "arm", "arm64", "linux", "macos", "windows", "nvidia-gpu", "nvidia-vfio". if it is a custom label for self-hosted runner, set list of labels in actionlint.yaml config file [runner-label]
+   |
+20 |     runs-on: ubuntu-4-cores-150GB-ssd
+   |              ^~~~~~~~~~~~~~~~~~~~~~~~
+.github/workflows/test_loongarch.yml:26:11: input "runs_on" is not defined in action "Test" defined at "./.github/actions/test". available inputs are "arch", "auto_test", "boot_protocol", "conformance_test_extra_blocklists", "conformance_test_suite", "conformance_test_workdir", "enable_kvm", "intel_tdx", "mem", "netdev", "release", "rootfs_boot", "scheme", "smp", "xfstests_disk_size", "xfstests_fs_type", "xfstests_runlist" [action]
+   |
+26 |           runs_on: 'ubuntu-latest'
+   |           ^~~~~~~~
+.github/workflows/test_nixos_full.yml:35:12: "paths" section must be sequence node but got alias node with "" tag [syntax-check]
+   |
+35 |     paths: *triggering_paths
+   |            ^~~~~~~~~~~~~~~~~
+.github/workflows/test_riscv.yml:75:34: 1st argument of function call is not assignable. "bool" cannot be assigned to "string". called function type is "contains(string, string) -> bool" [expression]
+   |
+75 |           release: ${{ !contains(matrix.release, 'false') }}
+   |                                  ^~~~~~~~~~~~~~~
+.github/workflows/test_riscv.yml:75:34: 1st argument of function call is not assignable. "bool" cannot be assigned to "array<any>". called function type is "contains(array<any>, any) -> bool" [expression]
+   |
+75 |           release: ${{ !contains(matrix.release, 'false') }}
+   |                                  ^~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:36:11: input "runs_on" is not defined in action "Test" defined at "./.github/actions/test". available inputs are "arch", "auto_test", "boot_protocol", "conformance_test_extra_blocklists", "conformance_test_suite", "conformance_test_workdir", "enable_kvm", "intel_tdx", "mem", "netdev", "release", "rootfs_boot", "scheme", "smp", "xfstests_disk_size", "xfstests_fs_type", "xfstests_runlist" [action]
+   |
+36 |           runs_on: 'ubuntu-latest'
+   |           ^~~~~~~~
+.github/workflows/test_x86.yml:106:34: 1st argument of function call is not assignable. "bool" cannot be assigned to "string". called function type is "contains(string, string) -> bool" [expression]
+    |
+106 |           release: ${{ !contains(matrix.release, 'false') }}
+    |                                  ^~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:106:34: 1st argument of function call is not assignable. "bool" cannot be assigned to "array<any>". called function type is "contains(array<any>, any) -> bool" [expression]
+    |
+106 |           release: ${{ !contains(matrix.release, 'false') }}
+    |                                  ^~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:147:34: 1st argument of function call is not assignable. "bool" cannot be assigned to "string". called function type is "contains(string, string) -> bool" [expression]
+    |
+147 |           release: ${{ !contains(matrix.release, 'false') }}
+    |                                  ^~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:147:34: 1st argument of function call is not assignable. "bool" cannot be assigned to "array<any>". called function type is "contains(array<any>, any) -> bool" [expression]
+    |
+147 |           release: ${{ !contains(matrix.release, 'false') }}
+    |                                  ^~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:148:37: 1st argument of function call is not assignable. "bool" cannot be assigned to "string". called function type is "contains(string, string) -> bool" [expression]
+    |
+148 |           enable_kvm: ${{ !contains(matrix.enable_kvm, 'false') }}
+    |                                     ^~~~~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:148:37: 1st argument of function call is not assignable. "bool" cannot be assigned to "array<any>". called function type is "contains(array<any>, any) -> bool" [expression]
+    |
+148 |           enable_kvm: ${{ !contains(matrix.enable_kvm, 'false') }}
+    |                                     ^~~~~~~~~~~~~~~~~~
+.github/workflows/test_x86.yml:150:23: property "netdev" is not defined in object type {boot_protocol: string; conformance_test_extra_blocklists: string; conformance_test_workdir: string; enable_kvm: bool; release: bool; scheme: string; smp: number; suite: string; variant: string} [expression]
+    |
+150 |           netdev: ${{ matrix.netdev || 'tap' }}
+    |                       ^~~~~~~~~~~~~
+.github/workflows/test_xfstests_full.yml:11:14: label "ubuntu-4-cores-150GB-ssd" is unknown. available labels are "windows-latest", "windows-latest-8-cores", "windows-2025", "windows-2022", "windows-2019", "ubuntu-latest", "ubuntu-latest-4-cores", "ubuntu-latest-8-cores", "ubuntu-latest-16-cores", "ubuntu-24.04", "ubuntu-24.04-arm", "ubuntu-22.04", "ubuntu-22.04-arm", "ubuntu-20.04", "macos-latest", "macos-latest-xl", "macos-latest-xlarge", "macos-latest-large", "macos-15-xlarge", "macos-15-large", "macos-15", "macos-14-xl", "macos-14-xlarge", "macos-14-large", "macos-14", "macos-13-xl", "macos-13-xlarge", "macos-13-large", "macos-13", "self-hosted", "x64", "arm", "arm64", "linux", "macos", "windows", "nvidia-gpu", "nvidia-vfio". if it is a custom label for self-hosted runner, set list of labels in actionlint.yaml config file [runner-label]
+   |
+11 |     runs-on: ubuntu-4-cores-150GB-ssd
+   |              ^~~~~~~~~~~~~~~~~~~~~~~~

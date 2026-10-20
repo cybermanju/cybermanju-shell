@@ -1,0 +1,288 @@
+warning: Git tree '/workspace/asterinas-gpui/gpui-shell' is dirty
+evaluating flake...
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+error:
+       … while checking flake output 'packages'
+
+         at /nix/store/ynj84gwzfs462n9iqk1ls9xvha3dc90h-source/flake.nix:67:7:
+
+           66|
+           67|       packages = forAllSystems (pkgs: rec {
+             |       ^
+           68|         default = pkgs.gpuishell;
+
+       … while checking the derivation 'packages.x86_64-linux.default'
+
+         at /nix/store/ynj84gwzfs462n9iqk1ls9xvha3dc90h-source/flake.nix:68:9:
+
+           67|       packages = forAllSystems (pkgs: rec {
+           68|         default = pkgs.gpuishell;
+             |         ^
+           69|         debug = default.override { profile = "dev"; };
+
+       … while calling the 'derivationStrict' builtin
+
+         at /builtin/derivation.nix:9:12: (source not available)
+
+       … while evaluating derivation 'gpuishell-0.1.0'
+         whose name attribute is located at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/pkgs/stdenv/generic/make-derivation.nix:651:11
+
+       … while evaluating attribute 'cargoArtifacts' of derivation 'gpuishell-0.1.0'
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/mkCargoDerivation.nix:92:12:
+
+           91|   // {
+           92|     inherit cargoArtifacts;
+             |            ^
+           93|
+
+       … while evaluating derivation 'gpuishell-deps-0.1.0'
+         whose name attribute is located at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/pkgs/stdenv/generic/make-derivation.nix:651:11
+
+       … while evaluating attribute 'cargoVendorDir' of derivation 'gpuishell-deps-0.1.0'
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/mkCargoDerivation.nix:102:5:
+
+          101|     # access. Directory structure should basically follow the output of `cargo vendor`.
+          102|     cargoVendorDir = args.cargoVendorDir or (vendorCargoDeps args);
+             |     ^
+          103|
+
+       … while evaluating derivation 'vendor-cargo-deps'
+         whose name attribute is located at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/pkgs/stdenv/generic/make-derivation.nix:651:11
+
+       … while evaluating attribute 'buildCommand' of derivation 'vendor-cargo-deps'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/pkgs/build-support/trivial-builders/default.nix:81:16:
+
+           80|         enableParallelBuilding = true;
+           81|         inherit buildCommand name;
+             |                ^
+           82|         passAsFile = [ "buildCommand" ] ++ (derivationArgs.passAsFile or [ ]);
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/vendorCargoRegistries.nix:139:29:
+
+          138|
+          139|   configReplaceRegistries = mapAttrsToList (
+             |                             ^
+          140|     name: urls:
+
+       … while calling 'mapAttrsToList'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/attrsets.nix:1089:23:
+
+         1088|   */
+         1089|   mapAttrsToList = f: attrs: attrValues (mapAttrs f attrs);
+             |                       ^
+         1090|
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/vendorCargoRegistries.nix:115:7:
+
+          114|     else
+          115|       warnIf (
+             |       ^
+          116|         builtins.length missingPackageRegistries > 0
+
+       … while calling 'warnIf'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/trivial.nix:914:18:
+
+          913|   */
+          914|   warnIf = cond: msg: if cond then warn msg else x: x;
+             |                  ^
+          915|
+
+       … while calling anonymous lambda
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/vendorCargoRegistries.nix:87:38:
+
+           86|   } allCargoRegistryPairsWithIndex;
+           87|   missingPackageRegistries = filter (r: !(existingRegistries ? ${r})) (
+             |                                      ^
+           88|     map (p: removeProtocol p.source) (
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/vendorCargoRegistries.nix:84:24:
+
+           83|   # Registries referenced in Cargo.lock that are missing from cargo config
+           84|   existingRegistries = foldl (acc: r: acc // { ${removeProtocol r.value.index} = true; }) {
+             |                        ^
+           85|     "https://github.com/rust-lang/crates.io-index" = true;
+
+       … while calling 'foldl'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/lists.nix:196:14:
+
+          195|   foldl =
+          196|     op: nul: list:
+             |              ^
+          197|     let
+
+       … from call site
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/lists.nix:200:5:
+
+          199|     in
+          200|     foldl' (length list - 1);
+             |     ^
+          201|
+
+       … while calling 'foldl''
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/lists.nix:198:16:
+
+          197|     let
+          198|       foldl' = n: if n == -1 then nul else op (foldl' (n - 1)) (elemAt list n);
+             |                ^
+          199|     in
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/vendorCargoRegistries.nix:75:27:
+
+           74|   allCargoRegistries = flatten (map (c: c.registries or [ ]) parsedCargoConfigTomls);
+           75|   allCargoRegistryPairs = flatten (
+             |                           ^
+           76|     map (mapAttrsToList (name: value: { inherit name value; })) allCargoRegistries
+
+       … while calling 'flatten'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/lists.nix:448:13:
+
+          447|   */
+          448|   flatten = x: if isList x then concatMap flatten x else [ x ];
+             |             ^
+          449|
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/vendorCargoRegistries.nix:74:24:
+
+           73|   parsedCargoConfigTomls = map (p: builtins.fromTOML (readFile p)) cargoConfigs;
+           74|   allCargoRegistries = flatten (map (c: c.registries or [ ]) parsedCargoConfigTomls);
+             |                        ^
+           75|   allCargoRegistryPairs = flatten (
+
+       … while calling 'flatten'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/lists.nix:448:13:
+
+          447|   */
+          448|   flatten = x: if isList x then concatMap flatten x else [ x ];
+             |             ^
+          449|
+
+       … from call site
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/trivial.nix:1083:5:
+
+         1082|     # TODO: Should we add call-time "type" checking like built in?
+         1083|     __functor = self: f;
+             |     ^
+         1084|     __functionArgs = args;
+
+       … while calling anonymous lambda
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/findCargoFiles.nix:61:1:
+
+           60| in
+           61| src:
+             | ^
+           62| let
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/findCargoFiles.nix:67:16:
+
+           66|
+           67|   foundFiles = listFilesRecursive filter false origSrc;
+             |                ^
+           68|   grouped = groupBy (x: x.type) foundFiles;
+
+       … while calling 'listFilesRecursive'
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/findCargoFiles.nix:19:31:
+
+           18|   listFilesRecursive =
+           19|     filter: parentIsDotCargo: dir:
+             |                               ^
+           20|     flatten (
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/findCargoFiles.nix:20:5:
+
+           19|     filter: parentIsDotCargo: dir:
+           20|     flatten (
+             |     ^
+           21|       flip mapAttrsToList (builtins.readDir dir) (
+
+       … while calling 'flatten'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/lists.nix:448:13:
+
+          447|   */
+          448|   flatten = x: if isList x then concatMap flatten x else [ x ];
+             |             ^
+          449|
+
+       … from call site
+
+         at /nix/store/8gmcll9svv0pwzafwvlhnfxij1kam4lf-source/lib/findCargoFiles.nix:21:7:
+
+           20|     flatten (
+           21|       flip mapAttrsToList (builtins.readDir dir) (
+             |       ^
+           22|         name: type:
+
+       … while calling 'flip'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/trivial.nix:377:11:
+
+          376|   flip =
+          377|     f: a: b:
+             |           ^
+          378|     f b a;
+
+       … from call site
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/trivial.nix:378:5:
+
+          377|     f: a: b:
+          378|     f b a;
+             |     ^
+          379|
+
+       … while calling 'mapAttrsToList'
+
+         at /nix/store/q1xsswrh8rfy39561x8hc3anfrbxzwvl-source/lib/attrsets.nix:1089:23:
+
+         1088|   */
+         1089|   mapAttrsToList = f: attrs: attrValues (mapAttrs f attrs);
+             |                       ^
+         1090|
+
+       error: path '/nix/store/zc27xhzgcwshqn0n99k8sgpd7i8j6drp-source' is not valid
+EXIT_STATUS=1

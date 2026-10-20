@@ -1,0 +1,428 @@
+[32m/workspace/asterinas-gpui/asterinas$ [0msed -n '1,170p' Makefile; sed -n '350,405p' Makefile; cat .github/workflows/test_nixos_minimal.yml; find test/nixos/tests/hello tools/nixos test/nixos/common -maxdepth 2 -type f | sort; ls -la target; find target -maxdepth 4 \( -iname '*nixos*' -o -iname '*.qcow2' -o -iname '*.img' -o -iname '*hello*' -o -iname '*vmlinuz*' \) -ls; cat tools/nixos/build_nixos.sh tools/nixos/run.sh
+# SPDX-License-Identifier: MPL-2.0
+# =========================== Makefile options. ===============================
+# Global build options.
+TARGET_ARCH ?= x86_64
+BENCHMARK ?= none
+BOOT_METHOD ?= grub-rescue-iso
+BOOT_PROTOCOL ?= multiboot2
+ENABLE_KVM ?= 1
+INTEL_TDX ?= 0
+MEM ?= 8G
+OVMF ?= on
+RELEASE ?= 0
+RELEASE_LTO ?= 0
+LOG_LEVEL ?= error
+SCHEME ?= ""
+SMP ?= 1
+OSTD_TASK_STACK_SIZE_IN_PAGES ?= 64
+FEATURES ?=
+NO_DEFAULT_FEATURES ?= 0
+COVERAGE ?= 0
+INITRAMFS ?= on
+CMDLINE ?=
+# Specify the primary system console (supported: tty0, ttyS0, hvc0).
+# - tty0: The active virtual terminal (VT).
+# - ttyS0: The serial (UART) terminal.
+# - hvc0: The virtio-console terminal.
+# Asterinas will automatically fall back to tty0 if hvc0 is not available.
+# Note that currently the virtual terminal (tty0) can only work with
+# linux-efi-handover64 and linux-efi-pe64 boot protocol.
+ifeq ($(SCHEME), sifive_u)
+CONSOLE ?= ttyS0
+else
+CONSOLE ?= hvc0
+endif
+# End of global build options.
+# GDB debugging and profiling options.
+GDB_TCP_PORT ?= 1234
+GDB_PROFILE_FORMAT ?= flame-graph
+GDB_PROFILE_COUNT ?= 200
+GDB_PROFILE_INTERVAL ?= 0.1
+# End of GDB options.
+# The Makefile provides a way to run arbitrary tests in the kernel
+# mode using the kernel command line.
+# Here are the options for the auto test feature.
+AUTO_TEST ?= none
+# Specify whether to build conformance tests under `test/initramfs/src/conforman
+ce`.
+ENABLE_CONFORMANCE_TEST ?= false
+CONFORMANCE_TEST_SUITE ?= ltp
+CONFORMANCE_TEST_WORKDIR ?= /tmp
+# Comma-separated extra blocklists for conformance runners.
+# - `gvisor` treats each entry as a directory relative to its runner directory,
+#   and loads a per-test blocklist file from that directory.
+# - `kselftest` treats each entry as a blocklist file relative to its runner
+#   directory, and appends that file directly.
+CONFORMANCE_TEST_EXTRA_BLOCKLISTS ?= ""
+# Comma-separated tests to run within the selected conformance suite.
+#
+# This variable allows one to select one or multiple tests to run.
+# When this environment variable is present,
+# the blocklist of a conformance test will be ignored.
+#
+# - gvisor:    a test *binary* name, e.g. `epoll_test` (narrow the cases inside
+#              it with `CONFORMANCE_TEST_GVISOR_FILTER`).
+# - kselftest: a `<collection>:<case>` entry, e.g. `timers:posix_timers`.
+# - ltp:       a syscall testcase id, e.g. `rename01`.
+# - xfstests:  a test id, e.g. `generic/001`.
+CONFORMANCE_TEST_SELECTOR ?= ""
+# gVisor-only positive gtest filter, applied inside one selected gVisor test
+# binary, e.g. `EpollTest.CloseFile:EpollTest.Oneshot`.
+CONFORMANCE_TEST_GVISOR_FILTER ?= ""
+# Parameters for xfstests.
+XFSTESTS_FS_TYPE ?= ext2
+XFSTESTS_RUNLIST ?= short.list
+XFSTESTS_DISK_SIZE ?= 12G
+# Specify whether to build regression tests under `test/initramfs/src/regression
+`.
+ENABLE_REGRESSION_TEST ?= false
+# End of auto test features.
+# Network settings
+# NETDEV possible values are user, tap, and none. SCHEME=microvm does not suppor
+t none.
+NETDEV ?= user
+VHOST ?= off
+# The name server listed by /etc/resolv.conf inside the Asterinas VM
+DNS_SERVER ?= none
+# End of network settings
+# Virtio-fs settings. Set VIRTIOFS=on to attach a virtio-fs device. Set
+# VIRTIOFS_SCRATCH=on to attach a second device (requires VIRTIOFS=on).
+# VIRTIOFS_CACHE accepts auto, always, never, or metadata.
+VIRTIOFS ?= off
+VIRTIOFS_SCRATCH ?= off
+VIRTIOFS_CACHE ?= auto
+# End of Virtio-fs settings.
+# NixOS settings
+NIXOS_DISK_SIZE_IN_MB ?= 16384
+NIXOS_DISABLE_SYSTEMD ?= false
+# The following option is only effective when NIXOS_DISABLE_SYSTEMD is set to 't
+rue'.
+# Use a login shell to ensure that environment variables are initialized correct
+ly.
+NIXOS_STAGE_2_INIT ?= /bin/sh -l
+# End of NixOS settings
+# ISO installer settings
+AUTO_INSTALL ?= true
+# End of ISO installer settings
+# Cachix binary cache settings
+CACHIX_AUTH_TOKEN ?=
+RELEASE_CACHIX_NAME ?= "aster-nixos-release"
+RELEASE_SUBSTITUTER ?= https://aster-nixos-release.cachix.org
+RELEASE_TRUSTED_PUBLIC_KEY ?= aster-nixos-release.cachix.org-1:xB6U/f5ck5vGDJZ04
+kPp3zGpZ4Nro9X4+TSSMAETVFE=
+DEV_CACHIX_NAME ?= "aster-nixos-dev"
+DEV_SUBSTITUTER ?= https://aster-nixos-dev.cachix.org
+DEV_TRUSTED_PUBLIC_KEY ?= aster-nixos-dev.cachix.org-1:xrCbE2flfliFTQCY/2HeJoT2t
+CO+5kMTZeLIUH9lnIA=
+# End of Cachix binary cache settings
+# ========================= End of Makefile options. ==========================
+export OSDK_TARGET_ARCH=$(TARGET_ARCH)
+SHELL := /bin/bash
+CARGO_OSDK := ~/.cargo/bin/cargo-osdk
+# Common arguments for `cargo osdk` `build`, `run` and `test` commands.
+CARGO_OSDK_COMMON_ARGS :=
+# The build arguments also apply to the `cargo osdk run` command.
+CARGO_OSDK_BUILD_ARGS := --kcmd-args="loglevel=$(LOG_LEVEL)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="earlycon"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="console=$(CONSOLE)"
+ifneq ($(strip $(CMDLINE)),)
+CARGO_OSDK_BUILD_ARGS += $(foreach arg,$(CMDLINE),--kcmd-args="$(arg)")
+endif
+CARGO_OSDK_TEST_ARGS :=
+ifeq ($(AUTO_TEST), conformance)
+ENABLE_CONFORMANCE_TEST := true
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="CONFORMANCE_TEST_SUITE=$(CONFORMANCE_TEST_
+SUITE)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="CONFORMANCE_TEST_WORKDIR=$(CONFORMANCE_TES
+T_WORKDIR)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="CONFORMANCE_TEST_EXTRA_BLOCKLISTS=$(CONFOR
+MANCE_TEST_EXTRA_BLOCKLISTS)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="CONFORMANCE_TEST_SELECTOR=$(CONFORMANCE_TE
+ST_SELECTOR)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="CONFORMANCE_TEST_GVISOR_FILTER=$(CONFORMAN
+CE_TEST_GVISOR_FILTER)"
+ifeq ($(CONFORMANCE_TEST_SUITE), xfstests)
+include test/initramfs/src/conformance/xfstests/build_config.mk
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="XFSTESTS_FS_TYPE=$(XFSTESTS_FS_TYPE)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="XFSTESTS_RUNLIST=$(XFSTESTS_RUNLIST)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="XFSTESTS_TEST_DEV=$(XFSTESTS_TEST_DEV)"
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="XFSTESTS_SCRATCH_DEV=$(XFSTESTS_SCRATCH_DE
+V)"
+endif
+CARGO_OSDK_BUILD_ARGS += --init-args="/opt/run_conformance_test.sh"
+else ifeq ($(AUTO_TEST), regression)
+ENABLE_REGRESSION_TEST := true
+CARGO_OSDK_BUILD_ARGS += --kcmd-args="INTEL_TDX=$(INTEL_TDX)"
+CARGO_OSDK_BUILD_ARGS += --init-args="/test/run_regression_test.sh"
+else ifeq ($(AUTO_TEST), boot)
+CARGO_OSDK_BUILD_ARGS += --init-args="/test/boot_hello.sh"
+else ifeq ($(AUTO_TEST), vsock)
+ENABLE_REGRESSION_TEST := true
+export VSOCK=on
+CARGO_OSDK_BUILD_ARGS += --init-args="/test/run_vsock_test.sh"
+endif
+ifeq ($(RELEASE_LTO), 1)
+CARGO_OSDK_COMMON_ARGS += --profile release-lto
+# Check the running status of auto tests from the QEMU log
+ifeq ($(AUTO_TEST), conformance)
+@tail --lines 100 qemu.log | grep -q "^All conformance tests passed." \
+|| (echo "Conformance test failed" && exit 1)
+else ifeq ($(AUTO_TEST), regression)
+@tail --lines 100 qemu.log | grep -q "^All regression tests passed." \
+|| (echo "Regression test failed" && exit 1)
+else ifeq ($(AUTO_TEST), boot)
+@tail --lines 100 qemu.log | grep -q "^Successfully booted." \
+|| (echo "Boot test failed" && exit 1)
+else ifeq ($(AUTO_TEST), vsock)
+@tail --lines 100 qemu.log | grep -q "^Vsock test passed." \
+|| (echo "Vsock test failed" && exit 1)
+endif
+# Build the Asterinas NixOS ISO installer image
+iso: BOOT_PROTOCOL = linux-efi-handover64
+iso:
+@make kernel
+@if [ -n "$(NIXOS_TEST_SUITE)" ]; then \
+        $(MAKE) --no-print-directory -C test/nixos iso; \
+    else \
+        ./tools/nixos/build_iso.sh; \
+    fi
+# Build the Asterinas NixOS ISO installer image and then do installation
+run_iso: OVMF = off
+run_iso:
+@./tools/nixos/run.sh iso
+# Create an Asterinas NixOS installation on host
+nixos: BOOT_PROTOCOL = linux-efi-handover64
+nixos:
+@make kernel
+@if [ -n "$(NIXOS_TEST_SUITE)" ]; then \
+        $(MAKE) --no-print-directory -C test/nixos nixos; \
+    else \
+        ./tools/nixos/build_nixos.sh; \
+    fi
+# After creating a Asterinas NixOS installation (via either the `run_iso` or `ni
+xos` target),
+# run the NixOS
+run_nixos: OVMF = off
+run_nixos:
+@if [ -n "$(NIXOS_TEST_SUITE)" ]; then \
+        $(MAKE) --no-print-directory -C test/nixos run_nixos; \
+    else \
+        ./tools/nixos/run.sh nixos; \
+    fi
+# Build the Asterinas NixOS patched packages
+cachix:
+@nix-build distro/cachix \
+--option extra-substituters "${RELEASE_SUBSTITUTER} ${DEV_SUBSTITUTER}" \
+--option extra-trusted-public-keys "${RELEASE_TRUSTED_PUBLIC_KEY} ${DEV_TRUSTED_
+PUBLIC_KEY}" \
+--out-link cachix.list
+# A basic CI test for NixOS.
+#
+# This workflow is intended to include the most basic test for AsterNixOS.
+# It requires only a minimal amount of disk space
+# and thus can be run on standard Github runners _for free_.
+name: Test AsterNixOS (minimal)
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+jobs:
+  minimal-nixos-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      # In the subsequent tests, a relatively large disk (4GB) will be created t
+o install AsterNixOS.
+      # Standard GitHub runners may encounter "insufficient disk space" errors.
+      # Therefore, we first execute the following action to free up
+      # some disk space. The amount of space saved can be referenced in
+      # https://github.com/endersonmenezes/free-disk-space?tab=readme-ov-file#si
+ze-savings,
+      # currently amounting to approximately 24GB.
+      - uses: endersonmenezes/free-disk-space@v3
+        with:
+          rm_cmd: "rmz"
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+      - uses: actions/checkout@v4
+      - name: Run the hello test on AsterNixOS
+        timeout-minutes: 30
+        uses: maus007/docker-run-action-fork@v1
+        with:
+          image: asterinas/kernel-dev:0.19.0-20261012
+          options: --privileged -v /dev:/dev -v ${{ github.workspace }}:/root/as
+terinas
+          # `docker-run-action-fork` joins these lines with ';' and runs them vi
+a
+          # `sh -c` without fail-fast settings, unlike a normal `run:` step.
+          # So we have to do `set -e` explicitly here.
+          run: |
+            set -e
+            make nixos NIXOS_TEST_SUITE=hello NIXOS_DISK_SIZE_IN_MB=6144
+            make run_nixos NIXOS_TEST_SUITE=hello
+test/nixos/common/framework/Cargo.toml
+test/nixos/common/merge_nixos_config.sh
+test/nixos/common/template/Cargo.toml
+test/nixos/common/template/extra_config.nix
+test/nixos/common/test_macro/Cargo.toml
+test/nixos/tests/hello/Cargo.toml
+test/nixos/tests/hello/src/main.rs
+tools/nixos/build_iso.sh
+tools/nixos/build_nixos.sh
+tools/nixos/print_target_nix_system.sh
+tools/nixos/run.sh
+total 48
+drwxr-xr-x  6 ubuntu ubuntu  4096 Oct 20 12:28 .
+drwxr-xr-x 16 ubuntu ubuntu  4096 Oct 20 12:59 ..
+-rw-r--r--  1 ubuntu ubuntu 17291 Oct 20 13:59 .rustc_info.json
+-rw-r--r--  1 ubuntu ubuntu   177 Oct 20 09:57 CACHEDIR.TAG
+drwxr-xr-x  7 ubuntu ubuntu  4096 Oct 20 16:33 debug
+drwxr-xr-x 19 ubuntu ubuntu  4096 Oct 20 16:36 osdk
+drwxr-xr-x  3 ubuntu ubuntu  4096 Oct 20 12:28 x86_64-unknown-linux-gnu
+drwxr-xr-x  3 ubuntu ubuntu  4096 Oct 20 09:59 x86_64-unknown-none
+#!/bin/bash
+# SPDX-License-Identifier: MPL-2.0
+set -e
+TARGET_ARCH=${TARGET_ARCH:-x86_64}
+# Accept config file name as parameter, default to "configuration.nix"
+CONFIG_FILE_NAME=${1:-"configuration.nix"}
+SCRIPT_DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
+ASTERINAS_DIR=$(realpath ${SCRIPT_DIR}/../..)
+ASTER_IMAGE_PATH=${ASTERINAS_DIR}/target/nixos/asterinas.img
+NIXOS_DISK_SIZE_IN_MB=${NIXOS_DISK_SIZE_IN_MB:-16384}
+DISTRO_DIR=$(realpath ${ASTERINAS_DIR}/distro)
+CONFIG_PATH=${DISTRO_DIR}/etc_nixos/${CONFIG_FILE_NAME}
+NIX_SYSTEM=$("${SCRIPT_DIR}/print_target_nix_system.sh" "${TARGET_ARCH}") || exi
+t 1
+pushd $DISTRO_DIR
+nix-build aster_nixos_installer/default.nix \
+    --argstr target_platform "${NIX_SYSTEM}" \
+    --argstr disable-systemd "${NIXOS_DISABLE_SYSTEMD}" \
+    --argstr stage-2-hook "${NIXOS_STAGE_2_INIT}" \
+    --argstr log-level "${LOG_LEVEL}" \
+    --argstr console "${CONSOLE}" \
+    --argstr extra-substituters "${RELEASE_SUBSTITUTER} ${DEV_SUBSTITUTER}" \
+    --argstr extra-trusted-public-keys "${RELEASE_TRUSTED_PUBLIC_KEY} ${DEV_TRUS
+TED_PUBLIC_KEY}"
+popd
+mkdir -p ${ASTERINAS_DIR}/target/nixos
+# The installer skips partitioning and mkfs on an existing image,
+# so a new size takes effect only on a new image.
+if [ -e ${ASTER_IMAGE_PATH} ] \
+    && [ "$(stat -c %s ${ASTER_IMAGE_PATH})" -ne $((NIXOS_DISK_SIZE_IN_MB * 1024
+ * 1024)) ]; then
+    echo "Removing ${ASTER_IMAGE_PATH}, because its size is not ${NIXOS_DISK_SIZ
+E_IN_MB}MB......"
+    rm ${ASTER_IMAGE_PATH}
+fi
+if [ ! -e ${ASTER_IMAGE_PATH} ]; then
+    echo "Creating image at ${ASTER_IMAGE_PATH} of size ${NIXOS_DISK_SIZE_IN_MB}
+MB......"
+    fallocate -l ${NIXOS_DISK_SIZE_IN_MB}M ${ASTER_IMAGE_PATH}
+    echo "Image created successfully!"
+fi
+DISK=$(losetup -fP --show ${ASTER_IMAGE_PATH})
+cleanup() {
+    losetup -d ${DISK} 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM ERR
+${DISTRO_DIR}/result/bin/aster-nixos-install --config ${CONFIG_PATH} --disk ${DI
+SK}
+#!/bin/sh
+# SPDX-License-Identifier: MPL-2.0
+# Run a NixOS installation or NixOS ISO installer image built by the root Makefi
+le inside a VM
+#
+# Usage: ./run.sh [nixos | iso]
+set -e
+usage() {
+    echo "Usage: $0 [nixos | iso]"
+    exit 1
+}
+if [ "$#" -ne 1 ]; then
+    usage
+fi
+MODE=$1
+TARGET_ARCH=${TARGET_ARCH:-x86_64}
+SCRIPT_DIR=$(dirname "$0")
+ASTERINAS_DIR=$(realpath "${SCRIPT_DIR}/../..")
+# tools/qemu_args.sh currently emits x86_64-specific arguments.
+# Reject other architectures to avoid invoking non-x86 QEMU with incompatible ar
+gs.
+if [ "${TARGET_ARCH}" != "x86_64" ]; then
+    echo "Error: tools/nixos/run.sh currently supports only TARGET_ARCH=x86_64; 
+got ${TARGET_ARCH}" >&2
+    exit 1
+fi
+# Change to Asterinas root directory to ensure all scripts run from the correct 
+location.
+cd "${ASTERINAS_DIR}"
+# Get base QEMU arguments from qemu_args.sh script
+QEMU_ARGS=$(${ASTERINAS_DIR}/tools/qemu_args.sh common 2>/dev/null)
+# Add mode-specific disk and device arguments
+case "$MODE" in
+    nixos)
+        NIXOS_DIR="${ASTERINAS_DIR}/target/nixos"
+        QEMU_ARGS="${QEMU_ARGS} \
+            -drive if=none,format=raw,id=u0,file=${NIXOS_DIR}/asterinas.img \
+            -device virtio-blk-pci,drive=u0,disable-legacy=on,disable-modern=off
+ \
+        "
+        ;;
+    iso)
+        ASTER_IMAGE_PATH=${ASTERINAS_DIR}/target/nixos/asterinas.img
+        NIXOS_DISK_SIZE_IN_MB=${NIXOS_DISK_SIZE_IN_MB:-16384}
+        ISO_IMAGE_PATH=$(find "${ASTERINAS_DIR}/target/nixos/iso_image/iso" -nam
+e "*.iso" | head -n 1)
+        if [ ! -f "$ISO_IMAGE_PATH" ]; then
+            echo "Error: ISO_IMAGE not found!"
+            exit 1
+        fi
+        rm -f "${ASTER_IMAGE_PATH}"
+        echo "Creating image at ${ASTER_IMAGE_PATH} of size ${NIXOS_DISK_SIZE_IN
+_MB}MB......"
+        dd if=/dev/zero of="${ASTER_IMAGE_PATH}" bs=1M count=${NIXOS_DISK_SIZE_I
+N_MB} status=none
+        echo "Image created successfully!"
+        QEMU_ARGS="${QEMU_ARGS} \
+            -cdrom ${ISO_IMAGE_PATH} -boot d \
+            -drive if=none,format=raw,id=u0,file=${ASTER_IMAGE_PATH} \
+            -device virtio-blk-pci,drive=u0,disable-legacy=on,disable-modern=off
+ \
+        "
+        ;;
+    *)
+        usage
+        ;;
+esac
+if [ "${ENABLE_KVM}" = "1" ]; then
+    QEMU_ARGS="${QEMU_ARGS} -accel kvm"
+fi
+QEMU_BIN=${QEMU_BIN:-qemu-system-${TARGET_ARCH}}
+# The kernel uses a specific value to signal a successful shutdown via the
+# isa-debug-exit device.
+KERNEL_SUCCESS_EXIT_CODE=16 # 0x10 in hexadecimal
+# QEMU translates the value written to the isa-debug-exit device into a final
+# process exit code using following formula.
+QEMU_SUCCESS_EXIT_CODE=$(((KERNEL_SUCCESS_EXIT_CODE << 1) | 1))
+# Execute QEMU
+# shellcheck disable=SC2086
+${QEMU_BIN} ${QEMU_ARGS} || exit_code=$?
+exit_code=${exit_code:-0}
+# Check if the execution was successful:
+# - Exit code 0: Normal successful exit (e.g., ACPI shutdown or clean terminatio
+n)
+# - Exit code $QEMU_SUCCESS_EXIT_CODE: Kernel signaled success via isa-debug-exi
+t device
+if [ ${exit_code} -eq 0 ] || [ ${exit_code} -eq ${QEMU_SUCCESS_EXIT_CODE} ]; the
+n
+    exit 0
+fi
+exit ${exit_code}
+[32m/workspace/asterinas-gpui/asterinas$ [0m

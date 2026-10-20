@@ -1,0 +1,168 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-rm-os-services.patch",
+  "apply_check": true,
+  "apply_round_trip_exact": true,
+  "git_index_unchanged": true,
+  "files": [
+    {
+      "path": ".github/workflows/graphics_gpu.yml",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 8525,
+      "new_bytes": 8771
+    },
+    {
+      "path": "Cargo.lock",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 49439,
+      "new_bytes": 49486
+    },
+    {
+      "path": "kernel/Cargo.toml",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 940,
+      "new_bytes": 981
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/Cargo.toml",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 227,
+      "new_bytes": 411
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/README.md",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 3792,
+      "new_bytes": 6225
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/lib.rs",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 12343,
+      "new_bytes": 13510
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/runtime.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 4211
+    },
+    {
+      "path": "kernel/src/lib.rs",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 1281,
+      "new_bytes": 1394
+    },
+    {
+      "path": "kernel/src/nvidia_boot.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 2553
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/Cargo.toml",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 222,
+      "new_bytes": 260
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/README.md",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 4940,
+      "new_bytes": 6419
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/build.rs",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 9595,
+      "new_bytes": 11741
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/diagnostics_format.c",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 9439
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/diagnostics_format_test.c",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 4139
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/firmware_bridge.c",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 2358
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/src/diagnostics.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 6577
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/src/firmware.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 21657
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/src/lib.rs",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 11462,
+      "new_bytes": 11598
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/src/runtime.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 11236
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/src/runtime_os.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 2686
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/src/sync.rs",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 26856
+    },
+    {
+      "path": "ostd/libs/nvidia-nvport/sync_bridge.c",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 4383
+    },
+    {
+      "path": "ostd/src/task/atomic_mode.rs",
+      "baseline": "unchanged-tracked-base",
+      "old_bytes": 3106,
+      "new_bytes": 4646
+    },
+    {
+      "path": "tools/graphics/run_cpu_kernel_tests.sh",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 2028,
+      "new_bytes": 2175
+    },
+    {
+      "path": "tools/graphics/run_native_nvidia.py",
+      "baseline": "saved-starting-tree",
+      "old_bytes": 9799,
+      "new_bytes": 9799
+    },
+    {
+      "path": "tools/graphics/run_nvport_format_tests.sh",
+      "baseline": "new-file",
+      "old_bytes": 0,
+      "new_bytes": 1835
+    }
+  ],
+  "prerequisite": "all prior ordered Asterinas patches through asterinas-nvidia-boot-pci-tcg.patch",
+  "commit_created": false,
+  "pushed": false,
+  "authenticated": false
+}

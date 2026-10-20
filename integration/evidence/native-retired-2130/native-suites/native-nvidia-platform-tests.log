@@ -1,0 +1,199 @@
+     Locking 117 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:363:20
+    |
+363 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+363 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+363 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:364:20
+    |
+364 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+364 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+364 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+warning: `typeflags-util` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-rights` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `aster-util` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+warning: `aster-time` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-nvidia-platform v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform)
+warning: the item `IrqLine` is imported redundantly
+ --> /workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform/src/worker/tests.rs:5:27
+  |
+5 |     irq::{InterruptLevel, IrqLine},
+  |                           ^^^^^^^
+...
+9 | use super::*;
+  |     -------- the item `IrqLine` is already imported here
+  |
+  = note: requested on the command line with `-W redundant-imports`
+
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+warning: `aster-nvidia-platform` (lib) generated 2 warnings (1 duplicate)
+   Compiling aster-nvidia-platform-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-test-base)
+warning: `aster-nvidia-platform-osdk-bin` (bin "aster-nvidia-platform-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.20s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 1119m free
+Added to ISO image: directory '/'='/tmp/grub.hbmeMd'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 6129 sectors
+Written to medium : 6129 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a76f000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 256045712040 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x78a, current 0x17ab1a, init 0x3c84
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 332 tests in 8 crates
+
+running 13 tests in crate "aster-nvidia-platform"
+
+test aster_nvidia_platform::runtime::tests::converts_calendar_to_unix_epoch_and_leap_day ... [32mok[39m
+test aster_nvidia_platform::tests::identity_requires_nvidia_display_class ... [32mok[39m
+test aster_nvidia_platform::tests::range_is_checked_and_rejects_empty_or_zero_base ... [32mok[39m
+test aster_nvidia_platform::tests::conventional_config_reads_are_bounded_and_aligned ... [32mok[39m
+test aster_nvidia_platform::worker::tests::worker_rejects_self_wait_without_closing_admission ... [32mok[39m
+test aster_nvidia_platform::worker::tests::generation_overflow_closes_admission_without_wrapping ... [32mok[39m
+test aster_nvidia_platform::worker::tests::actual_timer_irq_signals_worker_that_runs_in_sleepable_task ...NVIDIA native worker: actual APIC timer IRQ to sleepable task handoff passed; not NVIDIA IRQ or GPU
+ [32mok[39m
+test aster_nvidia_platform::worker::tests::dropping_owner_closes_without_waiting_and_task_still_drains ... [32mok[39m
+test aster_nvidia_platform::worker::tests::irq_callbacks_retire_before_worker_drain_and_capture_release ...NVIDIA native worker: IRQ callback retirement preceded accepted-work drain and capture release; not GPU IRQ/RM
+ [32mok[39m
+test aster_nvidia_platform::worker::tests::worker_coalesces_during_execution_and_shutdown_drops_captures ...NVIDIA native worker: actual task, pending coalescence, accepted-work drain and capture destruction passed; not RM/GPU
+ [32mok[39m
+test aster_nvidia_platform::worker::tests::worker_shutdown_rejects_atomic_context_without_closing_admission ... [32mok[39m
+test aster_nvidia_platform::worker::tests::callback_can_rearm_itself_without_inline_execution_or_lost_request ... [32mok[39m
+test aster_nvidia_platform::worker::tests::worker_flush_waits_for_snapshot_and_preserves_later_work_and_captures ... [32mok[39m
+
+test result: [32mok[39m. 13 passed; 0 failed; 0 filtered out.
+
+[ktest runner] skipping crate "aster-pci".
+
+[ktest runner] skipping crate "aster-util".
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+[ktest runner] skipping crate "ostd-nvidia-nvport".
+
+[ktest runner] All crates tested.

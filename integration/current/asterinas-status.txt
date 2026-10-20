@@ -1,0 +1,60 @@
+## graphics/wayland-readiness
+ M Cargo.lock
+ M Cargo.toml
+ M Components.toml
+ M kernel/Cargo.toml
+ M kernel/comps/drm/src/ioctl/gem.rs
+ M kernel/comps/simpledrm/src/lib.rs
+ M kernel/core/comps/nvme/src/device/block_device.rs
+ M kernel/core/comps/nvme/src/msix.rs
+ M kernel/core/comps/nvme/src/transport/pci/transport.rs
+ M kernel/core/comps/pci/src/bus.rs
+ M kernel/core/comps/pci/src/capability/mod.rs
+ M kernel/core/comps/pci/src/capability/msix.rs
+ M kernel/core/comps/pci/src/cfg_space.rs
+ M kernel/core/comps/pci/src/common_device.rs
+ M kernel/core/comps/pci/src/lib.rs
+ M kernel/core/comps/virtio/src/transport/pci/capability.rs
+ M kernel/core/comps/virtio/src/transport/pci/device.rs
+ M kernel/core/comps/virtio/src/transport/pci/legacy.rs
+ M kernel/core/comps/virtio/src/transport/pci/msix.rs
+ M kernel/src/lib.rs
+ M ostd/src/arch/x86/boot/multiboot2/mod.rs
+ M ostd/src/arch/x86/iommu/dma_remapping/context_table.rs
+ M ostd/src/arch/x86/iommu/dma_remapping/mod.rs
+ M ostd/src/arch/x86/iommu/fault.rs
+ M ostd/src/arch/x86/iommu/invalidate/queue.rs
+ M ostd/src/arch/x86/iommu/mod.rs
+ M ostd/src/arch/x86/iommu/registers/capability.rs
+ M ostd/src/arch/x86/iommu/registers/mod.rs
+ M ostd/src/arch/x86/kernel/acpi/mod.rs
+ M ostd/src/io/io_mem/allocator.rs
+ M ostd/src/io/io_mem/mod.rs
+ M ostd/src/io/io_port/mod.rs
+ M ostd/src/io/mod.rs
+ M ostd/src/irq/mod.rs
+ M ostd/src/irq/top_half.rs
+ M ostd/src/mm/dma/mod.rs
+ M ostd/src/task/atomic_mode.rs
+?? .github/actionlint.yaml
+?? .github/workflows/graphics_gpu.yml
+?? kernel/comps/nvidia-platform/
+?? kernel/core/comps/pci/src/dma.rs
+?? kernel/core/comps/pci/src/lifecycle_tests.rs
+?? kernel/core/comps/pci/src/mmio.rs
+?? kernel/core/comps/pci/src/msix_tests.rs
+?? kernel/core/comps/pci/src/msix_transaction.rs
+?? kernel/core/comps/pci/src/multifunction_tests.rs
+?? kernel/core/comps/pci/src/pcie_tests.rs
+?? kernel/core/comps/pci/src/reservation.rs
+?? kernel/core/comps/pci/src/topology.rs
+?? kernel/src/nvidia_boot.rs
+?? ostd/libs/nvidia-nvport/
+?? ostd/src/arch/x86/boot/multiboot2/tests.rs
+?? ostd/src/arch/x86/iommu/dma_remapping/isolated.rs
+?? ostd/src/arch/x86/kernel/acpi/dma_policy.rs
+?? ostd/src/arch/x86/kernel/acpi/vtd_policy.rs
+?? ostd/src/io/io_port/range.rs
+?? ostd/src/mm/dma/device.rs
+?? ostd/src/mm/dma/isolated.rs
+?? tools/graphics/

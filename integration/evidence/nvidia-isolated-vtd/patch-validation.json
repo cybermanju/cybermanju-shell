@@ -1,0 +1,136 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-isolated-vtd.patch",
+  "patch_sha256": "0826ad1aaf9601eacb66ee38da0ef11e595a87f5e157216b6898c30936a3af21",
+  "files": [
+    {
+      "path": "kernel/comps/nvidia-platform/README.md",
+      "old_sha256": "3bb0e60e93ccc36db005b227df56b5d30bb082349e472fc14f478453bf2ba010",
+      "new_sha256": "c324f8c715df99e7bbadeddc39bb4609a2a44ef850765ba73417b0c1020d4975",
+      "new_file": false
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/device.rs",
+      "old_sha256": "b5bb3a8b303508acad85408192abff0a70f24942aa2d5152be0e5f80187150fe",
+      "new_sha256": "0873042561ea1c9b3dddb6e55e9fe2dff183f6d8c1db6e93c10db8a0d90c7f2f",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/bus.rs",
+      "old_sha256": "223c9f90e7b71c8c37b3ee602a2c23b30f72f354d445479c7d61964c7c86d423",
+      "new_sha256": "cb07a83947760c0d293124130e41e305952adb2398a11afea2168b33f0b9e291",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/dma.rs",
+      "old_sha256": "e33df99efa238199d66270d1369feaf86ad7b8c6c5da7baabe920f9c28b1031a",
+      "new_sha256": "f8999814c5cca55b74f950a75ae2d444cf60ad955dbd6b4a5b5610f89478b6d3",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/lifecycle_tests.rs",
+      "old_sha256": "4f520fd1bb6ed2748b17790ac305e43c34aafc517c2cd0da1d36e666655a6680",
+      "new_sha256": "16b1df339181c9ab21a856d0269f5edd1f355652e9fed339aab5b47f6ddba5f6",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/mmio.rs",
+      "old_sha256": "4eb9a079a506d422929a23c3d8c4875cf8ee20798e5cf66e0ab001740556be8e",
+      "new_sha256": "c8b255ff1a5554520872dc4d7d26a37d918f968972ee4e9d0376f3ec1721b804",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/dma_remapping/context_table.rs",
+      "old_sha256": "9d853fbadc8fba746dccd3bbfc04c3f2d2efbbca96898770ab0841e3681c53f1",
+      "new_sha256": "4fe609833165e36d04817df0b5e5aeab1dedf3be05b74d9bcffc6bb2bf1f9874",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/dma_remapping/isolated.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "0effa3820b297ace4bf5dabf9ea8ec2c3ed9746cae4b5c46caaa96c734b97ff7",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/dma_remapping/mod.rs",
+      "old_sha256": "c80ff2ac2f3c47aae0881f4fc6c9709bbaf3bbf3c4b443814ae2639ac61c2da0",
+      "new_sha256": "2de5d97d03e00789cf68a86f7d3998e39ca2dcd27b0f58a806568d9fb3390637",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/fault.rs",
+      "old_sha256": "1fc2a3d8c988b15a7c51ce7079281fd786db3769de1c9d576ac8cfd1440d9f21",
+      "new_sha256": "14ad3c7f301a6d8d231fe8d9d47c26048fba9c621e8dd9ce3423940f9210f13a",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/invalidate/queue.rs",
+      "old_sha256": "669e43e6782d2d39fe95aedb31a165973947eb08e4eb7fbb861f7802e73b2088",
+      "new_sha256": "dfe14fcb2011d4371e6bddd4e0bc99b1b4af37e8bcf18cc7a4a53d44d89c0517",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/mod.rs",
+      "old_sha256": "bedcc471562616a11264a08e5bc7387cb7bd7d2f4866aa262c0f2574de7fede6",
+      "new_sha256": "330c5c5270c4c812c08e976a6a47bef8ccc56144702ad7013bbbc54051493028",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/registers/capability.rs",
+      "old_sha256": "6b72b0b1388d64ef7182f88238e16a372698ce5940dfc5863cb9cf1e28d820d3",
+      "new_sha256": "5e4d548347ca147070cdc50e640fd588bc295727134f5a6e0881054d3b66346a",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/registers/mod.rs",
+      "old_sha256": "90150b28e51838da1be1e748b11949a32ece1b1038888eeeba64a2b36d62d283",
+      "new_sha256": "e1588fbcb24caefb77fdf94d4466b441c012ac5e812284a995aff4d99421e122",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/kernel/acpi/mod.rs",
+      "old_sha256": "edc8aa93ca5972ee4ce6090a112be36438af9b90973104e5120744da02b1c084",
+      "new_sha256": "a89eb903490bb1e38059bcb6d1b6406ed341b8f3b16c5e206b1a0fb7de818999",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/kernel/acpi/vtd_policy.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "a9d9fe1fb88ccdca4880c8c98255668d16613c5530f524c9206a9e55e710c757",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/mm/dma/device.rs",
+      "old_sha256": "881b9b50f7d9db1a3b05ab673ce8087595c8a258d493acd7b56a6e479dd63ad6",
+      "new_sha256": "d02858396880aa97532d6617aa99bb68289984546db52dde04ff68965d3eaecf",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/mm/dma/isolated.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "685489b2f05dcbcd76ae0d231ab0294ba5723b7d2d31061cbb8d35c610a6e125",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/mm/dma/mod.rs",
+      "old_sha256": "4532a7bcdb4fa7d452ed0a54830bbfe2256e900c85b54dcf1a6b2651f79ae4f6",
+      "new_sha256": "985d3ccbc30006136154ecbb3dc5703cc7e97175ca026a3b6a037db3cab60ac1",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/run_cpu_kernel_tests.sh",
+      "old_sha256": "98ab93293b214cd4da5c7ad925f22dd83d92472d0659239495e2dd8bf02bd759",
+      "new_sha256": "09c2aa4ad9423a73f462e0f9f489bd463358991f81c7761616fc4ae83b3bf20c",
+      "new_file": false
+    }
+  ],
+  "prerequisite": "All nine ordered Asterinas patches through asterinas-nvidia-device-dma.patch",
+  "exact_incremental_round_trip": true,
+  "index_unchanged": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "hardware_gpu_test": false,
+  "rm_gsp_initialized": false,
+  "implementation": "Bounded Intel VT-d explicit root-bus conventional PCI requester domains; not full NVIDIA"
+}

@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "mode": "iommu",
+  "qemu_exit": 33,
+  "errors": [],
+  "scope": "Full CPU kernel boot only; instruction-counted TCG is not performance or GPU evidence",
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "image_sha256": "16084cb4d9e170f255b24a5a26ea5b852d8c52abaf382f2f5090a468b9d89f7a",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "63092c914c51c51fb75202a64a6a7344a73806f9d361513ae0a3dc0f3b1118d9"
+}

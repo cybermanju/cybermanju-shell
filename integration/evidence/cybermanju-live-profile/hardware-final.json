@@ -1,0 +1,11 @@
+{
+  "time_utc": "2026-10-20T21:14:11.364485+00:00",
+  "device_nodes": {
+    "dri": [],
+    "nvidia": [],
+    "kvm": []
+  },
+  "display_class_pci": [],
+  "physical_gpu_benchmark": false,
+  "host_ui_renderer": "Explicitly forced Mesa lavapipe; host Linux software rendering, not Asterinas or physical GPU"
+}

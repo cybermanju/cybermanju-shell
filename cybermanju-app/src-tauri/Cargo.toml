@@ -1,0 +1,130 @@
+[package]
+name = "cybermanju-os-desktop"
+version = "0.1.1"
+description = "CyberManju OS — Quantum-resistant encrypted file manager"
+authors = ["CyberManju Team"]
+edition = "2021"
+
+[features]
+default = ["real-treesitter"]
+onnx-face = ["cybermanju-faces/onnx-face"]
+# Real tree-sitter grammars (AUDIT D2). The heuristic extractor stays as the
+# fallback for the other ~45 extensions and for parse failures, and the JSON
+# shape is identical either way (`engine` says which one ran).
+real-treesitter = [
+    "dep:tree-sitter",
+    "dep:tree-sitter-rust",
+    "dep:tree-sitter-python",
+    "dep:tree-sitter-javascript",
+    "dep:tree-sitter-typescript",
+    "dep:tree-sitter-go",
+    "dep:tree-sitter-bash",
+]
+
+[lib]
+name = "cybermanju_os_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Workspace crates
+cybermanju-types = { path = "../crates/types" }
+cybermanju-crypto = { path = "../crates/crypto" }
+cybermanju-compression = { path = "../crates/compression" }
+cybermanju-search = { path = "../crates/search" }
+cybermanju-db = { path = "../crates/db" }
+cybermanju-faces = { path = "../crates/faces", default-features = false }
+cybermanju-sync = { path = "../crates/sync" }
+cybermanju-web = { path = "../crates/web" }
+cybermanju-disk = { path = "../crates/disk" }
+cybermanju-os = { path = "../crates/os" }
+cybermanju-agent = { path = "../crates/agent" }
+cybermanju-launcher = { path = "../crates/launcher" }
+
+# Tauri
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-store = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-scoped-storage = "=1.5.1"
+tauri-plugin-deep-link = "2"
+
+# General
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+blake3 = "1"
+log = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+base64 = "0.22"
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+# Database (direct for command files)
+redb = "2"
+
+# Auth & crypto (additional)
+argon2 = "0.5"
+jsonwebtoken = "9"
+# hmac stays 0.12: commands/users.rs instantiates Hmac<Sha256> from sha2
+# 0.10 (digest 0.10); hmac 0.13 (digest 0.11) breaks it (CI 2026-10-11).
+hmac = "0.12"
+sha2 = "0.10"
+
+# Image & media
+kamadak-exif = "0.5"
+image = "0.25"
+infer = "0.16"
+mime_guess = "2"
+
+# Networking
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
+url = "2"
+
+# File ops
+walkdir = "2.5"
+rayon = "1.10"
+
+# Code intelligence — real tree-sitter grammars (optional, see [features]).
+# Runtime 0.24 loads the ABI-14 grammars below; versions must stay in this
+# pairing or `cargo check` fails at resolve time (CI proves it).
+tree-sitter = { version = "0.24", optional = true }
+tree-sitter-rust = { version = "0.23", optional = true }
+tree-sitter-python = { version = "0.23", optional = true }
+tree-sitter-javascript = { version = "0.23", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
+tree-sitter-go = { version = "0.23", optional = true }
+tree-sitter-bash = { version = "0.25", optional = true }
+
+[dev-dependencies]
+# Only the window/runtime is mocked; commands, state, disk IO and crypto are real.
+tauri = { version = "2", features = ["test"] }
+
+# ─── Platform-gated extras (LAST table in this file) ────────────────
+# This `[target.*.dependencies]` table MUST stay after every
+# `[dependencies]` key above. TOML has no "close table" marker: any
+# `[dependencies]` key written below a `[target...]` header silently
+# becomes platform-only, which breaks the Android build with hundreds of
+# `unresolved import` errors (CI 2026-10-08: serde/anyhow/chrono/redb/…).
+#
+# ONNX face embeddings only where `ort` ships a usable prebuilt runtime
+# (desktop OSs). Android/iOS builds must not link ort-sys: its
+# `download-binaries` dist has no reliable mobile artifact and the link
+# fails with `could not find native static library 'onnxruntime'`.
+# Without the feature the honest fallback applies (empty detections,
+# never fabricated — AUDIT F7), same as a desktop with no model file.
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+cybermanju-faces = { path = "../crates/faces", features = ["onnx-face"] }
+# Single-instance with the `deep-link` feature: on Windows/Linux the OS
+# delivers a cybermanju:// OAuth return by spawning a second process, and the
+# plugin forwards its argv to the running app so the frontend `onOpenUrl`
+# listener fires (without it `onOpenUrl` never fires while running).
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

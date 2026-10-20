@@ -1,0 +1,89 @@
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..7ffdf000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: b449000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+ERROR: Uncaught panic:
+	Cannot handle kernel page fault: PageFault(
+    RawPageFaultInfo {
+        error_code: (empty),
+        addr: 0xffff80007ffe2321,
+    },
+); trapframe: TrapFrame {
+    rax: 0xffffffff880495a8,
+    rbx: 0xffffffff80000000,
+    rcx: 0x4,
+    rdx: 0x4,
+    rsi: 0xffff80007ffe2321,
+    rdi: 0xffffffff880495a8,
+    rbp: 0x0,
+    r8: 0x4,
+    r9: 0xffffffff890bbec8,
+    r10: 0xffffffff880496a7,
+    r11: 0x1,
+    r12: 0x0,
+    r13: 0x0,
+    r14: 0x0,
+    r15: 0x0,
+    trap_num: 0xe,
+    error_code: 0x0,
+    rip: 0xffffffff88f413f4,
+    cs: 0x8,
+    rflags: 0x86,
+    rsp: 0xffffffff88049448,
+    ss: 0x0,
+}
+	at /workspace/asterinas-gpui/asterinas/ostd/src/mm/fault/mod.rs:63
+	on CPU 0 by thread None
+Printing stack trace:
+   1: fn 0xffffffff88e02ad0 - pc 0xffffffff88e02b1b / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88048c20;
+
+   2: fn 0xffffffff88136950 - pc 0xffffffff8813710e / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88048c40;
+
+   3: fn 0xffffffff8813a970 - pc 0xffffffff8813a97a / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88049060;
+
+   4: fn 0xffffffff8804b000 - pc 0xffffffff8804b00a / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88049070;
+
+   5: fn 0xffffffff88f1def0 - pc 0xffffffff88f1df36 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88049080;
+
+   6: fn 0xffffffff88d81760 - pc 0xffffffff88d81812 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff880490c0;
+
+   7: fn 0xffffffff88e0dc00 - pc 0xffffffff88e0de34 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88049190;
+
+   8: fn                0x0 - pc 0xffffffff88d7afbd / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048b48; rdi 0xffffffff88dcd7b3; rbp                0x0; rsp 0xffffffff88049390;
+
+ERROR: Failed to power off the system
+ERROR: Halting the machine...
+qemu-system-x86_64: terminating on signal 15 from pid 401475 (timeout)

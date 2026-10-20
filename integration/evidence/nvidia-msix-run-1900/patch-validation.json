@@ -1,0 +1,20 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-irq-retire-storage.patch",
+  "isolated_implementation": "/workspace/asterinas-gpui/asterinas-irq-retire-local/ostd/src/irq/top_half.rs",
+  "incoming_sha256": "9a362f390e8943b548333e24a8a4e66b16b5f179ca0408c3ad3d23f4fe397eee",
+  "tested_source_sha256": "08dd2ee446140c2b2301288f8bde3e707dbe97f828a12d93109aac22e25d7539",
+  "patch_sha256": "90f119b1f28aa8b4aba77c5fbcd2d1097a5655c48014eee1c51ba698b2315875",
+  "exact_round_trip": true,
+  "shared_tree_apply_check": true,
+  "shared_tree_apply_check_stderr": "",
+  "shared_tree_modified": false,
+  "merged": false,
+  "prerequisite": "MSI-X implementation containing IrqLine::retire; intended after asterinas-nvidia-msix-transaction.patch when that pending concurrent patch is finalized",
+  "full_stack_validated": false,
+  "original_index_unchanged": true,
+  "hardware_gpu_acceptance": false,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false
+}

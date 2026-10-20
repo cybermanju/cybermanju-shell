@@ -1,0 +1,7 @@
+{
+  "scope": "CPU-only NVIDIA NVport memory self-test; not a GPU test or full-boot certification",
+  "image_sha256": "2f496433413e8644f7e0384cb4c19d13e98f7545b84fc7d10550575c2d17e4ec",
+  "log": "serial.log",
+  "qemu_stderr_log": "qemu-stderr.log",
+  "pass": true
+}

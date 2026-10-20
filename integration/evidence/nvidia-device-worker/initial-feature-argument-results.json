@@ -1,0 +1,17 @@
+{
+  "runs": [
+    {
+      "name": "reject-lost-accepted-work",
+      "exit": 6,
+      "expected": false,
+      "kernel_passed": false,
+      "counts": [],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/reject-lost-accepted-work.log"
+    }
+  ],
+  "source_restored": true,
+  "source_sha256": "22378883a73b3643c6de94b596892aaaafeaf428b4a1e45e4a3a8b81ca5d7d9a",
+  "hardware_gpu_acceptance": false,
+  "rm_initialized": false,
+  "remote_actions_run": false
+}

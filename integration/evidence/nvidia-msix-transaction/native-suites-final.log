@@ -1,0 +1,4379 @@
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `id-alloc` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+   Compiling osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+   Compiling osdk-test-kernel v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/test-kernel)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+   Compiling osdk-frame-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/frame-allocator)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+   Compiling ostd-nvidia-nvport-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-test-base)
+warning: `ostd-nvidia-nvport-osdk-bin` (bin "ostd-nvidia-nvport-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.29s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3487m free
+Added to ISO image: directory '/'='/tmp/grub.bkbtqz'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5679 sectors
+Written to medium : 5679 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a68e000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 509650680180 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x73d, current 0x184654, init 0x3e12
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 294 tests in 5 crates
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+running 20 tests in crate "ostd-nvidia-nvport"
+
+test ostd_nvidia_nvport::diagnostics::tests::actual_freestanding_formatter_through_c_abi ...nvidia-nvport: native formatter CPU-only check=17
+ [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::upstream_release_and_family_selection ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_exact_image_and_no_cross_release_fallback ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_rejects_every_truncation_and_bad_numeric_header ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_rejects_alias_duplicates_links_empty_and_traversal ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::actual_rm_ffi_handles_own_distinct_leases_of_static_fixture ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::allocation_alignment_and_free ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::reject_invalid_sizes_and_clear_output ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::usercopy_does_not_report_false_success ... [32mok[39m
+test ostd_nvidia_nvport::runtime::native_tests::actual_timer_and_distinct_live_tasks_through_upstream_c ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::upstream_semaphore_rwlock_and_irq_spinlock ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::upstream_mutex_contention_across_ostd_tasks ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::upstream_semaphore_and_rwlock_wake_contenders ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::semaphore_overflow_is_reported_without_wrapping ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::sleep_predicate_tracks_atomic_mode_and_nested_spin_irqs ... [32mok[39m
+test ostd_nvidia_nvport::tests::upstream_memory_self_test ... [32mok[39m
+test ostd_nvidia_nvport::tests::copy_fill_compare_many_lengths ... [32mok[39m
+test ostd_nvidia_nvport::tests::invalid_operations_leave_buffer_unchanged ... [32mok[39m
+test ostd_nvidia_nvport::tests::patterned_fill_including_partial_repetition ... [32mok[39m
+test ostd_nvidia_nvport::tests::overlapping_move_matches_rust_both_directions ... [32mok[39m
+
+test result: [32mok[39m. 20 passed; 0 failed; 0 filtered out.
+
+[ktest runner] All crates tested.
+     Locking 117 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+warning: `typeflags-util` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-rights` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-util)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+   Compiling aster-time v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/time)
+warning: `aster-util` (lib) generated 1 warning (1 duplicate)
+warning: `aster-time` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-nvidia-platform v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform)
+warning: `aster-nvidia-platform` (lib) generated 1 warning (1 duplicate)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-nvidia-platform-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-test-base)
+warning: `aster-nvidia-platform-osdk-bin` (bin "aster-nvidia-platform-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.32s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3481m free
+Added to ISO image: directory '/'='/tmp/grub.R6Ll7K'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 6051 sectors
+Written to medium : 6051 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a748000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 763177635080 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x2257, current 0x1bec6e, init 0x4724
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 322 tests in 8 crates
+
+running 4 tests in crate "aster-nvidia-platform"
+
+test aster_nvidia_platform::runtime::tests::converts_calendar_to_unix_epoch_and_leap_day ... [32mok[39m
+test aster_nvidia_platform::tests::identity_requires_nvidia_display_class ... [32mok[39m
+test aster_nvidia_platform::tests::range_is_checked_and_rejects_empty_or_zero_base ... [32mok[39m
+test aster_nvidia_platform::tests::conventional_config_reads_are_bounded_and_aligned ... [32mok[39m
+
+test result: [32mok[39m. 4 passed; 0 failed; 0 filtered out.
+
+[ktest runner] skipping crate "aster-pci".
+
+[ktest runner] skipping crate "aster-util".
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+[ktest runner] skipping crate "ostd-nvidia-nvport".
+
+[ktest runner] All crates tested.
+     Locking 108 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-pci-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-test-base)
+warning: `aster-pci-osdk-bin` (bin "aster-pci-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.35s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3480m free
+Added to ISO image: directory '/'='/tmp/grub.6IdTiR'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5881 sectors
+Written to medium : 5881 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a6f3000..7ffa7000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 256341893340 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x994, current 0x1d2eb9, init 0x4a9c
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 287 tests in 5 crates
+
+running 13 tests in crate "aster-pci"
+
+test aster_pci::capability::tests::enumeration_capability_walk_is_bounded_before_device_construction ... [32mok[39m
+test aster_pci::lifecycle_tests::qemu_pci_testdev_reservation_mmio_rollback_and_reacquisition ...DEBUG: Try to acquire security-insensitive MMIO range: 0xb0000000..0xc0000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+INFO: pci: initializing the PCI bus with bus numbers `0..=255`
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x29c0,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x1111,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x3,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfb000000,
+                        size: 0x1000000,
+                        prefetchable: true,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea10000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x5,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x2,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea11000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc000,
+                        size: 0x100,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfce00000,
+                        size: 0x1000,
+                        prefetchable: true,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x5,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe800000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x6,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe900000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x7,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x1,
+            0x1,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea12000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x8,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x2,
+            0x2,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea13000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x1,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x9,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x3,
+            0x3,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xa,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x4,
+            0x4,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea14000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xb,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x5,
+            0x5,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea15000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xc,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x6,
+            0x6,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea16000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xd,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x7,
+            0x7,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea17000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xe,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x8,
+            0x8,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea18000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2918,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x1,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2922,
+        revision_id: 0x2,
+        prog_if: 0x1,
+        subclass: 0x6,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x2,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc140,
+                        size: 0x20,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea19000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2930,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x5,
+        class: 0xc,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x3,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0x700,
+                        size: 0x40,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x1,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe600000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x2,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe400000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x3,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe200000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x4,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe000000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x4,
+        device: 0x0,
+        function: 0x1,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe004000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x5,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfdf00000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x5,
+        device: 0x0,
+        function: 0x1,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfde00000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x6,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfdc00000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x7,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfda00000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x8,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfd800000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI resource lifecycle passed: 8 real QEMU pci-testdev reserve/map/read/rollback/reacquire cycles; not NVIDIA/GPU proof
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles; requester/mask/cleanup verified; no NVIDIA or IOMMU isolation proof
+ [32mok[39m
+test aster_pci::mmio::tests::preparation_disables_dma_preserves_other_command_bits ... [32mok[39m
+test aster_pci::mmio::tests::capabilities_reject_cycles_alignment_and_header_pointers ... [32mok[39m
+test aster_pci::mmio::tests::active_msi_msix_and_low_power_are_rejected_without_writes ... [32mok[39m
+test aster_pci::msix_tests::qemu_active_msix_abandonment_quarantines_function ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfd800000..0xfd804000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfd800000..0xfd804000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI MSI-X abandonment passed: function and MMIO quarantined, no reprobe; not a hardware completion test
+ [32mok[39m
+test aster_pci::msix_tests::qemu_legacy_msix_never_grants_dma_and_checks_indices ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfda00000..0xfda04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfda00000..0xfda04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI legacy MSI-X passed: no implicit BME, checked indices, no handler unmask, no vector replacement
+ [32mok[39m
+test aster_pci::msix_tests::qemu_nvme_msix_masked_pending_interrupt_and_shutdown_cycles ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfdc00000..0xfdc04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfdc00000..0xfdc04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI MSI-X test using direct DMA; no IOMMU isolation claim
+PCI real NVMe MSI-X masked-pending IRQ and quiesced shutdown cycles passed; not GPU validation
+ [32mok[39m
+test aster_pci::msix_transaction::tests::msix_table_and_pba_ranges_fail_closed ... [32mok[39m
+test aster_pci::multifunction_tests::qemu_multifunction_nvme_group_reservation_and_shared_dma ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe004000..0xfe008000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfdf00000..0xfdf04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfdf00000..0xfdf04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfde00000..0xfdf00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI multifunction unsupported sibling correctly rejected: real conventional PCI EDU function one lacks PCIe
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe004000..0xfe008000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI multifunction group correctly rejected without IOMMU; no group DMA issued
+PCI multifunction group reservation passed: missing sibling, active BME preserved, invalid-BAR rollback, and single-function rejection verified
+ [32mok[39m
+test aster_pci::pcie_tests::qemu_real_pcie_topology_and_nvme_identify_dma ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfe200000..0xfe300000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe400000..0xfe404000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe400000..0xfe404000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe600000..0xfe604000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe600000..0xfe604000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCIe topology negative cases passed without IOMMU; no PCIe DMA issued
+ [32mok[39m
+test aster_pci::topology::tests::direct_translated_peer_path_is_never_accepted ... [32mok[39m
+test aster_pci::topology::tests::acs_requires_each_supported_and_enabled_isolation_control ... [32mok[39m
+
+test result: [32mok[39m. 13 passed; 0 failed; 0 filtered out.
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+[ktest runner] All crates tested.
+     Locking 108 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `ostd-pod` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-pci-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-test-base)
+warning: `aster-pci-osdk-bin` (bin "aster-pci-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.50s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3463m free
+Added to ISO image: directory '/'='/tmp/grub.KxGEOk'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5881 sectors
+Written to medium : 5881 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a6f3000..7ffa7000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 257229634820 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x7d7, current 0x1bc917, init 0x470d
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+DEBUG: iommu: validated single segment-zero INCLUDE_ALL DRHD: 0xfed90000
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfed90000..0xfed91000 with cache policy: Uncacheable
+DEBUG: iommu: registers: IommuRegisters {
+    _mmio: IoMem {
+        inner: IoMemInner {
+            kvirt_area: KVirtArea {
+                range: 0xffffdfffffffd000..0xffffdfffffffe000,
+            },
+            _reservation: None,
+        },
+        offset: 0x0,
+        limit: 0x1000,
+        pa: 0xfed90000,
+        cache_policy: Uncacheable,
+        phantom: PhantomData<ostd::io::io_mem::Sensitive>,
+    },
+    version: 0xffffdfffffffd000,
+    capability: 0xffffdfffffffd008,
+    extended_capability: 0xffffdfffffffd010,
+    global_command: 0xffffdfffffffd018,
+    global_status: 0xffffdfffffffd01c,
+    root_table_address: 0xffffdfffffffd020,
+    context_command: 0xffffdfffffffd028,
+    interrupt_remapping_table_addr: 0xffffdfffffffd0b8,
+    invalidate: InvalidationRegisters {
+        _queue_head: 0xffffdfffffffd080,
+        queue_tail: 0xffffdfffffffd088,
+        queue_addr: 0xffffdfffffffd090,
+        completion_status: 0xffffdfffffffd09c,
+        _completion_event_control: 0xffffdfffffffd0a0,
+        _completion_event_data: 0xffffdfffffffd0a4,
+        _completion_event_addr: 0xffffdfffffffd0a8,
+        _completion_event_upper_addr: 0xffffdfffffffd0ac,
+        _queue_error_record: 0xffffdfffffffd0b0,
+        _invalidate_address: 0xffffdfffffffd0f0,
+        iotlb_invalidate: 0xffffdfffffffd0f8,
+    },
+    invalidation_failed: false,
+}
+DEBUG: iommu: capability: Capability {
+    flags: PSI | DWD | DRD,
+    maximum_guest_address_width: 0x26,
+    second_stage_large_page_support: PAGE_21BIT_2MB | PAGE_30BIT_1GB,
+    fault_recording_register_offset: 0x22,
+    supported_adjusted_guest_address_widths: AGAW_39BIT_3LP,
+    domain_support_number: 0x6,
+    maximum_address_mask_value: 0x12,
+    fault_recording_number: 0x0,
+    raw: 0xd2008c22260206,
+}
+DEBUG: iommu: extend capability: ExtendedCapability {
+    flags: QI | IR | PT,
+    maximum_handle_mask: 0xf,
+    pasid_size: 0x0,
+    iotlb_register_offset: 0xf,
+    raw: 0xf00f4a,
+}
+INFO: iommu: Queued invalidation is enabled
+INFO: iommu: DMA remapping enabled
+INFO: iommu: Interrupt remapping enabled
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 287 tests in 5 crates
+
+running 13 tests in crate "aster-pci"
+
+test aster_pci::capability::tests::enumeration_capability_walk_is_bounded_before_device_construction ... [32mok[39m
+test aster_pci::lifecycle_tests::qemu_pci_testdev_reservation_mmio_rollback_and_reacquisition ...DEBUG: Try to acquire security-insensitive MMIO range: 0xb0000000..0xc0000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+INFO: pci: initializing the PCI bus with bus numbers `0..=255`
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x29c0,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x1111,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x3,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfb000000,
+                        size: 0x1000000,
+                        prefetchable: true,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea10000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x5,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x2,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea11000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc000,
+                        size: 0x100,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfce00000,
+                        size: 0x1000,
+                        prefetchable: true,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x5,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe800000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x6,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe900000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x7,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x1,
+            0x1,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea12000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x8,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x2,
+            0x2,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea13000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x1,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x9,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x3,
+            0x3,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xa,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x4,
+            0x4,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea14000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xb,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x5,
+            0x5,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea15000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xc,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x6,
+            0x6,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea16000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xd,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x7,
+            0x7,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea17000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0xc,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x4,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0xe,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: PciToPciBridge(
+            0x0,
+            0x8,
+            0x8,
+        ),
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea18000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x48,
+                msg_ctrl: 0x0,
+                table_info: 0x0,
+                pba_info: 0x800,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2918,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x1,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2922,
+        revision_id: 0x2,
+        prog_if: 0x1,
+        subclass: 0x6,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x2,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc140,
+                        size: 0x20,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea19000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2930,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x5,
+        class: 0xc,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x3,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0x700,
+                        size: 0x40,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x1,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe600000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x2,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe400000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x3,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe200000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x4,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe000000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x4,
+        device: 0x0,
+        function: 0x1,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe004000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x5,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfdf00000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x5,
+        device: 0x0,
+        function: 0x1,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfde00000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x6,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfdc00000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x7,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfda00000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x8,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfd800000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfea11000..0xfea12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI resource lifecycle passed: 8 real QEMU pci-testdev reserve/map/read/rollback/reacquire cycles; not NVIDIA/GPU proof
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI device DMA correctly rejected unsupported IOMMU/CVM platform; zero DMA issued
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+qemu-system-x86_64: vtd_iova_to_slpte: detected slpte permission error (iova=0x2000, level=0x1, slpte=0x0, write=1, pasid=0xffffffff)
+qemu-system-x86_64: vtd_iommu_translate: detected translation failure (dev=00:05:00, iova=0x2000)
+qemu-system-x86_64: New fault is not recorded due to compression of faults
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+ERROR: iommu: caught page fault, doing nothing. recording: FaultRecording { Fault: true, Request type: Write, Address type: Some(UntranslatedRequest), Source identifier: 28, Fault Reason: 5, Fault info: 2, Raw: 80ffff05000000280000000000002000 }
+PCI isolated DMA revocation passed: 8 stale IOVA device writes blocked while physical pages remained owned
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe800000..0xfe900000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI isolated DMA simultaneous requester isolation passed: 2 real EDU devices, distinct live domains, matching 4096/8192 source/destination IOVAs, full-page readbacks verified
+PCI isolated DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles; domain detach/reacquire verified; bounded type-0 PCI isolation only
+ [32mok[39m
+test aster_pci::mmio::tests::preparation_disables_dma_preserves_other_command_bits ... [32mok[39m
+test aster_pci::mmio::tests::capabilities_reject_cycles_alignment_and_header_pointers ... [32mok[39m
+test aster_pci::mmio::tests::active_msi_msix_and_low_power_are_rejected_without_writes ... [32mok[39m
+test aster_pci::msix_tests::qemu_active_msix_abandonment_quarantines_function ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfd800000..0xfd804000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfd800000..0xfd804000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI MSI-X abandonment passed: function and MMIO quarantined, no reprobe; not a hardware completion test
+ [32mok[39m
+test aster_pci::msix_tests::qemu_legacy_msix_never_grants_dma_and_checks_indices ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfda00000..0xfda04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfda00000..0xfda04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI legacy MSI-X passed: no implicit BME, checked indices, no handler unmask, no vector replacement
+ [32mok[39m
+test aster_pci::msix_tests::qemu_nvme_msix_masked_pending_interrupt_and_shutdown_cycles ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfdc00000..0xfdc04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfdc00000..0xfdc04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI real NVMe MSI-X masked-pending IRQ and quiesced shutdown cycles passed; not GPU validation
+ [32mok[39m
+test aster_pci::msix_transaction::tests::msix_table_and_pba_ranges_fail_closed ... [32mok[39m
+test aster_pci::multifunction_tests::qemu_multifunction_nvme_group_reservation_and_shared_dma ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe004000..0xfe008000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfdf00000..0xfdf04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfdf00000..0xfdf04000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfde00000..0xfdf00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI multifunction unsupported sibling correctly rejected: real conventional PCI EDU function one lacks PCIe
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe004000..0xfe008000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCI multifunction group reservation passed: missing sibling, active BME preserved, invalid-BAR rollback, and single-function rejection verified
+PCI multifunction isolated DMA passed: two real NVMe functions, shared requester domain, actual Identify CID/status/vendor/serial/model verified; both controllers stopped and BME off
+ [32mok[39m
+test aster_pci::pcie_tests::qemu_real_pcie_topology_and_nvme_identify_dma ...DEBUG: Try to acquire security-insensitive MMIO range: 0xfe200000..0xfe300000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe400000..0xfe404000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe400000..0xfe404000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe600000..0xfe604000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe600000..0xfe604000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff882d0f90 on CPU CpuId(
+    1,
+)
+PCIe NVMe isolated DMA passed: real root-port route, private SQ/CQ/Identify DMA, actual CID/status/vendor/serial/model verified; controller stopped and BME off; NOT NVIDIA/GPU proof
+PCIe topology negative cases passed: ACS controls off, ACS absent, legacy bridge alias rejected before BME; no spoofed PCI IDs
+ [32mok[39m
+test aster_pci::topology::tests::direct_translated_peer_path_is_never_accepted ... [32mok[39m
+test aster_pci::topology::tests::acs_requires_each_supported_and_enabled_isolation_control ... [32mok[39m
+
+test result: [32mok[39m. 13 passed; 0 failed; 0 filtered out.
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+[ktest runner] All crates tested.
+     Locking 97 packages to latest Rust 1.99.0-nightly compatible versions
+      Adding minicov v0.3.8 (available: v0.3.9)
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `ostd-pod` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-osdk-bin v0.19.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-test-base)
+warning: `ostd-osdk-bin` (bin "ostd-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.53s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3467m free
+Added to ISO image: directory '/'='/tmp/grub.TNy8ME'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5565 sectors
+Written to medium : 5565 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a655000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 256030072840 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x80d, current 0x18ae8c, init 0x3f1a
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 274 tests in 4 crates
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+running 255 tests in crate "ostd"
+
+test ostd::arch::boot::multiboot2::tests::ega_text_is_not_a_pixel_framebuffer ... [32mok[39m
+test ostd::arch::boot::multiboot2::tests::reserved_rsdt_remains_in_linear_mapping ... [32mok[39m
+test ostd::arch::boot::multiboot2::tests::reserved_xsdt_remains_in_linear_mapping ... [32mok[39m
+test ostd::arch::boot::multiboot2::tests::efi_without_acpi_does_not_promote_reserved_ram ... [32mok[39m
+test ostd::arch::iommu::dma_remapping::isolated::tests::multifunction_groups_validate_shape_and_common_route ... [32mok[39m
+test ostd::arch::iommu::dma_remapping::isolated::tests::private_tables_never_share_roots_and_clear_only_leaves ... [32mok[39m
+test ostd::arch::iommu::dma_remapping::isolated::tests::rejects_reserved_root_and_requires_route_for_downstream_requesters ... [32mok[39m
+test ostd::arch::iommu::invalidate::queue::tests::queue_tail_is_always_inside_ring ... [32mok[39m
+test ostd::arch::iommu::registers::tests::register_window_rejects_overflow_and_out_of_mapping_views ... [32mok[39m
+test ostd::arch::kernel::acpi::dma_policy::tests::root_pointer_parser_checks_width_and_address_bounds ... [32mok[39m
+test ostd::arch::kernel::acpi::dma_policy::tests::root_inventory_shape_requires_integral_pointer_entries ... [32mok[39m
+test ostd::arch::kernel::acpi::dma_policy::tests::sdt_parser_rejects_signature_length_and_checksum_errors ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::accepts_only_one_strict_first_region_mcfg ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::accepts_qemu_ioapic_and_exact_endpoint_membership ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::rejects_second_drhd_and_all_non_drhd_remapping_types ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::matches_qemu_one_hop_endpoint_scope_using_requester_bus ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::rejects_nonzero_segment_reserved_flags_and_unsupported_scopes ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::rejects_truncated_invalid_dmar_and_invalid_bases_or_scope_lengths ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::endpoint_path_is_exact_and_bridge_scope_excludes_the_bridge_itself ... [32mok[39m
+test ostd::arch::kernel::acpi::vtd_policy::tests::include_all_is_accepted_but_never_grants_implicit_requester_membership ... [32mok[39m
+test ostd::arch::vm::ept::test::leaf_encoding ... [32mok[39m
+test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] [32mok[39m
+test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] [32mok[39m
+test ostd::boot::memory_region::test::sort_full_non_overlapping ... [32mok[39m
+test ostd::boot::memory_region::test::into_non_overlapping_drops_usable_subpage_regions ... [32mok[39m
+test ostd::cpu::local::test::cpu_local ... [32mok[39m
+test ostd::cpu::local::test::cpu_local_cell ... [32mok[39m
+test ostd::io::io_mem::allocator::test::illegal_region ...INFO: Creating new I/O memory allocator builder, ranges: [
+    0x40000000..0x42000000,
+]
+DEBUG: Try to acquire security-insensitive MMIO range: 0x0..0x0 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xffffffffffffffff..0x0 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40000000..0x40000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40001000..0x40001000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x41ff0000..0x41ff0000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x42000000..0x42000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40001000..0x40000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40002000..0x40001000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x41fff000..0x41ffe000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x42000000..0x41fff000 with cache policy: Uncacheable
+ [32mok[39m
+test ostd::io::io_mem::allocator::test::conflict_region ...INFO: Creating new I/O memory allocator builder, ranges: [
+    0x100000000000..0x100002000000,
+    0x100002001000..0x10000200a000,
+]
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfffffffffff..0x100000000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100000000000..0x100000000001 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100002000001..0x100002000fff with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100001ffffff..0x100002001001 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100001ffffff..0x100002000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100002000000..0x100002000001 with cache policy: Uncacheable
+ [32mok[39m
+test ostd::io::io_mem::test::read_write_u8 ... [32mok[39m
+test ostd::io::io_mem::test::read_write_u16 ... [32mok[39m
+test ostd::io::io_mem::test::read_write_u32 ... [32mok[39m
+test ostd::io::io_mem::test::read_write_u64 ... [32mok[39m
+test ostd::io::io_mem::test::boundary_overlap ... [32mok[39m
+test ostd::io::io_mem::test::copy_to_alignment_and_sizes ... [32mok[39m
+test ostd::io::io_mem::test::copy_from_alignment_and_sizes ... [32mok[39m
+test ostd::io::io_mem::test::reservation_lives_through_iomem_clones_and_slices ... [32mok[39m
+test ostd::io::io_port::allocator::test::illegal_region ... [32mok[39m
+test ostd::io::io_port::allocator::test::conflict_region ...DEBUG: Try to acquire PIO range: 0x60..0x64
+DEBUG: Try to acquire PIO range: 0x62..0x66
+DEBUG: Recycling PIO range: 0x60..0x64
+DEBUG: Try to acquire PIO range: 0x62..0x66
+DEBUG: Recycling PIO range: 0x62..0x66
+ [32mok[39m
+test ostd::io::io_port::allocator::test::overlapping_region ...DEBUG: Try to acquire PIO range: 0xcf8..0xcf9
+DEBUG: Try to acquire PIO range: 0xcf9..0xcfa
+DEBUG: Try to acquire PIO range: 0xcf8..0xcf9
+DEBUG: Try to acquire PIO range: 0xcf9..0xcfa
+DEBUG: Recycling PIO range: 0xcf8..0xcf9
+DEBUG: Recycling PIO range: 0xcf9..0xcfa
+DEBUG: Try to acquire PIO range: 0xcf9..0xcfa
+DEBUG: Try to acquire PIO range: 0xcf8..0xcf9
+DEBUG: Recycling PIO range: 0xcf8..0xcf9
+DEBUG: Recycling PIO range: 0xcf9..0xcfa
+ [32mok[39m
+test ostd::io::io_port::range::tests::conflicts_and_partial_acquisition_roll_back ...DEBUG: Try to acquire PIO range: 0xd001..0xd002
+DEBUG: Try to acquire PIO range: 0xd000..0xd001
+DEBUG: Try to acquire PIO range: 0xd001..0xd002
+DEBUG: Recycling PIO range: 0xd000..0xd001
+DEBUG: Try to acquire PIO range: 0xd000..0xd001
+DEBUG: Try to acquire PIO range: 0xd002..0xd003
+DEBUG: Recycling PIO range: 0xd000..0xd001
+DEBUG: Recycling PIO range: 0xd002..0xd003
+DEBUG: Recycling PIO range: 0xd001..0xd002
+DEBUG: Try to acquire PIO range: 0xd010..0xd011
+DEBUG: Try to acquire PIO range: 0xd011..0xd012
+DEBUG: Try to acquire PIO range: 0xd011..0xd012
+DEBUG: Recycling PIO range: 0xd010..0xd011
+DEBUG: Recycling PIO range: 0xd011..0xd012
+DEBUG: Try to acquire PIO range: 0xd011..0xd012
+DEBUG: Recycling PIO range: 0xd011..0xd012
+ [32mok[39m
+test ostd::io::io_port::range::tests::invalid_bounds_are_rejected_before_reservation ...DEBUG: Try to acquire PIO range: 0xfffe..0xffff
+DEBUG: Recycling PIO range: 0xfffe..0xffff
+ [32mok[39m
+test ostd::io::io_port::range::tests::invalid_accesses_fail_before_any_port_instruction ...DEBUG: Try to acquire PIO range: 0xd030..0xd031
+DEBUG: Try to acquire PIO range: 0xd031..0xd032
+DEBUG: Try to acquire PIO range: 0xd032..0xd033
+DEBUG: Try to acquire PIO range: 0xd033..0xd034
+DEBUG: Recycling PIO range: 0xd030..0xd031
+DEBUG: Recycling PIO range: 0xd031..0xd032
+DEBUG: Recycling PIO range: 0xd032..0xd033
+DEBUG: Recycling PIO range: 0xd033..0xd034
+ [32mok[39m
+test ostd::irq::top_half::test::alloc_and_free_irq ... [32mok[39m
+test ostd::irq::top_half::test::register_and_unregister_callback ... [32mok[39m
+test ostd::irq::top_half::test::callback_captures_drop_outside_registry_lock ... [32mok[39m
+test ostd::irq::top_half::test::callbacks_are_dropped_before_irq_is_released ... [32mok[39m
+test ostd::irq::top_half::test::zero_sized_callbacks_keep_registration_identity ... [32mok[39m
+test ostd::irq::top_half::test::retired_irq_destroys_captures_but_never_reuses_number ... [32mok[39m
+test ostd::log::bridge::test::bridge_map_log_level ... [32mok[39m
+test ostd::log::bridge::test::bridge_map_level_filter ... [32mok[39m
+test ostd::log::level::test::level_ordering ... [32mok[39m
+test ostd::log::level::test::level_filter_enabled ... [32mok[39m
+test ostd::log::level::test::level_from_u8_clamping ... [32mok[39m
+test ostd::log::level::test::level_filter_from_level ... [32mok[39m
+test ostd::mm::dma::device::test::requester_identity_and_validation ... [32mok[39m
+test ostd::mm::dma::device::test::masks_cover_boundaries_and_overflow ... [32mok[39m
+test ostd::mm::dma::device::test::tiny_mask_rejection_releases_allocations ... [32mok[39m
+test ostd::mm::dma::device::test::allocation_requires_enabled_interrupts_and_supported_platform ... [32mok[39m
+test ostd::mm::dma::test::dma_coherent::read_write ...DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::reader_writer ...DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::read_write_once ...DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::zero_length_operations ...DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::alloc_uninit_dma_coherent ...DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::alloc_with_coherent_device ... [32mok[39m
+test ostd::mm::dma::test::dma_coherent::complex_read_write_patterns ...DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_stream::to_device ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::read_write ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::from_device ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::reader_writer ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::streaming_map ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::alloc_dma_stream ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::sync_invalid_ranges ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::alloc_uninit_dma_stream ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::streaming_boundary_conditions ... [32mok[39m
+test ostd::mm::frame::allocator::test_alloc_dealloc ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_drop ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_clone ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_to_uframe ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_allocation ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_conversions ... [32mok[39m
+test ostd::mm::frame::test::frame_ref::frame_impls_non_null_ptr ... [32mok[39m
+test ostd::mm::frame::test::frame_ref::frame_ref_preserves_refcnt ... [32mok[39m
+test ostd::mm::frame::test::linked_list::linked_list_push_pop ... [32mok[39m
+test ostd::mm::frame::test::linked_list::linked_list_cursor_at ... [32mok[39m
+test ostd::mm::frame::test::linked_list::linked_list_cursor_ops ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_drop ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_slice ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_split ... [32mok[39m
+test ostd::mm::frame::test::segment::frame_to_segment ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_iteration ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_to_segment ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_slice_empty ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_to_usegment ... [32mok[39m
+test ostd::mm::frame::test::segment::max_segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::invalid_segment_split ... [32mok[39m
+test ostd::mm::frame::test::segment::empty_segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::zeroed_segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_iter_partial_drop ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_slice_out_of_bounds ... [32mok[39m
+test ostd::mm::frame::test::untyped::untyped_frame_reader_writer ... [32mok[39m
+test ostd::mm::frame::test::untyped::untyped_segment_reader_writer ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_evenly ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_sparse_cpus ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_byte_remainder ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_partial_byte_tail ... [32mok[39m
+test ostd::mm::kspace::test::manual_paddr_to_vaddr ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_tracked_drop ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_untracked_drop ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_tracked_map_pages ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_untracked_map_pages ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::zeroed_pte_is_absent_pte ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::cast_pt_pte_preserves_repr ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::cast_frame_pte_preserves_repr ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::cast_absent_pte_preserves_repr ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::map_protect ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::map_base_page ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::protect_base_page_unmapped ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::map_base_page_already_mapped ... [32mok[39m
+test ostd::mm::page_table::test::create_page_table::new_kernel_page_table ... [32mok[39m
+test ostd::mm::page_table::test::create_page_table::create_user_page_table ... [32mok[39m
+test ostd::mm::page_table::test::lock_levels::map_above_locked_level ... [32mok[39m
+test ostd::mm::page_table::test::lock_levels::map_huge_pages_with_minimum_lock_level ... [32mok[39m
+test ostd::mm::page_table::test::mapping::mixed_granularity_map_unmap ... [32mok[39m
+test ostd::mm::page_table::test::mapping::mixed_granularity_protect_query ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump ... [32mok[39m
+test ostd::mm::page_table::test::navigation::find_next ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump_from_guard_level_end ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump_near_address_space_end ... [32mok[39m
+test ostd::mm::page_table::test::navigation::find_next_keeps_va_around_barrier ... [32mok[39m
+test ostd::mm::page_table::test::navigation::find_next_rejects_overflowing_len ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump_from_end_and_query_huge_middle ... [32mok[39m
+test ostd::mm::page_table::test::overlapping_mappings::unaligned_map ... [32mok[39m
+test ostd::mm::page_table::test::overlapping_mappings::overlapping_mappings ... [32mok[39m
+test ostd::mm::page_table::test::page_properties::map_preserves_page_property ... [32mok[39m
+test ostd::mm::page_table::test::protection_and_query::base_protect_query ... [32mok[39m
+test ostd::mm::page_table::test::protection_and_query::protect_next_empty_entry ... [32mok[39m
+test ostd::mm::page_table::test::protection_and_query::protect_next_touches_empty_range ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::range_check ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::boundary_conditions ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::end_boundary_mapping ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::start_boundary_mapping ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::overflow_boundary_mapping ... [32mok[39m
+test ostd::mm::page_table::test::test_utils::test_subset_iter ... [32mok[39m
+test ostd::mm::page_table::test::unmap::take_large_takes_subtree ... [32mok[39m
+test ostd::mm::page_table::test::unmap::take_next_takes_something ... [32mok[39m
+test ostd::mm::test::io::fill_infallible ... [32mok[39m
+test ostd::mm::test::io::read_val_segment ... [32mok[39m
+test ostd::mm::test::io::fill_zeros_segment ... [32mok[39m
+test ostd::mm::test::io::read_slice_segment ... [32mok[39m
+test ostd::mm::test::io::fallible_read_write ... [32mok[39m
+test ostd::mm::test::io::fill_zeros_fallible ... [32mok[39m
+test ostd::mm::test::io::write_slice_segment ... [32mok[39m
+test ostd::mm::test::io::atomic_load_fallible ... [32mok[39m
+test ostd::mm::test::io::skip_read_infallible ... [32mok[39m
+test ostd::mm::test::io::write_val_infallible ... [32mok[39m
+test ostd::mm::test::io::limit_read_infallible ... [32mok[39m
+test ostd::mm::test::io::partial_read_fallible ... [32mok[39m
+test ostd::mm::test::io::skip_write_infallible ... [32mok[39m
+test ostd::mm::test::io::limit_write_infallible ... [32mok[39m
+test ostd::mm::test::io::partial_write_fallible ... [32mok[39m
+test ostd::mm::test::io::read_write_val_fallible ... [32mok[39m
+test ostd::mm::test::io::read_write_u32_infallible ... [32mok[39m
+test ostd::mm::test::io::read_write_once_infallible ... [32mok[39m
+test ostd::mm::test::io::read_write_slice_infallible ... [32mok[39m
+test ostd::mm::test::io::read_write_struct_infallible ... [32mok[39m
+test ostd::mm::test::io::invalid_read_write_infallible ... [32mok[39m
+test ostd::mm::test::io::read_beyond_buffer_infallible ... [32mok[39m
+test ostd::mm::test::io::write_beyond_buffer_infallible ... [32mok[39m
+test ostd::mm::test::io::atomic_compare_exchange_fallible ... [32mok[39m
+test ostd::mm::test::io::invalid_args_read_write_fallible ... [32mok[39m
+test ostd::mm::test::io::read_write_slice_vmio_infallible ... [32mok[39m
+test ostd::mm::test::vmspace::protect_next ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_activate ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_creation ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_twice ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_unmap ... [32mok[39m
+test ostd::mm::test::vmspace::cursor_mut_flusher ... [32mok[39m
+test ostd::mm::test::vmspace::overlapping_cursors ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_unmap_twice ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_reader_writer ... [32mok[39m
+test ostd::mm::test::vmspace::protect_out_range_page ... [32mok[39m
+test ostd::mm::test::vmspace::unaligned_unmap_panics ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_query_iomem ...DEBUG: Try to acquire security-insensitive MMIO range: 0x100000000000..0x100000001000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::test::vmspace::vmspace_iomem_persistence ...DEBUG: Try to acquire security-insensitive MMIO range: 0x100000003000..0x100000004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_iomem_with_offset ...DEBUG: Try to acquire security-insensitive MMIO range: 0x100000001000..0x100000003000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8825ddc0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::pending_ipis_can_be_extended ...DEBUG: Performing inter-processor call to 0xffffffff882c59d0 on CPU CpuId(
+    1,
+)
+DEBUG: Performing inter-processor call to 0xffffffff882c59d0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::pending_ipis_waits_for_all_cpus ...DEBUG: Performing inter-processor call to 0xffffffff882c59d0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::pending_ipis_waits_for_remote_cpu ...DEBUG: Performing inter-processor call to 0xffffffff882c59d0 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::inter_processor_call_runs_on_current_cpu ... [32mok[39m
+test ostd::sync::mutex::test::try_lock_does_not_unlock ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::alignment ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::left_pointer ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::right_pointer ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::rcu_store_load ... [32mok[39m
+test ostd::sync::rwarc::test::lockless_get ... [32mok[39m
+test ostd::sync::wait::test::queue_wake_all ... [32mok[39m
+test ostd::sync::wait::test::queue_wake_one ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_drop ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_async ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_twice ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_reorder ... [32mok[39m
+test ostd::task::atomic_mode::tests::sleep_query_tracks_nested_irq_guards ... [32mok[39m
+test ostd::task::atomic_mode::tests::sleep_query_tracks_preemption_guards ... [32mok[39m
+test ostd::task::test::spawn_task ... [32mok[39m
+test ostd::task::test::create_task ... [32mok[39m
+test ostd::test::expect_panic ... [32mok[39m
+test ostd::test::failing_assertion ... [32mok[39m
+test ostd::test::trivial_assertion ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_full ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_iter ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_empty ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_default ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_from_id ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_iter_full ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_to ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_add_remove ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_from ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_full ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_add_all_clear ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_cardinality_one ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_iter_multi_part ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_half_unbounded ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_next_part ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_unbounded_bounds ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_exact_part_boundary ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_to_inclusive ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_add_remove_multi_part ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_ends_after_last ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_just_over_part_boundary ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_starts_after_last ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_bound_tuple_exclusive_inclusive ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_bound_tuple_inclusive_exclusive ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_is_full_with_less_than_full_last_part ... [32mok[39m
+test ostd::util::ops::test::range_difference_a_empty ... [32mok[39m
+test ostd::util::ops::test::range_difference_b_empty ... [32mok[39m
+test ostd::util::ops::test::range_intersection_empty ... [32mok[39m
+test ostd::util::ops::test::range_difference_all_same ... [32mok[39m
+test ostd::util::ops::test::range_difference_all_empty ... [32mok[39m
+test ostd::util::ops::test::range_difference_contained ... [32mok[39m
+test ostd::util::ops::test::range_difference_left_same ... [32mok[39m
+test ostd::util::ops::test::range_difference_right_same ... [32mok[39m
+test ostd::util::ops::test::range_intersection_disjoint ... [32mok[39m
+test ostd::util::ops::test::range_intersection_contained ... [32mok[39m
+test ostd::util::ops::test::range_intersection_overlapping ... [32mok[39m
+test ostd::util::ops::test::range_difference_left_intersected ... [32mok[39m
+test ostd::util::ops::test::range_difference_right_intersected ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_range ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_covering ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_overlapping_end ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_partial_overlap ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_overlapping_beginning ... [32mok[39m
+test ostd::vm::gpm_space::test::guest_mapping_lifecycle ...DEBUG: Performing inter-processor call to 0xffffffff88155cd0 on CPU CpuId(
+    1,
+)
+DEBUG: Performing inter-processor call to 0xffffffff88240340 on CPU CpuId(
+    1,
+)
+ [skipped: VMX/EPT invalidation unavailable] [32mok[39m
+
+test result: [32mok[39m. 255 passed; 0 failed; 0 filtered out.
+
+[ktest runner] All crates tested.

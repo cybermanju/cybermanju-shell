@@ -1,0 +1,365 @@
+{
+  "completed_at_utc": "2026-10-20T20:40:10.774090+00:00",
+  "scope": "local implementation; Asterinas primary; published snapshot untouched",
+  "frontend": {
+    "files": 125,
+    "tests_passed": 1207,
+    "appearance_tests_passed": 11,
+    "typecheck": "passed",
+    "version": "0.1.1",
+    "source": "completed subtask job_83KDOfgo and retained logs"
+  },
+  "gpui": {
+    "rust_suite_counts": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        83,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        19,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        82,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "rust_passed": 189,
+    "rust_failed": 0,
+    "python_tests": 32,
+    "python_ok": true,
+    "package_versions_unchanged": true,
+    "direct_dependency_added": "already-locked libc 0.2.187",
+    "negative_old_symlink_regression_reproduced": true
+  },
+  "gpui_profile_test_names": [
+    "test_shared_app_export_validates_without_wayland_or_mutating_preferences",
+    "test_invalid_profiles_fail_before_wayland_or_ipc",
+    "test_oversized_file_is_rejected",
+    "test_secondary_profile_refused_without_sending_launcher_or_claiming_import",
+    "test_ordinary_secondary_launcher_still_sends_existing_ipc_command",
+    "test_existing_config_validation_does_not_require_a_profile",
+    "test_terminal_symlinks_are_rejected_before_display",
+    "test_fifo_without_writer_is_rejected_without_blocking",
+    "test_directories_and_unix_sockets_are_rejected"
+  ],
+  "clippy_exit": 0,
+  "native": {
+    "suites": {
+      "native-nvidia-nvport-tests.log": {
+        "reported_passed": 20,
+        "failed": 0,
+        "filtered": 0
+      },
+      "native-nvidia-platform-tests.log": {
+        "reported_passed": 13,
+        "failed": 0,
+        "filtered": 0
+      },
+      "native-ostd-tests.log": {
+        "reported_passed": 256,
+        "failed": 0,
+        "filtered": 0
+      },
+      "native-pci-iommu-tests.log": {
+        "reported_passed": 13,
+        "failed": 0,
+        "filtered": 0
+      },
+      "native-pci-tests.log": {
+        "reported_passed": 13,
+        "failed": 0,
+        "filtered": 0
+      }
+    },
+    "total_reported_passed": 315,
+    "explicitly_skipped_bodies": [
+      "test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] ok",
+      "test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] ok",
+      " [skipped: VMX/EPT invalidation unavailable] ok"
+    ],
+    "native_runner_exit": 0,
+    "completion_job": "job_u2EectqK",
+    "initial_runner_failure": "relative-path invocation exited127; corrected absolute-path rerun exited0",
+    "gpu_acceptance": false,
+    "full_kernel_boot_rerun": false
+  },
+  "native_patch_validation": {
+    "patch_number": 18,
+    "base": "00a4842d976db6723b8224be2e57ac8105f13ee2",
+    "prerequisite_patch_count": 17,
+    "existing_patches_reused_without_regeneration": [
+      "asterinas-dumb-buffer-layout.patch",
+      "asterinas-simpledrm-exact-pixel-format.patch",
+      "asterinas-graphics-prerequisite-check.patch",
+      "asterinas-vulkan-compute-ci.patch",
+      "asterinas-nvidia-nvport-native-ci.patch",
+      "asterinas-nvidia-boot-pci-tcg.patch",
+      "asterinas-nvidia-rm-os-services.patch",
+      "asterinas-nvidia-resource-ownership.patch",
+      "asterinas-nvidia-device-dma.patch",
+      "asterinas-nvidia-isolated-vtd.patch",
+      "asterinas-nvidia-pcie-topology.patch",
+      "asterinas-nvidia-multifunction.patch",
+      "asterinas-nvidia-irq-callbacks.patch",
+      "asterinas-nvidia-msix-transaction.patch",
+      "asterinas-irq-retire-storage.patch",
+      "asterinas-nvidia-device-worker.patch",
+      "asterinas-nvidia-worker-flush.patch"
+    ],
+    "incremental_patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-irq-worker-teardown.patch",
+    "incremental_patch_sha256": "a1d9a1dc05fc7e4f6e08e98bb4c409361d9281eaa2c4847b516abc214d051391",
+    "files": [
+      "kernel/comps/nvidia-platform/src/worker.rs",
+      "kernel/comps/nvidia-platform/src/worker/tests.rs",
+      "kernel/comps/nvidia-platform/README.md"
+    ],
+    "patch18_applies_after_patch17": true,
+    "target_bytes_exact": true,
+    "index_tree_before": "290a566958a15c82819c45ce5f5fd650b3d0b264",
+    "index_tree_after": "290a566958a15c82819c45ce5f5fd650b3d0b264",
+    "original_index_unchanged": true,
+    "authenticated": false,
+    "committed": false,
+    "pushed": false,
+    "remote_actions_run": false,
+    "gpu_acceptance": false,
+    "rm_gsp_initialized": false
+  },
+  "appearance_patch_validation": {
+    "gpui": {
+      "patch": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/gpui-appearance-file-admission.patch",
+      "patch_sha256": "626a2fdd7f41bc1c276dd79dd433fd2585cd2e2cdbc2b6ab357149d657b6c4d1",
+      "applies_and_matches_final_bytes": true,
+      "files": [
+        {
+          "path": "Cargo.lock",
+          "before_sha256": "d6760de7f644d06b060d4b57e6b7e3889b3c4000f21e1a31c77234ca9d60c213",
+          "after_sha256": "76c620969a83c6a0a6069656674cc4bf02a914907da36c167a0d5235dde5df7f"
+        },
+        {
+          "path": "crates/app/Cargo.toml",
+          "before_sha256": "3f7499b53fcab0d2a0d4cbca6b28f7ba04e845f5cbfd56625ab5a74e231f2432",
+          "after_sha256": "f882ec1242a56d31bf1a1680629a1800e5ea206b39cd2b47e652d01330844813"
+        },
+        {
+          "path": "crates/app/src/config/appearance.rs",
+          "before_sha256": "45dadb72eac23949fd8a0507a2866a42815a0787bf63442f77cf12571ed38958",
+          "after_sha256": "191ffb83228e835ddb9f3912e44d66f3aee476e5fcb601761f40b06cae451826"
+        },
+        {
+          "path": "scripts/test_appearance_profile.py",
+          "before_sha256": "2ed597ff930c6c8f21702e18b2a332e9f3ac72634ca321a634d6aab92d7431bc",
+          "after_sha256": "ea36d2ec7c75e549a23bdd3896833e8dd9e86386cb4dff88255b6dc65844556a"
+        },
+        {
+          "path": "docs/src/content/docs/developer/cybermanju-appearance.md",
+          "before_sha256": "76fc2b0b5f410bebc8d16a380b81fb7e21fead07346ecd7c8d60c4d1729d7fa4",
+          "after_sha256": "a710b15b497a7dee302e7cbcd9d8dbdc3c0882e9bbb25d0e508709540cd58041"
+        }
+      ]
+    },
+    "app": {
+      "patch": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/cybermanju-appearance-restore.patch",
+      "patch_sha256": "33aac0c067e1962029d5bcd015b46b63d2de6d727bd3c03c12164d5bd05a4b2d",
+      "applies_and_matches_final_bytes": true,
+      "files": [
+        {
+          "path": "src/utils/appearanceProfile.ts",
+          "before_sha256": "f56ff1efc84fa70e538e2cacfcaef39e8350c39b5dfcd97398e315f627d32618",
+          "after_sha256": "6af4d7c6259c78d688b9a2eec0ee9249d13d795cff01ae552c6c7829d963f7a4"
+        },
+        {
+          "path": "src/components/SettingsPage.vue",
+          "before_sha256": "48b4b92def3fc6db0f18470b299b31fd6796a06b68d4cac540aed46537eb8ae0",
+          "after_sha256": "69d697dc940135e8d9a7c5e259694f719a65aec70b5fcfcb077d715d11223b62"
+        },
+        {
+          "path": "tests/frontend/appearance-profile.test.ts",
+          "before_sha256": "9901835e0505af720aa23310e5b9455236e4b85992ca6b7b08db222833a2d4c6",
+          "after_sha256": "bba33e0520e8d65f0a330bb85b038793756f129bac23fee09ee9c9119774b6a2"
+        }
+      ]
+    },
+    "app_docs": {
+      "patch": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/cybermanju-appearance-restore-docs.patch",
+      "patch_sha256": "ab600a6a8a8f55040a8122bd06c066ad32560489d95112fed62fc13b076cfe04",
+      "applies_and_matches_final_bytes": true,
+      "files": [
+        {
+          "path": "docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+          "before_sha256": "c5122e8d419bddad2d435cd51cfe591ab6ce2da2ce082648ba50bea465b01fe3",
+          "after_sha256": "227596c9125c63cc24b092efacb9d734af2b38b1b76e45da171bf605f10369b9"
+        },
+        {
+          "path": "docs/CYBERMANJU-OS-PLAN.md",
+          "before_sha256": "833d32fa3860dd192b374326eb3f5b0a2282aab6496b97f9d1be646f8fa165f4",
+          "after_sha256": "b76d73676ec5f42c658edd77b45010360370e9d927de4665f14d331b05246316"
+        },
+        {
+          "path": "TASKS.md",
+          "before_sha256": "940bfaa98c6e25b3273e3c2cbdea9626f19624cd12edafe3172093fcc34d9c70",
+          "after_sha256": "7503c73f014dc42a234d424b4b6dcaa4103d263a9a50145909397843a9f70553"
+        },
+        {
+          "path": "worklog.md",
+          "before_sha256": "bd8aa01f06929602b09f8f41ad660f4c6937fc9f6c7da6d2d50a799940f91e69",
+          "after_sha256": "2ecb91a560d1b64d13f638e02303cc9f6b0b7a2245b858848ec070b9439afde8"
+        }
+      ]
+    },
+    "app_baseline_provenance": {
+      "source": "previous verified source patch reconstructs exact v1 baseline",
+      "patch": "/workspace/asterinas-gpui/evidence/cybermanju-appearance-bridge/cybermanju-appearance-export.patch",
+      "patch_sha256": "32460623ff60c8e4c29555e3e9b2309a4396b9960ad324ba94d3d5e8e633a404",
+      "agent_captured_profile_matches_reconstructed_baseline": true
+    },
+    "gpui_index_unchanged": true,
+    "shared_fixture_sha256": "287945f257fdef684053d455e3d15075f3e0e244948c3ca79c705a9ae23fa6f9",
+    "scope": "Incremental local source/doc changes after the 20:00 UTC pass; no hardware acceptance or publication"
+  },
+  "hardware": {
+    "checked_at_utc": "2026-10-20T20:32:08.896281+00:00",
+    "device_nodes": {
+      "/dev/dri": [],
+      "/dev/nvidia*": [],
+      "/dev/kvm": []
+    },
+    "display_class_pci": [],
+    "gpu_acceptance": false,
+    "physical_gpu_benchmark_run": false
+  },
+  "gpu_acceptance": false,
+  "physical_gpu_benchmark_run": false,
+  "artifacts": [
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/continuation-notes.md",
+      "bytes": 6464,
+      "sha256": "d16eba45ab74e0d6e6f089b3fcf591e6d63483347d80b4280ca7e5e2a8d4bdb5"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "bytes": 120025,
+      "sha256": "8d3f058120360c1093c4a48fe1d5df39bfa671a3dd0fb8965385b67d604f716f"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/gpui-rust-tests.log",
+      "bytes": 17042,
+      "sha256": "0d42a1c8654dc6f73d237ff60328da3f5dc6010575462150e996e859a0c3a598"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/gpui-build.log",
+      "bytes": 396,
+      "sha256": "28535167eda1b4114e13573887663caae1a35f17dd5ca8675fffc386b0f4ec88"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/gpui-python-tests.log",
+      "bytes": 5443,
+      "sha256": "82ed41f03e9eb07f241fdc2d52699b7600acc3055eea53156a826f1b0b94ba06"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/gpui-clippy.log",
+      "bytes": 15914,
+      "sha256": "b491a2508b2a3f99a8c9e5f0fccfd1be22258ec6bc310848ce89e486aca7f5f9"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/old-symlink-regression.log",
+      "bytes": 1321,
+      "sha256": "24e741c730c75f2daf9b60c4e748f1e14ce482d69eec04bded2363792a0dce9d"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/frontend-tests.log",
+      "bytes": 15524,
+      "sha256": "a3f1e3aceee37d49f6e43d61546c09a9067960f4aed99579f55a43cb06f93043"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/appearance-profile.test.log",
+      "bytes": 568,
+      "sha256": "55f043b35099668465195727ce7752b3c8ce3b2b3cee9e04c184c11f3fc3dd3c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/typecheck.log",
+      "bytes": 230,
+      "sha256": "63189aef98b1365d2a87ba32fd0069d2896af920a0a0eaf3d08b595d4a3e5cb1"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/version-check.log",
+      "bytes": 1206,
+      "sha256": "08fd3c10e65e65613f4a3ea6990aa237324603776e3ecbdbde0604973f4ed5ca"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/file-headers.log",
+      "bytes": 32,
+      "sha256": "4168d8f0a32dc7c013bc5b5c6fd4891bf8923493fe427f477c44f7cbafe3df31"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-2030/patch-validation.json",
+      "bytes": 1699,
+      "sha256": "40b1558f253e67453ef72a31591c83cf2c41bd43f47adffee755d94bc2436371"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-irq-worker-teardown.patch",
+      "bytes": 7553,
+      "sha256": "a1d9a1dc05fc7e4f6e08e98bb4c409361d9281eaa2c4847b516abc214d051391"
+    }
+  ],
+  "restrictions": "No credentials/authentication/staging/commit/push/PR/publication/remote Actions or schedule changes; no Asterinas desktop/Linux parity claim"
+}

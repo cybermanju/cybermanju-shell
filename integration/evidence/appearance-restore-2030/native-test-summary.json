@@ -1,0 +1,40 @@
+{
+  "suites": {
+    "native-nvidia-nvport-tests.log": {
+      "reported_passed": 20,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-nvidia-platform-tests.log": {
+      "reported_passed": 13,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-ostd-tests.log": {
+      "reported_passed": 256,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-pci-iommu-tests.log": {
+      "reported_passed": 13,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-pci-tests.log": {
+      "reported_passed": 13,
+      "failed": 0,
+      "filtered": 0
+    }
+  },
+  "total_reported_passed": 315,
+  "explicitly_skipped_bodies": [
+    "test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] ok",
+    "test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] ok",
+    " [skipped: VMX/EPT invalidation unavailable] ok"
+  ],
+  "native_runner_exit": 0,
+  "completion_job": "job_u2EectqK",
+  "initial_runner_failure": "relative-path invocation exited127; corrected absolute-path rerun exited0",
+  "gpu_acceptance": false,
+  "full_kernel_boot_rerun": false
+}

@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-20T19:35:58.755003+00:00",
+  "dev_nvidia": [],
+  "dev_dri": false,
+  "dev_kvm": false,
+  "pci_devices": [],
+  "official_nvidia_release": "615.78.08",
+  "official_nvidia_commit": "1a82fbfda8f321b056eb3568850f9316c5e465c5",
+  "official_source": "https://github.com/NVIDIA/open-gpu-kernel-modules/releases",
+  "hardware_gpu_acceptance": false,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false
+}

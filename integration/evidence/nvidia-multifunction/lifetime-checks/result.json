@@ -1,0 +1,31 @@
+{
+  "cases": [
+    {
+      "case": "buffer-outlives-group-context",
+      "exit": 101,
+      "expected_code": "E0597",
+      "expected_borrow_failure": true
+    },
+    {
+      "case": "context-outlives-group-mmio",
+      "exit": 101,
+      "expected_code": "E0597",
+      "expected_borrow_failure": true
+    },
+    {
+      "case": "mmio-outlives-reservation",
+      "exit": 101,
+      "expected_code": "E0597",
+      "expected_borrow_failure": true
+    },
+    {
+      "case": "reprobe-while-group-live",
+      "exit": 101,
+      "expected_code": "E0499",
+      "expected_borrow_failure": true
+    }
+  ],
+  "restored_source": true,
+  "source_sha256": "df0ad564a6d317d631e53e1ea7489cd713accda8661ba6c6bdbc59f16d73a25c",
+  "scope": "Real compiler lifetime checks, not device quiescence proof"
+}

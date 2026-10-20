@@ -1,0 +1,52 @@
+{
+  "reason": "User explicitly authorized leaving these pre-existing ignored target-local cache files untouched and untracked; excluded from all staged/committed snapshot content",
+  "files": [
+    {
+      "path": "asterinas/tools/graphics/__pycache__/check_graphics.cpython-312.pyc",
+      "bytes": 17232,
+      "sha256": "02283523199314c350bf9883467c98aadf0d0743d73ca7d869030670645cc83b"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/run_native_nvidia.cpython-312.pyc",
+      "bytes": 16633,
+      "sha256": "1a28b9b25b4b0534a41c04b029214cf693f1c1d6662724d1c2a74bc87a1f5eba"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/run_nvport_smoke.cpython-312.pyc",
+      "bytes": 9860,
+      "sha256": "0f86a94e0f7cb69a4a4166cab9454fbfbfa017670f02fe960661510bacbdad31"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_check_graphics.cpython-312.pyc",
+      "bytes": 15594,
+      "sha256": "df0ad19ede8bcc5868a3dc76d9093c7951f53adb5586fd70a297578723975adb"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_native_gpu_evidence.cpython-312.pyc",
+      "bytes": 9645,
+      "sha256": "22d81f095be90bc5bf247968e30bc38632b65686bee02ab7bdc541ecac5e2b25"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_run_native_nvidia.cpython-312.pyc",
+      "bytes": 7443,
+      "sha256": "d92f3ef4782367b82400497068c63406c33b2bbe901dba82f7c9f78c37fbfd2a"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_run_nvport_smoke.cpython-312.pyc",
+      "bytes": 10791,
+      "sha256": "6ebcbf628344b9818aa80ea613f5da20ef51b94e9db65ca7b190f5694de25094"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_vulkan_compute_bench.cpython-312.pyc",
+      "bytes": 6220,
+      "sha256": "e8747b2194e824571694ee307b802d12560238b5b2e1d0408cb1a37baf11a7ba"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/validate_native_gpu_evidence.cpython-312.pyc",
+      "bytes": 12846,
+      "sha256": "9ee9e0fa24fe768891e2a525f336a208c895d70fa50b432233f5e2c6e0c877df"
+    }
+  ],
+  "count": 9,
+  "bytes": 106264
+}

@@ -72,6 +72,7 @@ impl NotificationData {
 pub enum LocalSlot {
     ConfigError,
     ThemeError,
+    AppearanceError,
 }
 
 impl LocalSlot {
@@ -717,6 +718,29 @@ mod tests {
             .map(|n| n.id)
             .collect();
         assert_eq!(surviving, vec![LocalSlot::ThemeError.id(), 7]);
+    }
+
+    #[test]
+    fn appearance_error_has_an_independent_sticky_slot() {
+        let notifications = NotificationSubscriber::new();
+        notifications.post_local(LocalSlot::ConfigError, "config".into(), "bad config".into());
+        notifications.post_local(LocalSlot::ThemeError, "theme".into(), "bad theme".into());
+        notifications.post_local(
+            LocalSlot::AppearanceError,
+            "profile".into(),
+            "bad profile".into(),
+        );
+        assert_eq!(notifications.get().notifications.len(), 3);
+        notifications.clear_local(LocalSlot::AppearanceError);
+        let ids: Vec<_> = notifications
+            .get()
+            .notifications
+            .iter()
+            .map(|n| n.id)
+            .collect();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&LocalSlot::ConfigError.id()));
+        assert!(ids.contains(&LocalSlot::ThemeError.id()));
     }
 
     #[test]

@@ -1,0 +1,71 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `id-alloc` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/firmware.rs:239:13
+    |
+239 |     handle: core::ptr::NonNull<c_void>,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+239 -     handle: core::ptr::NonNull<c_void>,
+239 +     handle: ptr::NonNull<c_void>,
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/firmware.rs:258:22
+    |
+258 | ...   let handle = core::ptr::NonNull::new(handle.cast_mut()).ok_or(Fir...
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+258 -         let handle = core::ptr::NonNull::new(handle.cast_mut()).ok_or(FirmwareError::NoMemory)?;
+258 +         let handle = ptr::NonNull::new(handle.cast_mut()).ok_or(FirmwareError::NoMemory)?;
+    |
+
+error: implicit autoref creates a reference to the dereference of a raw pointer
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/firmware.rs:324:20
+    |
+324 |         size.write((*handle).bytes.len() as u32);
+    |                    ^^------^^^^^^^^^^^^^
+    |                      |
+    |                      this raw pointer has type `*mut firmware::Handle`
+    |
+    = note: creating a reference requires the pointer target to be valid and imposes aliasing requirements
+note: autoref is being applied to this expression, resulting in: `&[u8]`
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/firmware.rs:324:20
+    |
+324 |         size.write((*handle).bytes.len() as u32);
+    |                    ^^^^^^^^^^^^^^^
+note: method calls to `len` require a reference
+   --> /usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/mod.rs:116:5
+    |
+116 |     pub const fn len(&self) -> usize {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: `#[deny(dangerous_implicit_autorefs)]` on by default
+help: try using a raw pointer method instead; or if this reference is intentional, make it explicit
+    |
+324 |         size.write((&(*handle).bytes).len() as u32);
+    |                    ++               +
+
+warning: `ostd-nvidia-nvport` (lib) generated 3 warnings (1 duplicate)
+error: could not compile `ostd-nvidia-nvport` (lib) due to 1 previous error; 3 warnings emitted
+[Error]: Cargo build failed

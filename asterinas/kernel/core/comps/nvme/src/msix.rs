@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 
 use aster_pci::capability::msix::CapabilityMsixData;
-use ostd::irq::IrqLine;
+use ostd::{Error, Result, irq::IrqLine};
 
 /// MSI-X interrupt manager for NVMe devices.
 ///
@@ -51,7 +51,7 @@ impl NvmeMsixManager {
         }
 
         for (i, irq) in irqs.into_iter().enumerate() {
-            msix.set_interrupt_vector(irq, i as u16);
+            msix.set_interrupt_vector(irq, i as u16).ok()?;
         }
 
         // Reserve the first vector for admin queue
@@ -91,5 +91,12 @@ impl NvmeMsixManager {
     /// Returns a mutable reference to the IRQ line for the given vector if any.
     pub(crate) fn irq_for_vector_mut(&mut self, vector: u16) -> Option<&mut IrqLine> {
         self.msix.irq_mut(vector as usize)
+    }
+
+    /// Enables a vector after its actual completion handler is registered.
+    pub(crate) fn enable_vector(&mut self, vector: u16) -> Result<()> {
+        self.msix
+            .enable_vector(vector)
+            .map_err(|_| Error::InvalidArgs)
     }
 }

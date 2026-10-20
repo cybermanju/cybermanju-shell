@@ -1,0 +1,3 @@
+buffer-outlives-context {'case': 'buffer-outlives-context', 'exit': 101, 'expected_borrow_failure': True}
+context-outlives-mmio {'case': 'context-outlives-mmio', 'exit': 101, 'expected_borrow_failure': True}
+Production source restored and rechecked

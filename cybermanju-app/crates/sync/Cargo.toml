@@ -1,0 +1,40 @@
+[package]
+name = "cybermanju-sync"
+version = "0.1.1"
+edition = "2021"
+description = "Storage sync backends (local, GitHub, GitLab, Google Drive)"
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+cybermanju-compression = { path = "../compression" }
+cybermanju-db = { path = "../db" }
+# <<< AGENT-8 CROSS-DEP >>> manifest.rs now calls cybermanju_erasure::{encode,decode}_framed
+# but the dep line was missing, so the whole workspace stopped compiling.
+cybermanju-erasure = { path = "../erasure" }
+cybermanju-types = { path = "../types" }
+image = "0.25"
+log = "0.4"
+rayon = "1.10"
+# <<< AGENT-7 CROSS-DEP: the durability modules open the scrub_runs /
+# repairs / chunk_refs / leases / provider_health tables directly through
+# Database::get_*_table(), which needs `ReadableTable` in scope. >>>
+redb = "2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# <<< AGENT-3 OAUTH >>>
+cybermanju-crypto = { path = "../crypto" }
+rand_core = { version = "0.6", features = ["getrandom"] }
+sha2 = "0.10"
+# <<< AGENT-1 TRANSFER: BLAKE3 integrity verification >>>
+blake3 = "1"
+# <<< P2P BONDS (CI proving): RaptorQ fountain codes (RFC 6330, Apache-2.0)
+# for lossy relay bulk — pure Rust, no async runtime, WASM-safe; the RS
+# path in swarm.rs stays the default, RQ is the GB-scale upgrade. >>>
+raptorq = "2"
+# <<< P2P BONDS (CI proving): iroh 1.x addressing (EndpointId/RelayUrl
+# validation + canonical tickets, MIT OR Apache-2.0). Default features =
+# upstream-tested config. Only the sync (non-async) surface is used here;
+# the async Endpoint dial stays sequenced on a tokio runtime decision. >>>
+iroh = "1"

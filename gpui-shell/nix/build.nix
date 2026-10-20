@@ -53,8 +53,11 @@ let
     rec {
       inherit pname;
       version = mgsCargoLock.package.version;
-      src = builtins.path {
-        path = ../.;
+      # Crane's findCargoFiles must traverse the original tree during read-only
+      # evaluation (flake check --no-build). A bare builtins.path can point at a
+      # filtered store path that has not been materialized in that mode.
+      src = lib.cleanSourceWith {
+        src = ../.;
         filter = mkIncludeFilter ../.;
         name = "source";
       };

@@ -1,0 +1,16 @@
+F
+======================================================================
+FAIL: test_live_file_mode_requires_a_profile_and_rejects_duplicate_opt_in (__main__.AppearanceCliTests.test_live_file_mode_requires_a_profile_and_rejects_duplicate_opt_in)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/asterinas-gpui/gpui-shell/scripts/test_appearance_profile.py", line 162, in test_live_file_mode_requires_a_profile_and_rejects_duplicate_opt_in
+    self.assertNotEqual(result.returncode, 0, result.stdout)
+AssertionError: 0 == 0 : /tmp/nix-shell.3i8NWs/gpui-appearance-cli-6hxaf9td/config/gpuishell/config.toml: absent, defaults apply
+/tmp/nix-shell.3i8NWs/gpui-appearance-cli-6hxaf9td/config/gpuishell/theme.toml: absent, defaults apply
+/tmp/nix-shell.3i8NWs/gpui-appearance-cli-6hxaf9td/config/gpuishell/state.toml: absent, defaults apply
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.143s
+
+FAILED (failures=1)

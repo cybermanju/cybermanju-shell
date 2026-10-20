@@ -1,0 +1,199 @@
+diff --git a/crates/ui/src/components/list.rs b/crates/ui/src/components/list.rs
+--- a/crates/ui/src/components/list.rs
++++ b/crates/ui/src/components/list.rs
+@@ -2,7 +2,7 @@
+ 
+ use std::rc::Rc;
+ 
+-use crate::theme::{ActiveTheme, Color, Radius, Spacing};
++use crate::theme::{ActiveTheme, Color, LayoutDensity, Radius, Spacing};
+ use gpui::{
+     AnyElement, AnyView, App, ClickEvent, CursorStyle, ElementId, IntoElement, MouseButton,
+     MouseDownEvent, ParentElement, Pixels, RenderOnce, SharedString, Window, div, prelude::*, px,
+@@ -29,6 +29,16 @@
+     ExtraDense,
+ }
+ 
++/// Default rows follow the runtime profile; explicit vertical spacing remains authored.
++fn row_vertical_padding(spacing: Option<ListItemSpacing>, density: LayoutDensity) -> Pixels {
++    match spacing {
++        None => density.spacing(Spacing::XSmall),
++        Some(ListItemSpacing::ExtraDense) => Spacing::None.pixels(),
++        Some(ListItemSpacing::Dense) => Spacing::XXSmall.pixels(),
++        Some(ListItemSpacing::Sparse) => Spacing::XSmall.pixels(),
++    }
++}
++
+ /// Controls when a [`ListItem`]'s end slot is shown.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+ pub enum EndSlotVisibility {
+@@ -50,7 +60,7 @@
+     id: ElementId,
+     disabled: bool,
+     selected: bool,
+-    spacing: ListItemSpacing,
++    spacing: Option<ListItemSpacing>,
+     indent_level: usize,
+     indent_step_size: Pixels,
+     inset: bool,
+@@ -73,7 +83,7 @@
+             id: id.into(),
+             disabled: false,
+             selected: false,
+-            spacing: ListItemSpacing::default(),
++            spacing: None,
+             indent_level: 0,
+             indent_step_size: px(12.0),
+             inset: false,
+@@ -102,9 +112,10 @@
+         self
+     }
+ 
+-    /// Set the row's vertical density.
++    /// Pin vertical spacing independently of profile density. Unpinned rows
++    /// follow profile density; horizontal semantic spacing still follows it.
+     pub fn spacing(mut self, spacing: ListItemSpacing) -> Self {
+-        self.spacing = spacing;
++        self.spacing = Some(spacing);
+         self
+     }
+ 
+@@ -201,16 +212,13 @@
+ 
+ impl RenderOnce for ListItem {
+     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
++        let density = cx.theme().density;
+         let colors = cx.theme().colors();
+         let interactive = !self.disabled;
+         let indent = self.indent_level as f32 * self.indent_step_size;
+         let group_name: SharedString = HOVER_GROUP.into();
+ 
+-        let py = match self.spacing {
+-            ListItemSpacing::ExtraDense => Spacing::None.pixels(),
+-            ListItemSpacing::Dense => Spacing::XXSmall.pixels(),
+-            ListItemSpacing::Sparse => Spacing::XSmall.pixels(),
+-        };
++        let py = row_vertical_padding(self.spacing, density);
+ 
+         let background = if self.selected {
+             Some(colors.element_selected)
+@@ -229,8 +237,8 @@
+             .id(self.id)
+             .group(group_name)
+             .w_full()
+-            .gap(Spacing::Small.pixels())
+-            .px(Spacing::Medium.pixels())
++            .gap(density.spacing(Spacing::Small))
++            .px(density.spacing(Spacing::Medium))
+             .py(py)
+             .when(!self.inset && self.indent_level > 0, |this| this.ml(indent))
+             .when(self.rounded, |this| this.rounded(Radius::XSmall.pixels()))
+@@ -249,7 +257,7 @@
+             .child(
+                 h_flex()
+                     .flex_grow(1.)
+-                    .gap(Spacing::Small.pixels())
++                    .gap(density.spacing(Spacing::Small))
+                     .children(self.children),
+             )
+             .when_some(self.end_slot, |this, slot| {
+@@ -361,3 +369,48 @@
+             })
+     }
+ }
++
++#[cfg(test)]
++mod density_tests {
++    use super::*;
++
++    #[test]
++    fn default_rows_follow_density_without_changing_comfortable_spacing() {
++        assert_eq!(
++            row_vertical_padding(None, LayoutDensity::Comfortable),
++            Spacing::XSmall.pixels()
++        );
++        assert_eq!(
++            row_vertical_padding(None, LayoutDensity::Compact),
++            LayoutDensity::Compact.spacing(Spacing::XSmall)
++        );
++        assert!(
++            row_vertical_padding(None, LayoutDensity::Compact)
++                < row_vertical_padding(None, LayoutDensity::Comfortable)
++        );
++    }
++
++    #[test]
++    fn explicit_vertical_spacing_is_not_reinterpreted_by_the_profile() {
++        for (spacing, step) in [
++            (ListItemSpacing::ExtraDense, Spacing::None),
++            (ListItemSpacing::Dense, Spacing::XXSmall),
++            (ListItemSpacing::Sparse, Spacing::XSmall),
++        ] {
++            for density in [LayoutDensity::Compact, LayoutDensity::Comfortable] {
++                assert_eq!(row_vertical_padding(Some(spacing), density), step.pixels());
++            }
++        }
++    }
++
++    #[test]
++    fn builders_distinguish_an_explicit_override_from_the_default() {
++        assert_eq!(ListItem::new("default-row").spacing, None);
++        assert_eq!(
++            ListItem::new("explicit-row")
++                .spacing(ListItemSpacing::Sparse)
++                .spacing,
++            Some(ListItemSpacing::Sparse)
++        );
++    }
++}
+diff --git a/crates/ui/src/theme/mod.rs b/crates/ui/src/theme/mod.rs
+--- a/crates/ui/src/theme/mod.rs
++++ b/crates/ui/src/theme/mod.rs
+@@ -57,7 +57,7 @@
+     pub overrides: ThemeColorsRefinement,
+     /// Base font size.
+     pub font_size: Pixels,
+-    /// Runtime profile overlay, consumed by launcher chrome only. Not persisted.
++    /// Runtime profile overlay for launcher and shared list-row spacing. Not persisted.
+     pub density: LayoutDensity,
+ }
+ 
+diff --git a/crates/app/src/config/appearance.rs b/crates/app/src/config/appearance.rs
+--- a/crates/app/src/config/appearance.rs
++++ b/crates/app/src/config/appearance.rs
+@@ -293,7 +293,7 @@
+             retained.push("followSystem (snapshot theme only)");
+         }
+         format!(
+-            "CyberManju appearance v1: theme={} and accent token projection; density={:?} (launcher spacing only; typography/bar/compositor geometry unchanged); retained, NOT applied: {}. Explicit live-file import requires --watch-appearance-profile; no automatic app sync or Asterinas/GPU certification.",
++            "CyberManju appearance v1: theme={} and accent token projection; density={:?} (launcher and shared list-row spacing only; explicit row overrides and typography/bar/compositor geometry preserved); retained, NOT applied: {}. Explicit live-file import requires --watch-appearance-profile; no automatic app sync or Asterinas/GPU certification.",
+             self.settings.theme.name(),
+             self.settings.density,
+             retained.join(", ")
+@@ -384,7 +384,11 @@
+         assert_eq!(compact.font_size, base.font_size);
+         assert_eq!(comfortable.font_size, base.font_size);
+         assert_eq!(compact.colors().accent, comfortable.colors().accent);
+-        assert!(compact_profile.report().contains("launcher spacing only"));
++        assert!(
++            compact_profile
++                .report()
++                .contains("launcher and shared list-row spacing only")
++        );
+     }
+ 
+     #[test]
+diff --git a/docs/src/content/docs/developer/cybermanju-appearance.md b/docs/src/content/docs/developer/cybermanju-appearance.md
+--- a/docs/src/content/docs/developer/cybermanju-appearance.md
++++ b/docs/src/content/docs/developer/cybermanju-appearance.md
+@@ -36,7 +36,9 @@
+ 
+ The existing inotify watcher is reused with bounded pending notifications and trailing-edge coalescing so rapid/atomic saves do not lose the final replacement. Export or replace the same file to update it. The app still does not automatically write to that path or communicate with the shell: browser downloads, Tauri/native IPC, authenticated remote synchronization and an OS settings daemon are not provided. There is no automatic path discovery, profile write-back or preference-store migration.
+ 
+-Density now applies to semantic padding/gaps in the native `LauncherFrame` query, body and footer. `compact` uses the app's existing `DENSITY_SCALE.unit = 0.9`; `comfortable` uses `1.0`, which preserves the original native spacing when no profile is imported. The runtime Theme carries this choice across live profile updates and native theme reloads. It does not scale typography, icons, bespoke control hit targets, bar width, panel docking or compositor geometry, and it is not added to `theme.toml`. The validation report explicitly says **launcher spacing only**, not whole-desktop density.
++In the last validated binary, density applies to semantic padding/gaps in the native `LauncherFrame` query, body and footer. `compact` uses the app's existing `DENSITY_SCALE.unit = 0.9`; `comfortable` uses `1.0`, which preserves the original native spacing when no profile is imported. The runtime Theme carries this choice across live profile updates and native theme reloads. It does not scale typography, icons, bespoke control hit targets, bar width, panel docking or compositor geometry, and it is not added to `theme.toml`. That binary's validation report says **launcher spacing only**, not whole-desktop density.
++
++**Source-only extension, not yet built or tested:** shared `ListItem` rows now consume runtime density for horizontal padding/gaps and default vertical padding. Explicit `.spacing(Sparse/Dense/ExtraDense)` vertical overrides retain their authored pixel sizes; indentation, slots, callbacks and interaction state remain intact. Three regression tests were added but not executed. The source report now names launcher and shared list-row spacing, but the existing binary is unchanged. Only formatting, whitespace and patch checks are permitted under the current low-disk restriction; old test counts do not validate this extension.
+ 
+ Wallpaper, shell style, panel docking, glass, motion and glow are retained in the snapshot and explicitly reported as **not applied**. Density outside the launcher chrome and live follow-system tracking remain unavailable. Geometry, theme-owned accent variants not currently selected, app keybindings/gestures/locale, and compositor workspace policy are not silently translated into invented native controls.
+ 

@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "scope": "real build/configuration only; guest not booted",
+  "grub_config": "# AUTOMATICALLY GENERATED FILE, DO NOT EDIT IF YOU KNOW WHAT YOU ARE DOING\n\n# set debug=linux,efi,linuxefi\n\nset timeout_style=hidden\nset timeout=0\n\nmenuentry 'asterinas' {\n    multiboot2 /boot/asterinas-osdk-bin earlycon console=ttyS0 rdinit=/bin/sh -- /aster-native-gpu-init\n    \n    boot\n}",
+  "vm_image": {
+    "path": "asterinas-osdk-bin.iso",
+    "aster_version": "0.1.0",
+    "size": 26032128,
+    "typ": {
+      "GrubIso": {
+        "grub_version": "grub-mkrescue (GRUB) 2.12-1ubuntu7.3\n"
+      }
+    },
+    "modified_time": {
+      "secs_since_epoch": 1792510795,
+      "nanos_since_epoch": 970377232
+    }
+  }
+}

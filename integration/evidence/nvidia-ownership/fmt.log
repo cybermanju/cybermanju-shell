@@ -1,0 +1,9 @@
+Diff in /workspace/asterinas-gpui/asterinas/kernel/comps/drm/src/ioctl/gem.rs:84:
+ mod tests {
+     use ostd::prelude::*;
+ 
+[31m-    use super::{dumb_buffer_layout, PAGE_SIZE};
+(B[m[32m+    use super::{PAGE_SIZE, dumb_buffer_layout};
+(B[m 
+     #[ktest]
+     fn dumb_buffer_rows_round_pixel_size_up_before_multiplying_width() {

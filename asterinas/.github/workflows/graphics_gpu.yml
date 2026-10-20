@@ -90,7 +90,7 @@ jobs:
           set -euo pipefail
           bash tools/graphics/run_nvport_format_tests.sh \
             2>&1 | tee "$NVPORT_OUTPUT/formatter-host-tests.log"
-      - name: Execute NVport, platform, PCI/EDU DMA, IOMMU rejection and OSTD inside Asterinas
+      - name: Execute NVport, platform, PCIe NVMe MSI-X/DMA, VT-d and OSTD regressions inside Asterinas
         run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
       - name: Build grub-rescue multiboot2 ISO with serial console
         shell: bash

@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use crate::theme::{ActiveTheme, Color, Radius, Spacing};
+use crate::theme::{ActiveTheme, Color, LayoutDensity, Radius, Spacing};
 use gpui::{
     AnyElement, AnyView, App, ClickEvent, CursorStyle, ElementId, IntoElement, MouseButton,
     MouseDownEvent, ParentElement, Pixels, RenderOnce, SharedString, Window, div, prelude::*, px,
@@ -29,6 +29,16 @@ pub enum ListItemSpacing {
     ExtraDense,
 }
 
+/// Default rows follow the runtime profile; explicit vertical spacing remains authored.
+fn row_vertical_padding(spacing: Option<ListItemSpacing>, density: LayoutDensity) -> Pixels {
+    match spacing {
+        None => density.spacing(Spacing::XSmall),
+        Some(ListItemSpacing::ExtraDense) => Spacing::None.pixels(),
+        Some(ListItemSpacing::Dense) => Spacing::XXSmall.pixels(),
+        Some(ListItemSpacing::Sparse) => Spacing::XSmall.pixels(),
+    }
+}
+
 /// Controls when a [`ListItem`]'s end slot is shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum EndSlotVisibility {
@@ -50,7 +60,7 @@ pub struct ListItem {
     id: ElementId,
     disabled: bool,
     selected: bool,
-    spacing: ListItemSpacing,
+    spacing: Option<ListItemSpacing>,
     indent_level: usize,
     indent_step_size: Pixels,
     inset: bool,
@@ -73,7 +83,7 @@ impl ListItem {
             id: id.into(),
             disabled: false,
             selected: false,
-            spacing: ListItemSpacing::default(),
+            spacing: None,
             indent_level: 0,
             indent_step_size: px(12.0),
             inset: false,
@@ -102,9 +112,10 @@ impl ListItem {
         self
     }
 
-    /// Set the row's vertical density.
+    /// Pin vertical spacing independently of profile density. Unpinned rows
+    /// follow profile density; horizontal semantic spacing still follows it.
     pub fn spacing(mut self, spacing: ListItemSpacing) -> Self {
-        self.spacing = spacing;
+        self.spacing = Some(spacing);
         self
     }
 
@@ -201,16 +212,13 @@ impl ParentElement for ListItem {
 
 impl RenderOnce for ListItem {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let density = cx.theme().density;
         let colors = cx.theme().colors();
         let interactive = !self.disabled;
         let indent = self.indent_level as f32 * self.indent_step_size;
         let group_name: SharedString = HOVER_GROUP.into();
 
-        let py = match self.spacing {
-            ListItemSpacing::ExtraDense => Spacing::None.pixels(),
-            ListItemSpacing::Dense => Spacing::XXSmall.pixels(),
-            ListItemSpacing::Sparse => Spacing::XSmall.pixels(),
-        };
+        let py = row_vertical_padding(self.spacing, density);
 
         let background = if self.selected {
             Some(colors.element_selected)
@@ -229,8 +237,8 @@ impl RenderOnce for ListItem {
             .id(self.id)
             .group(group_name)
             .w_full()
-            .gap(Spacing::Small.pixels())
-            .px(Spacing::Medium.pixels())
+            .gap(density.spacing(Spacing::Small))
+            .px(density.spacing(Spacing::Medium))
             .py(py)
             .when(!self.inset && self.indent_level > 0, |this| this.ml(indent))
             .when(self.rounded, |this| this.rounded(Radius::XSmall.pixels()))
@@ -249,7 +257,7 @@ impl RenderOnce for ListItem {
             .child(
                 h_flex()
                     .flex_grow(1.)
-                    .gap(Spacing::Small.pixels())
+                    .gap(density.spacing(Spacing::Small))
                     .children(self.children),
             )
             .when_some(self.end_slot, |this, slot| {
@@ -359,5 +367,50 @@ impl RenderOnce for List {
                     this.children(self.children)
                 }
             })
+    }
+}
+
+#[cfg(test)]
+mod density_tests {
+    use super::*;
+
+    #[test]
+    fn default_rows_follow_density_without_changing_comfortable_spacing() {
+        assert_eq!(
+            row_vertical_padding(None, LayoutDensity::Comfortable),
+            Spacing::XSmall.pixels()
+        );
+        assert_eq!(
+            row_vertical_padding(None, LayoutDensity::Compact),
+            LayoutDensity::Compact.spacing(Spacing::XSmall)
+        );
+        assert!(
+            row_vertical_padding(None, LayoutDensity::Compact)
+                < row_vertical_padding(None, LayoutDensity::Comfortable)
+        );
+    }
+
+    #[test]
+    fn explicit_vertical_spacing_is_not_reinterpreted_by_the_profile() {
+        for (spacing, step) in [
+            (ListItemSpacing::ExtraDense, Spacing::None),
+            (ListItemSpacing::Dense, Spacing::XXSmall),
+            (ListItemSpacing::Sparse, Spacing::XSmall),
+        ] {
+            for density in [LayoutDensity::Compact, LayoutDensity::Comfortable] {
+                assert_eq!(row_vertical_padding(Some(spacing), density), step.pixels());
+            }
+        }
+    }
+
+    #[test]
+    fn builders_distinguish_an_explicit_override_from_the_default() {
+        assert_eq!(ListItem::new("default-row").spacing, None);
+        assert_eq!(
+            ListItem::new("explicit-row")
+                .spacing(ListItemSpacing::Sparse)
+                .spacing,
+            Some(ListItemSpacing::Sparse)
+        );
     }
 }

@@ -1,0 +1,1 @@
+Real QEMU/KTest old-code reproduction: test result FAILED with 12 passed, 1 failed; the new NVMe regression asserted activation must fail closed after all owned IRQs were retired, observed Ok(()) instead of Err(AccessDenied). The outer cargo exit code was not reliably captured by the shell pipeline.

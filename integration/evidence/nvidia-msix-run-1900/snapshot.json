@@ -1,0 +1,7 @@
+{
+  "source": "/workspace/asterinas-gpui/asterinas",
+  "isolated_source": "/workspace/asterinas-gpui/asterinas-irq-retire-local",
+  "source_sha256": "9a362f390e8943b548333e24a8a4e66b16b5f179ca0408c3ad3d23f4fe397eee",
+  "reason": "Concurrent MSI-X implementation/validation in original workspace; independent target and source preserve its work",
+  "shared_tree_modified": false
+}

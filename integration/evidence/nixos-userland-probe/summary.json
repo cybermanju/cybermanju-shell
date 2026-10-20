@@ -1,0 +1,59 @@
+{
+  "timestamp_utc": "2026-10-20T19:48:01.217791+00:00",
+  "worktree": "/workspace/asterinas-gpui/asterinas",
+  "head": "00a4842d976db6723b8224be2e57ac8105f13ee2",
+  "dirty": true,
+  "result": "FAIL",
+  "status": "BLOCKED_DISK_CAPACITY",
+  "pass": false,
+  "failure_kind": "host preflight; NOT a guest test failure",
+  "build_executed": false,
+  "qemu_executed": false,
+  "intended_suite": "hello",
+  "intended_guest_command": "hello-asterinas",
+  "expected_guest_output": "Hello Asterinas!",
+  "guest_program_reached": null,
+  "guest_clean_exit_verified": null,
+  "serial_capture_status": "NOT_CREATED_GUEST_NEVER_STARTED",
+  "scope": {
+    "cpu_qemu_only": true,
+    "architecture": "x86_64",
+    "intended_acceleration": "TCG (ENABLE_KVM=0; /dev/kvm absent)",
+    "executed_acceleration": null,
+    "gpu_validated": false,
+    "cybermanju_app_compatibility_validated": false
+  },
+  "disk": {
+    "available_bytes": 5668941824,
+    "ci_image_mib": 6144,
+    "image_preallocation_bytes": 6442450944,
+    "image_only_shortfall_bytes": 773509120,
+    "additional_build_and_nix_space": "required but not measured; image alone exceeds available space",
+    "allocation_mechanism": "tools/nixos/build_nixos.sh:41 fallocate; not sparse"
+  },
+  "expected_image_path": "/workspace/asterinas-gpui/asterinas/target/nixos/asterinas.img",
+  "expected_image_exists": false,
+  "existing_artifacts_reused": false,
+  "kvm_device_exists": false,
+  "docker_executable_present": false,
+  "project_environment": "AGENTS.md specifies project Docker; Docker executable absent; not attempted because disk gate already blocks",
+  "versions": {
+    "nix": "nix (Nix) 2.18.1",
+    "qemu": "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)",
+    "make": "GNU Make 4.3"
+  },
+  "os_a1": "OPEN",
+  "not_proven": [
+    "libc compatibility requirements",
+    "GTK",
+    "WebKit",
+    "Tauri",
+    "Wayland",
+    "GPU",
+    "CyberManju application compatibility"
+  ],
+  "source_edits_by_probe": false,
+  "cache_deletion": false,
+  "git_staging_commit_push": false,
+  "remote_actions": false
+}

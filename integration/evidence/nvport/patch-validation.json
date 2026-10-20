@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "scope": "clean application, source equality, diff check and 30 host graphics/orchestration tests; not GPU runtime",
+  "base": "00a4842d976db6723b8224be2e57ac8105f13ee2",
+  "prerequisites": [
+    "asterinas-dumb-buffer-layout.patch",
+    "asterinas-simpledrm-exact-pixel-format.patch",
+    "asterinas-graphics-prerequisite-check.patch",
+    "asterinas-vulkan-compute-ci.patch"
+  ],
+  "patch": "asterinas-nvidia-nvport-native-ci.patch",
+  "sha256": "03e239cb623d9c05d6ece48a6ab1f06ca23756ed43668a8e068c229cfe71bfb7",
+  "original_index_unchanged": true
+}

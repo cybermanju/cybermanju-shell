@@ -1,0 +1,10 @@
+   Compiling syn v1.0.109
+   Compiling zerocopy v0.8.54
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+   Compiling darling_core v0.13.4
+    Checking ostd-pod v0.4.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-pod)
+   Compiling darling_macro v0.13.4
+   Compiling darling v0.13.4
+   Compiling inherit-methods-macro v0.1.0 (https://github.com/asterinas/inherit-methods-macro?rev=98f7e3e#98f7e3eb)
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.01s

@@ -46,6 +46,10 @@ impl IpcSubscriber {
         match Self::acquire(args) {
             AcquireResult::Primary(subscriber) => Some(subscriber),
             AcquireResult::Secondary => None,
+            AcquireResult::Error(err) if args.appearance_profile.is_some() => {
+                error!("Appearance startup refused: {err}");
+                None
+            }
             AcquireResult::Error(err) => {
                 error!("IPC service error: {}", err);
                 warn!("Retrying IPC acquire without initial input");
@@ -53,6 +57,8 @@ impl IpcSubscriber {
                 let retry_args = Args {
                     input: None,
                     validate: false,
+                    appearance_profile: None,
+                    watch_appearance_profile: false,
                 };
                 match Self::acquire(&retry_args) {
                     AcquireResult::Primary(subscriber) => Some(subscriber),
@@ -84,6 +90,11 @@ impl IpcSubscriber {
 
         // Try to connect to existing instance (fast, synchronous path)
         if let Ok(mut stream) = UnixStream::connect(&path) {
+            if args.appearance_profile.is_some() {
+                return AcquireResult::Error(
+                    "a shell is already running; appearance profiles are startup-only and were not sent over IPC".into(),
+                );
+            }
             // Set a short timeout for the write
             let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
 

@@ -1,0 +1,62 @@
+[workspace]
+members = [
+    "crates/types",
+    "crates/crypto",
+    "crates/compression",
+    "crates/search",
+    "crates/scene",
+    "crates/db",
+    "crates/web",
+    "crates/sync",
+    "crates/faces",
+    "crates/tests",
+    "crates/os-wasm",
+    # <<< CYBERMANJU OS PUSH: AGENT-6 disk, AGENT-7 erasure, AGENT-8 os >>>
+    "crates/disk",
+    "crates/erasure",
+    "crates/os",
+    "crates/agent",
+    "crates/launcher",
+    "src-tauri",
+    "docker/server",
+]
+resolver = "2"
+
+# ─── Build speed ───────────────────────────────────────────────────────
+# Cargo's `debug = 2` default puts full DWARF into every one of the 760+
+# crates in this workspace. On a 10-crate workspace that is invisible; here
+# it dominates both compile time and `target/` size — and `target/` is what
+# CI has to tar up and download on every single run.
+#
+# Line tables keep filename/line info for real backtraces and panics, which
+# is all a test failure needs. Third-party crates get none at all.
+
+[profile.dev]
+debug = "line-tables-only"
+incremental = true
+
+[profile.dev.package."*"]
+debug = false
+
+# `cargo test` uses this profile. It inherits `dev`, but say it outright so
+# the intent does not depend on cargo's inheritance semantics staying put.
+[profile.test]
+debug = "line-tables-only"
+incremental = true
+
+[profile.test.package."*"]
+debug = false
+
+# ─── Release runtime ──────────────────────────────────────────────────
+# Cargo's release default ships with `lto = "off"` and `codegen-units = 16`:
+# across ~760 crates that measurably lessens inlining (every command handler,
+# every crypto/hash/compression hot loop runs on this code) and inflates the
+# binary — which the AppImage has to squeeze and then decompress at launch.
+#
+# Thin LTO + a single codegen unit buys back the cross-crate inlining at a
+# link-time cost CI already tolerates. `opt-level = 3` stays explicit so a
+# future `s`-flavoured size tweak can never silently slow the runtime down.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

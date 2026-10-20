@@ -1,0 +1,15 @@
+{
+  "index_unchanged": true,
+  "kvm": false,
+  "dri": false,
+  "nvidia_nodes": [],
+  "nvidia_release": "615.78.08",
+  "nvidia_source_pin": "1a82fbfda8f321b056eb3568850f9316c5e465c5",
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "gpu_firmware_loaded": false,
+  "rm_gsp_initialized": false,
+  "native_nvidia_benchmark": false
+}

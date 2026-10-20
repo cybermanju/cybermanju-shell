@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "qemu_exit": 33,
+  "errors": [],
+  "scope": "Full CPU kernel boot with Intel VT-d, not GPU proof",
+  "hardware_gpu": false,
+  "image_sha256": "c475fe70328b586146000d3e8368ecfe9526e82a7e3695156aee87dc5b6eee28",
+  "serial_sha256": "5e4b56480c1beca27e452dbd3c4d10c68d36edcd4127c6442ad8ced9d7dc2ca0"
+}

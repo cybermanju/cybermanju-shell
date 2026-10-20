@@ -1,0 +1,22 @@
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+error[E0308]: mismatched types
+   --> ostd/src/arch/x86/kernel/acpi/vtd_policy.rs:480:40
+    |
+480 |         assert_eq!(parse_dmar(&table), Ok(0xfed9_0000));
+    |                                        ^^^^^^^^^^^^^^^ expected `Result<VtdPolicy, VtdPolicyError>`, found `Result<{integer}, _>`
+    |
+    = note: expected enum `Result<VtdPolicy, vtd_policy::VtdPolicyError>`
+               found enum `Result<{integer}, _>`
+
+error[E0308]: mismatched types
+   --> ostd/src/arch/x86/kernel/acpi/vtd_policy.rs:483:65
+    |
+483 | ...ar(&no_scope_drhd)), Ok(0xfed9_0000));
+    |                         ^^^^^^^^^^^^^^^ expected `Result<VtdPolicy, VtdPolicyError>`, found `Result<{integer}, _>`
+    |
+    = note: expected enum `Result<VtdPolicy, vtd_policy::VtdPolicyError>`
+               found enum `Result<{integer}, _>`
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `ostd` (lib) due to 2 previous errors
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest) --cfg ktest" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" failed with status: ExitStatus(unix_wait_status(25856))

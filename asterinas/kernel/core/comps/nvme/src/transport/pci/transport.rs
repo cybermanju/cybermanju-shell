@@ -103,6 +103,10 @@ impl NvmePciTransport {
         let msix_opt = common_device.acquire_msix_capability().ok()?;
         let msix_data = msix_opt?;
         let manager = NvmeMsixManager::new(msix_data)?;
+        // DMA is a driver decision, not an implicit effect of acquiring MSI-X.
+        common_device.write_command_raw(
+            common_device.location().read16(4) | aster_pci::cfg_space::Command::BUS_MASTER.bits(),
+        );
         info!("MSI-X enabled with {} vectors", manager.table_size());
         Some(manager)
     }

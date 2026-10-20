@@ -1,0 +1,718 @@
+{
+  "directory_exclusions_cover_all_descendants": true,
+  "entries": [
+    {
+      "source_group": "asterinas",
+      "path": ".git",
+      "kind": "directory-subtree",
+      "reason": "Nested Git metadata/history; target repository history is retained separately"
+    },
+    {
+      "source_group": "asterinas",
+      "path": "target",
+      "kind": "directory-subtree",
+      "reason": "Rust/OSDK build outputs"
+    },
+    {
+      "source_group": "asterinas",
+      "path": "osdk/target",
+      "kind": "directory-subtree",
+      "reason": "Rust/OSDK build outputs"
+    },
+    {
+      "source_group": "asterinas",
+      "path": "tools/graphics/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "gpui-shell",
+      "path": ".git",
+      "kind": "directory-subtree",
+      "reason": "Nested Git metadata/history; target repository history is retained separately"
+    },
+    {
+      "source_group": "gpui-shell",
+      "path": "target",
+      "kind": "directory-subtree",
+      "reason": "Rust/OSDK build outputs"
+    },
+    {
+      "source_group": "gpui-shell",
+      "path": "scripts/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "cybermanju-app",
+      "path": ".git",
+      "kind": "directory-subtree",
+      "reason": "Nested Git metadata/history; target repository history is retained separately"
+    },
+    {
+      "source_group": "cybermanju-app",
+      "path": "tsconfig.node.tsbuildinfo",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "local-prs",
+      "path": ".manus-fa67d1d16d26d55b6144cdfcd0100ea3.tmp",
+      "kind": "file",
+      "reason": "Temporary editor/agent scratch artifact"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "appearance-density-2121/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "appearance-restore-2030/app-before/SettingsPage.vue",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "appearance-restore-2030/app-before/appearance-profile.test.ts",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "appearance-restore-2030/app-before/appearanceProfile.ts",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "appearance-restore-2030/app-before/index.html",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-appearance-bridge/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-appearance-bridge/app-before/SettingsPage.vue",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-appearance-bridge/app-before/useCustomWallpaper.ts",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-live-profile/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-live-profile/host-window-smoke/01-startup-dark.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-live-profile/host-window-smoke/02-live-os-light.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-live-profile/host-window-smoke/03-invalid-profile-error-state.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "cybermanju-live-profile/host-window-smoke/04-recovered-os-dark.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "gpui-second-review/source-snapshot",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "gpui-second-review/frame-metrics-tests",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "gpui-second-review/nested-passive/gpui-nested.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "gpui-second-review/nested-probe/gpui-nested.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "list-density-lowdisk-2139/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "live-profile-watcher/watcher.rs.before",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "native-2030/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "native-2030/index-tree.before",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "native-2030/source-sha256.before",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "native-2030/status.before",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "native-integration-followup/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "native-integration-followup/bin/rust-strip",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nested-smoke-audio-fixed/gpui-nested.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nixos-userland-probe/SHA256SUMS",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-dma/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-dma/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-dma/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-dma/iommu-debug/exceptions.log",
+      "kind": "file-excerpted",
+      "reason": "Large text evidence compacted to first 8 KiB + last 32 KiB; full SHA-256 recorded in excerpt"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-dma/iommu-debug/exit",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-worker/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-worker/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-device-worker/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-irq-callbacks/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-irq-callbacks/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-irq-callbacks/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-isolated-vtd/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-isolated-vtd/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-isolated-vtd/vtd-spec.pdf",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-isolated-vtd/vtd-spec.txt",
+      "kind": "file-excerpted",
+      "reason": "Large text evidence compacted to first 8 KiB + last 32 KiB; full SHA-256 recorded in excerpt"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-isolated-vtd/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-isolated-vtd/cpu-boot-final/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-run-1900/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/.manus-62b150d0f85a57062955b995238cfce1.tmp",
+      "kind": "file",
+      "reason": "Temporary editor/agent scratch artifact"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/rootfs",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/asterinas-consumer-io.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/consumer-io-initramfs.cpio",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/init",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/nvme.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/virtio-legacy.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run/virtio-modern.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/rootfs",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/asterinas-consumer-io.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/consumer-io-initramfs.cpio",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/init",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/nvme.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/virtio-legacy.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-final/virtio-modern.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/rootfs",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/asterinas-consumer-io.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/consumer-io-initramfs.cpio",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/init",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/nvme.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/virtio-legacy.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/consumer-io/run-pio-v2/virtio-modern.raw",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-msix-transaction/cpu-boot-final/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-multifunction/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-multifunction/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-multifunction/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-ownership/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-ownership/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-ownership/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-pcie-topology/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-pcie-topology/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-pcie-topology/cpu-boot/asterinas-cpu.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvidia-worker-flush/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/cpu-rootfs",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/source-build",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/boot-screen.png",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/boot-screen.ppm",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/cpu-initramfs.cpio",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/vector.spv",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport/vulkan-compute-strict",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/__pycache__",
+      "kind": "directory-subtree",
+      "reason": "Generated Python bytecode cache"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/before",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot/rootfs",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot/asterinas-real-firmware.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot/fnv1a64",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot/real-firmware-initramfs.cpio",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot-clock-failure/rootfs",
+      "kind": "directory-subtree",
+      "reason": "Redundant historical source/rootfs/build tree; current sources and adjacent text results retained"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot-clock-failure/asterinas-real-firmware.iso",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot-clock-failure/fnv1a64",
+      "kind": "file",
+      "reason": "Non-text evidence/generated binary or external reference; compact text evidence retained instead"
+    },
+    {
+      "source_group": "integration/evidence",
+      "path": "nvport-lifecycle/real-firmware-boot-clock-failure/real-firmware-initramfs.cpio",
+      "kind": "file",
+      "reason": "Generated build/disk/firmware/binary artifact, not source"
+    }
+  ],
+  "external_not_imported": [
+    {
+      "path": "/workspace/asterinas-gpui/vendor-drivers",
+      "reason": "External NVIDIA source checkout, installer, proprietary firmware and built objects; not one of the requested source trees"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/toolchain",
+      "reason": "Installed build tools"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/installed",
+      "reason": "Installed binaries/Nix symlinks"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/asterinas-irq-retire-local",
+      "reason": "Separate historical verification worktree, not a requested source tree"
+    }
+  ],
+  "target_local_exclusions": [
+    {
+      "path": "asterinas/tools/graphics/__pycache__/check_graphics.cpython-312.pyc",
+      "bytes": 17232,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/run_native_nvidia.cpython-312.pyc",
+      "bytes": 16633,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/run_nvport_smoke.cpython-312.pyc",
+      "bytes": 9860,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_check_graphics.cpython-312.pyc",
+      "bytes": 15594,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_native_gpu_evidence.cpython-312.pyc",
+      "bytes": 9645,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_run_native_nvidia.cpython-312.pyc",
+      "bytes": 7443,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_run_nvport_smoke.cpython-312.pyc",
+      "bytes": 10791,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/test_vulkan_compute_bench.cpython-312.pyc",
+      "bytes": 6220,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    },
+    {
+      "path": "asterinas/tools/graphics/__pycache__/validate_native_gpu_evidence.cpython-312.pyc",
+      "bytes": 12846,
+      "reason": "Pre-existing ignored generated bytecode; user explicitly requires leaving untouched and untracked; excluded from commit"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+Real guest comparison: old-implicit-bme
+{"name": "old-implicit-bme", "exit": 1, "expected": true, "passed": false, "baseline_failed": true, "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/old-implicit-bme.log"}
+Real guest comparison: old-index-panic
+{"name": "old-index-panic", "exit": 1, "expected": true, "passed": false, "baseline_failed": true, "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/old-index-panic.log"}
+Real guest comparison: fixed-legacy
+{"name": "fixed-legacy", "exit": 0, "expected": true, "passed": true, "baseline_failed": false, "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/fixed-legacy.log"}

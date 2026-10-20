@@ -4,11 +4,12 @@
 //!
 //! Reference: <https://wiki.osdev.org/PCI>
 
+use alloc::sync::Arc;
+
 use bitflags::bitflags;
 use ostd::{
     Error, Result,
-    arch::device::io_port::{PortRead, PortWrite},
-    io::IoMem,
+    io::{IoMem, IoPortRange},
     mm::{PodOnce, VmIoOnce},
 };
 
@@ -248,8 +249,7 @@ impl Bar {
     pub fn acquire(&mut self) -> Result<BarAccess> {
         match self {
             Self::Memory(mem_bar) => mem_bar.acquire().cloned().map(BarAccess::Memory),
-            // TODO: Implement the `acquire` operation based on `IoPortAllocator`.
-            Self::Io(_) => Ok(BarAccess::Io),
+            Self::Io(io_bar) => io_bar.acquire().cloned().map(BarAccess::Io),
         }
     }
 
@@ -261,8 +261,7 @@ impl Bar {
     pub fn access(&self) -> Option<BarAccess> {
         match self {
             Self::Memory(mem_bar) => mem_bar.access().cloned().map(BarAccess::Memory),
-            // TODO: Implement the `access` operation based on `IoPortAllocator`.
-            Self::Io(_) => Some(BarAccess::Io),
+            Self::Io(io_bar) => io_bar.access().cloned().map(BarAccess::Io),
         }
     }
 
@@ -292,25 +291,23 @@ pub enum BarAccess {
     /// Memory BAR
     Memory(IoMem),
     /// I/O BAR
-    Io,
+    Io(Arc<IoPortRange>),
 }
 
 impl BarAccess {
     /// Reads a value of a specified type at a specified offset.
-    pub fn read_once<T: PodOnce + PortRead>(&self, offset: usize) -> Result<T> {
+    pub fn read_once<T: PodOnce>(&self, offset: usize) -> Result<T> {
         match self {
             Self::Memory(io_mem) => io_mem.read_once(offset),
-            // TODO: Implement the `read` operation based on `IoPortAllocator`.
-            Self::Io => Err(Error::IoError),
+            Self::Io(io_ports) => io_ports.read_pod(offset),
         }
     }
 
     /// Writes a value of a specified type at a specified offset.
-    pub fn write_once<T: PodOnce + PortWrite>(&self, offset: usize, value: T) -> Result<()> {
+    pub fn write_once<T: PodOnce>(&self, offset: usize, value: T) -> Result<()> {
         match self {
             Self::Memory(io_mem) => io_mem.write_once(offset, &value),
-            // TODO: Implement the `write` operation based on `IoPortAllocator`.
-            Self::Io => Err(Error::IoError),
+            Self::Io(io_ports) => io_ports.write_pod(offset, value),
         }
     }
 }
@@ -363,7 +360,7 @@ impl MemoryBar {
     /// The MMIO allocator enforces physical range exclusivity. A pre-existing cached
     /// mapping is rejected; the caller must keep exclusive device ownership until the
     /// returned mapping (including all its clones/slices) is dropped.
-    pub fn acquire_owned(&mut self) -> Result<IoMem> {
+    pub fn acquire_owned(&self) -> Result<IoMem> {
         if self.io_memory.is_some() {
             return Err(Error::AccessDenied);
         }
@@ -493,13 +490,27 @@ pub enum AddrLen {
 }
 
 /// I/O port BAR.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct IoBar {
     base: u32,
     size: u32,
+    io_ports: Option<Arc<IoPortRange>>,
 }
 
 impl IoBar {
+    /// Acquires and caches exclusive access to the I/O BAR.
+    pub fn acquire(&mut self) -> Result<&Arc<IoPortRange>> {
+        if self.io_ports.is_none() {
+            self.io_ports = Some(Arc::new(IoPortRange::acquire(self.base, self.size)?));
+        }
+        Ok(self.io_ports.as_ref().unwrap())
+    }
+
+    /// Returns the cached access to the I/O BAR, if acquired.
+    pub fn access(&self) -> Option<&Arc<IoPortRange>> {
+        self.io_ports.as_ref()
+    }
+
     /// Returns the BAR's base port.
     pub fn base(&self) -> u32 {
         self.base
@@ -524,9 +535,9 @@ impl IoBar {
         // Decode the BAR's size.
         let size = decode_size(size_encoded as u64, BarKind::Io) as u32;
 
-        // Restore the original base address.
+        // Restore the original base address and I/O BAR flag bits.
         let base = raw & IO_ADDRESS_MASK;
-        location.write32(offset, base);
+        location.write32(offset, base | (raw & !IO_ADDRESS_MASK));
 
         // FIXME: As with the memory BAR check, we assume that a zero base address means that the
         // BAR has not been initialized. In the future, we may need to add the ability to manually
@@ -541,7 +552,18 @@ impl IoBar {
             return Err(Error::InvalidArgs);
         }
 
-        Ok(Self { base, size })
+        // x86 PIO uses u16 port addresses and the allocator stores exclusive
+        // ends in u16. Reject malformed/unsupported metadata before reserving.
+        let end = base.checked_add(size).ok_or(Error::Overflow)?;
+        if size == 0 || end > u16::MAX as u32 {
+            return Err(Error::InvalidArgs);
+        }
+
+        Ok(Self {
+            base,
+            size,
+            io_ports: None,
+        })
     }
 }
 

@@ -1,0 +1,43 @@
+Building full local kernel; no GPU firmware in initramfs
+Booting plain; TCG functional evidence only
+{
+  "passed": true,
+  "mode": "plain",
+  "qemu_exit": 33,
+  "errors": [],
+  "scope": "Full CPU kernel boot only; instruction-counted TCG is not performance or GPU evidence",
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "image_sha256": "fb83b0c1cac352c8ebe9007eecc9cce948ad3bc2578b33e9b770a19521688b39",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "bef46e919565e6766dec0e5e373e75566584942cba38bcf0bba9cdac9cbe9757"
+}
+Booting iommu; TCG functional evidence only
+{
+  "passed": true,
+  "mode": "iommu",
+  "qemu_exit": 33,
+  "errors": [],
+  "scope": "Full CPU kernel boot only; instruction-counted TCG is not performance or GPU evidence",
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "image_sha256": "fb83b0c1cac352c8ebe9007eecc9cce948ad3bc2578b33e9b770a19521688b39",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "c6508e0c6100c10536311d91241440167fb5527de2bb0eac14d374faeb6d3466"
+}
+Booting multifunction-iommu; TCG functional evidence only
+{
+  "passed": true,
+  "mode": "multifunction-iommu",
+  "qemu_exit": 33,
+  "errors": [],
+  "scope": "Full CPU kernel boot only; instruction-counted TCG is not performance or GPU evidence",
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "image_sha256": "fb83b0c1cac352c8ebe9007eecc9cce948ad3bc2578b33e9b770a19521688b39",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "630d1355fe95ebbd02245e7793f38a6bcf8a4e4bcd1f26456a96448fc055292b"
+}

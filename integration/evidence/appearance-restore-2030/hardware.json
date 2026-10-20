@@ -1,0 +1,11 @@
+{
+  "checked_at_utc": "2026-10-20T20:32:08.896281+00:00",
+  "device_nodes": {
+    "/dev/dri": [],
+    "/dev/nvidia*": [],
+    "/dev/kvm": []
+  },
+  "display_class_pci": [],
+  "gpu_acceptance": false,
+  "physical_gpu_benchmark_run": false
+}

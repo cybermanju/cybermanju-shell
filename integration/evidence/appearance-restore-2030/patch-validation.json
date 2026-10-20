@@ -1,0 +1,92 @@
+{
+  "gpui": {
+    "patch": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/gpui-appearance-file-admission.patch",
+    "patch_sha256": "626a2fdd7f41bc1c276dd79dd433fd2585cd2e2cdbc2b6ab357149d657b6c4d1",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "Cargo.lock",
+        "before_sha256": "d6760de7f644d06b060d4b57e6b7e3889b3c4000f21e1a31c77234ca9d60c213",
+        "after_sha256": "76c620969a83c6a0a6069656674cc4bf02a914907da36c167a0d5235dde5df7f"
+      },
+      {
+        "path": "crates/app/Cargo.toml",
+        "before_sha256": "3f7499b53fcab0d2a0d4cbca6b28f7ba04e845f5cbfd56625ab5a74e231f2432",
+        "after_sha256": "f882ec1242a56d31bf1a1680629a1800e5ea206b39cd2b47e652d01330844813"
+      },
+      {
+        "path": "crates/app/src/config/appearance.rs",
+        "before_sha256": "45dadb72eac23949fd8a0507a2866a42815a0787bf63442f77cf12571ed38958",
+        "after_sha256": "191ffb83228e835ddb9f3912e44d66f3aee476e5fcb601761f40b06cae451826"
+      },
+      {
+        "path": "scripts/test_appearance_profile.py",
+        "before_sha256": "2ed597ff930c6c8f21702e18b2a332e9f3ac72634ca321a634d6aab92d7431bc",
+        "after_sha256": "ea36d2ec7c75e549a23bdd3896833e8dd9e86386cb4dff88255b6dc65844556a"
+      },
+      {
+        "path": "docs/src/content/docs/developer/cybermanju-appearance.md",
+        "before_sha256": "76fc2b0b5f410bebc8d16a380b81fb7e21fead07346ecd7c8d60c4d1729d7fa4",
+        "after_sha256": "a710b15b497a7dee302e7cbcd9d8dbdc3c0882e9bbb25d0e508709540cd58041"
+      }
+    ]
+  },
+  "app": {
+    "patch": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/cybermanju-appearance-restore.patch",
+    "patch_sha256": "33aac0c067e1962029d5bcd015b46b63d2de6d727bd3c03c12164d5bd05a4b2d",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "src/utils/appearanceProfile.ts",
+        "before_sha256": "f56ff1efc84fa70e538e2cacfcaef39e8350c39b5dfcd97398e315f627d32618",
+        "after_sha256": "6af4d7c6259c78d688b9a2eec0ee9249d13d795cff01ae552c6c7829d963f7a4"
+      },
+      {
+        "path": "src/components/SettingsPage.vue",
+        "before_sha256": "48b4b92def3fc6db0f18470b299b31fd6796a06b68d4cac540aed46537eb8ae0",
+        "after_sha256": "69d697dc940135e8d9a7c5e259694f719a65aec70b5fcfcb077d715d11223b62"
+      },
+      {
+        "path": "tests/frontend/appearance-profile.test.ts",
+        "before_sha256": "9901835e0505af720aa23310e5b9455236e4b85992ca6b7b08db222833a2d4c6",
+        "after_sha256": "bba33e0520e8d65f0a330bb85b038793756f129bac23fee09ee9c9119774b6a2"
+      }
+    ]
+  },
+  "app_docs": {
+    "patch": "/workspace/asterinas-gpui/evidence/appearance-restore-2030/cybermanju-appearance-restore-docs.patch",
+    "patch_sha256": "ab600a6a8a8f55040a8122bd06c066ad32560489d95112fed62fc13b076cfe04",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+        "before_sha256": "c5122e8d419bddad2d435cd51cfe591ab6ce2da2ce082648ba50bea465b01fe3",
+        "after_sha256": "227596c9125c63cc24b092efacb9d734af2b38b1b76e45da171bf605f10369b9"
+      },
+      {
+        "path": "docs/CYBERMANJU-OS-PLAN.md",
+        "before_sha256": "833d32fa3860dd192b374326eb3f5b0a2282aab6496b97f9d1be646f8fa165f4",
+        "after_sha256": "b76d73676ec5f42c658edd77b45010360370e9d927de4665f14d331b05246316"
+      },
+      {
+        "path": "TASKS.md",
+        "before_sha256": "940bfaa98c6e25b3273e3c2cbdea9626f19624cd12edafe3172093fcc34d9c70",
+        "after_sha256": "7503c73f014dc42a234d424b4b6dcaa4103d263a9a50145909397843a9f70553"
+      },
+      {
+        "path": "worklog.md",
+        "before_sha256": "bd8aa01f06929602b09f8f41ad660f4c6937fc9f6c7da6d2d50a799940f91e69",
+        "after_sha256": "2ecb91a560d1b64d13f638e02303cc9f6b0b7a2245b858848ec070b9439afde8"
+      }
+    ]
+  },
+  "app_baseline_provenance": {
+    "source": "previous verified source patch reconstructs exact v1 baseline",
+    "patch": "/workspace/asterinas-gpui/evidence/cybermanju-appearance-bridge/cybermanju-appearance-export.patch",
+    "patch_sha256": "32460623ff60c8e4c29555e3e9b2309a4396b9960ad324ba94d3d5e8e633a404",
+    "agent_captured_profile_matches_reconstructed_baseline": true
+  },
+  "gpui_index_unchanged": true,
+  "shared_fixture_sha256": "287945f257fdef684053d455e3d15075f3e0e244948c3ca79c705a9ae23fa6f9",
+  "scope": "Incremental local source/doc changes after the 20:00 UTC pass; no hardware acceptance or publication"
+}

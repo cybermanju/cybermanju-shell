@@ -1,0 +1,11 @@
+[package]
+name = "cybermanju-scene"
+version = "0.1.1"
+edition = "2021"
+description = "Honest filename/tag heuristic scene matcher (multilingual, score-bearing, no fake vision)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]

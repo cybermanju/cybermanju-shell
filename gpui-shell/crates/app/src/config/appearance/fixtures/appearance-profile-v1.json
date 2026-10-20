@@ -1,0 +1,25 @@
+{
+  "schema": "com.cybermanju.appearance",
+  "version": 1,
+  "settings": {
+    "theme": "os-graphite",
+    "accent": "#abcdef",
+    "accents": {
+      "plasma-light": "#123456",
+      "os-dark": "#aa11bb"
+    },
+    "density": "compact",
+    "glass": 0,
+    "motion": "reduced",
+    "followSystem": false,
+    "wallpaper": "dunes",
+    "glow": false,
+    "shell": "plasma"
+  },
+  "shellStyle": "plasma",
+  "panelDocked": true,
+  "wallpaper": {
+    "kind": "preset",
+    "id": "dunes"
+  }
+}

@@ -1,12 +1,8 @@
 //! GPUi Shell - A Wayland status bar built with GPUI.
 //!
-//! Supports single-instance mode: if the app is already running,
-//! subsequent invocations will signal the existing instance to open the launcher.
-//!
-//! Usage:
-//!   gpuishell              - Start the shell or open launcher if already running
-//!   gpuishell --input "x"  - Open launcher with prefilled input
-//!   gpuishell --validate   - Check the config files and exit
+//! Subsequent ordinary invocations open the existing launcher's input. Cosmetic
+//! imports require the primary instance; --watch-appearance-profile additionally
+//! follows an explicitly supplied file, never browser storage or credentials.
 
 use crate::ipc::IpcSubscriber;
 use assets::Assets;
@@ -18,13 +14,18 @@ mod bar;
 pub mod config;
 pub mod control_center;
 pub mod dock;
+mod frame_metrics;
+mod frame_telemetry;
 pub mod icons;
 mod ipc;
-mod keybinds;
+pub mod keybinds;
 pub mod launcher;
 pub mod notification;
 pub mod osd;
 mod panel;
+// Parser/lifecycle prototype only; not a live protocol subscription.
+#[cfg(test)]
+mod presentation_contract;
 pub mod state;
 
 #[tokio::main]
@@ -32,50 +33,127 @@ async fn main() {
     #[cfg(not(target_os = "linux"))]
     compile_error!("This application requires a Linux system with Wayland.");
 
-    // Initialize tracing with RUST_LOG env var support
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
-
-    // Parse command-line arguments
     let args = args::Args::parse();
+    let appearance_path = match args
+        .appearance_profile
+        .as_deref()
+        .map(std::path::absolute)
+        .transpose()
+    {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("Cannot resolve explicit appearance path: {error:#}");
+            std::process::exit(1);
+        }
+    };
+    let mut appearance = match appearance_path
+        .as_deref()
+        .map(config::appearance::AppearanceProfile::load)
+        .transpose()
+    {
+        Ok(profile) => profile,
+        Err(error) => {
+            eprintln!("Appearance profile rejected: {error:#}");
+            std::process::exit(1);
+        }
+    };
+    if let Some(profile) = &appearance
+        && let Err(error) = profile.project_theme(&ui::Theme::default())
+    {
+        eprintln!("Appearance token projection failed: {error:#}");
+        std::process::exit(1);
+    }
 
-    // Before the single-instance check: a running shell must not swallow this.
+    // Renderer-free, no watcher, writes or secondary-instance commands.
     if args.validate {
+        if let Some(profile) = &appearance {
+            println!("{}", profile.report());
+        }
+        if args.watch_appearance_profile {
+            println!("Live-file watch requested; validation only, no watcher or UI was started.");
+        }
         std::process::exit(if config::validate() { 0 } else { 1 });
     }
 
-    // Try to acquire single-instance lock or signal existing instance.
-    // Secondary path exits immediately after signaling the primary instance.
     let Some(ipc) = IpcSubscriber::init(&args) else {
+        if appearance.is_some() {
+            eprintln!(
+                "Appearance profile was NOT applied; import requires an available primary shell instance."
+            );
+            std::process::exit(1);
+        }
         return;
     };
+    if std::env::var_os("WAYLAND_DISPLAY").is_none_or(|display| display.is_empty()) {
+        eprintln!(
+            "GPUi Shell requires WAYLAND_DISPLAY from a running Wayland session (Hyprland, Niri or Mango)."
+        );
+        drop(ipc);
+        std::process::exit(1);
+    }
 
-    // Initialize services (requires async)
-    let services = state::init_services()
-        .await
-        .expect("Failed to initialize services");
+    // Register before rereading: saves between initial validation and watch setup
+    // are covered by the reread, and later changes remain queued for the UI task.
+    let appearance_watch = if args.watch_appearance_profile {
+        let path = appearance_path.expect("argument parser requires an explicit profile");
+        let rx = match services::FileWatcher::try_watch(path.clone()) {
+            Ok(rx) => rx,
+            Err(error) => {
+                eprintln!("Cannot watch appearance profile: {error:#}");
+                drop(ipc);
+                std::process::exit(1);
+            }
+        };
+        appearance = match config::appearance::AppearanceProfile::load(&path) {
+            Ok(profile) => Some(profile),
+            Err(error) => {
+                eprintln!(
+                    "Appearance profile changed during watch setup and was rejected: {error:#}"
+                );
+                drop(ipc);
+                std::process::exit(1);
+            }
+        };
+        Some((path, rx))
+    } else {
+        None
+    };
 
-    // Create and run the GPUI application
+    let services = match state::init_services().await {
+        Ok(services) => services,
+        Err(error) => {
+            tracing::error!("Failed to initialize compositor services: {error:#}");
+            eprintln!("GPUi Shell could not connect to a supported compositor: {error:#}");
+            drop(ipc);
+            std::process::exit(1);
+        }
+    };
     let app = application().with_assets(Assets {});
     app.run(move |cx| {
         config::Config::init(cx);
-        // Registers the TextField / Menu keybindings the component set needs.
+        if let Some(profile) = appearance {
+            tracing::info!("{}", profile.report());
+            if let Err(error) = config::appearance_live::AppearanceOverlay::install(profile, cx) {
+                tracing::error!("Appearance token projection failed: {error:#}");
+                cx.quit();
+                return;
+            }
+        }
         ui::init(cx);
         state::AppState::init(services, cx);
-
-        // Register keybindings
         keybinds::register(cx);
-
         bar::init(cx);
         dock::init(cx);
         notification::init(cx);
         osd::init(cx);
         launcher::init(cx);
-
-        // Now that the notification service is up, say what didn't parse.
         config::report_load_errors(cx);
-
+        if let Some((path, rx)) = appearance_watch {
+            config::appearance_live::AppearanceOverlay::start_watch(path, rx, cx);
+        }
         ipc.start(cx);
     });
 }

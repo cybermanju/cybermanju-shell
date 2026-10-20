@@ -1,0 +1,26 @@
+{
+  "workspace": "/workspace/asterinas-gpui",
+  "artifacts": {
+    "incremental_patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-irq-callbacks.patch",
+    "notes": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+    "regressions": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/regression-results.json",
+    "test_counts": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/test-counts.json",
+    "patch_validation": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/patch-validation.json",
+    "full_stack_validation": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/full-stack-validation.json",
+    "environment": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/environment.json",
+    "sources": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/upstream-sources.md",
+    "boot_plain": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/cpu-boot/result-plain.json",
+    "boot_iommu": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/cpu-boot/result-iommu.json",
+    "boot_multifunction-iommu": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/cpu-boot/result-multifunction-iommu.json"
+  },
+  "source_sha256": "6e485e3f832b0a69d8faccc7556713f9c2d09a0c20dc64f6debb2dcb97c24046",
+  "original_index_unchanged": true,
+  "temporary_manifests_removed": true,
+  "hardware_gpu_acceptance": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false
+}

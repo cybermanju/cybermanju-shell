@@ -1,0 +1,10 @@
+{
+  "notes": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+  "canonical_patch": "/workspace/asterinas-gpui/local-prs/asterinas-msix-retired-activation.patch",
+  "patch_sha256": "12843ef3d57c61872b06d1ae7967a48edc33ecf2a2f6edd29cf984de97ade3dd",
+  "native_reported_passed": 315,
+  "explicit_skips": 3,
+  "canonical_stack_count": 21,
+  "physical_gpu_acceptance": false,
+  "manifest": "/workspace/asterinas-gpui/evidence/native-retired-2130/delivery-manifest.json"
+}

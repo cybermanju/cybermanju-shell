@@ -76,13 +76,16 @@ mod device_info;
 pub mod dma;
 #[cfg(ktest)]
 mod lifecycle_tests;
-#[cfg(ktest)]
-mod pcie_tests;
 pub mod mmio;
 #[cfg(ktest)]
+mod msix_tests;
+pub mod msix_transaction;
+#[cfg(ktest)]
 mod multifunction_tests;
-mod topology;
+#[cfg(ktest)]
+mod pcie_tests;
 pub mod reservation;
+mod topology;
 
 extern crate alloc;
 

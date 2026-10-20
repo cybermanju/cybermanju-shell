@@ -1,0 +1,12 @@
+diff --git a/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md b/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+--- a/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
++++ b/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+@@ -35,6 +35,8 @@
+ The native consumer supports all five current themes and global → per-theme → built-in accent precedence. It projects semantic GPUI Base16 colors rather than promising pixel-identical Vue chrome, preserves GPUI font size and does not rewrite existing configuration files.
+ 
+ **Partially applied density:** native launcher query/body/footer semantic spacing uses the existing compact `0.9` and comfortable `1.0` unit factors. Live file updates and native-theme reloads retain this runtime choice. Typography, icons, explicit hit targets, bar dimensions and compositor geometry are not scaled; native theme files gain no density key. The consumer reports **launcher spacing only**, not desktop-wide density support.
++
++**Pending low-disk source extension:** shared native `ListItem` rows now use runtime density for semantic horizontal padding/gaps and default vertical padding, while explicit vertical-spacing overrides remain unchanged. The source capability report names this partial row support. This extension and three added regression tests are **uncompiled and unexecuted**; the existing built binary and its earlier results still cover launcher spacing only. No app preference-store, schema, frontend source or dependency changed. Do not count formatting/patch checks as new native runtime acceptance.
+ 
+ **Not applied to the native desktop yet:** wallpaper, shell geometry/style, panel docking, density outside launcher chrome, transparency, motion, glow or live system-theme following. The consumer explicitly reports retained-but-unapplied fields rather than acknowledging successful no-ops. Keyboard bindings/KPL, gestures/JSON, locale and other app-local preferences keep their existing behavior and are outside this initial cosmetic snapshot.
+ 

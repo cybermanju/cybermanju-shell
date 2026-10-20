@@ -1,0 +1,84 @@
+diff --git a/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md b/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+--- a/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
++++ b/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+@@ -2,7 +2,7 @@
+ 
+ ## A concrete first connection
+ 
+-CyberManju keeps its existing Settings controls, appearance tokens and per-install storage. The app can now export a version-1 cosmetic snapshot; the local GPUI shell can read that file and project its **theme palette and accent** into GPUI's native theme. This does not replace the app with a second settings interface.
++CyberManju keeps its existing Settings controls, appearance tokens and per-install storage. The app can export a version-1 cosmetic snapshot and explicitly preview/restore supported profiles through those existing controls. The local GPUI shell can read that file and project its **theme palette and accent** into GPUI's native theme. This does not replace the app with a second settings interface.
+ 
+ The active base remains **Asterinas**, as selected on 2026-10-20. Ubuntu+niri is an optional comparison environment, not a replacement kernel or the target architecture. Neither a JSON export nor a Linux-host build proves the intended Asterinas desktop works.
+ 
+@@ -47,9 +47,17 @@
+ gpuishell --appearance-profile /path/to/cybermanju-appearance-v1.json
+ ```
+ 
+-`--validate` needs no display or GPU and makes no preference writes. The profile is bounded to 64 KiB and rejects unknown schema versions, unknown fields, invalid colors/types, conflicting preferences and unsafe wallpaper metadata. A secondary shell invocation refuses imports rather than silently opening the launcher and claiming an import. Supply the file again on the next shell start; live reload/export-back/restore are not implemented.
++`--validate` needs no display or GPU and makes no preference writes. The profile is bounded to 64 KiB and rejects unknown schema versions, unknown fields, invalid colors/types, conflicting preferences and unsafe wallpaper metadata. A secondary shell invocation refuses imports rather than silently opening the launcher and claiming an import. Supply the file again on the next shell start; native live reload/export-back/restore are not implemented.
+ 
+-The same fixture is tested by the app and native parser: `tests/fixtures/appearance-profile-v1.json` and GPUI's `crates/app/src/config/appearance/fixtures/appearance-profile-v1.json`. The app has pure normalization/export tests; GPUI has real Rust palette/parser tests and built-binary CLI regressions with isolated directories and real Unix sockets. Those prove the adapter boundary, not runtime compatibility or graphics acceleration.
++The native file loader now rejects terminal symlinks, no-writer FIFOs, directories and Unix sockets. It opens one read-only descriptor with nonblocking/no-follow/no-controlling-terminal flags before checking its type, avoiding the earlier pathname-stat/open race. Parent directory symlinks are not sandboxed, regular-file writers are not locked out, and regular filesystem I/O is not deadline-bounded. These safeguards have actual Linux-host CLI tests, not an Asterinas userspace-runtime certification.
++
++## Restore within the existing app
++
++Choose a profile JSON in the Settings appearance section, inspect its preview, then explicitly apply it. Selection/preview alone does not mutate preferences. Input is validated against the same bounded v1 schema again before application. URL wallpapers go through the existing custom-wallpaper service; presets clear the current custom override through its controller before applying the profile's existing theme/shell/panel preference owners. A rejected or failed wallpaper operation leaves those preferences unapplied.
++
++A `local-file` descriptor is refused before mutation because no image bytes are present; the existing wallpaper is preserved. Choose an image on this installation or use a URL/preset profile instead. Restore status is deliberately **session-scoped**: existing localStorage/IndexedDB availability and limits still govern persistence. This is not an atomic transaction across stores, a durable backup, a native GPUI restore, or a completed restart/media-migration guarantee.
++
++The same fixture is tested by the app and native parser: `tests/fixtures/appearance-profile-v1.json` and GPUI's `crates/app/src/config/appearance/fixtures/appearance-profile-v1.json`. The app has normalization/export and restore-orchestration tests; GPUI has real Rust palette/parser tests and built-binary CLI regressions with isolated directories and real Unix sockets. Current local checks pass 1,207 frontend tests (11 appearance-profile cases), 189 GPUI Rust tests and 32 Python tests; native lint/build also pass. Those prove the adapter boundary, not runtime compatibility or graphics acceleration. No browser import/export click-through was exercised.
+ 
+ ## What still blocks acceptance
+ 
+diff --git a/docs/CYBERMANJU-OS-PLAN.md b/docs/CYBERMANJU-OS-PLAN.md
+--- a/docs/CYBERMANJU-OS-PLAN.md
++++ b/docs/CYBERMANJU-OS-PLAN.md
+@@ -38,8 +38,12 @@
+ **Local implementation update:** the [appearance bridge](ASTERINAS-PERSONALIZATION-BRIDGE.md)
+ now exports existing cosmetic preferences and applies an explicit startup snapshot's
+ palette/accent to the real GPUI theme. Its current local GPUI checks pass 189 Rust
+-tests and 29 Python tests, including six actual-binary profile/IPC regressions;
+-these are Linux-host prerequisite checks, not Asterinas desktop acceptance.
++tests and 32 Python tests, including nine actual-binary profile/IPC/filesystem
++regressions. The app now previews and explicitly restores URL/preset profiles
++through its existing preference owners; 1,207 frontend tests pass. Restore is
++session-scoped, not an atomic durable migration; local-file descriptors cannot
++restore missing image bytes. These are host prerequisite checks, not Asterinas
++desktop acceptance.
+ Native device-worker lifecycle work continues separately in
+ `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. Neither code path updates the
+ published initial snapshot automatically or closes physical-GPU/runtime gates.
+diff --git a/TASKS.md b/TASKS.md
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -207,9 +207,12 @@
+   OS capabilities honestly; never silently reset preferences.
+   Local prerequisite implemented: bounded v1 cosmetic export from the existing
+   Settings state and explicit startup-only GPUI palette/accent projection. App
+-  frontend passes 1,203 tests; native shell passes 189 Rust and 29 Python tests,
+-  including six real-binary profile/IPC checks. No live propagation, wallpaper
+-  migration, native Asterinas app/session or physical-GPU acceptance is inferred;
++  frontend passes 1,207 tests, including explicit-preview URL/preset restore
++  through existing owners; native shell passes 189 Rust and 32 Python tests,
++  including nine real-binary profile/IPC/filesystem checks. Restore is session-
++  scoped; missing local wallpaper bytes are refused, not fabricated. No atomic
++  durable migration, live propagation, native Asterinas app/session or physical-
++  GPU acceptance is inferred;
+   see [the bridge contract](docs/ASTERINAS-PERSONALIZATION-BRIDGE.md).
+ 
+ ### P0 release safety / P2 qualification — design early, close after integration
+diff --git a/worklog.md b/worklog.md
+--- a/worklog.md
++++ b/worklog.md
+@@ -2317,3 +2317,11 @@
+ - Added an opt-in native consumer in `/workspace/asterinas-gpui/gpui-shell`: `--appearance-profile FILE` validates before display/IPC and applies actual GPUI palette/accent at primary startup, preserving native font size and configuration files. `--validate` is renderer-free. Secondary imports fail explicitly without sending a launcher command. Wallpaper/style/docking/density/glass/motion/glow and live system following remain disclosed as unapplied, not successful no-ops.
+ - Verification: app version/header checks, Vue typechecking and frontend suite passed (125 files / 1,203 tests, including 7 profile cases). No app Cargo commands or fresh npm install were used. Native GPUI workspace tests passed 189 Rust cases; binary build and 29 Python cases passed, including 6 actual-binary profile/Unix-socket regressions. The shared Vue/Rust fixture validates in the real shell; the lock change only makes already-locked `url` a direct dependency. No live browser export/download was exercised.
+ - Recorded the dependency/ownership map and bounded schema in `docs/ASTERINAS-PERSONALIZATION-BRIDGE.md`; OS-A6-PERSONAL and target runtime/hardware gates remain open. Native NVIDIA worker lifecycle work continues separately in `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. No credentials, Git authentication, commit, push, PR, publication or remote Actions were used. No physical GPU, DRM/NVIDIA nodes or KVM are exposed; GPU/Vulkan/Wayland/Tauri acceptance and Linux parity are not claimed.
++
++## 2026-10-20 — Session-scoped appearance restore and native file admission
++
++Added explicit-preview v1 profile restore through existing Settings, wallpaper and preference owners. URL/preset profiles apply only after the wallpaper operation succeeds; local-file metadata without image bytes is refused before mutation. Preview does not apply state, failed wallpaper operations do not apply theme/shell/panel preferences, and success is session-scoped rather than a claim of atomic durable persistence across stores. No new settings database or replacement controls were introduced.
++
++App frontend passed 125 files / 1,207 tests (11 profile cases), typecheck, version 0.1.1 and file-header checks. Existing compatible dependencies were reused temporarily, then the symlink removed; no app Cargo commands, fresh npm installation or browser click-through was performed. In the local GPUI tree, native file admission now uses a single read-only nonblocking/no-follow descriptor and rejects terminal symlinks, FIFOs, directories and sockets. Its 189 Rust / 32 Python tests, binary build and offline Clippy passed; host results are not Asterinas runtime certification.
++
++Native patch18 also enforces callback-owner retirement before accepted worker teardown; its CPU/QEMU matrix completed with 315 reported positives, including 3 explicitly skipped VMX/EPT bodies. Full kernel boot and GPU acceptance were not repeated or claimed. Asterinas remains primary; the published initial snapshot was not updated. No GPU/KVM/DRM/NVIDIA nodes are exposed, and no credentials, authentication, staging, commits, push, PR, publication or remote Actions were used. Updated bridge/plan/task evidence; full native media/density/style propagation, durable restart/restore, Tauri/runtime and physical GPU gates remain open. Exact sources/patches/logs are recorded in `/workspace/asterinas-gpui/evidence/appearance-restore-2030/` and PR_NOTES.md.

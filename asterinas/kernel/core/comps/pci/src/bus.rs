@@ -43,6 +43,7 @@ pub struct PciBus {
     common_devices: VecDeque<PciCommonDevice>,
     devices: Vec<Arc<dyn PciDevice>>,
     drivers: Vec<Arc<dyn PciDriver>>,
+    quarantined_devices: Vec<PciCommonDevice>,
 }
 
 impl PciBus {
@@ -63,7 +64,11 @@ impl PciBus {
     }
 
     pub(crate) fn return_reserved(&mut self, device: PciCommonDevice) {
-        self.common_devices.push_back(device);
+        if device.irqs_quarantined() {
+            self.quarantined_devices.push(device);
+        } else {
+            self.common_devices.push_back(device);
+        }
     }
 
     /// Reserves every physically present function of one slot, or none.
@@ -90,8 +95,9 @@ impl PciBus {
                 .unwrap();
             devices.push(self.common_devices.remove(index).unwrap());
         }
-        // Recheck presence and BME after taking ownership; rollback the whole
-        // group if configuration changed. Hotplug is deliberately unsupported.
+        // Recheck presence after taking ownership; rollback the whole group if
+        // configuration changed. prepare_mmio separately rejects active BME.
+        // Hotplug is deliberately unsupported.
         if super::topology::present_slot_functions(location).as_ref() != Ok(&locations) {
             for device in devices {
                 self.return_reserved(device);
@@ -144,7 +150,7 @@ impl PciBus {
                     common_device
                 }
             };
-            self.common_devices.push_back(device);
+            self.return_reserved(device);
         }
         self.drivers.push(driver);
     }
@@ -153,6 +159,9 @@ impl PciBus {
         debug!("found common device: {:#x?}", common_device);
         let device_id = *common_device.device_id();
         for driver in self.drivers.iter() {
+            if common_device.irqs_quarantined() {
+                break;
+            }
             common_device = match driver.probe(common_device) {
                 Ok(device) => {
                     debug_assert!(device_id == device.device_id());
@@ -168,7 +177,7 @@ impl PciBus {
                 }
             };
         }
-        self.common_devices.push_back(common_device);
+        self.return_reserved(common_device);
     }
 
     pub(super) const fn new() -> Self {
@@ -176,6 +185,7 @@ impl PciBus {
             common_devices: VecDeque::new(),
             devices: Vec::new(),
             drivers: Vec::new(),
+            quarantined_devices: Vec::new(),
         }
     }
 }

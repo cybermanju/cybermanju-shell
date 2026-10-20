@@ -1,0 +1,9 @@
+{
+  "checked_utc": "2026-10-20T20:58:57.932872+00:00",
+  "device_nodes": {
+    "/dev/dri": [],
+    "/dev/nvidia*": [],
+    "/dev/kvm": []
+  },
+  "display_class_pci": []
+}

@@ -1,0 +1,16 @@
+{
+  "rust_passed": 205,
+  "failed": 0,
+  "python_passed": 36,
+  "new_density_cases": [
+    "default_preserves_every_existing_native_spacing_step",
+    "compact_is_bounded_monotonic_and_keeps_zero_spacing_zero",
+    "profile_density_is_runtime_only_and_survives_a_palette_change",
+    "density_projects_launcher_spacing_without_scaling_native_typography",
+    "real_file_watch_feeds_theme_updates_and_keeps_bad_saves_out"
+  ],
+  "build_passed": true,
+  "clippy_passed": true,
+  "binary_sha256": "15c510c9b3de89a7f5ad68bd8288178e3534ae5dec2db2855b663c5de15b1309",
+  "scope": "Launcher semantic spacing only; no native GPU or Asterinas graphical-session acceptance"
+}

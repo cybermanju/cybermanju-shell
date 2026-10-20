@@ -1,0 +1,122 @@
+diff --git a/Cargo.lock b/Cargo.lock
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2522,6 +2522,7 @@
+  "gpui_platform",
+  "hyprland",
+  "image",
++ "libc",
+  "serde",
+  "serde_json",
+  "services",
+diff --git a/crates/app/Cargo.toml b/crates/app/Cargo.toml
+--- a/crates/app/Cargo.toml
++++ b/crates/app/Cargo.toml
+@@ -29,6 +29,7 @@
+ image.workspace = true
+ uuid.workspace = true
+ url = "=2.5.8"
++libc = "=0.2.187"
+ 
+ [dev-dependencies]
+ # Compile parser fixtures against the real protocol API; no runtime connection.
+diff --git a/crates/app/src/config/appearance.rs b/crates/app/src/config/appearance.rs
+--- a/crates/app/src/config/appearance.rs
++++ b/crates/app/src/config/appearance.rs
+@@ -1,7 +1,9 @@
+ //! CyberManju cosmetic snapshot bridge. No network, credentials, config writes,
+ //! compositor commands, wallpaper downloads or claims about the Asterinas runtime.
+ 
+-use std::{collections::BTreeMap, fs::File, io::Read, path::Path};
++use std::{
++    collections::BTreeMap, fs::OpenOptions, io::Read, os::unix::fs::OpenOptionsExt, path::Path,
++};
+ 
+ use anyhow::{Context, Result, ensure};
+ use serde::{Deserialize, Serialize};
+@@ -111,10 +113,17 @@
+ 
+ impl AppearanceProfile {
+     /// Read no more than 64 KiB plus a sentinel byte, even if the file grows
+-    /// between metadata and reading. Local wallpaper contents are not in v1.
++    /// during reading. Open once before checking the descriptor: a pathname
++    /// metadata precheck cannot prevent replacement by a blocking FIFO.
++    /// Terminal symlinks are refused, but parent directories are not sandboxed.
++    /// O_NONBLOCK prevents FIFO-open waiting, not regular-filesystem I/O delays.
++    /// Local wallpaper contents are not in v1.
+     pub fn load(path: &Path) -> Result<Self> {
+-        ensure!(path.is_file(), "appearance profile must be a regular file");
+-        let file = File::open(path).context("cannot open appearance profile")?;
++        let file = OpenOptions::new()
++            .read(true)
++            .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW | libc::O_NOCTTY)
++            .open(path)
++            .context("cannot open appearance profile without following a terminal symlink")?;
+         ensure!(
+             file.metadata()?.is_file(),
+             "appearance profile is not a regular file"
+diff --git a/scripts/test_appearance_profile.py b/scripts/test_appearance_profile.py
+--- a/scripts/test_appearance_profile.py
++++ b/scripts/test_appearance_profile.py
+@@ -110,6 +110,40 @@
+         self.assertNotIn('CyberManju appearance v1:', result.stdout)
+         self.assertFalse((self.runtime / 'gpuishell.sock').exists())
+ 
++    def test_terminal_symlinks_are_rejected_before_display(self):
++        for target in (self.profile, self.directory / 'missing.json'):
++            link = self.directory / 'profile-link.json'
++            link.symlink_to(target)
++            try:
++                result = self.run_shell('--validate', '--appearance-profile', str(link))
++                self.assertNotEqual(result.returncode, 0, result.stdout)
++                self.assertIn('Appearance profile rejected:', result.stdout)
++                self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++            finally:
++                link.unlink()
++
++    def test_fifo_without_writer_is_rejected_without_blocking(self):
++        fifo = self.directory / 'profile.fifo'
++        os.mkfifo(fifo)
++        result = subprocess.run(
++            [str(BINARY), '--validate', '--appearance-profile', str(fifo)],
++            env=self.env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
++            stderr=subprocess.STDOUT, text=True, timeout=2,
++        )
++        self.assertNotEqual(result.returncode, 0, result.stdout)
++        self.assertIn('not a regular file', result.stdout)
++        self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++
++    def test_directories_and_unix_sockets_are_rejected(self):
++        path = self.directory / 'not-a-profile.sock'
++        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
++            server.bind(str(path))
++            for candidate in (self.directory, path):
++                result = self.run_shell('--validate', '--appearance-profile', str(candidate))
++                self.assertNotEqual(result.returncode, 0, result.stdout)
++                self.assertIn('Appearance profile rejected:', result.stdout)
++                self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++
+ 
+ if __name__ == '__main__':
+     unittest.main()
+diff --git a/docs/src/content/docs/developer/cybermanju-appearance.md b/docs/src/content/docs/developer/cybermanju-appearance.md
+--- a/docs/src/content/docs/developer/cybermanju-appearance.md
++++ b/docs/src/content/docs/developer/cybermanju-appearance.md
+@@ -37,13 +37,15 @@
+ - `url`: an HTTP(S) URL with a host, no username/password, no control characters or leading/trailing whitespace, at most 8192 UTF-8 bytes.
+ - `local-file`: basename, supported image MIME type and nonzero size at most 20 MiB. No file contents, absolute path, object URL or blob is exported or loaded.
+ 
+-The native loader requires a regular file and reads at most 64 KiB plus a sentinel byte before rejecting oversized input. It does not fetch URLs, read wallpaper files, migrate IndexedDB blobs or manufacture an image where one is missing. Local wallpaper migration and per-install permission checks remain separate work.
++The native loader opens one read-only descriptor with `O_NOFOLLOW | O_NONBLOCK | O_NOCTTY`, checks that descriptor is a regular file, and reads at most 64 KiB plus a sentinel byte. A terminal symlink is now rejected, including one pointing to an otherwise valid profile; use the real regular file instead. There is no pathname-metadata precheck that could race replacement by a blocking FIFO. FIFOs without writers, directories and Unix sockets are refused. The descriptor is never used to create or truncate a file.
++
++This is **not a path sandbox or a universal I/O timeout**. Parent-directory symlinks are still followed, concurrent in-place regular-file writers are not locked out, and regular filesystem/device I/O can still wait. The flags' [Rust interface](https://doc.rust-lang.org/std/os/unix/fs/trait.OpenOptionsExt.html#tymethod.custom_flags) and [Linux semantics](https://man7.org/linux/man-pages/man2/open.2.html) do not promise otherwise. The loader does not fetch URLs, read wallpaper files, migrate IndexedDB blobs or manufacture an image where one is missing. Local wallpaper migration and per-install permission checks remain separate work.
+ 
+ ## Real tests and open dependencies
+ 
+ `cargo test --workspace --locked --offline` exercises the native parser, shared app-export fixture, five real palette projections, accent precedence, preference retention, unknown-field/version/type/conflict rejection and wallpaper bounds. It also preserves the existing IPC and presentation parser/lifecycle tests.
+ 
+-After building `gpuishell`, `python3 scripts/test_appearance_profile.py -v` runs the actual binary against isolated configuration/runtime directories and real Unix sockets. It verifies renderer-free validation, oversized/unsafe profile refusal, no preference writes, secondary import refusal and unchanged ordinary launcher IPC. These are parser/CLI tests, not a compositor or GPU benchmark.
++After building `gpuishell`, `python3 scripts/test_appearance_profile.py -v` runs the actual binary against isolated configuration/runtime directories and real Unix sockets. It verifies renderer-free validation, oversized/unsafe profile refusal, terminal-symlink rejection, no-writer FIFO refusal with a subprocess deadline, directory/socket rejection, no preference writes, secondary import refusal and unchanged ordinary launcher IPC. A negative baseline reproduces the old binary accepting a terminal symlink; the corrected binary rejects it. These are parser/CLI tests, not a compositor or GPU benchmark.
+ 
+ The shared fixture is `crates/app/src/config/appearance/fixtures/appearance-profile-v1.json`, copied byte-for-byte from the app repository's `tests/fixtures/appearance-profile-v1.json`; keep both synchronized when deliberately evolving the contract.
+ 

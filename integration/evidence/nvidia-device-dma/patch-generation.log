@@ -1,0 +1,107 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-device-dma.patch",
+  "patch_sha256": "264ca863c8fd0c733b49cf84cf12abc4f1198ef610fc0072e2a917f7327416a1",
+  "prerequisite": "all ordered prior Asterinas patches through asterinas-nvidia-resource-ownership.patch",
+  "exact_round_trip": true,
+  "index_unchanged": true,
+  "files": [
+    {
+      "path": ".github/workflows/graphics_gpu.yml",
+      "old_sha256": "ff068f4f7cdfe57bfc5996c63298c805acda6e2beb4ef2003f654447600b2a66",
+      "new_sha256": "db345476903f4dd41de2139dc13284fadf2ef3bc066d8cac472a4ab8d08db29e",
+      "new_file": false
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/README.md",
+      "old_sha256": "fc9e584f03826fc60d62cfa58d6148779a553d186ab8d5534329149f156c0f93",
+      "new_sha256": "3bb0e60e93ccc36db005b227df56b5d30bb082349e472fc14f478453bf2ba010",
+      "new_file": false
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/device.rs",
+      "old_sha256": "05a27b90ee3eb98cba392a0218f86c8ec014a32eb70ccff31d55d7be9909232e",
+      "new_sha256": "b5bb3a8b303508acad85408192abff0a70f24942aa2d5152be0e5f80187150fe",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/dma.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "e33df99efa238199d66270d1369feaf86ad7b8c6c5da7baabe920f9c28b1031a",
+      "new_file": true
+    },
+    {
+      "path": "kernel/core/comps/pci/src/lib.rs",
+      "old_sha256": "47ff3e79ff35174ed1b9d9a5053e066dc2c1c6b87459bcb493f9b718ea0f2a50",
+      "new_sha256": "3731fb4586be5fcec9872bd0e87f3916c7e8a5e6a0ad6e00eca2cdfbb3b6a2ff",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/lifecycle_tests.rs",
+      "old_sha256": "a6027760630d01f78178d825c2ebb914df65f25194e6d5c1e5a6b6388c61923f",
+      "new_sha256": "4f520fd1bb6ed2748b17790ac305e43c34aafc517c2cd0da1d36e666655a6680",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/mmio.rs",
+      "old_sha256": "314061373a05e56f1ebe395df335ec6a9e1a4a47de00bc8d72c1b68cc56e6332",
+      "new_sha256": "4eb9a079a506d422929a23c3d8c4875cf8ee20798e5cf66e0ab001740556be8e",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/mod.rs",
+      "old_sha256": "02e1d4ed420e6b586c7439c4d94066470279b248ac9cf5e435f11d56cf6a8b4d",
+      "new_sha256": "bedcc471562616a11264a08e5bc7387cb7bd7d2f4866aa262c0f2574de7fede6",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/iommu/registers/mod.rs",
+      "old_sha256": "c52ba1e38da93736449883acda8c363356b25adf4d0bc61b1fe4839b0465385b",
+      "new_sha256": "90150b28e51838da1be1e748b11949a32ece1b1038888eeeba64a2b36d62d283",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/arch/x86/kernel/acpi/dma_policy.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "923592c6f43ef17cb88c74ce6ebce5cb17c9a6b6e4ffa059a1a3e7c4f5ada978",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/arch/x86/kernel/acpi/mod.rs",
+      "old_sha256": "4b5f77e77e261ef2ceb9d48ef56c2dd00dbea87970c58eaee4afc898c4b69ab8",
+      "new_sha256": "edc8aa93ca5972ee4ce6090a112be36438af9b90973104e5120744da02b1c084",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/io/io_mem/mod.rs",
+      "old_sha256": "27ccb3ba62fc968d68766286e5e1bb6a94c295a689ff20dfd9c0ac14d074f857",
+      "new_sha256": "9b57645b7a381f24a79206f72b30d3b256ada0fa86b325637e22492a6e3f107b",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/mm/dma/device.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "881b9b50f7d9db1a3b05ab673ce8087595c8a258d493acd7b56a6e479dd63ad6",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/mm/dma/mod.rs",
+      "old_sha256": "b2b7ddf7accbd80b869954fd63e61c9e4cab4b143e13991542f983e50156df2c",
+      "new_sha256": "4532a7bcdb4fa7d452ed0a54830bbfe2256e900c85b54dcf1a6b2651f79ae4f6",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/run_cpu_kernel_tests.sh",
+      "old_sha256": "8182370adb82f03a0ea7cec63cc13065254f1fb5cabcf7c6861ca0ba0bc0be08",
+      "new_sha256": "98ab93293b214cd4da5c7ad925f22dd83d92472d0659239495e2dd8bf02bd759",
+      "new_file": false
+    }
+  ],
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "hardware_gpu_test": false,
+  "rm_gsp_initialized": false,
+  "iommu_domain_implemented": false,
+  "mode": "explicit coherent direct DMA only; IOMMU/CVM denied"
+}

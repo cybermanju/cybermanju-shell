@@ -1,0 +1,23 @@
+warning: Git tree '/workspace/asterinas-gpui/gpui-shell' is dirty
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+this derivation will be built:
+  /nix/store/jabns2p5s3m45gamc30z0fbcr123wfny-gpuishell-0.1.0.drv
+building '/nix/store/jabns2p5s3m45gamc30z0fbcr123wfny-gpuishell-0.1.0.drv'...

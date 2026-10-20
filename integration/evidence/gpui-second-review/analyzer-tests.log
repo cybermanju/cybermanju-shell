@@ -1,0 +1,20 @@
+test_device_backend_must_match_renderer_specs (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_device_backend_must_match_renderer_specs) ... ok
+test_each_renderer_device_requires_a_matching_adapter (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_each_renderer_device_requires_a_matching_adapter) ... ok
+test_empty_sample_count_fails (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_empty_sample_count_fails) ... ok
+test_every_telemetry_window_requires_its_own_renderer_record (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_every_telemetry_window_requires_its_own_renderer_record) ... ok
+test_invalid_and_nonfinite_timing_values_fail (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_invalid_and_nonfinite_timing_values_fail) ... ok
+test_malformed_json_after_each_required_marker_fails (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_malformed_json_after_each_required_marker_fails) ... ok
+test_malformed_upstream_adapter_fails (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_malformed_upstream_adapter_fails) ... ok
+test_missing_renderer_telemetry_or_selected_adapter_fails (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_missing_renderer_telemetry_or_selected_adapter_fails) ... ok
+test_mixed_window_identities_are_reported_per_window_without_singular_summary (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_mixed_window_identities_are_reported_per_window_without_singular_summary) ... ok
+test_non_strict_software_observation_is_not_hardware_evidence (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_non_strict_software_observation_is_not_hardware_evidence) ... ok
+test_one_sample_allows_null_rate_but_requires_build_timing (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_one_sample_allows_null_rate_but_requires_build_timing) ... ok
+test_parses_escaped_device_name_and_matches_upstream_backend (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_parses_escaped_device_name_and_matches_upstream_backend) ... ok
+test_renderer_metadata_and_telemetry_mode_fields_are_validated (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_renderer_metadata_and_telemetry_mode_fields_are_validated) ... ok
+test_same_adapter_name_on_two_backends_is_rejected_as_ambiguous (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_same_adapter_name_on_two_backends_is_rejected_as_ambiguous) ... ok
+test_strict_physical_gpu_requirement_fails_for_every_classification (test_frame_telemetry.FrameTelemetryAnalyzerTests.test_strict_physical_gpu_requirement_fails_for_every_classification) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.012s
+
+OK

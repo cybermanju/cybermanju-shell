@@ -1,0 +1,24 @@
+# CyberManju OS — build tuning
+#
+# Policy: a change to one workspace crate rebuilds that crate and whatever
+# depends on it. Nothing else — least of all the 760+ third-party crates —
+# is rebuilt unless Cargo.lock changed.
+#
+# Every key here is a *default*. Environment variables still win, which is
+# how CI turns incremental off (see `.github/workflows/ci.yml` and
+# `Swatinem/rust-cache`, which sets `CARGO_INCREMENTAL=0` itself).
+
+[build]
+# One target dir for cargo, clippy, rust-analyzer and the Tauri CLI so they
+# share artifacts instead of each compiling the world.
+target-dir = "target"
+
+# Incremental compilation for workspace + path dependencies (cargo already
+# excludes third-party crates from this by itself).
+incremental = true
+
+# The dev machine has 8 cores but 3.5 GiB of RAM with ~2 GiB already in
+# swap. Eight concurrent rustc jobs make the big crates (tauri, tantivy,
+# image, zstd-sys) thrash, which ends up slower than four. Raise it with
+# `CARGO_BUILD_JOBS=N` on a machine with more memory.
+jobs = 4

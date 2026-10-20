@@ -1,0 +1,168 @@
+# cybsh: 1
+# cap: deny=rm net=api.github.com
+# schedule: manual
+# on: tour
+# desc: guided tour of (almost) everything one `.cybsh` file can do
+# tour.cybsh — start here, then read hello/functions/providers-tidy/lib.
+# Usage: `run /scripts/tour.cybsh -- mon` (copy the examples dir to
+# `/scripts` first; this tour imports `/scripts/lib.cybsh`).
+# Every block runs on all three transports (native, static/Pages, wasm).
+# Dashboard-only legs are wrapped, so honest `unsupported:` prints
+# instead of aborting the tour. Caps are least-privilege: `rm` is denied
+# below (see the capabilities block), `fetch` is allowlisted to one host.
+
+print "== vars, const, interpolation =="
+let name = "manju"
+const home = "/vault"
+let retries: number = 3
+name = "manju-os"
+print "hi ${name} from ${home}"
+print("two", "args", retries)
+
+print "== js expressions (pure, no shell) =="
+let x = js: 1 + 2 * 3
+print x
+js x > 5 and len(name) > 0
+print "ab" * 3
+print "xy"[1]
+
+print "== branches and loops =="
+if retries > 0:
+  print "retrying"
+elif retries == 0:
+  print "last chance"
+else:
+  print "done"
+for i in range(3):
+  print "count " + str(i)
+for w in ["a", "b"]:
+  print w
+for word in "alpha beta":
+  print word
+let n = 0
+while n < 3:
+  let n = n + 1
+print "n=" + str(n)
+
+print "== dicts are deterministic (sorted keys) =="
+let d = {"b": 2, "a": 1}
+print d
+print d.a
+print d["b"]
+let e = set(d, "c", 3)
+print keys(e)
+print values(e)
+for k in e:
+  print k + "=" + str(e[k])
+print "len=" + str(len(e))
+print del(e, "a")
+print json(e)
+print split("a,b,c", ",")
+
+print "== defs, pipes, with =="
+def greet(who, punct):
+  return "hi " + who + punct
+def loud(s):
+  return s + "!"
+print greet("manju", "!")
+print "a,b,c" |> split(",") |> len
+print "hey" |> loud
+with snapshot = e:
+  print "scoped: " + str(len(snapshot))
+print "outer kept: " + str(len(e))
+
+print "== inline shell (one call, three spellings) =="
+ls /
+$ echo hello shell
+sh "echo quoted shell"
+let out = sh("echo kept")
+print "kept: " + out
+print "last output var: " + _
+$ echo interpolated ${name}
+$ echo chained && echo stitched
+
+print "== structured shell output (no re-parsing) =="
+let ui = sh("ui get --json")
+print ui
+print "theme now: " + ui.theme
+print "keys: " + str(len(ui))
+
+print "== capabilities (deny wins) =="
+try:
+  sh "rm /anything"
+catch e:
+  print "denied as declared: " + e
+
+print "== errors you catch where they happen =="
+try:
+  sh "sync start"
+catch e:
+  print "sync offline here: " + e
+try:
+  fail "demo abort"
+catch e:
+  print "caught: " + e
+match sh("echo tour"):
+  ok(v):
+    print "matched ok: " + v
+  err(e):
+    print "matched err: " + e
+  else:
+    print "matched neither"
+let good = ok("fine")
+print good?
+print unwrap(good)
+print is_ok(good)
+print is_err(err("bad"))
+
+print "== imports share defs =="
+import "/scripts/lib.cybsh" as lib
+print lib_greet("tourist")
+print lib_shout("loud")
+print lib_first([], "empty-fallback")
+
+print "== inputs: argv and environment =="
+print args
+print arg(0, "weekly")
+print env("CYBSH_TOUR", "unset")
+print fingerprint("tour")
+
+print "== fetch (browser transport, journaled elsewhere) =="
+try:
+  fetch "https://api.github.com/repos/o/r" as body
+  print "fetched bytes: " + str(len(body))
+catch e:
+  print "no HTTP client here: " + e
+
+print "== await polls logically (no sleep) =="
+await 2 + 2 == 4 timeout 3
+print "immediate truth — no waiting"
+try:
+  await len(sh("sync status --json").jobs) == 0 timeout 5
+  print "sync idle"
+catch e:
+  print "still busy or offline: " + e
+
+print "== volume file verbs =="
+sh "write /scripts/tour-note.txt tour was here"
+print sh("cat /scripts/tour-note.txt")
+print sh("stat /scripts/tour-note.txt --json")
+
+print "== providers, durability, host (honest everywhere) =="
+$ providers
+try:
+  sh "scrub || echo scrub-unavailable-here"
+  sh "gc --dry || echo gc-unavailable-here"
+catch e:
+  print "durability says: " + e
+try:
+  let photos = sh("ls -os /sdcard/DCIM --json")
+  print photos
+catch e:
+  print "host unavailable here: " + e
+
+print "== memory: vars, free, gc =="
+vars
+free out
+gc
+print "tour done"

@@ -1,0 +1,45 @@
+{
+  "suites": {
+    "native-nvidia-nvport-tests.log": {
+      "reported_passed": 20,
+      "failed": 0,
+      "hardware_skip_messages": [],
+      "final_runner_marker": true
+    },
+    "native-nvidia-platform-tests.log": {
+      "reported_passed": 4,
+      "failed": 0,
+      "hardware_skip_messages": [],
+      "final_runner_marker": true
+    },
+    "native-ostd-tests.log": {
+      "reported_passed": 236,
+      "failed": 0,
+      "hardware_skip_messages": [
+        "VMX unavailable",
+        "VMX unavailable",
+        "VMX/EPT invalidation unavailable"
+      ],
+      "final_runner_marker": true
+    },
+    "native-pci-iommu-tests.log": {
+      "reported_passed": 5,
+      "failed": 0,
+      "hardware_skip_messages": [],
+      "final_runner_marker": true
+    },
+    "native-pci-tests.log": {
+      "reported_passed": 5,
+      "failed": 0,
+      "hardware_skip_messages": [],
+      "final_runner_marker": true
+    }
+  },
+  "real_edu_dma_cycles": 8,
+  "bytes_per_direction_per_cycle": 4096,
+  "iommu_enabled_and_direct_dma_rejected": true,
+  "isolated_iommu_mapping_tested": false,
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "native_gpu_benchmark_pass": false
+}

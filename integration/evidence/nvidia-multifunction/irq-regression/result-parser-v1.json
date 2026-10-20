@@ -1,0 +1,20 @@
+{
+  "runs": [
+    {
+      "mode": "old-order",
+      "exit": 1,
+      "expected": true,
+      "test_passed": false,
+      "baseline_failed": true
+    },
+    {
+      "mode": "fixed-order",
+      "exit": 0,
+      "expected": false,
+      "test_passed": false,
+      "baseline_failed": false
+    }
+  ],
+  "source_restored": true,
+  "source_sha256": "0482b21c0c8ebe53ecc1aa2f5fafe02b3d307c8119e05c056ee9444a9dc1dcd1"
+}

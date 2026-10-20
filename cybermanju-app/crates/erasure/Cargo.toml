@@ -1,0 +1,18 @@
+[package]
+name = "cybermanju-erasure"
+version = "0.1.1"
+edition = "2021"
+description = "Reed-Solomon erasure coding for striped chunk placement"
+
+[dependencies]
+anyhow = "1"
+log = "0.4"
+# No default features: drops the `std` → parking_lot::Mutex cache lock
+# (parking_lot_core 0.8 needs an OS clock and fails to link on
+# wasm32-unknown-unknown with `undefined symbol: now`). The no-std build
+# uses spin::Mutex instead — same API, works on native and wasm.
+reed-solomon-erasure = { version = "6", default-features = false }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rand = "0.8"

@@ -1,0 +1,13 @@
+[package]
+name = "cybermanju-os-server"
+version = "0.1.1"
+edition = "2021"
+description = "Standalone web dashboard server for CyberManju OS (Docker deployment)"
+
+[dependencies]
+cybermanju-db = { path = "../../crates/db" }
+cybermanju-web = { path = "../../crates/web" }
+env_logger = "0.11"
+log = "0.4"
+cybermanju-search = { path = "../../crates/search" }
+libc = "0.2"

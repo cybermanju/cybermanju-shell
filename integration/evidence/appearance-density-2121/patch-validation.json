@@ -1,0 +1,65 @@
+{
+  "gpui": {
+    "patch": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-cybermanju-launcher-density.patch",
+    "patch_sha256": "71eb7f5e396197c131e84b30b3977abaf72d898dab4d8318eaeaee494bf3cae7",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "crates/ui/src/ui.rs",
+        "before_sha256": "c4563e2fcaadf3a10e1c1a24365251a58478eca75a3a837efe20bdc55296118f",
+        "after_sha256": "cdb92a180fb440ce85d939919da8a5a3acf061a7a47ac0242c319f8513af17fa"
+      },
+      {
+        "path": "crates/ui/src/theme/mod.rs",
+        "before_sha256": "07ef195baca9835038a31da35995aa04a006d19f2c7eb685a9289f18bbe9a832",
+        "after_sha256": "38df52042af1e8c95a06b63b896bc8da624a6e2729e3b7b2a1ae0fe62267bca2"
+      },
+      {
+        "path": "crates/ui/src/patterns/launcher.rs",
+        "before_sha256": "c0e1f3c803120ddb75364ee11b11f53ca1a85277197c3b64b3c75888ead9c909",
+        "after_sha256": "932702ca8effecc0f8fe9cc9843addadff7f90b579b5682b03d574b2a5239368"
+      },
+      {
+        "path": "crates/app/src/config/appearance.rs",
+        "before_sha256": "5372a86a15c413d46e27904b0d783b328acc7e55c79844292ad9bb4b72a3dac5",
+        "after_sha256": "fdaa4e4cab4dfda1222d1876ca3835b967cc224a4e7e93b1be7d2d203f349582"
+      },
+      {
+        "path": "crates/app/src/config/appearance_live.rs",
+        "before_sha256": "717d9b5e9b171f7c7bad191ac5712273473ae786e7c99029e6521fc4ce629fe8",
+        "after_sha256": "e6605345a7c3dbf18f5c64d9f8ff3e9c1937efd3e0a6e31144495ce48e2286f2"
+      },
+      {
+        "path": "docs/src/content/docs/developer/cybermanju-appearance.md",
+        "before_sha256": "b4beef1ddecfb54058ff8d84b4fd73a810ba96af037453a0cc601de6e8a0db35",
+        "after_sha256": "c84d593fab56138a8984a36b65acd3926dc10bb33cbeeab37060c1af01a55ae8"
+      },
+      {
+        "path": "crates/ui/src/theme/density.rs",
+        "before_sha256": null,
+        "after_sha256": "a25658a06120ee4bf92a39e3392482eb468f48264f1c973fe69e05bef612cdcb"
+      }
+    ]
+  },
+  "app_docs": {
+    "patch": "/workspace/asterinas-gpui/evidence/appearance-density-2121/cybermanju-launcher-density-docs.patch",
+    "patch_sha256": "659dfc6d31049dfbee05cf876d56def580ac6738db55d66a9b6edb01c0de543b",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+        "before_sha256": "efb22e23d0afe847774de66e34bd9fc43a7a5af3e2afc57b495dbf4c9a1c9e4d",
+        "after_sha256": "1992ac3d321c0569746f57f0e59fe0780e742917fa52b22c4fa644aadbf8f84b"
+      },
+      {
+        "path": "worklog.md",
+        "before_sha256": "33fe9a304f252d555637ac076328805aad47d0898d99b2eda95a9f525d0168f7",
+        "after_sha256": "0a6cbd44ff3f73b74c837cb9913e1d7e301e1d81d0bbacf9b2c1421b1c906e01"
+      }
+    ]
+  },
+  "indexes_unchanged": true,
+  "commits_or_publication": false,
+  "physical_gpu_acceptance": false,
+  "scope": "Launcher semantic spacing only; no frontend source or preference schema changes"
+}

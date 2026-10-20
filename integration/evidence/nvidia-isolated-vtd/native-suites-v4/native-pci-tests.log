@@ -1,0 +1,652 @@
+     Locking 108 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 2 warnings (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-pci-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-test-base)
+warning: `aster-pci-osdk-bin` (bin "aster-pci-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.98s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 16.4g free
+Added to ISO image: directory '/'='/tmp/grub.nsw9LC'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5583 sectors
+Written to medium : 5583 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-pci-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a65d000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2624578240 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x8e3, current 0x17a2ec, init 0x3c6b
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 268 tests in 5 crates
+
+running 5 tests in crate "aster-pci"
+
+test aster_pci::capability::tests::enumeration_capability_walk_is_bounded_before_device_construction ... [32mok[39m
+test aster_pci::lifecycle_tests::qemu_pci_testdev_reservation_mmio_rollback_and_reacquisition ...DEBUG: Try to acquire security-insensitive MMIO range: 0xb0000000..0xc0000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+INFO: pci: initializing the PCI bus with bus numbers `0..=255`
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x29c0,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x1111,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x3,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfd000000,
+                        size: 0x1000000,
+                        prefetchable: true,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfeb10000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x5,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x2,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfeb11000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc000,
+                        size: 0x100,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe000000,
+                        size: 0x1000,
+                        prefetchable: true,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x5,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe900000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x11e8,
+        revision_id: 0x10,
+        prog_if: 0x0,
+        subclass: 0xff,
+        class: 0x0,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x6,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfea00000,
+                        size: 0x100000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2918,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x1,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2922,
+        revision_id: 0x2,
+        prog_if: 0x1,
+        subclass: 0x6,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x2,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc140,
+                        size: 0x20,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfeb12000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2930,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x5,
+        class: 0xc,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x3,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0x700,
+                        size: 0x40,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfeb11000..0xfeb12000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+PCI resource lifecycle passed: 8 real QEMU pci-testdev reserve/map/read/rollback/reacquire cycles; not NVIDIA/GPU proof
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfe900000..0xfea00000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8826bda0 on CPU CpuId(
+    1,
+)
+PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles; requester/mask/cleanup verified; no NVIDIA or IOMMU isolation proof
+ [32mok[39m
+test aster_pci::mmio::tests::preparation_disables_dma_preserves_other_command_bits ... [32mok[39m
+test aster_pci::mmio::tests::capabilities_reject_cycles_alignment_and_header_pointers ... [32mok[39m
+test aster_pci::mmio::tests::active_msi_msix_and_low_power_are_rejected_without_writes ... [32mok[39m
+
+test result: [32mok[39m. 5 passed; 0 failed; 0 filtered out.
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+[ktest runner] All crates tested.

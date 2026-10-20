@@ -1,0 +1,26 @@
+diff --git a/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md b/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+--- a/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
++++ b/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+@@ -34,7 +34,9 @@
+ 
+ The native consumer supports all five current themes and global → per-theme → built-in accent precedence. It projects semantic GPUI Base16 colors rather than promising pixel-identical Vue chrome, preserves GPUI font size and does not rewrite existing configuration files.
+ 
+-**Not applied to the native desktop yet:** wallpaper, shell geometry/style, panel docking, density, transparency, motion, glow or live system-theme following. The consumer explicitly reports retained-but-unapplied fields rather than acknowledging successful no-ops. Keyboard bindings/KPL, gestures/JSON, locale and other app-local preferences keep their existing behavior and are outside this initial cosmetic snapshot.
++**Partially applied density:** native launcher query/body/footer semantic spacing uses the existing compact `0.9` and comfortable `1.0` unit factors. Live file updates and native-theme reloads retain this runtime choice. Typography, icons, explicit hit targets, bar dimensions and compositor geometry are not scaled; native theme files gain no density key. The consumer reports **launcher spacing only**, not desktop-wide density support.
++
++**Not applied to the native desktop yet:** wallpaper, shell geometry/style, panel docking, density outside launcher chrome, transparency, motion, glow or live system-theme following. The consumer explicitly reports retained-but-unapplied fields rather than acknowledging successful no-ops. Keyboard bindings/KPL, gestures/JSON, locale and other app-local preferences keep their existing behavior and are outside this initial cosmetic snapshot.
+ 
+ Wallpaper metadata is a known preset, validated HTTP(S) URL without credentials, or bounded local image filename/MIME/size descriptor. Version 1 exports no blob, filesystem path or image contents. The app's wallpaper bytes remain per-install in IndexedDB; their migration, access permissions, missing-asset behavior and offline availability are still open work. The native importer never downloads or invents a wallpaper.
+ 
+diff --git a/worklog.md b/worklog.md
+--- a/worklog.md
++++ b/worklog.md
+@@ -2330,3 +2330,8 @@
+ ## 2026-10-20 — Asterinas-first live-file appearance follow-up
+ 
+ The local GPUI consumer now supports explicit `--watch-appearance-profile` with bounded trailing-edge inotify updates, off-foreground parsing, validated native theme replacement/redraw, last-good retention and an independent appearance-error card. Native theme reloads retain imported colors but adopt native typography. The Vue/Tauri source and existing preference owners were not replaced or changed; documentation and the open OS-A6-PERSONAL gate reflect the narrower implemented scope. Final checks passed 201 GPUI Rust and 36 Python tests, build and Clippy; app version/header checks passed (the previous 1,207 frontend result was not rerun). A real nested Niri/Xvfb/lavapipe host window changed dark→light, displayed an invalid-profile warning without exiting and recovered to dark. This is host software rendering, not Asterinas/GPU acceptance. Wallpaper/density/shell-style propagation, automatic app transport, native Tauri runtime and physical-GPU results remain open. Native kernel lifecycle patch 19 and all evidence are recorded in `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. No credentials, staging, commit, push or remote Actions were used.
++
++
++## 2026-10-20 — Native launcher density bridge
++
++The existing exported density preference now changes nine actual native GPUI launcher query/body/footer semantic spacing consumers: compact uses the existing Vue unit factor 0.9, comfortable uses 1.0 and preserves original default native spacing. Native font/icon sizes, explicit hit-target dimensions and compositor/bar geometry remain unchanged. Live atomic-file/inotify updates, malformed-save retention, recovery and native-theme reload cover density; runtime density survives palette changes but is not written into native theme files. No frontend source, app preference owner, schema or dependency changed. Final GPUI checks passed 205 Rust and 36 Python tests, real binary build and all-target Clippy; app version/header checks passed. Frontend and host-window suites were not rerun in this pass. New native NVIDIA patch20 and its final validation status are recorded in `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. Physical GPU, RM/GSP/Vulkan, target Wayland/Tauri runtime and full personalization remain open. Only idle reproducible GPUI incremental caches were cleared after compilation to recover critical shared disk space; sources, binaries and evidence were retained. No credentials, staging, commit, push, publication or remote Actions were used.

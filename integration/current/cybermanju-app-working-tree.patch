@@ -1,0 +1,605 @@
+diff --git a/TASKS.md b/TASKS.md
+index c02bcd0..64cb3a0 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -128,3 +128,121 @@ Checkboxes are intentional — tick as you land.
+ 3. Revalidate the remaining `P1-3`, `P1-9`, `P1-13`, `P1-16`, `P1-19`, `P1-20` gaps against the new dashboard identity probe, REST crypto routes and shared volume-write FIFO; store-refresh/error handling, WASM backend retry and vault boot still need independent coverage.
+ 4. `P2-16` — signed iOS release/TestFlight remains dependent on Apple credentials and CI wiring; unsigned device IPA is already built by CI.
+ 5. Recovery file/Shamir — decide and integrate only after product policy is confirmed; current `src/utils/shamir.ts` alone does not complete recovery.
++
++---
++
++## Asterinas OS integration — separate prioritized track (2026-10-20)
++
++**Primary kernel/base: Asterinas.** Ubuntu+niri is an optional reference, not
++the target base or an automatic fallback. This track adds future OS integration
++work; all earlier app/security checkboxes and follow-up priorities remain
++unchanged. `PLAN.md` still owns app improvements. The active architecture and
++full acceptance criteria are in [the Asterinas-first plan](docs/CYBERMANJU-OS-PLAN.md#active-plan--asterinas-first-2026-10-20).
++All `OS-A*` items are open/unvalidated, not claims of missing upstream features.
++P0 here denotes release-blocking safety/prerequisites, not discovered app bugs.
++
++### P0 — establish a bootable, safe and testable foundation
++
++- [ ] `OS-A0` **Baseline and review (phase A0).** Collect the concurrent
++  Asterinas/GPUI second review; pin source/toolchain/rootfs/firmware revisions,
++  target models and VM configuration. Produce an ABI/ioctl/protocol and runtime
++  dependency matrix with explicit implementation vs validation status. Initial
++  boot, simpledrm and PCI/DMA/IOMMU/IRQ experiments are not accelerated graphics.
++  Inventory drafted: [Asterinas ABI baseline](docs/ASTERINAS-ABI-BASELINE.md)
++  records completed local reviews and remaining blockers; A0 stays open pending
++  review, exact runtime/target pins and ownership of proposed experiments.
++- [ ] `OS-A1` **Boot/userspace (after A0).** Validate boot/init/rootfs and Rust
++  userspace loader/libc, threads/futex, mmap, polling/sockets, storage durability,
++  permissions, entropy and networking. Gate: repeatable VM cold boot to shell,
++  representative Rust service I/O, restart and shutdown logs. No assumption of
++  systemd/apt or full Linux ABI from the kernel's language or compatibility goal.
++- [ ] `OS-A2` **Display/seat/input (after A1).** Validate DRM/KMS/GEM/mmap,
++  scanout/events, seat/session/input access, keyboard/pointer and teardown.
++  Specify required DMA-BUF formats/modifiers and synchronization contracts.
++  Gate: known-buffer output, mode/input/lifetime tests; CPU dumb buffers remain
++  explicitly diagnostic, not native acceleration or frame parity.
++- [ ] `OS-A3-AMD` **Native AMD + Vulkan (after A1/A2 interface baseline).**
++  Resolve real device/ioctl contracts, memory management, submission, DMA/IOMMU,
++  IRQs/reset, firmware rights/loading and userspace ICD. Gate per named physical
++  GPU: real GPU execution, correct output, synchronized render/present and fault
++  recovery on Asterinas; Linux amdgpu/Mesa installation is not a port.
++- [ ] `OS-A3-NVIDIA` **Native NVIDIA + Vulkan (same dependencies; independent
++  of AMD).** Resolve RM/GSP where applicable, firmware and vendor contracts plus
++  memory/submission/isolation/IRQ/reset and ICD/presentation requirements.
++  Gate: the same per-device native evidence as AMD. Neither PCI enumeration,
++  simpledrm nor an AMD pass closes this item; complete RM/GSP is not established.
++
++### P1 — integrate the desktop and preserve the product
++
++- [ ] `OS-A4` **Compositor/presentation.** A2 permits software experiments;
++  accelerated closure requires A3 for that GPU. Validate niri/Smithay or a
++  documented alternative, Wayland/seat/input, required DRM/GBM/EGL, DMA-BUF/fences,
++  layer-shell, scaling/hotplug and IPC. Gate: two local clients, focus/workspaces,
++  reliable synchronized presentation, resize/mixed-DPI/multi-output/restart tests
++  with renderer/device recorded; no XWayland shortcut counted as native success.
++- [ ] `OS-A5` **GPUI shell (after accelerated A4 and that GPU's A3).** Inspect
++  the actual pinned rendering backend; integrate bar/launcher/control center,
++  notifications/fonts and supported desktop-service APIs. Gate: launch/focus,
++  input/scaling and restart tests on Asterinas. Vault/agent/sync widgets remain
++  proposals until separately implemented and tested; no premature frame parity.
++- [ ] `OS-A6` **CyberManju app/API/UX.** Inventory can start at A0; native UI
++  needs A1/A4 and shell integration needs A5. Prove Tauri/Wry/GTK/WebKitGTK,
++  IPC, fonts, sandbox/process model and desktop-service dependencies. Gate:
++  native app launch and representative files/vault/agent/search/sync/scheduler/
++  secrets flows with existing AuthZ, async jobs, error and persistence contracts.
++  Browser/REST demos do not prove native compatibility. Keep `P0-REVIEW`, folder
++  encryption/trash/restore, recovery decisions, transport/UI and cross-device
++  tests as separate app release blockers; do not duplicate or close them here.
++- [ ] `OS-A6-PERSONAL` **Personalization compatibility (inventory at A0; close
++  with A5/A6).** Reuse `SettingsPage.vue` controls and `src/ui/tokens.ts`: themes,
++  shell style, URL/file wallpaper, accent, density, chrome and panel position.
++  Preserve motion, keyboard bindings/KPL, touch gestures/JSON, locale and local
++  view/sidebar/refresh preferences too; inventory current storage and distinguish
++  durable settings from unverified Pinia-only persistence. Retain per-install
++  wallpaper blobs and keep credentials out of cosmetic exports.
++  Define a versioned adapter with app-vs-desktop ownership, not duplicate stores
++  or controls. Gate: existing profile import, every supported setting propagated
++  to Vue/GPUI, restart/export/restore/migration without loss, invalid/missing
++  wallpaper behavior, accessibility and multi-output scaling. Report unsupported
++  OS capabilities honestly; never silently reset preferences.
++  Local prerequisite implemented: bounded v1 cosmetic export from the existing
++  Settings state and explicit GPUI palette/accent projection with opt-in live-file
++  watching, last-good error retention and native-theme reload precedence. App's
++  preceding frontend run passed 1,207 tests, including explicit-preview URL/preset
++  restore through existing owners; native shell passes 201 Rust and 36 Python
++  tests, including 13 real-binary profile/IPC/filesystem checks. Restore is session-
++  scoped; missing local wallpaper bytes are refused, not fabricated. No atomic
++  durable migration, automatic app-to-shell synchronization, full settings/media
++  propagation, native Asterinas app/session or physical-GPU acceptance is inferred;
++  see [the bridge contract](docs/ASTERINAS-PERSONALIZATION-BRIDGE.md).
++
++### P0 release safety / P2 qualification — design early, close after integration
++
++- [ ] `OS-A7` **[P0] Installer/update/recovery.** Design after A1; release
++  closure needs A6 and supported hardware evidence. Validate storage/encryption
++  and boot mechanisms independently of app vault crypto; specify signed images/
++  manifests, atomic update, rollback, offline rescue and migration policy.
++  Gate on disposable VM disks: install/reboot, wrong-disk refusal, interruption,
++  tampered signature rejection, failed-boot rollback, backup/key recovery. No
++  inferred LUKS2+ML-KEM or Shamir completion; physical destructive tests require
++  separate approval and current app recovery policy decisions remain open.
++- [ ] `OS-A8-CI` **[P2; release gate] Continuous CI evidence.** Design at A0,
++  require evidence per phase, qualify A3–A7 at release. Plan pinned VM boot/ABI/
++  graphics/input/API and installer/recovery tests plus existing app/security
++  checks; retain logs/artifact hashes and explicit unsupported results. Future
++  approved CI must pass before closing gates. This docs-only pass neither edits
++  workflows nor runs scripts, Cargo/npm, installs, builds or remote Actions.
++- [ ] `OS-A8-HW` **[P2; release gate] Physical GPU/performance qualification
++  (after A3–A6, release after A7).** Current environment has no physical GPU;
++  arrange explicit AMD and NVIDIA targets and publish per-model support.
++  Compare pinned Asterinas vs Ubuntu+niri on the same machine, firmware,
++  resolution/refresh, renderer, workload and power/thermal settings. Gate:
++  repeated raw traces for cold/warm boot, CPU/RAM, input-to-present latency,
++  p50/p95/p99 frame times/missed frames, GPU utilization/power and app timings,
++  variance and predeclared parity thresholds. VM/software results never close
++  physical GPU or frame-parity claims; unsupported models remain excluded.
++
++**Execution boundary:** planning edits only, kept local. No code changes,
++project scripts, dependency installation, local Rust/Cargo/npm, commit, push,
++PR or remote Actions in this pass. Dependencies replace the historical fixed
++week estimates; neither choosing Asterinas nor writing this track completes it.
+diff --git a/docs/CYBERMANJU-OS-PLAN.md b/docs/CYBERMANJU-OS-PLAN.md
+index 019d2bb..d9c083f 100644
+--- a/docs/CYBERMANJU-OS-PLAN.md
++++ b/docs/CYBERMANJU-OS-PLAN.md
+@@ -1,15 +1,200 @@
+ // CyberManju OS — Master Plan (docs/CYBERMANJU-OS-PLAN.md).
+-// Role: Complete architecture and implementation roadmap for transforming CyberManju from a Tauri app into a bootable, installable OS with GPU-accelerated shell, modular WASM apps, and decentralized P2P sync.
+-// Exports: Phase plans, architecture diagrams, technology decisions, integration specs, packaging guides.
+-// Integrates: niri (Wayland compositor), GPUI/gpui-shell (GPU shell), Ubuntu 26.04 (base), COSMIC DE (optional), WASM modular apps, GitHub Pages static API, LUKS2+ML-KEM encryption, NVIDIA/AMD drivers, low-latency kernel.
++// Role: Asterinas-first OS architecture decision and dependency-gated integration plan; retains the superseded Ubuntu/Linux proposal as unvalidated history.
++// Exports: Dated architecture decision, acceptance gates, blockers, personalization requirements, historical proposals.
++// Integrates: Asterinas (primary kernel/base), candidate Wayland compositor, GPUI shell, CyberManju Tauri/Vue app and existing personalization; Ubuntu+niri is an optional reference only.
+ // Contracts: All phases respect the AGENTS.md rules (no local cargo, no npm ci from scratch, file headers enforced). CI gates: meta-check, rust-check, docker-build, audit, wasm-build, deploy-pages.
+ 
+ # CyberManju OS — Master Plan
+ 
+-> **Vision:** Transform CyberManju from a Tauri desktop app into a bootable, installable OS featuring a GPU-accelerated native shell (GPUI), modular WASM-as-apps that run identically on GitHub Pages and on the desktop, decentralized P2P sync, quantum-resistant full-disk encryption, and a choice of niri or COSMIC as the Wayland compositor.
++> **Primary decision — 2026-10-20:** CyberManju OS targets **Asterinas as its kernel/base**, preserving the CyberManju product and personalization above it. The Tauri/Vue app is still userspace software, not a kernel or a completed OS. Ubuntu+niri is a prior/optional comparison environment, not the primary base or an implicit fallback.
+ 
+ ---
+ 
++## Active plan — Asterinas first (2026-10-20)
++
++### Decision, boundaries and evidence
++
++The owner selected Asterinas. Retain GPUI as the intended native shell and
++reuse the existing CyberManju app, APIs and settings; validate every runtime
++dependency on Asterinas before promising compatibility. niri is a compositor
++candidate, not a kernel/base choice; another compositor requires the same gates.
++No Linux-kernel swap, XWayland workaround, browser/remote demo or software
++renderer may silently count as completed native Asterinas integration.
++
++This repository contains the cross-device Tauri/Vue/Rust app and planning docs.
++`ARCHITECTURE.md` governs its existing app design; this decision specifies the
++future OS integration, not a claim that app contracts have already changed.
++`PLAN.md` remains the app improvement plan and `TASKS.md` retains its bug tracker
++plus a separate `OS-A*` track. Existing app P0s are not closed by choosing a kernel.
++
++| Evidence boundary | Initial planning baseline (later local implementation noted below) |
++|---|---|
++| App clone | Local `main`, baseline `a2f78d1`; source presence is not CI/security approval. |
++| Asterinas work | Completed local PCI/MSI-X checkpoint in `/workspace/asterinas-gpui/asterinas`: 20 NVport, 4 platform, 13 PCI, 13 PCI+VT-d and 256 reported OSTD tests, with 3 VMX-dependent bodies skipped; NVMe and modern/legacy Virtio read/write/fsync/readback and three full CPU/QEMU boots passed. CPU/QEMU evidence only, not GPU acceptance. A later worker patch has separate evidence; see the [ABI baseline](ASTERINAS-ABI-BASELINE.md#local-asterinas-checkpoint--tested-in-vm). |
++| GPUI shell work | Completed newer review reports 180 Rust tests (including 14 parser/lifecycle contract tests), 18 analyzer tests, 5 startup tests, build and full Nix evaluation passing. Nested Niri passed on CPU software Vulkan; trace has zero per-buffer feedback requests, strict physical-GPU validation rejects it, and physical FPS remains null. Real feedback needs an upstream GPUI hook; hardware/Linux parity is unproven. New evidence is in `gpui-shell/target/presentation-review/`; older 166/15 rollups are stale. See the [ABI baseline](ASTERINAS-ABI-BASELINE.md#local-gpui-review--software-only-on-linux). Product widgets remain proposals. |
++| Combined private repo | Handoff records only initial snapshot `0832aead043cf34d06b51dbe72c732dedefe2a28`; do not infer that local follow-up work has been integrated there. |
++| Native graphics and app runtime | No physical GPU is available. No physical GPU test, GPU submission, RM/GSP initialization, accelerated Vulkan/Wayland/GPUI or Asterinas FPS benchmark has passed. Complete Tauri/GTK/WebKit compatibility remains unproven; the current app is Tauri/Vue userspace, existing personalization must be preserved rather than duplicated, and app security/recovery gates remain open. |
++
++**Local implementation update:** the [appearance bridge](ASTERINAS-PERSONALIZATION-BRIDGE.md)
++now exports existing cosmetic preferences and applies palette/accent to the real
++GPUI theme, with opt-in live watching of the explicitly supplied local file.
++Invalid saves retain last-good colors; native theme reloads keep the imported
++palette while preserving native typography. Current GPUI checks pass 201 Rust
++tests and 36 Python tests, including 13 actual-binary profile/IPC/filesystem
++regressions and real-inotify-to-theme tests. The app previews and explicitly
++restores URL/preset profiles through existing owners; its preceding frontend run
++passed 1,207 tests (not rerun in this GPUI-only code follow-up). Restore is
++session-scoped, not an atomic durable migration; local-file descriptors cannot
++restore missing image bytes. These are host prerequisite checks, not Asterinas
++desktop acceptance.
++Native device-worker lifecycle work continues separately in
++`/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. Neither code path updates the
++published initial snapshot automatically or closes physical-GPU/runtime gates.
++
++Upstream [Asterinas](https://github.com/asterinas/asterinas) targets Linux ABI
++compatibility; that goal does **not** imply all Linux syscalls, ioctls, drivers
++or desktop runtimes work in this fork. Its [0.19 graphics announcement](https://asterinas.github.io/2026/10/13/announcing-asterinas-0.19.0.html)
++describes DRM/GEM dumb buffers/KMS and Xorg with **Mesa software OpenGL**.
++That upstream milestone is not evidence of local accelerated Vulkan, native
++AMD/NVIDIA support or a working Wayland/GPUI/Tauri session.
++
++### Intended architecture (target only; unvalidated)
++
++```text
++CyberManju Tauri/Vue app + existing settings and product APIs
++                 ↕ authenticated, capability-scoped service boundary
++GPUI shell (panel / launcher / notifications / proposed product widgets)
++                 ↓ Wayland protocols + shell/compositor IPC
++niri or another validated compositor + seat/input/session services
++                 ↓ DRM/KMS + buffer sharing + synchronization/presentation
++validated GPU userspace renderer / Vulkan ICD + native AMD or NVIDIA driver
++                 ↓ device contracts, firmware, DMA/IOMMU, interrupts
++Asterinas kernel + validated userland/ABI + boot/init/storage/networking
++                 ↓
++installer / signed updates / rollback / independent recovery
++```
++
++Simpledrm/CPU rendering is an early diagnostic path, not the native GPU target.
++Rust kernel code does not supply Rust `std` userland, GTK/WebKit, D-Bus, systemd,
++seat management or a Vulkan implementation automatically. Choose a pinned
++rootfs/init/package strategy against demonstrated Asterinas support; upstream
++Asterinas NixOS is a candidate to evaluate, not an approved or validated image.
++Do not inherit apt, Linux low-latency kernels, systemd-boot, Btrfs or LUKS support
++from the Ubuntu proposal without their own boot/runtime/storage evidence.
++
++### Dependency-gated delivery
++
++All gates below are **open/unvalidated**. Each requires pinned source revisions,
++configuration, reproducible test steps, logs and explicit pass/fail/unsupported
++results. No dates or frame/performance parity are promised before evidence.
++
++| Phase / tracker | Work and dependencies | Acceptance gate |
++|---|---|---|
++| A0 — baseline and CI design (`OS-A0`) | Collect the concurrent kernel/shell review, pin kernel/shell/app/toolchain/rootfs/firmware revisions, define supported VM and physical targets and an ABI/ioctl/protocol gap matrix. Design CI evidence collection before implementation phases. | Reviewed inventory distinguishes upstream claims, local implementation and verified behavior; test owners, supported configurations and blockers are recorded. |
++| A1 — boot and userspace (`OS-A1`) | After A0, validate bootloader/UEFI path, init/rootfs, process lifecycle and Rust userspace ABI: loader/libc, threads/futex, mmap, polling, Unix sockets, filesystem durability/permissions, entropy, time and networking. Inventory app/compositor/shell native library and device-node requirements. | Repeated VM cold boots reach a usable shell; a representative Rust userspace service starts, uses storage/networking and shuts down/restarts correctly with logs. Missing syscalls/ioctls remain blocking, not stubbed successes. |
++| A2 — display/input foundation (`OS-A2`) | After A1, validate DRM device nodes, KMS, GEM/mmap buffer lifetime, scanout, display events and seat/session/input permissions. Specify DMA-BUF import/export, formats/modifiers and fences required by the chosen renderer/compositor. | Test clients display known buffers and receive keyboard/pointer events; mode changes and teardown work without corruption/leaks. Simpledrm/dumb-buffer results are labeled CPU-only; advanced presentation gaps remain explicit. |
++| A3 — native drivers and Vulkan (`OS-A3-AMD`, `OS-A3-NVIDIA`) | After A1/A2 interfaces stabilize, separate AMD and NVIDIA workstreams: real ioctl/UAPI contracts, device discovery, PCI/BAR/VRAM mapping, allocation, command submission, DMA/IOMMU isolation, IRQs, scheduling/reset, firmware licensing/loading and userspace driver/ICD. NVIDIA RM/GSP bring-up is an explicit unresolved prerequisite where applicable. | For each declared GPU model independently: submit real GPU workloads, validate rendered output, synchronization and recovery; demonstrate Vulkan enumerate/render/present on Asterinas. Passing AMD never closes NVIDIA or vice versa. No Linux module/package installation counts as an Asterinas driver port. |
++| A4 — compositor and presentation (`OS-A4`) | Basic software-backed compositor experiments may follow A2, but accelerated acceptance requires A3 for that GPU. Validate niri/Smithay dependencies or document another compositor: Wayland, libinput/evdev, seat/session control, DRM/GBM/EGL as required, DMA-BUF/fences, layer-shell, output scaling/hotplug and IPC. | A local Asterinas session accepts two clients and input, manages focus/workspaces, and reliably presents synchronized frames; test resize, mixed DPI, multi-output and restart. Record renderer/device and distinguish software prototype from accelerated pass. |
++| A5 — GPUI shell (`OS-A5`) | After A4 and that GPU's A3 gate, verify the pinned GPUI backend rather than assuming the historical WGPU diagram. Port bar/launcher/control center/notifications, layer-shell integration, fonts/assets, and audio/network/Bluetooth service contracts as supported. | Shell runs on Asterinas, launches/focuses clients and survives compositor/service restart; input, scaling, text and animation correctness are evidenced. Widgets stay proposed until integrated and tested; no accelerated/frame-parity claim precedes driver and presentation gates. |
++| A6 — app/API/UX and personalization (`OS-A6`, `OS-A6-PERSONAL`) | API/settings inventory can start at A0; native UI acceptance needs A1/A4 and shell integration needs A5. Resolve Tauri/Wry + GTK/WebKitGTK dependencies (loader, IPC, graphics, fonts, sandbox/process model and required desktop services). Preserve existing Rust/Vue services and transport contracts rather than replacing product features with mock widgets. | Native app launches on Asterinas with verified IPC and representative files/vault/agent/search/sync/scheduler/secrets flows. AuthZ, async jobs, errors, persistence and unsupported-capability behavior match approved contracts. Existing settings round-trip into app and GPUI shell after restart; explicit app security/recovery blockers remain release gates. |
++| A7 — install, update and recovery (`OS-A7`) | Design may start after A1; releasable integration needs A6 and supported hardware evidence. Select tested storage/encryption/boot/update mechanisms; separate app vault encryption from OS disk encryption. Define signed manifests/images, atomic activation, known-good rollback and offline rescue with migration policy. | In disposable VM disks first: install/boot/reinstall, wrong-disk refusal, interrupted install/update, tampered-signature rejection, failed-boot rollback, backup restore and key-recovery tests. Destructive physical-disk tests need separate authorization. No LUKS2+ML-KEM or Shamir recovery completion is inferred from app crypto. |
++| A8 — CI and hardware qualification (`OS-A8-CI`, `OS-A8-HW`) | CI scaffolding belongs in A0 and evidence is required at every gate; final release qualification follows A3–A7. Plan pinned VM boot/ABI/input/API tests, app checks/security audits and separate native AMD/NVIDIA physical runners. | Approved future CI passes and reproducible physical results exist for each supported configuration; installer/recovery tests pass. Publish measured performance and a hardware support matrix with unsupported/deferred models, not blanket GPU support. No CI workflow is changed or dispatched in this docs-only pass. |
++
++**Critical path:** A0 → A1 → A2 → A3 (per GPU) → A4 accelerated
++presentation → A5 shell → A6 integrated product → A7 delivery → A8 release
++qualification. A4 software experiments, A6 API/personalization mapping, A7
++design and continuous CI planning can overlap; none waives their final gates.
++
++### Personalization is a compatibility requirement, not a new settings app
++
++Use `src/components/SettingsPage.vue` and `src/ui/tokens.ts` as the existing
++product contract: appearance/themes, shell style, wallpaper URL/file, accent,
++density, chrome and panel position must survive the migration. Inventory their
++current keys, values, defaults and persistence before defining a versioned
++adapter between Vue settings and GPUI. Reuse controls and token semantics;
++define app-local versus whole-desktop ownership and supported capabilities.
++Do not silently reset preferences or invent a competing GPUI settings store.
++
++Source inspection identifies these compatibility details. The initial versioned
++cosmetic export and GPUI color adapter with explicit live-file opt-in are implemented; the
++[bridge contract](ASTERINAS-PERSONALIZATION-BRIDGE.md) separates applied tokens
++from retained-but-unapplied preferences. The inventory below remains the broader
++compatibility requirement, not a completed universal export/restore or live-sync API:
++
++| Existing control/storage | Migration requirement |
++|---|---|
++| `cybermanju_theme_v1` localStorage JSON | Preserve `theme`, `accent`, `accents`, `density`, `glass`, `motion`, `followSystem`, `wallpaper`, `glow` and legacy `shell` handling. Live themes are `os-light`, `os-dark`, `os-graphite`, `plasma-light`, `plasma-dark`; preserve `auto`/system preference, aliases and global → per-theme → built-in accent precedence. |
++| `cybermanju_shell_style`; `cybermanju_panel_docked` | Retain separate `macos`/`plasma` shell override and `'1'`/`'0'` docked/floating representation; do not confuse panel docking with compositor workspace policy. |
++| Wallpaper IndexedDB `cybermanju-wallpapers`, store `wallpapers`, key `active-custom-wallpaper` | Migrate `{kind:'url',url}` or `{kind:'file',blob,name,mimeType}` deliberately; preview uses `cybermanju-develop-wallpapers`. Keep files per-install/on-device, preserve presets and clear-to-preset. Retain HTTP(S)-only URLs without credentials and nonempty ≤20 MiB supported AVIF/GIF/JPEG/PNG/WebP files. |
++| `cybermanju_keybindings`; `cybermanju_touch_config` | Preserve shortcut rebinding/reset, KPL/JSON imports and KPL export; retain gesture mappings, swipe/long-press/edge-zone/double-tap thresholds, resets and JSON import/export. Conflicts with OS/compositor bindings need explicit resolution rather than silently stealing shortcuts. |
++| `cybermanju.locale.v1` | Preserve `en`/`pt`, English/Português (BR), and accessible desktop/mobile settings navigation. |
++| Motion and local UI preferences | Retain auto/full/reduced motion, solid/translucent chrome, opt-in Matrix effect, grid/list/masonry default view, sidebar state and refresh choices. Matrix/view/sidebar/refresh refs are present in Pinia but durability was not established; specify persistence intentionally rather than claiming it already exists. |
++
++Appearance settings are currently local preferences, not a settings-specific
++REST service. Define the adapter's permission/schema/event contracts before
++sharing them with GPUI. Keep server URL, OAuth/broker configuration and secrets
++outside a cosmetic profile export; never broaden credential exposure or silently
++sync per-device settings as part of desktop personalization.
++
++A6 acceptance includes importing an existing profile, changing each supported
++setting from the existing UI, seeing app/shell propagation, restarting both,
++and checking export/restore and schema migration without loss. Check custom
++wallpaper file permissions/offline availability, invalid URLs, missing assets,
++contrast, keyboard accessibility, density and scaling across outputs. Explicitly
++surface unavailable OS capabilities rather than showing successful no-ops.
++
++### Release blockers and performance evidence
++
++- **ABI/runtime:** compiling Rust or booting a shell is not proof that niri,
++  GPUI, Tauri, GTK/WebKit or their session services run. Track missing runtime
++  contracts and sandbox/security limitations explicitly.
++- **Graphics:** PCI/DMA/IRQ experiments, a framebuffer or a DRM node do not
++  establish GPU command submission, safe memory isolation, shared-buffer
++  presentation or Vulkan. Firmware redistribution and vendor-specific driver
++  contracts need review and per-device evidence.
++- **Product safety:** retain `P0-REVIEW`, recursive folder encryption and
++  restore/trash policy, integrated recovery/Shamir decisions, transport/UI,
++  cross-device and CI gaps in `PLAN.md`/`TASKS.md`. An OS milestone cannot
++  relabel these as shipped; safety gates block release with real user data.
++- **Benchmarks:** no physical GPU is available in the current environment.
++  After A3–A6 pass on physical AMD and NVIDIA targets, compare against a pinned
++  Ubuntu+niri reference on the same machine, firmware, resolution, refresh,
++  renderer, power/thermal settings and workload. Record cold/warm boot,
++  idle/load CPU/RAM, input-to-present latency, p50/p95/p99 frame times,
++  missed frames, GPU utilization, power and app task timings over repeated
++  runs, with raw traces and variance. Declare the parity threshold before
++  testing; VM/CPU-rendered results cannot establish physical GPU frame parity.
++
++This pass changes planning prose only. No project scripts, Cargo/npm, dependency
++installation, builds/tests, commits, pushes, PRs or remote Actions are authorized
++or performed. Future validation needs separate execution authorization and must
++follow `AGENTS.md`; no local Rust/Cargo validation is allowed in this clone.
++
++### How the previous plan is reconciled
++
++| Historical proposal below | Current disposition |
++|---|---|
++| Ubuntu ISO, Linux low-latency kernel, apt/systemd packaging (old phases 0/4/5/7) | Superseded as the primary base; optional reference only. Replace with A1/A7 mechanisms actually supported by Asterinas. |
++| GPUI+niri/Tauri “already works”, “proven”, “Production”, “no gap” | Not local Asterinas evidence. Require A1–A6; distinguish app code presence from runtime verification. |
++| Vue-in-GPUI / XWayland / JS extension sketches | Unvalidated research, not a delivered DOM/webview runtime or an approved compatibility shortcut. Separate GPUI chrome and Tauri app remain intended boundaries, gated on actual runtime support. |
++| Driver detection after shell milestones; old WGPU/Vulkan assumptions | Superseded by A2/A3 before accelerated A4/A5 or frame parity. Pin and inspect actual renderer/backend; detect-only is not driver support. |
++| Kernel/driver version tables, star counts and “verified October 2026” assertions | Historical, not revalidated: e.g. Linux 6.8 low-latency, AMD 26.16, NVIDIA 617.42/580 and niri “26.04+” are not selected Asterinas requirements or current support claims. |
++| WASM-as-apps, Pages/Workers APIs and new P2P/CRDT modules (old phases 2/3/6) | Deferred product proposals, not boot/runtime prerequisites or implemented modules. Preserve existing WASM/REST behavior; Pages itself is static hosting, not a server API. |
++| LUKS2+ML-KEM, recovery, trusted apt repo and installer sketches | Not approved security designs. A7 needs reviewed cryptographic/storage contracts and signed updates; never adopt `trusted=yes` or destructive historical commands as operational instructions. ML-KEM alone is not peer authentication. |
++| 8/20/22-week delivery, daily-driver claims and historical checkboxes | Withdrawn as current commitments. Gate-driven planning replaces dates; checked historical items never imply present security or OS validation. |
++
++---
++
++## Historical Ubuntu/Linux proposal — superseded, unvalidated reference
++
++**Everything below is preserved from the 2026-10-18 proposal as design history,
++not the active architecture or execution instructions.** Its technology claims,
++versions, timelines, code snippets and completion language have not been
++revalidated by this pass. The dated Asterinas-first decision above takes
++precedence wherever they conflict. “What exists” describes the app snapshot,
++not a verified Asterinas desktop; “what does not exist” is not a denial of the
++separate concurrent kernel experiments. No commands below were executed.
++
+ ## Table of Contents
+ 
+ 1. [Executive Summary](#1-executive-summary)
+diff --git a/src/components/SettingsPage.vue b/src/components/SettingsPage.vue
+index 3a35371..a136322 100644
+--- a/src/components/SettingsPage.vue
++++ b/src/components/SettingsPage.vue
+@@ -295,6 +295,49 @@
+             @update:model-value="store.sidebarCollapsed = !$event"
+           />
+         </div>
++        <div class="st-appearance-export">
++          <UiButton size="sm" icon="solar:download-bold" :disabled="customWallpaper.busy.value" @click="exportAppearanceProfile">
++            Export appearance profile
++          </UiButton>
++          <input
++            ref="appearanceImportInput"
++            type="file"
++            accept="application/json,.json"
++            class="st-hidden"
++            aria-label="Choose appearance profile JSON"
++            @change="handleAppearanceProfileFile"
++          />
++          <div class="st-actions">
++            <UiButton size="sm" icon="solar:upload-bold" :disabled="customWallpaper.busy.value || appearanceImportBusy" @click="openAppearanceProfilePicker">
++              Import appearance profile
++            </UiButton>
++            <UiButton
++              v-if="pendingAppearanceProfile"
++              size="sm"
++              variant="primary"
++              :loading="appearanceImportBusy"
++              :disabled="customWallpaper.busy.value || appearanceImportBusy"
++              @click="applyAppearanceProfile"
++            >Apply preview</UiButton>
++          </div>
++          <p v-if="pendingAppearanceProfile" class="st-wallpaper-note">
++            Preview: {{ pendingAppearanceProfile.settings.theme }} · {{ pendingAppearanceProfile.shellStyle }} shell ·
++            {{ pendingAppearanceProfile.wallpaper.kind === 'url' ? 'URL wallpaper' : pendingAppearanceProfile.wallpaper.kind === 'preset' ? `preset ${pendingAppearanceProfile.wallpaper.id}` : 'local image (unsupported)' }}.
++            Preferences apply only after the existing wallpaper service succeeds.
++          </p>
++          <p class="st-wallpaper-note">
++            Versioned JSON keeps appearance preferences. The native GPUI consumer initially applies theme colors and accent only; density, shell style, panel position, wallpaper, and other settings are retained but not applied. This is not OS live sync or evidence of Asterinas GUI acceptance.
++          </p>
++          <p v-if="customWallpaper.kind.value === 'file'" class="st-wallpaper-note">
++            The selected local file remains on this device and is not included in the export. Native GPUI import will report this wallpaper as unsupported.
++          </p>
++          <p v-if="appearanceExportStatus" class="st-wallpaper-note" role="status" aria-live="polite">
++            {{ appearanceExportStatus }}
++          </p>
++          <p v-if="appearanceImportStatus" class="st-wallpaper-note" role="status" aria-live="polite">
++            {{ appearanceImportStatus }}
++          </p>
++        </div>
+         <div class="st-row">
+           <UiText as="span" variant="label" tone="muted">{{ t('settings.language') }}</UiText>
+           <UiSelect
+@@ -601,6 +644,12 @@ import { ShortcutsKey } from '@/composables/shortcutsKey'
+ import { useTouchConfig, type GestureType, type TouchAction } from '@/composables/useTouchConfig'
+ import { useTheme } from '@/composables/useTheme'
+ import { ACCENT_CHOICES, WALLPAPERS, type ShellStyle } from '@/ui/tokens'
++import {
++  applyAppearanceProfileRestore,
++  prepareAppearanceProfileRestore,
++  serializeAppearanceProfileV1,
++  type AppearanceProfileV1,
++} from '@/utils/appearanceProfile'
+ import { lockMobileVaultMirror, mobileVaultMirrorState, supportsNativeScopedStorage, syncMobileVaultMirrorNow, unlockMobileVaultMirror } from '@/utils/mobileScopedStorage'
+ import { LOCALES, getLocale, t, useLocale, type Locale } from '@/utils/i18n'
+ import pkg from '../../package.json'
+@@ -640,6 +689,11 @@ function setLanguage(next: Locale) {
+ const customWallpaper = useCustomWallpaper()
+ const wallpaperUrlDraft = ref('')
+ const wallpaperFileInput = ref<HTMLInputElement | null>(null)
++const appearanceImportInput = ref<HTMLInputElement | null>(null)
++const appearanceExportStatus = ref('')
++const appearanceImportStatus = ref('')
++const pendingAppearanceProfile = ref<AppearanceProfileV1 | null>(null)
++const appearanceImportBusy = ref(false)
+ const nativeMirrorAvailable = supportsNativeScopedStorage()
+ const mirrorPassphrase = ref('')
+ const mirrorActionBusy = ref(false)
+@@ -736,6 +790,98 @@ function setPanelDocked(v: string | number) {
+   } catch { /* session-only */ }
+ }
+ 
++function exportAppearanceProfile() {
++  try {
++    const custom = customWallpaper.kind.value === 'url'
++      ? { kind: 'url' as const, url: customWallpaper.url.value }
++      : customWallpaper.kind.value === 'file'
++        ? {
++            kind: 'file' as const,
++            name: customWallpaper.fileName.value,
++            mimeType: customWallpaper.fileMimeType.value,
++            size: customWallpaper.fileSize.value,
++          }
++        : { kind: null as null }
++    const json = serializeAppearanceProfileV1({
++      settings: theme.settings,
++      shellStyle: theme.shellStyle.value,
++      panelDocked: panelDocked.value === '1',
++      customWallpaper: custom,
++    })
++    const data = new Blob([json], { type: 'application/json' })
++    const objectUrl = URL.createObjectURL(data)
++    const link = document.createElement('a')
++    link.href = objectUrl
++    link.download = 'cybermanju-appearance-v1.json'
++    link.click()
++    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
++    appearanceExportStatus.value = 'Appearance profile exported.'
++  } catch (cause) {
++    appearanceExportStatus.value = cause instanceof Error
++      ? `Profile export failed: ${cause.message}`
++      : 'Profile export failed because appearance state could not be validated.'
++  }
++}
++
++function openAppearanceProfilePicker() {
++  if (!customWallpaper.busy.value && !appearanceImportBusy.value) {
++    appearanceImportInput.value?.click()
++  }
++}
++
++async function handleAppearanceProfileFile(event: Event) {
++  const input = event.currentTarget as HTMLInputElement
++  const file = input.files?.[0]
++  pendingAppearanceProfile.value = null
++  if (!file) return
++  try {
++    if (file.size > 64 * 1024) throw new Error('Appearance profile exceeds the 64 KiB limit.')
++    const profile = prepareAppearanceProfileRestore(await file.text())
++    pendingAppearanceProfile.value = profile
++    appearanceImportStatus.value = 'Profile validated. Review its preview, then explicitly apply it.'
++  } catch (cause) {
++    appearanceImportStatus.value = cause instanceof Error
++      ? `Profile import refused: ${cause.message}`
++      : 'Profile import refused because it could not be validated.'
++  } finally {
++    input.value = ''
++  }
++}
++
++async function applyAppearanceProfile() {
++  const profile = pendingAppearanceProfile.value
++  if (!profile || customWallpaper.busy.value || appearanceImportBusy.value) return
++  appearanceImportBusy.value = true
++  appearanceImportStatus.value = ''
++  try {
++    const applied = await applyAppearanceProfileRestore(profile, {
++      async applyWallpaper(wallpaper) {
++        if (wallpaper.kind === 'url') return customWallpaper.setUrl(wallpaper.url)
++        await customWallpaper.load()
++        return customWallpaper.kind.value ? customWallpaper.clear() : true
++      },
++      applyPreferences(validated) {
++        Object.assign(theme.settings, validated.settings)
++        theme.setShellStyle(validated.shellStyle)
++        setPanelDocked(validated.panelDocked ? '1' : '0')
++        wallpaperUrlDraft.value = customWallpaper.kind.value === 'url' ? customWallpaper.url.value : ''
++      },
++    })
++    if (!applied) {
++      appearanceImportStatus.value = 'Restore not applied: wallpaper storage failed. Existing preferences were left unchanged.'
++      return
++    }
++    pendingAppearanceProfile.value = null
++    appearanceImportStatus.value = 'Applied to this session through the existing preference and wallpaper services. Preference persistence remains subject to each existing store’s storage availability and limits.'
++  } catch (cause) {
++    appearanceImportStatus.value = cause instanceof Error
++      ? `Restore failed before preference changes: ${cause.message}`
++      : 'Restore failed before preference changes.'
++  } finally {
++    appearanceImportBusy.value = false
++  }
++}
++
+ onMounted(async () => {
+   await customWallpaper.load()
+   if (!wallpaperUrlDraft.value && customWallpaper.url.value) {
+diff --git a/src/composables/useCustomWallpaper.ts b/src/composables/useCustomWallpaper.ts
+index 87e8e4f..5a88235 100644
+--- a/src/composables/useCustomWallpaper.ts
++++ b/src/composables/useCustomWallpaper.ts
+@@ -22,6 +22,8 @@ export function createCustomWallpaperController(
+   const kind = ref<'url' | 'file' | null>(null)
+   const url = ref('')
+   const fileName = ref('')
++  const fileMimeType = ref('')
++  const fileSize = ref(0)
+   const error = ref('')
+   const busy = ref(false)
+   let activeObjectUrl: string | null = null
+@@ -53,6 +55,8 @@ export function createCustomWallpaperController(
+           activeObjectUrl = objectUrls.createObjectURL(saved.blob)
+           source.value = activeObjectUrl
+           fileName.value = saved.name
++          fileMimeType.value = saved.mimeType
++          fileSize.value = saved.blob.size
+           kind.value = 'file'
+         }
+         error.value = ''
+@@ -85,6 +89,8 @@ export function createCustomWallpaperController(
+       source.value = safeUrl
+       url.value = safeUrl
+       fileName.value = ''
++      fileMimeType.value = ''
++      fileSize.value = 0
+       kind.value = 'url'
+       error.value = ''
+       return true
+@@ -122,6 +128,8 @@ export function createCustomWallpaperController(
+       source.value = nextObjectUrl
+       url.value = ''
+       fileName.value = file.name
++      fileMimeType.value = file.type.toLowerCase()
++      fileSize.value = file.size
+       kind.value = 'file'
+       error.value = ''
+       return true
+@@ -143,6 +151,8 @@ export function createCustomWallpaperController(
+       source.value = null
+       url.value = ''
+       fileName.value = ''
++      fileMimeType.value = ''
++      fileSize.value = 0
+       kind.value = null
+       error.value = ''
+       loaded = true
+@@ -161,7 +171,7 @@ export function createCustomWallpaperController(
+     error.value = 'The wallpaper image could not be loaded. Check its URL or choose another image.'
+   }
+ 
+-  return { source, kind, url, fileName, error, busy, load, setUrl, setFile, clear, imageFailed }
++  return { source, kind, url, fileName, fileMimeType, fileSize, error, busy, load, setUrl, setFile, clear, imageFailed }
+ }
+ 
+ const customWallpaper = createCustomWallpaperController(
+diff --git a/worklog.md b/worklog.md
+index 36374e1..97cd203 100644
+--- a/worklog.md
++++ b/worklog.md
+@@ -2309,3 +2309,29 @@ Clarification: commit [`d0a49df`](https://github.com/cybermanju/cybermanju.githu
+ - Actual validation: frontend suite passed (124 files / 1193 tests); Vue/TypeScript, version checks, file headers, diff whitespace and static transport inventory (181 mappings) passed. No Cargo, rustfmt, Clippy or Rust tests ran, per AGENTS.md; Rust compilation/formatting/new regressions remain for CI. No commit or push.
+ - **Remaining P1 limitation, not claimed fixed:** private rename and byte checks cannot revoke an already-open external writable handle; a write after the final comparison can still race removal. Encrypt/decrypt require quiesced external in-place writers. Full arbitrary-writer safety needs platform-enforced write exclusion or a stronger storage/snapshot contract; the source race is narrowed, not fully closed. Documented in docs/SECURITY.md.
+ - Final ACL review also moved missing-file denial ahead of the active-admin success return; added an admin/unknown-file regression. Encrypted rows with corrupt packages and no verified plaintext remain untouched for manual recovery.
++
++## 2026-10-20 — Asterinas-first cosmetic snapshot bridge (local implementation)
++
++- Preserved the owner's Asterinas-primary decision and the existing Tauri/Vue app, appearance controls and stores. Ubuntu+niri remains a prior/optional reference; `/workspace/cybermanju-shell` remains an older published snapshot and was not updated.
++- Added strict, allowlisted `com.cybermanju.appearance` v1 export from the current theme, separate shell style, panel docking and custom wallpaper state. Existing normalization and global → per-theme → built-in accent precedence remain authoritative. Excluded credentials, server configuration, image blobs, object URLs and filesystem paths; local wallpaper metadata does not promise media migration.
++- Added an opt-in native consumer in `/workspace/asterinas-gpui/gpui-shell`: `--appearance-profile FILE` validates before display/IPC and applies actual GPUI palette/accent at primary startup, preserving native font size and configuration files. `--validate` is renderer-free. Secondary imports fail explicitly without sending a launcher command. Wallpaper/style/docking/density/glass/motion/glow and live system following remain disclosed as unapplied, not successful no-ops.
++- Verification: app version/header checks, Vue typechecking and frontend suite passed (125 files / 1,203 tests, including 7 profile cases). No app Cargo commands or fresh npm install were used. Native GPUI workspace tests passed 189 Rust cases; binary build and 29 Python cases passed, including 6 actual-binary profile/Unix-socket regressions. The shared Vue/Rust fixture validates in the real shell; the lock change only makes already-locked `url` a direct dependency. No live browser export/download was exercised.
++- Recorded the dependency/ownership map and bounded schema in `docs/ASTERINAS-PERSONALIZATION-BRIDGE.md`; OS-A6-PERSONAL and target runtime/hardware gates remain open. Native NVIDIA worker lifecycle work continues separately in `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. No credentials, Git authentication, commit, push, PR, publication or remote Actions were used. No physical GPU, DRM/NVIDIA nodes or KVM are exposed; GPU/Vulkan/Wayland/Tauri acceptance and Linux parity are not claimed.
++
++## 2026-10-20 — Session-scoped appearance restore and native file admission
++
++Added explicit-preview v1 profile restore through existing Settings, wallpaper and preference owners. URL/preset profiles apply only after the wallpaper operation succeeds; local-file metadata without image bytes is refused before mutation. Preview does not apply state, failed wallpaper operations do not apply theme/shell/panel preferences, and success is session-scoped rather than a claim of atomic durable persistence across stores. No new settings database or replacement controls were introduced.
++
++App frontend passed 125 files / 1,207 tests (11 profile cases), typecheck, version 0.1.1 and file-header checks. Existing compatible dependencies were reused temporarily, then the symlink removed; no app Cargo commands, fresh npm installation or browser click-through was performed. In the local GPUI tree, native file admission now uses a single read-only nonblocking/no-follow descriptor and rejects terminal symlinks, FIFOs, directories and sockets. Its 189 Rust / 32 Python tests, binary build and offline Clippy passed; host results are not Asterinas runtime certification.
++
++Native patch18 also enforces callback-owner retirement before accepted worker teardown; its CPU/QEMU matrix completed with 315 reported positives, including 3 explicitly skipped VMX/EPT bodies. Full kernel boot and GPU acceptance were not repeated or claimed. Asterinas remains primary; the published initial snapshot was not updated. No GPU/KVM/DRM/NVIDIA nodes are exposed, and no credentials, authentication, staging, commits, push, PR, publication or remote Actions were used. Updated bridge/plan/task evidence; full native media/density/style propagation, durable restart/restore, Tauri/runtime and physical GPU gates remain open. Exact sources/patches/logs are recorded in `/workspace/asterinas-gpui/evidence/appearance-restore-2030/` and PR_NOTES.md.
++
++
++## 2026-10-20 — Asterinas-first live-file appearance follow-up
++
++The local GPUI consumer now supports explicit `--watch-appearance-profile` with bounded trailing-edge inotify updates, off-foreground parsing, validated native theme replacement/redraw, last-good retention and an independent appearance-error card. Native theme reloads retain imported colors but adopt native typography. The Vue/Tauri source and existing preference owners were not replaced or changed; documentation and the open OS-A6-PERSONAL gate reflect the narrower implemented scope. Final checks passed 201 GPUI Rust and 36 Python tests, build and Clippy; app version/header checks passed (the previous 1,207 frontend result was not rerun). A real nested Niri/Xvfb/lavapipe host window changed dark→light, displayed an invalid-profile warning without exiting and recovered to dark. This is host software rendering, not Asterinas/GPU acceptance. Wallpaper/density/shell-style propagation, automatic app transport, native Tauri runtime and physical-GPU results remain open. Native kernel lifecycle patch 19 and all evidence are recorded in `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. No credentials, staging, commit, push or remote Actions were used.
++
++
++## 2026-10-20 — Native launcher density bridge
++
++The existing exported density preference now changes nine actual native GPUI launcher query/body/footer semantic spacing consumers: compact uses the existing Vue unit factor 0.9, comfortable uses 1.0 and preserves original default native spacing. Native font/icon sizes, explicit hit-target dimensions and compositor/bar geometry remain unchanged. Live atomic-file/inotify updates, malformed-save retention, recovery and native-theme reload cover density; runtime density survives palette changes but is not written into native theme files. No frontend source, app preference owner, schema or dependency changed. Final GPUI checks passed 205 Rust and 36 Python tests, real binary build and all-target Clippy; app version/header checks passed. Frontend and host-window suites were not rerun in this pass. New native NVIDIA patch20 and its final validation status are recorded in `/workspace/asterinas-gpui/local-prs/PR_NOTES.md`. Physical GPU, RM/GSP/Vulkan, target Wayland/Tauri runtime and full personalization remain open. Only idle reproducible GPUI incremental caches were cleared after compilation to recover critical shared disk space; sources, binaries and evidence were retained. No credentials, staging, commit, push, publication or remote Actions were used.

@@ -1,0 +1,351 @@
+{
+  "completed_utc": "2026-10-20T21:15:26.902690+00:00",
+  "implementation_complete_for_recorded_scope": true,
+  "full_nvidia_or_app_integration": false,
+  "physical_gpu_acceptance": false,
+  "gpu_devices": {
+    "time_utc": "2026-10-20T21:14:11.364485+00:00",
+    "device_nodes": {
+      "dri": [],
+      "nvidia": [],
+      "kvm": []
+    },
+    "display_class_pci": [],
+    "physical_gpu_benchmark": false,
+    "host_ui_renderer": "Explicitly forced Mesa lavapipe; host Linux software rendering, not Asterinas or physical GPU"
+  },
+  "gpui_rust_passed": 201,
+  "python_passed": 36,
+  "native_reported_passed": 315,
+  "native_explicit_skips": 3,
+  "native_owner_hardware_exercised": false,
+  "host_software_window_smoke": "PASS",
+  "native_stack": {
+    "patches": 19,
+    "files_compared": 99,
+    "source_byte_equality": false,
+    "known_preexisting_import_order_only": [
+      "kernel/comps/drm/src/ioctl/gem.rs"
+    ],
+    "unexpected_mismatches": []
+  },
+  "staging_commits_push_auth_remote_actions": false,
+  "free_workspace_bytes": 1450401792,
+  "files": [
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "bytes": 124914,
+      "sha256": "e56edbc85c18a0736b66d554a0e5a0255a85c24cdab7e24449728ecff6e36eaf"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-interrupt-worker.patch",
+      "bytes": 4893,
+      "sha256": "fc2006ec5afaaa9eff644d245b497418a4e5114c643953f8aae819d1dcbfec3c"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "bytes": 9355,
+      "sha256": "efb22e23d0afe847774de66e34bd9fc43a7a5af3e2afc57b495dbf4c9a1c9e4d"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/docs/CYBERMANJU-OS-PLAN.md",
+      "bytes": 68450,
+      "sha256": "fd1052f5c30ebd9207d772a07ecfd2f8ad9d101ebf732ca70c2746e6b7c2a14a"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/TASKS.md",
+      "bytes": 33391,
+      "sha256": "cd5a5f337da0978309e8f1841b310f73e9a1ae35b63496b728117ea03d12949c"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/worklog.md",
+      "bytes": 293526,
+      "sha256": "33fe9a304f252d555637ac076328805aad47d0898d99b2eda95a9f525d0168f7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-cybermanju-live-profile.patch",
+      "bytes": 49289,
+      "sha256": "6a3e2d18d94fa0684d1fbd2de75c2623b470280e640e088252e35ecbba4f9f17"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/cybermanju-live-profile-docs.patch",
+      "bytes": 13959,
+      "sha256": "8a2ff749c6de6c6ea9f4c360873a55439d3403c2ed399791d4b9b321a84add2a"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/app-docs-before/TASKS.md",
+      "bytes": 33241,
+      "sha256": "7503c73f014dc42a234d424b4b6dcaa4103d263a9a50145909397843a9f70553"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/app-docs-before/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "bytes": 7534,
+      "sha256": "227596c9125c63cc24b092efacb9d734af2b38b1b76e45da171bf605f10369b9"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/app-docs-before/docs/CYBERMANJU-OS-PLAN.md",
+      "bytes": 68214,
+      "sha256": "b76d73676ec5f42c658edd77b45010360370e9d927de4665f14d331b05246316"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/app-docs-before/worklog.md",
+      "bytes": 292293,
+      "sha256": "2ecb91a560d1b64d13f638e02303cc9f6b0b7a2245b858848ec070b9439afde8"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/app-file-headers.log",
+      "bytes": 32,
+      "sha256": "4168d8f0a32dc7c013bc5b5c6fd4891bf8923493fe427f477c44f7cbafe3df31"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/app-version-check.log",
+      "bytes": 1206,
+      "sha256": "08fd3c10e65e65613f4a3ea6990aa237324603776e3ecbdbde0604973f4ed5ca"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/app/src/args.rs",
+      "bytes": 3069,
+      "sha256": "72b2fb12023375e51919086c7bc64cc3faa089676f15b8d18d42a6b90af2a3b5"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/app/src/config/appearance.rs",
+      "bytes": 16961,
+      "sha256": "191ffb83228e835ddb9f3912e44d66f3aee476e5fcb601761f40b06cae451826"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/app/src/config/mod.rs",
+      "bytes": 12695,
+      "sha256": "b0cec64b15d576db05247f32e5e3b63dd2ee59423ad4c2f2062bccd84a946c36"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/app/src/ipc/service.rs",
+      "bytes": 9435,
+      "sha256": "3b421b1c26bb192231aa049a87b9fffc762901e0cdbd1f20ce883bd27d9a14ad"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/app/src/main.rs",
+      "bytes": 4709,
+      "sha256": "2a65cd3ed93e1161aca584306fb88edfc13391cea9afe51f33c1ff39a97f124e"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/services/src/notification/mod.rs",
+      "bytes": 25106,
+      "sha256": "e4ae6a8243cd5cd98e17e5e0cb1a71205a9b0a9243b797a9d199d35aac4efd8c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/crates/services/src/watcher.rs",
+      "bytes": 2604,
+      "sha256": "e50f3fc22182efc53b602cb6f198555bae3b6534604919697078b8fe0583ae0f"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/docs/src/content/docs/developer/cybermanju-appearance.md",
+      "bytes": 6550,
+      "sha256": "a710b15b497a7dee302e7cbcd9d8dbdc3c0882e9bbb25d0e508709540cd58041"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/before/scripts/test_appearance_profile.py",
+      "bytes": 7258,
+      "sha256": "ea36d2ec7c75e549a23bdd3896833e8dd9e86386cb4dff88255b6dc65844556a"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/cache-space-recovery.json",
+      "bytes": 2984,
+      "sha256": "fb2d378d078641f813ba466b9cfbe2ad3663de90e6983861a08e0f47599c78a2"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-build.log",
+      "bytes": 395,
+      "sha256": "b5b981e132b7683cd9c205a29f159c2b4e3f84b78fee890b8a9fb1e77ac2d4fe"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-clippy.log",
+      "bytes": 1036,
+      "sha256": "b3f83f601547469e9cc2f2a37425458e16bb9c8eba4cd9d69dff0e9742b12b59"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-python-tests.log",
+      "bytes": 6175,
+      "sha256": "418ef8c21dcbe75c60629124157a307faf5a75fd66ffd84b1151b47596e7636c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-rust-tests.log",
+      "bytes": 18121,
+      "sha256": "ffb44da9797cd28525ce40ee378cdbd254fa7e9b997b4b5d1cab9680e053f8f6"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-test-summary.json",
+      "bytes": 2030,
+      "sha256": "485571d45bbdfa0f98a7b3de6d9d424ffaa3811f705769fd6634015faf030bf6"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/hardware-final.json",
+      "bytes": 306,
+      "sha256": "29eb5fa22639201988c37f92d16c78dfa50894eaa0dfb0e912e3f32b126e760c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/hardware.json",
+      "bytes": 171,
+      "sha256": "79fe8c3679d92ff88f35d46ebf731fcec86c6d063940c9ca228cb49990082624"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/01-startup-dark.png",
+      "bytes": 12019,
+      "sha256": "78cf61ab614272c40d540bc08d2d5b863031b176e4ba40237badc962294f369a"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/02-live-os-light.png",
+      "bytes": 17652,
+      "sha256": "e4a3292c9dbd0616a51c0963df031c4eda7c57b9bbc66cc8d43893c814aa6553"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/03-invalid-profile-error-state.png",
+      "bytes": 37554,
+      "sha256": "3925111177087ebd6074f12aff269b788ac719c80a04c1aa8fdf4b8e2e63f9e8"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/04-recovered-os-dark.png",
+      "bytes": 23319,
+      "sha256": "90009dd5aa5b795953429eaf52dedc813a716b358500e15082d022a7b5829ceb"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/appearance-profile-live.json",
+      "bytes": 482,
+      "sha256": "0aa52530fabd32154df30fc70d8f553c50dfdebd0d23c0de58eb59c4e34af56b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/gpui.log",
+      "bytes": 8655,
+      "sha256": "bb05a414c459f96f61f1ad33e7a83ba7ba2a408678fcefe39994642bb90c5892"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/layers-latest.json",
+      "bytes": 362,
+      "sha256": "3f94da895c2cb7bc1712611e8ae067bee9460b5283c19ec36f2eae67e92da983"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/layers-startup.json",
+      "bytes": 123,
+      "sha256": "8fc48cffbc2220156090ec8c6d7bc20ff7b9de06c8106adb52b7f26e62581875"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/niri.log",
+      "bytes": 16607,
+      "sha256": "5a28cb9042d82baf7f9be15d5da67bd11ee71db465cc6774a0974521a8604464"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/result.json",
+      "bytes": 5039,
+      "sha256": "4b8e76a83afecd20f13fc1023fd35064f0d22f8323bdab4c425aad6595f46de2"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/run.log",
+      "bytes": 4570,
+      "sha256": "867704e82edd33477cbcc55df12b8ee4da330507a2a34687b0fe6b36fe20654b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/run_host_profile_smoke.py",
+      "bytes": 14839,
+      "sha256": "573a7d17a7477a9ee67eb9718115b04af871d1b3084925b9573171c76afb7f7c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/wayland-info.txt",
+      "bytes": 9270,
+      "sha256": "170f41f48f9eb84a323a3397900ecaec729883949e1f42821d53b7a89f1d1b26"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/host-window-smoke/xvfb.log",
+      "bytes": 2348,
+      "sha256": "b987a262609a3720f450ab6815ed90b2069dd47b7b012959ca19c325aebf5d55"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/index-before.txt",
+      "bytes": 45869,
+      "sha256": "453d1781c1c86394a8d4a979d3be10a122030d7af668ab9a396810509893ecf0"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/initial-disk-full-build.log",
+      "bytes": 15555,
+      "sha256": "dbea319777cfed4ee37480849aeea4339e3759d194d13fdb51f93628b02b941e"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/make_patches.py",
+      "bytes": 2616,
+      "sha256": "553dbe29e3d15875570c66621e886e8d02925e3ceacbaebc8fc9e714fbb46665"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/native-stack/full-stack-validation.json",
+      "bytes": 3710,
+      "sha256": "4ac08ce3fad82f54a536827042f8131de3daee6ef915455f4d1565bd3acdfae7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/native-stack/index-before.txt",
+      "bytes": 289626,
+      "sha256": "cb6a94bd04ab4156fbda5984822f2f3355c1b1ce7fed427595a912d3682951be"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/native-stack/stack-mismatch-kernel_comps_drm_src_ioctl_gem.rs.diff",
+      "bytes": 341,
+      "sha256": "f39eb643931b05ce632b95f6c68e9e33e26d463d46d72b2b06c77e3d9612fa1e"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/native-test-summary.json",
+      "bytes": 1400,
+      "sha256": "2bd843d279c2435823855d0d6359db799ddebebabe6e68470712ffe09a597a4b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/old-unbound-watch-regression.log",
+      "bytes": 1025,
+      "sha256": "2324691702086c2160e686e3b22475a1970bfc262f112acdde9dffe6064c3914"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/patch-generation.log",
+      "bytes": 3812,
+      "sha256": "e0e8ee9c53028a6518ea4d41ec377fdf9bb8720ac4ac8fa30a3d22d32a4da632"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/patch-validation.json",
+      "bytes": 4214,
+      "sha256": "43870dbcf7fb910f2f705521685b59288c79b0b980b83b935a391cc7562de1bf"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/pre-lint-success/gpui-build.log",
+      "bytes": 396,
+      "sha256": "e619051844cf1ef0d53a1b21f47b04057664a578294bc83aa11bab184555cea1"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/pre-lint-success/gpui-clippy.log",
+      "bytes": 2964,
+      "sha256": "516de684a69092cb3942d0f6822f8e957473d53982eb79dc0c9fb8df4faa976e"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/pre-lint-success/gpui-python-tests.log",
+      "bytes": 6175,
+      "sha256": "0b144510794be0ff9c50fbe76df10ce380414b1beb2d5a7e7bcc9488aab14d3b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/pre-lint-success/gpui-rust-tests.log",
+      "bytes": 18205,
+      "sha256": "cb9aaeb24d25795b78ad8b5563fd93ce4e1cf8eac74583cabfb787fdc353f94d"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/summarize_gpui.py",
+      "bytes": 2291,
+      "sha256": "db5fc1cbb7ba7bad782223a1651627aca24e0c119887b0b42fc0e90bb8065e29"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/summarize_native.py",
+      "bytes": 2747,
+      "sha256": "48a65551da963bdeaa80633821ef7b7c208d29a9ca9601978f53f84e303f0d33"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/upstream-sources.md",
+      "bytes": 1808,
+      "sha256": "36b094aea0d0392979f168b21079a83eb0674512d7373f6c99c9483d0a67ee44"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/validate_gpui.sh",
+      "bytes": 972,
+      "sha256": "b25bf3f4aca480e4f3f10b1236a4fd2bc03d750a6e9a962213e16c224365ce3e"
+    }
+  ]
+}

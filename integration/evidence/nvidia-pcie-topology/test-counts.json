@@ -1,0 +1,59 @@
+{
+  "suites": {
+    "native-nvidia-nvport-tests.log": {
+      "reported_counts": [
+        [
+          "20",
+          "0"
+        ]
+      ],
+      "explicit_skips": [],
+      "sha256": "c1d0b019d71cdf474ce6938fba08281eacb19d07c197935511b8c84619953b37"
+    },
+    "native-nvidia-platform-tests.log": {
+      "reported_counts": [
+        [
+          "4",
+          "0"
+        ]
+      ],
+      "explicit_skips": [],
+      "sha256": "6142c6d382b16d6379258fb17ad4b562f1c6fdb0148af22b2bdea08e9f44fdb4"
+    },
+    "native-ostd-tests.log": {
+      "reported_counts": [
+        [
+          "247",
+          "0"
+        ]
+      ],
+      "explicit_skips": [
+        "[skipped: VMX unavailable]",
+        "[skipped: VMX unavailable]",
+        "[skipped: VMX/EPT invalidation unavailable]"
+      ],
+      "sha256": "07d2c13ec55d4cda41cb5b52ac305bf9a9c64c0b40d484ebab641356f6f0cc70"
+    },
+    "native-pci-iommu-tests.log": {
+      "reported_counts": [
+        [
+          "8",
+          "0"
+        ]
+      ],
+      "explicit_skips": [],
+      "sha256": "f985bd8bfed57fc1842a14eca29f50c55d1803f18fb78ca524b22b74b9f8408c"
+    },
+    "native-pci-tests.log": {
+      "reported_counts": [
+        [
+          "8",
+          "0"
+        ]
+      ],
+      "explicit_skips": [],
+      "sha256": "8ba33b31bdd2173b10a987704a6cb56516b345b10a6f99ca6215a30ca852929f"
+    }
+  },
+  "real_revoked_iova_vtd_write_faults": 8
+}

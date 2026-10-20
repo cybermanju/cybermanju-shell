@@ -1,0 +1,42 @@
+{
+  "patch_number": 18,
+  "base": "00a4842d976db6723b8224be2e57ac8105f13ee2",
+  "prerequisite_patch_count": 17,
+  "existing_patches_reused_without_regeneration": [
+    "asterinas-dumb-buffer-layout.patch",
+    "asterinas-simpledrm-exact-pixel-format.patch",
+    "asterinas-graphics-prerequisite-check.patch",
+    "asterinas-vulkan-compute-ci.patch",
+    "asterinas-nvidia-nvport-native-ci.patch",
+    "asterinas-nvidia-boot-pci-tcg.patch",
+    "asterinas-nvidia-rm-os-services.patch",
+    "asterinas-nvidia-resource-ownership.patch",
+    "asterinas-nvidia-device-dma.patch",
+    "asterinas-nvidia-isolated-vtd.patch",
+    "asterinas-nvidia-pcie-topology.patch",
+    "asterinas-nvidia-multifunction.patch",
+    "asterinas-nvidia-irq-callbacks.patch",
+    "asterinas-nvidia-msix-transaction.patch",
+    "asterinas-irq-retire-storage.patch",
+    "asterinas-nvidia-device-worker.patch",
+    "asterinas-nvidia-worker-flush.patch"
+  ],
+  "incremental_patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-irq-worker-teardown.patch",
+  "incremental_patch_sha256": "a1d9a1dc05fc7e4f6e08e98bb4c409361d9281eaa2c4847b516abc214d051391",
+  "files": [
+    "kernel/comps/nvidia-platform/src/worker.rs",
+    "kernel/comps/nvidia-platform/src/worker/tests.rs",
+    "kernel/comps/nvidia-platform/README.md"
+  ],
+  "patch18_applies_after_patch17": true,
+  "target_bytes_exact": true,
+  "index_tree_before": "290a566958a15c82819c45ce5f5fd650b3d0b264",
+  "index_tree_after": "290a566958a15c82819c45ce5f5fd650b3d0b264",
+  "original_index_unchanged": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "gpu_acceptance": false,
+  "rm_gsp_initialized": false
+}

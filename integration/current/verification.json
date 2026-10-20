@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "errors": [],
+  "manifest_entries": 5221,
+  "source_file_hashes_rechecked": 5208,
+  "source_status_unchanged": true,
+  "initial_snapshot_records_unchanged": true,
+  "target_branch": "main",
+  "no_root_actions_workflows": true,
+  "functional_tests_or_builds_run": false,
+  "authorized_ignored_cache_files": 9,
+  "source_whitespace": {
+    "newly_introduced_by_consolidation": 0,
+    "inherited_preserved_findings": [
+      {
+        "path": "cybermanju-app/.github/workflows/release.yml",
+        "line": 1252,
+        "reason": "Pre-existing trailing whitespace in unchanged source file; copied byte-for-byte, not modified"
+      }
+    ]
+  },
+  "staged_tree_files": 5249,
+  "staged_changed_files": 1724,
+  "staged_added_files": 1683,
+  "staged_modified_files": 41,
+  "staged_deleted_files": 0,
+  "staged_generated_cache_files": 0,
+  "staged_manifest_hashes_verified": 5221,
+  "staged_exact_file_set_verified": true,
+  "staged_secret_scan_passed": true,
+  "changed_file_inventory": "integration/current/staged-files.tsv"
+}

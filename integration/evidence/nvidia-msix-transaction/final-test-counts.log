@@ -1,0 +1,84 @@
+{
+  "native_suites": [
+    {
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/native-suites-storage-final/native-nvidia-nvport-tests.log",
+      "counts": [
+        {
+          "passed": 20,
+          "failed": 0,
+          "filtered": 0
+        }
+      ],
+      "explicit_hardware_skips": [],
+      "sha256": "459fc4da372879f48f5dd255c42a7f6cf9d943de6e7db78b7e7dec9906874fe6"
+    },
+    {
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/native-suites-storage-final/native-nvidia-platform-tests.log",
+      "counts": [
+        {
+          "passed": 4,
+          "failed": 0,
+          "filtered": 0
+        }
+      ],
+      "explicit_hardware_skips": [],
+      "sha256": "a5dd8762533034c0c619b3113bc461bfa833f52925a61032f418d7af72634ca4"
+    },
+    {
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/native-suites-storage-final/native-ostd-tests.log",
+      "counts": [
+        {
+          "passed": 256,
+          "failed": 0,
+          "filtered": 0
+        }
+      ],
+      "explicit_hardware_skips": [
+        "[skipped: VMX unavailable]",
+        "[skipped: VMX unavailable]",
+        "[skipped: VMX/EPT invalidation unavailable]"
+      ],
+      "sha256": "92ca8d0989f345daf0f32ec3fb46b16bb7284c22fd27eb133c591d7251a3b3eb"
+    },
+    {
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/native-suites-storage-final/native-pci-iommu-tests.log",
+      "counts": [
+        {
+          "passed": 13,
+          "failed": 0,
+          "filtered": 0
+        }
+      ],
+      "explicit_hardware_skips": [],
+      "sha256": "2d84072062d0bc0116a6020303e2c4653550a45c17cd32a27cd6aa6931c8e162"
+    },
+    {
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/native-suites-storage-final/native-pci-tests.log",
+      "counts": [
+        {
+          "passed": 13,
+          "failed": 0,
+          "filtered": 0
+        }
+      ],
+      "explicit_hardware_skips": [],
+      "sha256": "0df0173d5e364b183b45b8a65b1ef29592fac6f2ad867bc44ff87887f1e972b9"
+    }
+  ],
+  "real_device_markers": [
+    "PCI isolated DMA revocation passed: 8 stale IOVA device writes blocked while physical pages remained owned",
+    "PCI isolated DMA simultaneous requester isolation passed: 2 real EDU devices, distinct live domains, matching 4096/8192 source/destination IOVAs, full-page readbacks verified",
+    "PCI isolated DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles; domain detach/reacquire verified; bounded type-0 PCI isolation only",
+    "PCI MSI-X abandonment passed: function and MMIO quarantined, no reprobe; not a hardware completion test",
+    "PCI legacy MSI-X passed: no implicit BME, checked indices, no handler unmask, no vector replacement",
+    "PCI real NVMe MSI-X masked-pending IRQ and quiesced shutdown cycles passed; not GPU validation",
+    "PCI multifunction unsupported sibling correctly rejected: real conventional PCI EDU function one lacks PCIe",
+    "PCI multifunction group reservation passed: missing sibling, active BME preserved, invalid-BAR rollback, and single-function rejection verified",
+    "PCI multifunction isolated DMA passed: two real NVMe functions, shared requester domain, actual Identify CID/status/vendor/serial/model verified; both controllers stopped and BME off",
+    "PCIe NVMe isolated DMA passed: real root-port route, private SQ/CQ/Identify DMA, actual CID/status/vendor/serial/model verified; controller stopped and BME off; NOT NVIDIA/GPU proof"
+  ],
+  "host_graphics_tests": 38,
+  "hardware_gpu_acceptance": false,
+  "rm_gsp_initialized": false,
+  "remote_actions_run": false
+}

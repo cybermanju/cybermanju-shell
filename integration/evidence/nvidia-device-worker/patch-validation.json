@@ -1,0 +1,45 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-device-worker.patch",
+  "patch_sha256": "95d6978fd8c528c8a4176de66066c345f023137efa1997dc9492be4e72aa6d2f",
+  "prerequisite": "All fifteen patches through asterinas-irq-retire-storage.patch",
+  "files": [
+    {
+      "path": "kernel/comps/nvidia-platform/src/lib.rs",
+      "before_sha256": "13d08d5f6e007ba184ad1f9f2587b8c39fdd3ba4c3e60c7c959b67a19979819a",
+      "after_sha256": "a96bc59cb5e0538664ce2bec3cf6a94b073e259c998e289f75c97bd486d9f3eb",
+      "new_file": false
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/worker.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "22378883a73b3643c6de94b596892aaaafeaf428b4a1e45e4a3a8b81ca5d7d9a",
+      "new_file": true
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/worker/tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "81847cd901795891d86c801867c6ef257df59f49ac5f9c451dbd32e1d12710b3",
+      "new_file": true
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/README.md",
+      "before_sha256": "15e4f0098b9f7d4db07b61a61496de1492909f827c991be0dbcc0ccdf1abf083",
+      "after_sha256": "cafd145022da5c5b4a4ed780970eeb40296f4a5eaac4fa8e13276c43d14cb33e",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/run_cpu_kernel_tests.sh",
+      "before_sha256": "b1b05c06b6ee0ad783702ec746281b2e9719a5896122f5a963f8db17f15d36c7",
+      "after_sha256": "f9d6745a2f6abef161e16c4f41c33a92fafba947917577983af32249bffdd815",
+      "new_file": false
+    }
+  ],
+  "exact_round_trip": true,
+  "original_index_unchanged": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "hardware_gpu_acceptance": false,
+  "rm_gsp_initialized": false
+}

@@ -1,0 +1,23 @@
+{
+  "files": {
+    "incremental_patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-isolated-vtd.patch",
+    "notes": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+    "native_counts": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/test-counts.json",
+    "patch_validation": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/patch-validation.json",
+    "full_stack_validation": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/full-stack-validation.json",
+    "cpu_boot": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/cpu-boot-final/result.json",
+    "iommu_cpu_boot": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/cpu-boot-final/result-iommu.json",
+    "lifetime_checks": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/lifetime-checks-v2/result.json",
+    "native_runner_log": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/native-suites-v4.log",
+    "iommu_device_log": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/native-suites-v4/native-pci-iommu-tests.log",
+    "full_boot_log": "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/full-boot-final.log"
+  },
+  "native_gpu_benchmark_passed": false,
+  "rm_gsp_initialized": false,
+  "modern_nvidia_pcie_supported": false,
+  "local_only": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false
+}

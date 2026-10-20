@@ -1,0 +1,46 @@
+dist.root-owned/
+target/
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+dist-wasm/
+src-tauri/target/
+
+# Env
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tauri
+src-tauri/gen/
+
+# Database
+*.db
+tantivy_index/
+
+# Logs
+*.log
+logs/
+
+# Tool results
+tool-results/
+
+# Knowledge graph (graphify — regenerate with `npm run wiki:graph`)
+graphify-out/
+
+# Download artifacts
+download/
+
+# Temp
+*.b64
+download-app/

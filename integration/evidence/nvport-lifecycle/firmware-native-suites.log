@@ -1,0 +1,710 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `id-alloc` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-test-base)
+warning: `ostd-nvidia-nvport-osdk-bin` (bin "ostd-nvidia-nvport-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.25s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 19.2g free
+Added to ISO image: directory '/'='/tmp/grub.PnzVoe'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5393 sectors
+Written to medium : 5393 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a5fe000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2626221260 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x9e7, current 0x17bcfc, init 0x3cab
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 257 tests in 5 crates
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+running 13 tests in crate "ostd-nvidia-nvport"
+
+test ostd_nvidia_nvport::firmware::tests::upstream_release_and_family_selection ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_exact_image_and_no_cross_release_fallback ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_rejects_every_truncation_and_bad_numeric_header ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_rejects_alias_duplicates_links_empty_and_traversal ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::actual_rm_ffi_handles_own_distinct_leases_of_static_fixture ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::allocation_alignment_and_free ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::reject_invalid_sizes_and_clear_output ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::usercopy_does_not_report_false_success ... [32mok[39m
+test ostd_nvidia_nvport::tests::upstream_memory_self_test ... [32mok[39m
+test ostd_nvidia_nvport::tests::copy_fill_compare_many_lengths ... [32mok[39m
+test ostd_nvidia_nvport::tests::invalid_operations_leave_buffer_unchanged ... [32mok[39m
+test ostd_nvidia_nvport::tests::patterned_fill_including_partial_repetition ... [32mok[39m
+test ostd_nvidia_nvport::tests::overlapping_move_matches_rust_both_directions ... [32mok[39m
+
+test result: [32mok[39m. 13 passed; 0 failed; 0 filtered out.
+
+[ktest runner] All crates tested.
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 109 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-nvidia-platform v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform)
+warning: `aster-nvidia-platform` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-nvidia-platform-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-test-base)
+warning: `aster-nvidia-platform-osdk-bin` (bin "aster-nvidia-platform-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.53s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 19.2g free
+Added to ISO image: directory '/'='/tmp/grub.axfgbe'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5411 sectors
+Written to medium : 5411 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/aster-nvidia-platform-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a607000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2620772600 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x785, current 0x17b8b8, init 0x3ca6
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 247 tests in 5 crates
+
+running 3 tests in crate "aster-nvidia-platform"
+
+test aster_nvidia_platform::tests::identity_requires_nvidia_display_class ... [32mok[39m
+test aster_nvidia_platform::tests::range_is_checked_and_rejects_empty_or_zero_base ... [32mok[39m
+test aster_nvidia_platform::tests::conventional_config_reads_are_bounded_and_aligned ... [32mok[39m
+
+test result: [32mok[39m. 3 passed; 0 failed; 0 filtered out.
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+[ktest runner] All crates tested.
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 97 packages to latest Rust 1.99.0-nightly compatible versions
+      Adding minicov v0.3.8 (available: v0.3.9)
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `ostd-pod` (lib) generated 1 warning
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-osdk-bin v0.19.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-test-base)
+warning: `ostd-osdk-bin` (bin "ostd-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.42s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 19.2g free
+Added to ISO image: directory '/'='/tmp/grub.2GMbQK'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5329 sectors
+Written to medium : 5329 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a5de000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 256048236120 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x730, current 0x17bc21, init 0x3cb0
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 244 tests in 4 crates
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+running 225 tests in crate "ostd"
+
+test ostd::arch::boot::multiboot2::tests::ega_text_is_not_a_pixel_framebuffer ... [32mok[39m
+test ostd::arch::boot::multiboot2::tests::reserved_rsdt_remains_in_linear_mapping ... [32mok[39m
+test ostd::arch::boot::multiboot2::tests::reserved_xsdt_remains_in_linear_mapping ... [32mok[39m
+test ostd::arch::boot::multiboot2::tests::efi_without_acpi_does_not_promote_reserved_ram ... [32mok[39m
+test ostd::arch::vm::ept::test::leaf_encoding ... [32mok[39m
+test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] [32mok[39m
+test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] [32mok[39m
+test ostd::boot::memory_region::test::sort_full_non_overlapping ... [32mok[39m
+test ostd::boot::memory_region::test::into_non_overlapping_drops_usable_subpage_regions ... [32mok[39m
+test ostd::cpu::local::test::cpu_local ... [32mok[39m
+test ostd::cpu::local::test::cpu_local_cell ... [32mok[39m
+test ostd::io::io_mem::allocator::test::illegal_region ...INFO: Creating new I/O memory allocator builder, ranges: [
+    0x40000000..0x42000000,
+]
+DEBUG: Try to acquire security-insensitive MMIO range: 0x0..0x0 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0xffffffffffffffff..0x0 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40000000..0x40000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40001000..0x40001000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x41ff0000..0x41ff0000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x42000000..0x42000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40001000..0x40000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x40002000..0x40001000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x41fff000..0x41ffe000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x42000000..0x41fff000 with cache policy: Uncacheable
+ [32mok[39m
+test ostd::io::io_mem::allocator::test::conflict_region ...INFO: Creating new I/O memory allocator builder, ranges: [
+    0x100000000000..0x100002000000,
+    0x100002001000..0x10000200a000,
+]
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfffffffffff..0x100000000000 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100000000000..0x100000000001 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100002000001..0x100002000fff with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100001ffffff..0x100002001001 with cache policy: Uncacheable
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100001ffffff..0x100002000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+DEBUG: Try to acquire security-insensitive MMIO range: 0x100002000000..0x100002000001 with cache policy: Uncacheable
+ [32mok[39m
+test ostd::io::io_mem::test::read_write_u8 ... [32mok[39m
+test ostd::io::io_mem::test::read_write_u16 ... [32mok[39m
+test ostd::io::io_mem::test::read_write_u32 ... [32mok[39m
+test ostd::io::io_mem::test::read_write_u64 ... [32mok[39m
+test ostd::io::io_mem::test::boundary_overlap ... [32mok[39m
+test ostd::io::io_mem::test::copy_to_alignment_and_sizes ... [32mok[39m
+test ostd::io::io_mem::test::copy_from_alignment_and_sizes ... [32mok[39m
+test ostd::io::io_port::allocator::test::illegal_region ... [32mok[39m
+test ostd::io::io_port::allocator::test::conflict_region ...DEBUG: Try to acquire PIO range: 0x60..0x64
+DEBUG: Try to acquire PIO range: 0x62..0x66
+DEBUG: Recycling PIO range: 0x60..0x64
+DEBUG: Try to acquire PIO range: 0x62..0x66
+DEBUG: Recycling PIO range: 0x62..0x66
+ [32mok[39m
+test ostd::io::io_port::allocator::test::overlapping_region ...DEBUG: Try to acquire PIO range: 0xcf8..0xcf9
+DEBUG: Try to acquire PIO range: 0xcf9..0xcfa
+DEBUG: Try to acquire PIO range: 0xcf8..0xcf9
+DEBUG: Try to acquire PIO range: 0xcf9..0xcfa
+DEBUG: Recycling PIO range: 0xcf8..0xcf9
+DEBUG: Recycling PIO range: 0xcf9..0xcfa
+DEBUG: Try to acquire PIO range: 0xcf9..0xcfa
+DEBUG: Try to acquire PIO range: 0xcf8..0xcf9
+DEBUG: Recycling PIO range: 0xcf8..0xcf9
+DEBUG: Recycling PIO range: 0xcf9..0xcfa
+ [32mok[39m
+test ostd::irq::top_half::test::alloc_and_free_irq ... [32mok[39m
+test ostd::irq::top_half::test::register_and_unregister_callback ... [32mok[39m
+test ostd::log::bridge::test::bridge_map_log_level ... [32mok[39m
+test ostd::log::bridge::test::bridge_map_level_filter ... [32mok[39m
+test ostd::log::level::test::level_ordering ... [32mok[39m
+test ostd::log::level::test::level_filter_enabled ... [32mok[39m
+test ostd::log::level::test::level_from_u8_clamping ... [32mok[39m
+test ostd::log::level::test::level_filter_from_level ... [32mok[39m
+test ostd::mm::dma::test::dma_coherent::read_write ...DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::reader_writer ...DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::read_write_once ...DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::zero_length_operations ...DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::alloc_uninit_dma_coherent ...DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_coherent::alloc_with_coherent_device ... [32mok[39m
+test ostd::mm::dma::test::dma_coherent::complex_read_write_patterns ...DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::dma::test::dma_stream::to_device ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::read_write ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::from_device ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::reader_writer ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::streaming_map ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::alloc_dma_stream ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::sync_invalid_ranges ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::alloc_uninit_dma_stream ... [32mok[39m
+test ostd::mm::dma::test::dma_stream::streaming_boundary_conditions ... [32mok[39m
+test ostd::mm::frame::allocator::test_alloc_dealloc ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_drop ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_clone ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_to_uframe ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_allocation ... [32mok[39m
+test ostd::mm::frame::test::frame::frame_conversions ... [32mok[39m
+test ostd::mm::frame::test::frame_ref::frame_impls_non_null_ptr ... [32mok[39m
+test ostd::mm::frame::test::frame_ref::frame_ref_preserves_refcnt ... [32mok[39m
+test ostd::mm::frame::test::linked_list::linked_list_push_pop ... [32mok[39m
+test ostd::mm::frame::test::linked_list::linked_list_cursor_at ... [32mok[39m
+test ostd::mm::frame::test::linked_list::linked_list_cursor_ops ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_drop ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_slice ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_split ... [32mok[39m
+test ostd::mm::frame::test::segment::frame_to_segment ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_iteration ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_to_segment ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_slice_empty ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_to_usegment ... [32mok[39m
+test ostd::mm::frame::test::segment::max_segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::invalid_segment_split ... [32mok[39m
+test ostd::mm::frame::test::segment::empty_segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::zeroed_segment_creation ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_iter_partial_drop ... [32mok[39m
+test ostd::mm::frame::test::segment::segment_slice_out_of_bounds ... [32mok[39m
+test ostd::mm::frame::test::untyped::untyped_frame_reader_writer ... [32mok[39m
+test ostd::mm::frame::test::untyped::untyped_segment_reader_writer ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_evenly ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_sparse_cpus ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_byte_remainder ... [32mok[39m
+test ostd::mm::frame::unaccepted::test::partition_units_partial_byte_tail ... [32mok[39m
+test ostd::mm::kspace::test::manual_paddr_to_vaddr ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_tracked_drop ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_untracked_drop ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_tracked_map_pages ... [32mok[39m
+test ostd::mm::kspace::test::kvirt_area_untracked_map_pages ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::zeroed_pte_is_absent_pte ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::cast_pt_pte_preserves_repr ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::cast_frame_pte_preserves_repr ... [32mok[39m
+test ostd::mm::page_table::test::arch_pte_impls::cast_absent_pte_preserves_repr ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::map_protect ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::map_base_page ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::protect_base_page_unmapped ... [32mok[39m
+test ostd::mm::page_table::test::boot_pt::map_base_page_already_mapped ... [32mok[39m
+test ostd::mm::page_table::test::create_page_table::new_kernel_page_table ... [32mok[39m
+test ostd::mm::page_table::test::create_page_table::create_user_page_table ... [32mok[39m
+test ostd::mm::page_table::test::lock_levels::map_above_locked_level ... [32mok[39m
+test ostd::mm::page_table::test::lock_levels::map_huge_pages_with_minimum_lock_level ... [32mok[39m
+test ostd::mm::page_table::test::mapping::mixed_granularity_map_unmap ... [32mok[39m
+test ostd::mm::page_table::test::mapping::mixed_granularity_protect_query ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump ... [32mok[39m
+test ostd::mm::page_table::test::navigation::find_next ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump_from_guard_level_end ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump_near_address_space_end ... [32mok[39m
+test ostd::mm::page_table::test::navigation::find_next_keeps_va_around_barrier ... [32mok[39m
+test ostd::mm::page_table::test::navigation::find_next_rejects_overflowing_len ... [32mok[39m
+test ostd::mm::page_table::test::navigation::jump_from_end_and_query_huge_middle ... [32mok[39m
+test ostd::mm::page_table::test::overlapping_mappings::unaligned_map ... [32mok[39m
+test ostd::mm::page_table::test::overlapping_mappings::overlapping_mappings ... [32mok[39m
+test ostd::mm::page_table::test::page_properties::map_preserves_page_property ... [32mok[39m
+test ostd::mm::page_table::test::protection_and_query::base_protect_query ... [32mok[39m
+test ostd::mm::page_table::test::protection_and_query::protect_next_empty_entry ... [32mok[39m
+test ostd::mm::page_table::test::protection_and_query::protect_next_touches_empty_range ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::range_check ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::boundary_conditions ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::end_boundary_mapping ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::start_boundary_mapping ... [32mok[39m
+test ostd::mm::page_table::test::range_checks::overflow_boundary_mapping ... [32mok[39m
+test ostd::mm::page_table::test::test_utils::test_subset_iter ... [32mok[39m
+test ostd::mm::page_table::test::unmap::take_large_takes_subtree ... [32mok[39m
+test ostd::mm::page_table::test::unmap::take_next_takes_something ... [32mok[39m
+test ostd::mm::test::io::fill_infallible ... [32mok[39m
+test ostd::mm::test::io::read_val_segment ... [32mok[39m
+test ostd::mm::test::io::fill_zeros_segment ... [32mok[39m
+test ostd::mm::test::io::read_slice_segment ... [32mok[39m
+test ostd::mm::test::io::fallible_read_write ... [32mok[39m
+test ostd::mm::test::io::fill_zeros_fallible ... [32mok[39m
+test ostd::mm::test::io::write_slice_segment ... [32mok[39m
+test ostd::mm::test::io::atomic_load_fallible ... [32mok[39m
+test ostd::mm::test::io::skip_read_infallible ... [32mok[39m
+test ostd::mm::test::io::write_val_infallible ... [32mok[39m
+test ostd::mm::test::io::limit_read_infallible ... [32mok[39m
+test ostd::mm::test::io::partial_read_fallible ... [32mok[39m
+test ostd::mm::test::io::skip_write_infallible ... [32mok[39m
+test ostd::mm::test::io::limit_write_infallible ... [32mok[39m
+test ostd::mm::test::io::partial_write_fallible ... [32mok[39m
+test ostd::mm::test::io::read_write_val_fallible ... [32mok[39m
+test ostd::mm::test::io::read_write_u32_infallible ... [32mok[39m
+test ostd::mm::test::io::read_write_once_infallible ... [32mok[39m
+test ostd::mm::test::io::read_write_slice_infallible ... [32mok[39m
+test ostd::mm::test::io::read_write_struct_infallible ... [32mok[39m
+test ostd::mm::test::io::invalid_read_write_infallible ... [32mok[39m
+test ostd::mm::test::io::read_beyond_buffer_infallible ... [32mok[39m
+test ostd::mm::test::io::write_beyond_buffer_infallible ... [32mok[39m
+test ostd::mm::test::io::atomic_compare_exchange_fallible ... [32mok[39m
+test ostd::mm::test::io::invalid_args_read_write_fallible ... [32mok[39m
+test ostd::mm::test::io::read_write_slice_vmio_infallible ... [32mok[39m
+test ostd::mm::test::vmspace::protect_next ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_activate ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_creation ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_twice ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_unmap ... [32mok[39m
+test ostd::mm::test::vmspace::cursor_mut_flusher ... [32mok[39m
+test ostd::mm::test::vmspace::overlapping_cursors ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_unmap_twice ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_reader_writer ... [32mok[39m
+test ostd::mm::test::vmspace::protect_out_range_page ... [32mok[39m
+test ostd::mm::test::vmspace::unaligned_unmap_panics ... [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_query_iomem ...DEBUG: Try to acquire security-insensitive MMIO range: 0x100000000000..0x100000001000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::test::vmspace::vmspace_iomem_persistence ...DEBUG: Try to acquire security-insensitive MMIO range: 0x100000003000..0x100000004000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::mm::test::vmspace::vmspace_map_iomem_with_offset ...DEBUG: Try to acquire security-insensitive MMIO range: 0x100000001000..0x100000003000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff8821fd10 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::pending_ipis_can_be_extended ...DEBUG: Performing inter-processor call to 0xffffffff88269820 on CPU CpuId(
+    1,
+)
+DEBUG: Performing inter-processor call to 0xffffffff88269820 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::pending_ipis_waits_for_all_cpus ...DEBUG: Performing inter-processor call to 0xffffffff88269820 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::pending_ipis_waits_for_remote_cpu ...DEBUG: Performing inter-processor call to 0xffffffff88269820 on CPU CpuId(
+    1,
+)
+ [32mok[39m
+test ostd::smp::test::inter_processor_call_runs_on_current_cpu ... [32mok[39m
+test ostd::sync::mutex::test::try_lock_does_not_unlock ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::alignment ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::left_pointer ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::right_pointer ... [32mok[39m
+test ostd::sync::rcu::non_null::either::test::rcu_store_load ... [32mok[39m
+test ostd::sync::rwarc::test::lockless_get ... [32mok[39m
+test ostd::sync::wait::test::queue_wake_all ... [32mok[39m
+test ostd::sync::wait::test::queue_wake_one ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_drop ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_async ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_twice ... [32mok[39m
+test ostd::sync::wait::test::waiter_wake_reorder ... [32mok[39m
+test ostd::task::test::spawn_task ... [32mok[39m
+test ostd::task::test::create_task ... [32mok[39m
+test ostd::test::expect_panic ... [32mok[39m
+test ostd::test::failing_assertion ... [32mok[39m
+test ostd::test::trivial_assertion ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_full ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_iter ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_empty ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_default ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_from_id ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_iter_full ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_to ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_add_remove ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_from ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_full ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_add_all_clear ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_cardinality_one ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_iter_multi_part ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_half_unbounded ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_next_part ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_unbounded_bounds ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_exact_part_boundary ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_to_inclusive ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_add_remove_multi_part ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_ends_after_last ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_just_over_part_boundary ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_range_starts_after_last ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_bound_tuple_exclusive_inclusive ... [32mok[39m
+test ostd::util::id_set::id_set_tests::iter_in_bound_tuple_inclusive_exclusive ... [32mok[39m
+test ostd::util::id_set::id_set_tests::id_set_is_full_with_less_than_full_last_part ... [32mok[39m
+test ostd::util::ops::test::range_difference_a_empty ... [32mok[39m
+test ostd::util::ops::test::range_difference_b_empty ... [32mok[39m
+test ostd::util::ops::test::range_intersection_empty ... [32mok[39m
+test ostd::util::ops::test::range_difference_all_same ... [32mok[39m
+test ostd::util::ops::test::range_difference_all_empty ... [32mok[39m
+test ostd::util::ops::test::range_difference_contained ... [32mok[39m
+test ostd::util::ops::test::range_difference_left_same ... [32mok[39m
+test ostd::util::ops::test::range_difference_right_same ... [32mok[39m
+test ostd::util::ops::test::range_intersection_disjoint ... [32mok[39m
+test ostd::util::ops::test::range_intersection_contained ... [32mok[39m
+test ostd::util::ops::test::range_intersection_overlapping ... [32mok[39m
+test ostd::util::ops::test::range_difference_left_intersected ... [32mok[39m
+test ostd::util::ops::test::range_difference_right_intersected ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_range ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_covering ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_overlapping_end ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_partial_overlap ... [32mok[39m
+test ostd::util::range_counter::test::add_remove_overlapping_beginning ... [32mok[39m
+test ostd::vm::gpm_space::test::guest_mapping_lifecycle ...DEBUG: Performing inter-processor call to 0xffffffff88145410 on CPU CpuId(
+    1,
+)
+DEBUG: Performing inter-processor call to 0xffffffff88204ce0 on CPU CpuId(
+    1,
+)
+ [skipped: VMX/EPT invalidation unavailable] [32mok[39m
+
+test result: [32mok[39m. 225 passed; 0 failed; 0 filtered out.
+
+[ktest runner] All crates tested.

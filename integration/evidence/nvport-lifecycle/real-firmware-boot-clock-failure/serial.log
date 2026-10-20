@@ -1,0 +1,431 @@
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 7098000..8000000
+INFO: Adding free frames to the allocator: b460000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 256024405700 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0xa61, current 0x17af45, init 0x3c87
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+NVIDIA NVport CPU memory self-test passed (not a GPU test)
+NVIDIA RM firmware acquired from guest boot archive: nvidia/615.78.08/gsp_tu10x.bin bytes=22901632 cpu_fnv1a64=72656e9b858593f3 (GSP not started)
+NVIDIA RM firmware acquired from guest boot archive: nvidia/615.78.08/ucodes_tu10x.bin bytes=8837632 cpu_fnv1a64=c24eaf33dedbc0e5 (GSP not started)
+NVIDIA RM firmware acquired from guest boot archive: nvidia/615.78.08/gsp_ga10x.bin bytes=27043992 cpu_fnv1a64=cf7436af6e868c2c (GSP not started)
+NVIDIA RM firmware acquired from guest boot archive: nvidia/615.78.08/ucodes_ga10x.bin bytes=58215936 cpu_fnv1a64=e2068f4b832b7252 (GSP not started)
+NVIDIA RM firmware file service: 4 images acquired/released; GPU initialization not attempted
+OSTD initialized. Preparing components.
+WARN: framebuffer: Framebuffer not found
+DEBUG: Try to acquire security-insensitive MMIO range: 0xb0000000..0xc0000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff88e02be0 on CPU CpuId(
+    1,
+)
+INFO: pci: initializing the PCI bus with bus numbers `0..=255`
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x29c0,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x1111,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x3,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfd000000,
+                        size: 0x1000000,
+                        prefetchable: true,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf0000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2918,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x1,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2922,
+        revision_id: 0x2,
+        prog_if: 0x1,
+        subclass: 0x6,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x2,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc040,
+                        size: 0x20,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf1000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2930,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x5,
+        class: 0xc,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x3,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0x700,
+                        size: 0x40,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: Try to acquire PIO range: 0x70..0x71
+DEBUG: Try to acquire PIO range: 0x71..0x72
+ERROR: Uncaught panic:
+	assertion failed: max_multiplier < (1 << 40)
+	at /workspace/asterinas-gpui/asterinas/kernel/libs/aster-util/src/coeff.rs:71
+	on CPU 0 by thread None
+Printing stack trace:
+   1: fn 0xffffffff88d85c40 - pc 0xffffffff88d85c8b / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff880486f0;
+
+   2: fn 0xffffffff88839340 - pc 0xffffffff88839afe / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048710;
+
+   3: fn 0xffffffff8883d340 - pc 0xffffffff8883d34a / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048b30;
+
+   4: fn 0xffffffff8804b000 - pc 0xffffffff8804b00a / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048b40;
+
+   5: fn 0xffffffff88f2c480 - pc 0xffffffff88f2c4c6 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048b50;
+
+   6: fn 0xffffffff88f2c450 - pc 0xffffffff88f2c476 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048b90;
+
+   7: fn 0xffffffff88ced020 - pc 0xffffffff88ced081 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048bb0;
+
+   8: fn 0xffffffff88a72200 - pc 0xffffffff88a722d4 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048c40;
+
+   9: fn 0xffffffff88a72ca0 - pc 0xffffffff88a72cd1 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048d10;
+
+  10: fn 0xffffffff88a71500 - pc 0xffffffff88a71506 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048d80;
+
+  11: fn 0xffffffff88a70f40 - pc 0xffffffff88a71074 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048d90;
+
+  12: fn 0xffffffff88a70ec0 - pc 0xffffffff88a70f1c / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048e60;
+
+  13: fn 0xffffffff88a71180 - pc 0xffffffff88a7118e / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048ea0;
+
+  14: fn 0xffffffff88a72da0 - pc 0xffffffff88a72dad / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048ed0;
+
+  15: fn 0xffffffff88a72f20 - pc 0xffffffff88a72f26 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048ee0;
+
+  16: fn 0xffffffff88a74690 - pc 0xffffffff88a746c1 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048ef0;
+
+  17: fn 0xffffffff88a75140 - pc 0xffffffff88a75155 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048f20;
+
+  18: fn 0xffffffff88d49260 - pc 0xffffffff88d49a77 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88048f40;
+
+  19: fn 0xffffffff88d4a410 - pc 0xffffffff88d4a4a0 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049760;
+
+  20: fn 0xffffffff8850f0e0 - pc 0xffffffff8850f6af / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049830;
+
+  21: fn 0xffffffff886d2db0 - pc 0xffffffff886d2db6 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049f50;
+
+  22: fn 0xffffffff8804b020 - pc 0xffffffff8804b067 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049f60;
+
+  23: fn 0xffffffff8804b070 - pc 0xffffffff8804b076 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049f70;
+
+  24: fn 0xffffffff88d7a650 - pc 0xffffffff88d7a65b / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049f80;
+
+  25: fn 0xffffffff88df3710 - pc 0xffffffff88df37f1 / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff88049f90;
+
+  26: fn                0x0 - pc 0xffffffff88df3b3e / registers:
+
+     rax 0xffffffff8944a410; rdx   0xffffff8944a410; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff88048618; rdi 0xffffffff88ddfd83; rbp                0x0; rsp 0xffffffff8804a000;
+

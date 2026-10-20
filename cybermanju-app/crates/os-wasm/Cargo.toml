@@ -1,0 +1,90 @@
+[package]
+name = "cybermanju-os-wasm"
+version = "0.1.1"
+edition = "2021"
+description = "CyberManju OS — WASM bridge for browser-based crypto, compression, and storage"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+# Crypto (pure Rust only, no C bindings)
+base64 = "0.22"
+blake3 = "1"
+chacha20poly1305 = "0.10"
+sha2 = "0.10"
+hkdf = "0.12"
+# hmac stays 0.12 — same digest-0.10 tree constraint as cybermanju-crypto
+# (hmac 0.13 needs digest 0.11 and breaks Hmac<Sha512>, CI 2026-10-11).
+hmac = "0.12"
+ml-dsa = { version = "0.1.1", features = ["getrandom"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+signature = "3"
+rand_core = { version = "0.6", features = ["getrandom"] }
+getrandom = { version = "0.2", features = ["js"] }
+# ml-dsa → crypto-common 0.2 resolves getrandom **0.4**, which hard
+# compile-errors on wasm32-unknown-unknown unless its `wasm_js` backend is
+# opted into. Declared under a second name: cargo unifies *features* per
+# resolved version, so this turns `wasm_js` on for the very instance
+# crypto-common links, without touching the 0.2 line above.
+getrandom-wasm = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+# uuid v4 on wasm may resolve getrandom 0.3 (via cybermanju-db); give that
+# instance its JS backend too. Harmless when 0.3 is absent from the tree.
+getrandom03-wasm = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+# Compression (pure Rust only)
+lz4_flex = "0.11"
+brotli = "7"
+# ZSTD *decoder* only — pure Rust, so the wasm build can undo the native
+# TripleCompressor chain (Brotli → ZSTD → LZ4). The encoder side stays
+# native: `cybermanju-compression` pulls `zstd-sys` (C, `cc`) and can never
+# build for wasm32-unknown-unknown, which is why this crate carries its own
+# lz4/brotli/zstd decoders instead of depending on it.
+ruzstd = "0.9"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Pure agent core (providers, protocol builders/parsers — no HTTP here).
+# The `native` feature stays OFF: the browser fetches via web-sys below.
+cybermanju-agent = { path = "../agent" }
+
+# Browser fetch for agent turns and the provider canal (WASM target only in
+# practice — `WorkerGlobalScope` because `db-worker` has no `window()`).
+web-sys = { version = "0.3", features = [
+    "Window",
+    "WorkerGlobalScope",
+    "Request",
+    "RequestInit",
+    "Response",
+    "Headers",
+] }
+
+# Async JS interop (OPFS access handles resolve via Promises)
+wasm-bindgen-futures = "0.4"
+
+# Embedded database: pure-Rust redb over a custom OPFS StorageBackend
+# (worker) with an in-memory fallback. Same table names + JSON row shapes
+# as cybermanju-db, so the file the demo writes IS a real cybermanju.db.
+redb = "2"
+cybermanju-db = { path = "../db" }
+cybermanju-types = { path = "../types" }
+# Erasure-coded relay swarming (pure Rust, no C bindings; the erasure crate
+# disables reed-solomon-erasure's default `std` feature so the wasm build
+# uses spin::Mutex instead of parking_lot — same math as native sync).
+cybermanju-erasure = { path = "../erasure" }
+# RaptorQ fountain codes for the wasm swarm twin (no mandatory deps at all —
+# pyo3/serde are optional and off — so the wasm build just works).
+raptorq = "2"
+
+# Argon2id password hashing (pure Rust, wasm-safe), same pinned parameters
+# as the server (m=19456, t=2, p=1, 32-byte tag).
+argon2 = "0.5"
+
+# Logging
+wasm-logger = "0.2"
+log = "0.4"

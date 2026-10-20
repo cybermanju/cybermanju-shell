@@ -1,0 +1,916 @@
+diff --git a/Cargo.lock b/Cargo.lock
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -2530,6 +2530,7 @@
+  "tracing",
+  "tracing-subscriber",
+  "ui",
++ "url",
+  "uuid",
+  "wayland-client",
+  "wayland-protocols",
+diff --git a/crates/app/Cargo.toml b/crates/app/Cargo.toml
+--- a/crates/app/Cargo.toml
++++ b/crates/app/Cargo.toml
+@@ -28,6 +28,7 @@
+ toml = "1.1"
+ image.workspace = true
+ uuid.workspace = true
++url = "=2.5.8"
+ 
+ [dev-dependencies]
+ # Compile parser fixtures against the real protocol API; no runtime connection.
+diff --git a/crates/app/src/args.rs b/crates/app/src/args.rs
+--- a/crates/app/src/args.rs
++++ b/crates/app/src/args.rs
+@@ -1,36 +1,91 @@
+ //! Command-line argument parsing for GPUi Shell.
+ 
++use std::path::PathBuf;
++
+ /// Command-line arguments.
++#[derive(Debug, Default)]
+ pub struct Args {
+     /// Optional input to prefill in the launcher.
+     pub input: Option<String>,
+     /// Parse the config files, report, and exit without starting the shell.
+     pub validate: bool,
++    /// Explicit CyberManju cosmetic snapshot; never an auto-discovered secret store.
++    pub appearance_profile: Option<PathBuf>,
+ }
+ 
+ impl Args {
+     /// Parse command-line arguments from `std::env::args()`.
+     pub fn parse() -> Self {
+-        let args: Vec<String> = std::env::args().collect();
+-        let mut input = None;
+-        let mut validate = false;
++        Self::parse_from(std::env::args().skip(1)).unwrap_or_else(|error| {
++            eprintln!("Error: {error}");
++            std::process::exit(1)
++        })
++    }
+ 
+-        let mut i = 1;
+-        while i < args.len() {
+-            if args[i] == "--input" || args[i] == "-i" {
+-                if i + 1 < args.len() {
+-                    input = Some(args[i + 1].clone());
+-                    i += 2;
+-                } else {
+-                    eprintln!("Error: --input requires a value");
+-                    std::process::exit(1);
++    fn parse_from(args: impl IntoIterator<Item = String>) -> Result<Self, &'static str> {
++        let mut parsed = Self::default();
++        let mut args = args.into_iter();
++        while let Some(arg) = args.next() {
++            match arg.as_str() {
++                "--input" | "-i" => {
++                    parsed.input = Some(args.next().ok_or("--input requires a value")?);
+                 }
+-            } else {
+-                validate |= args[i] == "--validate";
+-                i += 1;
++                "--validate" => parsed.validate = true,
++                "--appearance-profile" => {
++                    if parsed.appearance_profile.is_some() {
++                        return Err("--appearance-profile may only be supplied once");
++                    }
++                    let path = args.next().ok_or("--appearance-profile requires a path")?;
++                    if path.is_empty() || path.starts_with("--") {
++                        return Err("--appearance-profile requires a path");
++                    }
++                    parsed.appearance_profile = Some(path.into());
++                }
++                // Preserve the existing handling of unrelated/legacy options.
++                _ => {}
+             }
+         }
+-
+-        Args { input, validate }
++        Ok(parsed)
+     }
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn parse(args: &[&str]) -> Result<Args, &'static str> {
++        Args::parse_from(args.iter().map(|s| s.to_string()))
++    }
++
++    #[test]
++    fn explicit_profile_and_validation_do_not_steal_launcher_input() {
++        let args = parse(&[
++            "--validate",
++            "--appearance-profile",
++            "/tmp/my profile.json",
++            "-i",
++            "hello",
++        ])
++        .unwrap();
++        assert!(args.validate);
++        assert_eq!(args.input.as_deref(), Some("hello"));
++        assert_eq!(
++            args.appearance_profile,
++            Some(PathBuf::from("/tmp/my profile.json"))
++        );
++        assert!(parse(&[]).unwrap().appearance_profile.is_none());
++    }
++
++    #[test]
++    fn missing_and_ambiguous_profile_paths_fail_closed() {
++        for args in [
++            vec!["--appearance-profile"],
++            vec!["--appearance-profile", ""],
++            vec!["--appearance-profile", "--validate"],
++            vec!["--appearance-profile", "a", "--appearance-profile", "b"],
++        ] {
++            assert!(parse(&args).is_err());
++        }
++        assert!(parse(&["--input"]).is_err());
++    }
++}
+diff --git a/crates/app/src/main.rs b/crates/app/src/main.rs
+--- a/crates/app/src/main.rs
++++ b/crates/app/src/main.rs
+@@ -7,6 +7,7 @@
+ //!   gpuishell              - Start the shell or open launcher if already running
+ //!   gpuishell --input "x"  - Open launcher with prefilled input
+ //!   gpuishell --validate   - Check the config files and exit
++//!   gpuishell --appearance-profile FILE - Apply a cosmetic snapshot at startup
+ 
+ use crate::ipc::IpcSubscriber;
+ use assets::Assets;
+@@ -45,14 +46,49 @@
+     // Parse command-line arguments
+     let args = args::Args::parse();
+ 
++    // Explicit opt-in only; reject malformed input before IPC or display setup.
++    // This is a startup snapshot, not a live service or credential transport.
++    let appearance = match args
++        .appearance_profile
++        .as_deref()
++        .map(config::appearance::AppearanceProfile::load)
++        .transpose()
++    {
++        Ok(profile) => profile,
++        Err(error) => {
++            eprintln!("Appearance profile rejected: {error:#}");
++            std::process::exit(1);
++        }
++    };
++    let appearance_theme = match appearance
++        .as_ref()
++        .map(|profile| profile.project_theme(&ui::Theme::default()))
++        .transpose()
++    {
++        Ok(theme) => theme,
++        Err(error) => {
++            eprintln!("Appearance token projection failed: {error:#}");
++            std::process::exit(1);
++        }
++    };
++
+     // Before the single-instance check: a running shell must not swallow this.
+     if args.validate {
++        if let Some(profile) = &appearance {
++            println!("{}", profile.report());
++        }
+         std::process::exit(if config::validate() { 0 } else { 1 });
+     }
+ 
+     // Try to acquire single-instance lock or signal existing instance.
+     // Secondary path exits immediately after signaling the primary instance.
+     let Some(ipc) = IpcSubscriber::init(&args) else {
++        if appearance.is_some() {
++            eprintln!(
++                "Appearance profile was NOT applied; startup-only import requires an available primary shell instance."
++            );
++            std::process::exit(1);
++        }
+         return;
+     };
+ 
+@@ -81,6 +117,13 @@
+     let app = application().with_assets(Assets {});
+     app.run(move |cx| {
+         config::Config::init(cx);
++        if let Some(mut theme) = appearance_theme {
++            theme.font_size = ui::Theme::global(cx).font_size;
++            ui::Theme::set(theme, cx);
++            if let Some(profile) = &appearance {
++                tracing::info!("{}", profile.report());
++            }
++        }
+         // Registers the TextField / Menu keybindings the component set needs.
+         ui::init(cx);
+         state::AppState::init(services, cx);
+diff --git a/crates/app/src/config/mod.rs b/crates/app/src/config/mod.rs
+--- a/crates/app/src/config/mod.rs
++++ b/crates/app/src/config/mod.rs
+@@ -1,5 +1,6 @@
+ //! Application configuration stored as a GPUI global.
+ 
++pub mod appearance;
+ mod persistence;
+ mod state;
+ mod theme;
+diff --git a/crates/app/src/ipc/service.rs b/crates/app/src/ipc/service.rs
+--- a/crates/app/src/ipc/service.rs
++++ b/crates/app/src/ipc/service.rs
+@@ -46,6 +46,10 @@
+         match Self::acquire(args) {
+             AcquireResult::Primary(subscriber) => Some(subscriber),
+             AcquireResult::Secondary => None,
++            AcquireResult::Error(err) if args.appearance_profile.is_some() => {
++                error!("Appearance startup refused: {err}");
++                None
++            }
+             AcquireResult::Error(err) => {
+                 error!("IPC service error: {}", err);
+                 warn!("Retrying IPC acquire without initial input");
+@@ -53,6 +57,7 @@
+                 let retry_args = Args {
+                     input: None,
+                     validate: false,
++                    appearance_profile: None,
+                 };
+                 match Self::acquire(&retry_args) {
+                     AcquireResult::Primary(subscriber) => Some(subscriber),
+@@ -84,6 +89,11 @@
+ 
+         // Try to connect to existing instance (fast, synchronous path)
+         if let Ok(mut stream) = UnixStream::connect(&path) {
++            if args.appearance_profile.is_some() {
++                return AcquireResult::Error(
++                    "a shell is already running; appearance profiles are startup-only and were not sent over IPC".into(),
++                );
++            }
+             // Set a short timeout for the write
+             let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(100)));
+ 
+diff --git a/crates/app/src/config/appearance.rs b/crates/app/src/config/appearance.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/app/src/config/appearance.rs
+@@ -0,0 +1,453 @@
++//! CyberManju cosmetic snapshot bridge. No network, credentials, config writes,
++//! compositor commands, wallpaper downloads or claims about the Asterinas runtime.
++
++use std::{collections::BTreeMap, fs::File, io::Read, path::Path};
++
++use anyhow::{Context, Result, ensure};
++use serde::{Deserialize, Serialize};
++use ui::{Base16Palette, Theme};
++
++const MAX_PROFILE_BYTES: u64 = 64 * 1024;
++const MAX_WALLPAPER_BYTES: u64 = 20 * 1024 * 1024;
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "kebab-case")]
++pub enum ThemeId {
++    OsDark,
++    OsLight,
++    OsGraphite,
++    PlasmaDark,
++    PlasmaLight,
++}
++
++impl ThemeId {
++    fn name(self) -> &'static str {
++        match self {
++            Self::OsDark => "os-dark",
++            Self::OsLight => "os-light",
++            Self::OsGraphite => "os-graphite",
++            Self::PlasmaDark => "plasma-dark",
++            Self::PlasmaLight => "plasma-light",
++        }
++    }
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum ShellStyle {
++    Macos,
++    Plasma,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum Density {
++    Compact,
++    Comfortable,
++}
++
++#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum Motion {
++    Auto,
++    Full,
++    Reduced,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct Settings {
++    pub theme: ThemeId,
++    pub shell: Option<ShellStyle>,
++    pub accent: Option<String>,
++    pub accents: BTreeMap<String, String>,
++    pub density: Density,
++    pub glass: u8,
++    pub motion: Motion,
++    pub follow_system: bool,
++    pub wallpaper: String,
++    pub glow: bool,
++}
++
++#[derive(Debug, Clone, Serialize, Deserialize)]
++#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
++pub enum Wallpaper {
++    Preset {
++        id: String,
++    },
++    Url {
++        url: String,
++    },
++    LocalFile {
++        name: String,
++        #[serde(rename = "mimeType")]
++        mime_type: String,
++        size: u64,
++    },
++}
++
++/// The original cosmetic preferences remain intact; only the supported token
++/// projection is applied. Never treat retained settings as an applied desktop.
++#[derive(Debug, Clone, Serialize, Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct AppearanceProfile {
++    schema: String,
++    version: u32,
++    pub settings: Settings,
++    pub shell_style: ShellStyle,
++    pub panel_docked: bool,
++    pub wallpaper: Wallpaper,
++}
++
++fn valid_preset(id: &str) -> bool {
++    matches!(id, "slopes-dark" | "slopes-light" | "dunes")
++}
++
++fn valid_hex(hex: &str) -> bool {
++    matches!(hex.len(), 4 | 7)
++        && hex.starts_with('#')
++        && hex.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
++}
++
++impl AppearanceProfile {
++    /// Read no more than 64 KiB plus a sentinel byte, even if the file grows
++    /// between metadata and reading. Local wallpaper contents are not in v1.
++    pub fn load(path: &Path) -> Result<Self> {
++        ensure!(path.is_file(), "appearance profile must be a regular file");
++        let file = File::open(path).context("cannot open appearance profile")?;
++        ensure!(
++            file.metadata()?.is_file(),
++            "appearance profile is not a regular file"
++        );
++        let mut bytes = Vec::new();
++        file.take(MAX_PROFILE_BYTES + 1).read_to_end(&mut bytes)?;
++        Self::parse(&bytes)
++    }
++
++    pub fn parse(bytes: &[u8]) -> Result<Self> {
++        ensure!(
++            bytes.len() as u64 <= MAX_PROFILE_BYTES,
++            "appearance profile exceeds 64 KiB"
++        );
++        let profile: Self =
++            serde_json::from_slice(bytes).context("invalid appearance profile JSON")?;
++        ensure!(
++            profile.schema == "com.cybermanju.appearance",
++            "unsupported appearance schema"
++        );
++        ensure!(profile.version == 1, "unsupported appearance version");
++        ensure!(profile.settings.glass <= 3, "invalid glass level");
++        ensure!(
++            valid_preset(&profile.settings.wallpaper),
++            "unknown wallpaper preset"
++        );
++        ensure!(
++            profile
++                .settings
++                .shell
++                .is_none_or(|s| s == profile.shell_style),
++            "conflicting shell preferences"
++        );
++        if let Some(accent) = &profile.settings.accent {
++            ensure!(valid_hex(accent), "invalid global accent");
++        }
++        ensure!(
++            profile.settings.accents.len() <= 5,
++            "too many theme accents"
++        );
++        for (id, accent) in &profile.settings.accents {
++            ensure!(
++                matches!(
++                    id.as_str(),
++                    "os-dark" | "os-light" | "os-graphite" | "plasma-dark" | "plasma-light"
++                ),
++                "unknown accent theme"
++            );
++            ensure!(valid_hex(accent), "invalid per-theme accent");
++        }
++        match &profile.wallpaper {
++            Wallpaper::Preset { id } => {
++                ensure!(valid_preset(id), "unknown wallpaper preset");
++                ensure!(
++                    id == &profile.settings.wallpaper,
++                    "conflicting wallpaper presets"
++                );
++            }
++            Wallpaper::Url { url } => {
++                ensure!(
++                    url.len() <= 8192 && url.trim() == url && !url.chars().any(char::is_control),
++                    "invalid wallpaper URL text"
++                );
++                let parsed = url::Url::parse(url).context("invalid wallpaper URL")?;
++                ensure!(
++                    matches!(parsed.scheme(), "http" | "https") && parsed.host_str().is_some(),
++                    "wallpaper URL requires HTTP(S) and a host"
++                );
++                ensure!(
++                    parsed.username().is_empty() && parsed.password().is_none(),
++                    "wallpaper URL must not contain credentials"
++                );
++            }
++            Wallpaper::LocalFile {
++                name,
++                mime_type,
++                size,
++            } => {
++                ensure!(
++                    !name.is_empty()
++                        && name.len() <= 255
++                        && !name.contains(['/', '\\'])
++                        && !name.chars().any(char::is_control),
++                    "wallpaper filename must be a bounded basename"
++                );
++                ensure!(
++                    matches!(
++                        mime_type.as_str(),
++                        "image/avif"
++                            | "image/gif"
++                            | "image/jpg"
++                            | "image/jpeg"
++                            | "image/png"
++                            | "image/webp"
++                    ),
++                    "unsupported wallpaper MIME type"
++                );
++                ensure!(
++                    *size > 0 && *size <= MAX_WALLPAPER_BYTES,
++                    "invalid wallpaper file size"
++                );
++            }
++        }
++        Ok(profile)
++    }
++
++    /// Project only the supported semantic color palette. Geometry, density,
++    /// compositor policy and the media-query/system follower are NOT emulated.
++    pub fn project_theme(&self, current: &Theme) -> Result<Theme> {
++        let (bg, surface, raised, muted, text, built_in_accent) = match self.settings.theme {
++            ThemeId::OsDark => (
++                "#000000", "#0B0B0D", "#161618", "#929298", "#F5F5F7", "#0A84FF",
++            ),
++            ThemeId::OsLight => (
++                "#ECECEC", "#FFFFFF", "#F5F5F7", "#636369", "#1D1D1F", "#007AFF",
++            ),
++            ThemeId::OsGraphite => (
++                "#000000", "#101012", "#17171A", "#929298", "#F5F5F7", "#8E8E93",
++            ),
++            ThemeId::PlasmaDark => (
++                "#1b1e20", "#232629", "#2a2e32", "#bdc3c7", "#eff0f1", "#3daee9",
++            ),
++            ThemeId::PlasmaLight => (
++                "#dcdfe3", "#fcfcfc", "#f4f5f6", "#4d5559", "#232629", "#178dc2",
++            ),
++        };
++        let accent = self
++            .settings
++            .accent
++            .as_deref()
++            .or_else(|| {
++                self.settings
++                    .accents
++                    .get(self.settings.theme.name())
++                    .map(String::as_str)
++            })
++            .unwrap_or(built_in_accent);
++        // Base16 is the shell's native semantic representation, not an exact
++        // clone of the Vue chrome. Keep typography, replace color overrides so
++        // an old native accent cannot silently defeat the imported preference.
++        let palette = Base16Palette::from_hex(&[
++            bg, surface, raised, muted, muted, text, text, text, "#da4453", "#f67400", "#FF9F0A",
++            "#27ae60", "#64D2FF", accent, "#AF52DE", "#bdc3c7",
++        ])?;
++        let mut theme = Theme::from_palette(
++            format!("CyberManju {}", self.settings.theme.name()),
++            palette,
++        );
++        theme.font_size = current.font_size;
++        Ok(theme)
++    }
++
++    pub fn report(&self) -> String {
++        let mut retained = vec![
++            "wallpaper",
++            "shellStyle",
++            "panelDocked",
++            "density",
++            "glass",
++            "motion",
++            "glow",
++        ];
++        if self.settings.follow_system {
++            retained.push("followSystem (snapshot theme only)");
++        }
++        format!(
++            "CyberManju appearance v1: theme={} and accent token projection; retained, NOT applied: {}. No live sync or Asterinas/GPU certification.",
++            self.settings.theme.name(),
++            retained.join(", ")
++        )
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use serde_json::{Value, json};
++
++    fn fixture() -> Value {
++        json!({"schema":"com.cybermanju.appearance","version":1,
++            "settings":{"theme":"os-dark","accent":null,"accents":{},"density":"compact","glass":2,"motion":"reduced","followSystem":false,"wallpaper":"slopes-dark","glow":false},
++            "shellStyle":"macos","panelDocked":true,"wallpaper":{"kind":"preset","id":"slopes-dark"}})
++    }
++    fn parse(value: Value) -> Result<AppearanceProfile> {
++        AppearanceProfile::parse(&serde_json::to_vec(&value).unwrap())
++    }
++
++    #[test]
++    fn shared_vue_export_fixture_projects_through_the_native_gpui_theme() {
++        let profile = AppearanceProfile::parse(include_bytes!(
++            "appearance/fixtures/appearance-profile-v1.json"
++        ))
++        .unwrap();
++        assert_eq!(profile.version, 1);
++        let theme = profile.project_theme(&Theme::default()).unwrap();
++        assert_eq!(theme.colors().accent, theme.palette.base0d);
++        assert!(profile.report().contains("NOT applied"));
++    }
++
++    #[test]
++    fn preserves_all_preferences_without_claiming_unsupported_application() {
++        let value = fixture();
++        let profile = parse(value.clone()).unwrap();
++        let encoded = serde_json::to_value(&profile).unwrap();
++        for key in ["settings", "shellStyle", "panelDocked", "wallpaper"] {
++            if key == "settings" {
++                for (name, expected) in value[key].as_object().unwrap() {
++                    assert_eq!(&encoded[key][name], expected);
++                }
++            } else {
++                assert_eq!(encoded[key], value[key]);
++            }
++        }
++        assert!(profile.report().contains("retained, NOT applied"));
++        assert!(profile.report().contains("No live sync"));
++    }
++
++    #[test]
++    fn actual_gpui_theme_uses_global_then_per_theme_then_builtin_accent() {
++        let base = Theme::default();
++        let builtin = parse(fixture()).unwrap().project_theme(&base).unwrap();
++        let mut value = fixture();
++        value["settings"]["accents"] = json!({"os-dark":"#ff0000","os-light":"#00ff00"});
++        let per_theme = parse(value.clone()).unwrap().project_theme(&base).unwrap();
++        assert_ne!(builtin.colors().accent, per_theme.colors().accent);
++        value["settings"]["accent"] = json!("#0000ff");
++        let global = parse(value).unwrap().project_theme(&base).unwrap();
++        assert_ne!(global.colors().accent, per_theme.colors().accent);
++        assert_eq!(global.font_size, base.font_size);
++        assert_eq!(
++            global.colors().accent,
++            Base16Palette::from_hex(&["#0000ff"; 16]).unwrap().base0d
++        );
++    }
++
++    #[test]
++    fn all_five_app_themes_project_real_light_or_dark_tokens() {
++        for (id, dark) in [
++            ("os-dark", true),
++            ("os-light", false),
++            ("os-graphite", true),
++            ("plasma-dark", true),
++            ("plasma-light", false),
++        ] {
++            let mut value = fixture();
++            value["settings"]["theme"] = json!(id);
++            let theme = parse(value)
++                .unwrap()
++                .project_theme(&Theme::default())
++                .unwrap();
++            assert_eq!(theme.appearance().is_dark(), dark, "{id}");
++            assert_eq!(theme.colors().accent, theme.palette.base0d);
++        }
++    }
++
++    #[test]
++    fn rejects_unknown_fields_versions_bad_types_and_conflicting_preferences() {
++        for (path, invalid) in [
++            (vec!["version"], json!(2)),
++            (vec!["schema"], json!("foreign")),
++            (vec!["settings", "glass"], json!(4)),
++            (vec!["settings", "theme"], json!("foreign")),
++            (vec!["settings", "density"], json!("dense")),
++            (vec!["settings", "accent"], json!("red")),
++            (vec!["settings", "accents"], json!({"foreign":"#ffffff"})),
++            (vec!["settings", "shell"], json!("plasma")),
++            (vec!["settings", "wallpaper"], json!("unknown")),
++            (vec!["panelDocked"], json!("1")),
++            (vec!["serverUrl"], json!("https://private.invalid")),
++            (vec!["settings", "apiKey"], json!("must-not-be-exported")),
++            (vec!["wallpaper", "token"], json!("must-not-be-exported")),
++        ] {
++            let mut value = fixture();
++            if path.len() == 1 {
++                value[path[0]] = invalid;
++            } else {
++                value[path[0]][path[1]] = invalid;
++            }
++            assert!(parse(value).is_err(), "{path:?}");
++        }
++    }
++
++    #[test]
++    fn wallpaper_metadata_is_validated_but_never_fetched_or_applied() {
++        for url in [
++            "https://example.invalid/picture.png",
++            "http://[::1]/picture",
++        ] {
++            let mut value = fixture();
++            value["wallpaper"] = json!({"kind":"url","url":url});
++            assert!(parse(value).is_ok());
++        }
++        for url in [
++            "file:///tmp/a",
++            "blob:https://example.invalid/id",
++            "data:image/png;base64,AAAA",
++            "https://user:pass@example.invalid/a",
++            "https://:pass@example.invalid/a",
++            "https://example.invalid/\nsecret",
++            "/relative",
++            "https://",
++        ] {
++            let mut value = fixture();
++            value["wallpaper"] = json!({"kind":"url","url":url});
++            assert!(parse(value).is_err(), "unsafe metadata was accepted");
++        }
++        let mut value = fixture();
++        value["wallpaper"] =
++            json!({"kind":"local-file","name":"wallpaper.png","mimeType":"image/png","size":42});
++        let profile = parse(value.clone()).unwrap();
++        assert!(profile.report().contains("wallpaper"));
++        for field in ["path", "blob", "data"] {
++            let mut extra = value.clone();
++            extra["wallpaper"][field] = json!("not-an-asset-transfer");
++            assert!(parse(extra).is_err());
++        }
++        for name in ["../wallpaper.png", "C:\\wallpaper.png", "", "control\n.png"] {
++            let mut extra = value.clone();
++            extra["wallpaper"]["name"] = json!(name);
++            assert!(parse(extra).is_err());
++        }
++        for size in [0, MAX_WALLPAPER_BYTES + 1] {
++            let mut extra = value.clone();
++            extra["wallpaper"]["size"] = json!(size);
++            assert!(parse(extra).is_err());
++        }
++    }
++
++    #[test]
++    fn rejects_unbounded_or_duplicate_top_level_input() {
++        assert!(AppearanceProfile::parse(&vec![b' '; MAX_PROFILE_BYTES as usize + 1]).is_err());
++        let json = serde_json::to_string(&fixture()).unwrap();
++        let duplicate = json.replacen("{", "{\"version\":1,", 1);
++        assert!(AppearanceProfile::parse(duplicate.as_bytes()).is_err());
++    }
++}
+diff --git a/crates/app/src/config/appearance/fixtures/appearance-profile-v1.json b/crates/app/src/config/appearance/fixtures/appearance-profile-v1.json
+new file mode 100644
+--- /dev/null
++++ b/crates/app/src/config/appearance/fixtures/appearance-profile-v1.json
+@@ -0,0 +1,25 @@
++{
++  "schema": "com.cybermanju.appearance",
++  "version": 1,
++  "settings": {
++    "theme": "os-graphite",
++    "accent": "#abcdef",
++    "accents": {
++      "plasma-light": "#123456",
++      "os-dark": "#aa11bb"
++    },
++    "density": "compact",
++    "glass": 0,
++    "motion": "reduced",
++    "followSystem": false,
++    "wallpaper": "dunes",
++    "glow": false,
++    "shell": "plasma"
++  },
++  "shellStyle": "plasma",
++  "panelDocked": true,
++  "wallpaper": {
++    "kind": "preset",
++    "id": "dunes"
++  }
++}
+diff --git a/scripts/test_appearance_profile.py b/scripts/test_appearance_profile.py
+new file mode 100644
+--- /dev/null
++++ b/scripts/test_appearance_profile.py
+@@ -0,0 +1,115 @@
++#!/usr/bin/env python3
++"""Exercise the real GPUI binary's cosmetic snapshot boundary, never GPU acceptance."""
++import json
++import os
++from pathlib import Path
++import socket
++import subprocess
++import tempfile
++import unittest
++
++ROOT = Path(__file__).resolve().parents[1]
++FIXTURE = ROOT / 'crates/app/src/config/appearance/fixtures/appearance-profile-v1.json'
++BINARY = Path(os.environ.get('GPUI_SHELL_TEST_BINARY', str(ROOT / 'target/debug/gpuishell'))).resolve()
++
++
++class AppearanceCliTests(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        if not BINARY.is_file() or not FIXTURE.is_file():
++            raise RuntimeError('A real built shell and the shared app-export fixture are required')
++        cls.fixture = json.loads(FIXTURE.read_text())
++
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(prefix='gpui-appearance-cli-')
++        self.addCleanup(self.temp.cleanup)
++        self.directory = Path(self.temp.name)
++        self.runtime = self.directory / 'runtime'
++        self.runtime.mkdir(mode=0o700)
++        self.config = self.directory / 'config'
++        self.config.mkdir()
++        self.profile = self.directory / 'appearance.json'
++        self.profile.write_text(json.dumps(self.fixture))
++        self.env = dict(os.environ, XDG_RUNTIME_DIR=str(self.runtime), XDG_CONFIG_HOME=str(self.config))
++        self.env.pop('WAYLAND_DISPLAY', None)
++        self.env.pop('DISPLAY', None)
++
++    def run_shell(self, *args):
++        return subprocess.run([str(BINARY), *args], env=self.env, stdin=subprocess.DEVNULL,
++                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=20)
++
++    def test_shared_app_export_validates_without_wayland_or_mutating_preferences(self):
++        before = self.profile.read_bytes()
++        result = self.run_shell('--validate', '--appearance-profile', str(self.profile))
++        self.assertEqual(result.returncode, 0, result.stdout)
++        self.assertIn('CyberManju appearance v1:', result.stdout)
++        self.assertIn('retained, NOT applied:', result.stdout)
++        self.assertIn('No live sync or Asterinas/GPU certification', result.stdout)
++        self.assertEqual(before, self.profile.read_bytes())
++        self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++        self.assertEqual(list(self.config.rglob('*.toml')), [])
++
++    def test_invalid_profiles_fail_before_wayland_or_ipc(self):
++        cases = []
++        for key, value in [('version', 2), ('serverUrl', 'https://private.invalid')]:
++            profile = dict(self.fixture)
++            profile[key] = value
++            cases.append(profile)
++        profile = dict(self.fixture)
++        profile['wallpaper'] = {'kind': 'url', 'url': 'https://user:password@example.invalid/picture'}
++        cases.append(profile)
++        for case in cases:
++            with self.subTest(case_keys=list(case)):
++                self.profile.write_text(json.dumps(case))
++                result = self.run_shell('--appearance-profile', str(self.profile))
++                self.assertNotEqual(result.returncode, 0)
++                self.assertIn('Appearance profile rejected:', result.stdout)
++                self.assertNotIn('requires WAYLAND_DISPLAY', result.stdout)
++                self.assertNotIn('user:password', result.stdout)
++                self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++
++    def test_oversized_file_is_rejected(self):
++        self.profile.write_bytes(b' ' * (64 * 1024 + 1))
++        result = self.run_shell('--validate', '--appearance-profile', str(self.profile))
++        self.assertNotEqual(result.returncode, 0)
++        self.assertIn('exceeds 64 KiB', result.stdout)
++
++    def test_secondary_profile_refused_without_sending_launcher_or_claiming_import(self):
++        path = self.runtime / 'gpuishell.sock'
++        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
++            server.bind(str(path))
++            server.listen(2)
++            server.settimeout(2)
++            result = self.run_shell('--appearance-profile', str(self.profile))
++            connection, _ = server.accept()
++            with connection:
++                connection.settimeout(2)
++                self.assertEqual(connection.recv(4096), b'')
++            self.assertNotEqual(result.returncode, 0, result.stdout)
++            self.assertIn('NOT applied', result.stdout)
++            self.assertTrue(path.exists())
++
++    def test_ordinary_secondary_launcher_still_sends_existing_ipc_command(self):
++        path = self.runtime / 'gpuishell.sock'
++        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
++            server.bind(str(path))
++            server.listen(2)
++            server.settimeout(2)
++            result = self.run_shell('--input', 'unchanged launcher')
++            connection, _ = server.accept()
++            with connection:
++                connection.settimeout(2)
++                payload = connection.recv(4096)
++            self.assertEqual(result.returncode, 0, result.stdout)
++            self.assertIn(b'unchanged launcher', payload)
++            self.assertTrue(path.exists())
++
++    def test_existing_config_validation_does_not_require_a_profile(self):
++        result = self.run_shell('--validate')
++        self.assertEqual(result.returncode, 0, result.stdout)
++        self.assertNotIn('CyberManju appearance v1:', result.stdout)
++        self.assertFalse((self.runtime / 'gpuishell.sock').exists())
++
++
++if __name__ == '__main__':
++    unittest.main()
+diff --git a/docs/src/content/docs/developer/cybermanju-appearance.md b/docs/src/content/docs/developer/cybermanju-appearance.md
+new file mode 100644
+--- /dev/null
++++ b/docs/src/content/docs/developer/cybermanju-appearance.md
+@@ -0,0 +1,50 @@
++---
++title: CyberManju appearance snapshots
++description: An opt-in bridge from existing Vue preferences to GPUI color tokens, with unsupported settings disclosed.
++---
++
++## What the bridge actually does
++
++The CyberManju app retains its existing personalization controls and stores. Its Settings appearance section can export a versioned **cosmetic snapshot**. GPUi Shell now reads that file with `--appearance-profile FILE`, validates it before IPC/display initialization, and projects its theme and accent into the real GPUI `Theme` global before opening the shell windows. No settings service, new preference database, compositor, GPU device, or browser transport is introduced.
++
++This is a startup-only import. Supply the file again after restarting the shell. A running primary shell cannot receive profiles through the launcher IPC: the secondary invocation exits unsuccessfully and explicitly says the profile was **not applied**, without sending a launcher command. `--validate` remains available even when a shell is running, without Wayland or a renderer.
++
++```sh
++# Export from CyberManju Settings, then inspect without a display:
++gpuishell --validate --appearance-profile /path/to/cybermanju-appearance-v1.json
++
++# With no primary shell running, on an otherwise supported Wayland session:
++gpuishell --appearance-profile /path/to/cybermanju-appearance-v1.json
++```
++
++No Tauri/Vue process has been made native to Asterinas by this change. Linux-host parser/build tests are not proof that GPUI runs on Asterinas. The older `/workspace/cybermanju-shell` snapshot does not acquire these changes automatically.
++
++## Version 1 and ownership
++
++The only accepted schema is `com.cybermanju.appearance`, version `1`. The top-level fields are `schema`, `version`, `settings`, `shellStyle`, `panelDocked`, and `wallpaper`. Unknown fields are rejected rather than used as a general settings or credential channel.
++
++`settings` contains the existing resolved canonical theme, optional legacy shell preference, global accent, per-theme accents, density, glass level, motion, follow-system flag, preset wallpaper identifier and glow flag. Five themes are accepted: `os-dark`, `os-light`, `os-graphite`, `plasma-dark`, and `plasma-light`. Legacy aliases/auto are resolved by the app's existing settings normalization before export; `followSystem` is retained but GPUI does not watch Vue/browser system-preference events. Both `#RGB` and `#RRGGBB` accents are supported, with the existing global → per-theme → built-in precedence.
++
++GPUI applies a semantic native Base16 palette and accent, **not an exact reproduction of Vue chrome**. Its existing font size is preserved; old native color overrides cannot defeat the explicitly imported colors. No `config.toml`, `state.toml`, `theme.toml`, localStorage or IndexedDB settings are rewritten by the importer. Later deliberate native theme/config changes follow the existing shell behavior; there is no live synchronization with the snapshot file or the CyberManju app.
++
++Wallpaper, shell style, panel docking, density, glass, motion and glow are retained in the snapshot and explicitly reported as **not applied**. Live follow-system tracking is also unavailable. Geometry, theme-owned accent variants not currently selected, app keybindings/gestures/locale, and compositor workspace policy are not silently translated into invented native controls.
++
++## Wallpaper and bounded input
++
++A wallpaper descriptor is one of:
++
++- `preset`: a known preset identifier matching `settings.wallpaper`.
++- `url`: an HTTP(S) URL with a host, no username/password, no control characters or leading/trailing whitespace, at most 8192 UTF-8 bytes.
++- `local-file`: basename, supported image MIME type and nonzero size at most 20 MiB. No file contents, absolute path, object URL or blob is exported or loaded.
++
++The native loader requires a regular file and reads at most 64 KiB plus a sentinel byte before rejecting oversized input. It does not fetch URLs, read wallpaper files, migrate IndexedDB blobs or manufacture an image where one is missing. Local wallpaper migration and per-install permission checks remain separate work.
++
++## Real tests and open dependencies
++
++`cargo test --workspace --locked --offline` exercises the native parser, shared app-export fixture, five real palette projections, accent precedence, preference retention, unknown-field/version/type/conflict rejection and wallpaper bounds. It also preserves the existing IPC and presentation parser/lifecycle tests.
++
++After building `gpuishell`, `python3 scripts/test_appearance_profile.py -v` runs the actual binary against isolated configuration/runtime directories and real Unix sockets. It verifies renderer-free validation, oversized/unsafe profile refusal, no preference writes, secondary import refusal and unchanged ordinary launcher IPC. These are parser/CLI tests, not a compositor or GPU benchmark.
++
++The shared fixture is `crates/app/src/config/appearance/fixtures/appearance-profile-v1.json`, copied byte-for-byte from the app repository's `tests/fixtures/appearance-profile-v1.json`; keep both synchronized when deliberately evolving the contract.
++
++Asterinas boot/userspace ABI → native per-GPU driver and Vulkan → Wayland compositor/presentation → GPUI runtime → Tauri/GTK/WebKit runtime and secure app/API boundary remain independently unproven gates. Full appearance propagation, media migration, restart/restore and physical-GPU performance must not be inferred from successful profile validation.

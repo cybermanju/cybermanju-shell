@@ -1,0 +1,42 @@
+{
+  "suites": {
+    "native-nvidia-nvport-tests.log": {
+      "reported_passed": 20,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-nvidia-platform-tests.log": {
+      "reported_passed": 13,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-ostd-tests.log": {
+      "reported_passed": 256,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-pci-iommu-tests.log": {
+      "reported_passed": 13,
+      "failed": 0,
+      "filtered": 0
+    },
+    "native-pci-tests.log": {
+      "reported_passed": 13,
+      "failed": 0,
+      "filtered": 0
+    }
+  },
+  "reported_passed": 315,
+  "explicitly_skipped_bodies": [
+    "test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] ok",
+    "test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] ok",
+    " [skipped: VMX/EPT invalidation unavailable] ok"
+  ],
+  "new_owner_hardware_exercised": false,
+  "physical_gpu_benchmark": false,
+  "native_runner_exit": 0,
+  "completion_job": "job_s1XLuEbf",
+  "canonical_patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-interrupt-worker.patch",
+  "patch_sha256": "fc2006ec5afaaa9eff644d245b497418a4e5114c643953f8aae819d1dcbfec3c",
+  "notes": "Fresh masked MSI-X acquisition is enforced by resource-owner constructor. Actual device-source quiescence and RM/GSP remain unimplemented hardware-dependent work."
+}

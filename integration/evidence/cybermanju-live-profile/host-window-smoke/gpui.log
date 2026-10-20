@@ -1,0 +1,46 @@
+[2m2026-10-20T21:12:03.369121Z[0m [32m INFO[0m [2mgpuishell::ipc::service[0m[2m:[0m Prepared as primary instance, socket at "/tmp/gpui-host-profile-52sovqt4/runtime/gpuishell.sock"
+[2m2026-10-20T21:12:03.369974Z[0m [32m INFO[0m [2mservices::compositor[0m[2m:[0m Detected compositor backend: Niri
+[2m2026-10-20T21:12:03.900462Z[0m [32m INFO[0m [2mgpuishell::state[0m[2m:[0m Connected to the compositor in 530.50586ms
+[2m2026-10-20T21:12:03.900585Z[0m [32m INFO[0m [2mservices::compositor::niri[0m[2m:[0m Starting Niri event listener
+[2m2026-10-20T21:12:04.093214Z[0m [32m INFO[0m [2mgpuishell[0m[2m:[0m CyberManju appearance v1: theme=os-dark and accent token projection; retained, NOT applied: wallpaper, shellStyle, panelDocked, density, glass, motion, glow. Explicit live-file import requires --watch-appearance-profile; no automatic app sync or Asterinas/GPU certification.
+[2m2026-10-20T21:12:04.096226Z[0m [32m INFO[0m [2mservices::mpris[0m[2m:[0m MPRIS subscriber started
+[2m2026-10-20T21:12:04.096694Z[0m [31mERROR[0m [2mservices::audio[0m[2m:[0m Failed to connect to PulseAudio: PAErr(-1)
+[2m2026-10-20T21:12:04.098048Z[0m [32m INFO[0m [2mservices::tray::dbus[0m[2m:[0m Acquired bus name: org.kde.StatusNotifierWatcher
+[2m2026-10-20T21:12:04.098184Z[0m [33m WARN[0m [1m{}[0m[1m{[0m[3mtask_name[0m[2m=[0m"org.freedesktop.portal.Settings proxy caching"[1m}[0m[2m:[0m [2mzbus::proxy[0m[2m:[0m Failed to populate properties cache via GetAll: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.portal.Desktop was not provided by any .service files. Property change streams will not produce values.
+[2m2026-10-20T21:12:04.098391Z[0m [33m WARN[0m [1m{}[0m[1m{[0m[3mtask_name[0m[2m=[0m"org.freedesktop.NetworkManager proxy caching"[1m}[0m[2m:[0m [2mzbus::proxy[0m[2m:[0m Failed to populate properties cache via GetAll: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files. Property change streams will not produce values.
+[2m2026-10-20T21:12:04.102115Z[0m [32m INFO[0m [2mservices::tray[0m[2m:[0m Tray service started with 0 items
+[2m2026-10-20T21:12:04.101253Z[0m [31mERROR[0m [2mservices::upower[0m[2m:[0m Failed to initialize UPower data: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[2m2026-10-20T21:12:04.102282Z[0m [31mERROR[0m [2mservices::bluetooth[0m[2m:[0m Failed to fetch initial bluetooth data: org.freedesktop.DBus.Error.ServiceUnknown: The name org.bluez was not provided by any .service files
+[2m2026-10-20T21:12:04.102496Z[0m [31mERROR[0m [2mservices::network[0m[2m:[0m Failed to fetch initial network data: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files
+[2m2026-10-20T21:12:04.102801Z[0m [32m INFO[0m [2mservices::network[0m[2m:[0m Network subscriber started
+[2m2026-10-20T21:12:04.103641Z[0m [31mERROR[0m [2mservices::bluetooth[0m[2m:[0m Bluetooth listener error: org.freedesktop.DBus.Error.ServiceUnknown: The name org.bluez was not provided by any .service files
+[2m2026-10-20T21:12:04.104909Z[0m [33m WARN[0m [1m{}[0m[1m{[0m[3mtask_name[0m[2m=[0m"org.freedesktop.NetworkManager proxy caching"[1m}[0m[2m:[0m [2mzbus::proxy[0m[2m:[0m Failed to populate properties cache via GetAll: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files. Property change streams will not produce values.
+[2m2026-10-20T21:12:04.105111Z[0m [31mERROR[0m [2mservices::network[0m[2m:[0m Network listener error: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files
+[2m2026-10-20T21:12:04.167312Z[0m [33m WARN[0m [2mservices::brightness[0m[2m:[0m No backlight device found
+[2m2026-10-20T21:12:04.168444Z[0m [33m WARN[0m [2mservices::privacy[0m[2m:[0m Webcam device not found: /dev/video0
+[2m2026-10-20T21:12:04.169204Z[0m [33m WARN[0m [2mservices::wallpaper[0m[2m:[0m Failed to start awww daemon: No such file or directory (os error 2)
+[2m2026-10-20T21:12:04.169614Z[0m [32m INFO[0m [2mgpuishell::ipc::service[0m[2m:[0m Socket listener started at "/tmp/gpui-host-profile-52sovqt4/runtime/gpuishell.sock"
+[2m2026-10-20T21:12:04.170107Z[0m [32m INFO[0m [2mgpuishell::ipc[0m[2m:[0m IPC listener started
+[2m2026-10-20T21:12:04.178192Z[0m [31mERROR[0m [2mservices::privacy[0m[2m:[0m PipeWire listener error: Creation failed
+[2m2026-10-20T21:12:04.270469Z[0m [32m INFO[0m [2mgpuishell::bar::view[0m[2m:[0m Bar opened
+[2m2026-10-20T21:12:04.270582Z[0m [32m INFO[0m [2mgpuishell::bar::view[0m[2m:[0m Opening bar on 1 displays
+[2m2026-10-20T21:12:04.270599Z[0m [32m INFO[0m [2mgpuishell::bar::view[0m[2m:[0m Opening bar on display DisplayId(4)
+[2m2026-10-20T21:12:04.313728Z[0m [31mERROR[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m GENERAL [Loader Message (0x0)]
+	libVkLayer_MESA_device_select.so: cannot open shared object file: No such file or directory
+[2m2026-10-20T21:12:04.313841Z[0m [31mERROR[0m [2mwgpu_hal::vulkan::instance[0m[2m:[0m 	objects: (type: INSTANCE, hndl: 0x564fcfaa7200, name: ?)
+[2m2026-10-20T21:12:04.342545Z[0m [32m INFO[0m [2mwgpu_hal::vulkan::adapter[0m[2m:[0m Found 2 cooperative matrix configurations supported by wgpu
+[2m2026-10-20T21:12:04.344713Z[0m [32m INFO[0m [2mgpui_wgpu::wgpu_context[0m[2m:[0m Found 2 GPU adapter(s):
+[2m2026-10-20T21:12:04.344775Z[0m [32m INFO[0m [2mgpui_wgpu::wgpu_context[0m[2m:[0m   - llvmpipe (LLVM 21.1.8, 256 bits) (vendor=0x10005, device=0x0000, backend=Vulkan, type=Cpu)
+[2m2026-10-20T21:12:04.344792Z[0m [32m INFO[0m [2mgpui_wgpu::wgpu_context[0m[2m:[0m   - llvmpipe (LLVM 21.1.8, 256 bits) (vendor=0x10005, device=0x0000, backend=Gl, type=Cpu)
+[2m2026-10-20T21:12:04.344813Z[0m [32m INFO[0m [2mgpui_wgpu::wgpu_context[0m[2m:[0m Testing adapter: llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan)...
+[2m2026-10-20T21:12:04.409107Z[0m [32m INFO[0m [2mgpui_wgpu::wgpu_context[0m[2m:[0m Selected GPU (passed configuration test): llvmpipe (LLVM 21.1.8, 256 bits) (Vulkan)
+[2m2026-10-20T21:12:04.409303Z[0m [32m INFO[0m [2mgpui_wgpu::wgpu_context[0m[2m:[0m Selected GPU adapter: "llvmpipe (LLVM 21.1.8, 256 bits)" (Vulkan)
+[2m2026-10-20T21:12:04.698207Z[0m [32m INFO[0m [2mgpui_linux::linux::wayland::window[0m[2m:[0m Server-side decorations requested, but the Wayland server does not support them. Falling back to client-side decorations.
+[2m2026-10-20T21:12:04.698815Z[0m [32m INFO[0m [2mgpuishell::frame_telemetry[0m[2m:[0m GPUI_SHELL_RENDERER {"schema":1,"window":"AnyWindowHandle { id: WindowId(1v1), state_type: TypeId(0x29f8a8da46f9536cbf78abc0ee1508f6) }","api":"wgpu","backend":null,"backend_source":"upstream Selected GPU adapter log (GpuSpecs does not expose backend)","device":{"is_software_emulated":true,"device_name":"llvmpipe (LLVM 21.1.8, 256 bits)","driver_name":"llvmpipe","driver_info":"Mesa 26.1.5 (LLVM 21.1.8)"},"classification":"software_cpu","hardware_acceleration_verified":false,"physical_presentation_timestamps_available":false,"presentation_feedback_status":"unavailable_locked_gpui","presentation_feedback_reason":"no original-queue per-buffer-commit subscription; raw surface handles are insufficient","host_monitor_scanout_verified":false}
+[2m2026-10-20T21:12:04.698930Z[0m [33m WARN[0m [2mgpuishell::frame_telemetry[0m[2m:[0m GPUI renderer is software_cpu; this session is not physical-GPU performance evidence
+[2m2026-10-20T21:12:04.711334Z[0m [32m INFO[0m [2mgpui::window[0m[2m:[0m Accessibility activated
+[2m2026-10-20T21:12:04.853917Z[0m [32m INFO[0m [2mgpuishell::dock[0m[2m:[0m Dock opened
+[2m2026-10-20T21:12:05.153909Z[0m [32m INFO[0m [2mgpui_linux::linux::wayland::window[0m[2m:[0m Server-side decorations requested, but the Wayland server does not support them. Falling back to client-side decorations.
+[2m2026-10-20T21:12:05.154345Z[0m [32m INFO[0m [2mgpui::window[0m[2m:[0m Accessibility activated
+[2m2026-10-20T21:12:07.882651Z[0m [32m INFO[0m [2mgpui_linux::linux::wayland::window[0m[2m:[0m Server-side decorations requested, but the Wayland server does not support them. Falling back to client-side decorations.
+[2m2026-10-20T21:12:07.883262Z[0m [32m INFO[0m [2mgpui::window[0m[2m:[0m Accessibility activated

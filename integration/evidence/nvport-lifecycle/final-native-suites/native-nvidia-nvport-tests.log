@@ -1,0 +1,78 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+error: there is no argument named `text`
+  --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/diagnostics.rs:32:9
+   |
+32 |         ostd::early_println!("nvidia-nvport: {text}");
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: did you intend to capture a variable `text` from the surrounding scope?
+   = note: to avoid ambiguity, `format_args!` cannot capture variables when the format string is expanded from a macro
+   = note: this error originates in the macro `concat` which comes from the expansion of the macro `ostd::early_println` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: the item `Ordering` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/runtime.rs:271:41
+    |
+271 |     use core::sync::atomic::{AtomicU64, Ordering};
+    |                                         ^^^^^^^^
+...
+275 |     use super::*;
+    |         -------- the item `Ordering` is already imported here
+    |
+    = note: requested on the command line with `-W redundant-imports`
+
+warning: the item `AtomicU32` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:675:30
+    |
+675 |     use core::sync::atomic::{AtomicU32, Ordering};
+    |                              ^^^^^^^^^
+...
+679 |     use super::*;
+    |         -------- the item `AtomicU32` is already imported here
+
+warning: the item `Ordering` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:675:41
+    |
+675 |     use core::sync::atomic::{AtomicU32, Ordering};
+    |                                         ^^^^^^^^
+...
+679 |     use super::*;
+    |         -------- the item `Ordering` is already imported here
+
+warning: the item `irq` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:677:16
+    |
+677 |     use ostd::{irq, sync::WaitQueue, task::TaskOptions};
+    |                ^^^
+678 |
+679 |     use super::*;
+    |         -------- the item `irq` is already imported here
+
+warning: the item `WaitQueue` is imported redundantly
+   --> /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/src/sync.rs:677:21
+    |
+677 |     use ostd::{irq, sync::WaitQueue, task::TaskOptions};
+    |                     ^^^^^^^^^^^^^^^
+678 |
+679 |     use super::*;
+    |         -------- the item `WaitQueue` is already imported here
+
+warning: `ostd-nvidia-nvport` (lib) generated 6 warnings (1 duplicate)
+error: could not compile `ostd-nvidia-nvport` (lib) due to 1 previous error; 6 warnings emitted
+[Error]: Cargo build failed

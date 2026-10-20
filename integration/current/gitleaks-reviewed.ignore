@@ -1,0 +1,10 @@
+# Nine exact reviewed non-secret findings; no directory/rule-wide exclusions.
+cybermanju-app/crates/agent/src/redact.rs:private-key:28
+cybermanju-app/crates/agent/src/redact.rs:generic-api-key:205
+cybermanju-app/src/composables/useDock.ts:generic-api-key:23
+cybermanju-app/src/utils/redact.ts:private-key:24
+cybermanju-app/src/stores/app.ts:generic-api-key:373
+cybermanju-app/src/utils/speechCorrect.ts:generic-api-key:17
+cybermanju-app/tests/frontend/redact.test.ts:generic-api-key:22
+cybermanju-app/tests/frontend/redact.test.ts:generic-api-key:32
+cybermanju-app/tests/frontend/redact.test.ts:generic-api-key:51

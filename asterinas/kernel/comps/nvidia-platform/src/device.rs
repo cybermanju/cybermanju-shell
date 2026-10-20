@@ -99,6 +99,16 @@ impl<'a> NvidiaDeviceResources<'a> {
         self.registers.isolated_dma_context(mask)
     }
 
+    /// Reserves real MSI-X vectors masked, without enabling DMA or inventing RM callbacks.
+    /// The caller must register real device handlers before activation, and implement NVIDIA
+    /// hardware/worker quiescence before shutdown. This is not probe or RM/GSP success.
+    pub fn prepare_msix(
+        &self,
+        count: u16,
+    ) -> Result<aster_pci::msix_transaction::PciMsixGuard<'_>, ostd::Error> {
+        self.registers.prepare_msix(count)
+    }
+
     /// Read a register via the real bounded MMIO mapping.
     ///
     /// Do not call until NVIDIA's BAR firewall/power prerequisites have been satisfied.

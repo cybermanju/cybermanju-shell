@@ -1,0 +1,49 @@
+# Build artifacts
+target/
+dist/
+dist-wasm/
+*.db
+tantivy_index/
+
+# Tauri build artifacts (not needed for Docker)
+src-tauri/target/
+src-tauri/icons/32x32.png
+src-tauri/icons/128x128.png
+src-tauri/icons/128x128@2x.png
+src-tauri/icons/icon.icns
+src-tauri/icons/icon.ico
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation
+README.md
+ARCHITECTURE.md
+worklog.md
+LICENSE
+
+# Docker
+docker-compose.yml
+.dockerignore
+
+# Node (will be re-installed in container)
+node_modules/
+
+# Misc
+*.log
+tool-results/

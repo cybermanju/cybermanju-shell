@@ -1,0 +1,11 @@
+# Fontes desta etapa
+
+A lista oficial de releases NVIDIA foi aberta e ainda marca **615.78.08** como Latest, com tag no commit `1a82fbfda8f321b056eb3568850f9316c5e465c5`: https://github.com/NVIDIA/open-gpu-kernel-modules/releases . Não foi adotada uma versão presumida 360.x, nem substituída a fonte por outra release.
+
+A auditoria do código local dessa tag identificou a próxima fronteira real: `kernel-open/nvidia/nv-pci.c::nv_pci_probe_body` exige stack, `rm_wait_for_bar_firewall` e `rm_is_supported_pci_device` antes de admissão e recursos. Em `kernel-open/nvidia/nv.c::nv_start_device`, power/stacks, IRQs e filas de trabalho antecedem `rm_init_adapter`; os caminhos ISR/BH usam `rm_isr`/`rm_isr_bh` com estado e stacks por dispositivo vivos. Reservar MSI-X não fornece nenhum desses serviços nem constitui probe bem-sucedido.
+
+O novo `IrqLine::retire` tem contrato estritamente limitado: a exclusão pelo writer lock existente espera os leitores que executam callbacks; os captures são destruídos fora do lock; a referência ao número IRQ é retida permanentemente. Não há prova de drain APIC/IRTE cross-CPU, término de EOI ou workers assíncronos. Os números ativados não podem ser reciclados nesta implementação. Workers/DMA precisam de parada e drenagem reais pelo driver antes do shutdown da transação.
+
+A tentativa de desenhar um teste SMP determinístico encontrou uma limitação concreta: `TaskOptions` não expõe afinidade e o scheduler FIFO encaminha tarefas criadas para BSP; esperar outra tarefa no mesmo CPU com read guard não preemptível travaria. Nenhum teste SMP fictício ou flaky foi adicionado. A entrega física de MSI-X é testada separadamente por NVMe QEMU real, sem ser chamada de GPU NVIDIA.
+
+Firmware local extraído do instalador incompleto continua não autenticado e inadequado para GPU. Nenhum firmware foi carregado ou incluído no initramfs desta etapa. A próxima ponte RM ainda exige admissão/firewall/suporte reais, estado/power/stacks/IRQ/workers por dispositivo, callbacks de DMA específicos, firmware autenticado correspondente e inicialização GSP antes de ioctl/submissão/DRM/Vulkan/Wayland/GPUI acelerados. AMD precisa de backend próprio; infraestrutura comum não o implementa.

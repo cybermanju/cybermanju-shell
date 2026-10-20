@@ -1,0 +1,30 @@
+# CyberManju OS — Caddyfile (TLS terminator for the Docker build).
+#
+# The API server is cleartext HTTP by design (docs/SECURITY.md §2), so LAN and
+# WAN deployments terminate TLS here: Caddy obtains + renews the certificate
+# automatically, forces 80→443, sets HSTS + hardening headers, and caps
+# request bodies at the app's 100 MB API limit.
+#
+# Usage:
+#   DOMAIN=vault.example.com docker compose -f docker-compose.yml \
+#     -f docker-compose.tls.yml up -d
+{
+	email {$ACME_EMAIL:admin@example.com}
+}
+
+{$DOMAIN:vault.example.com} {
+	reverse_proxy cybermanju-os:3456
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+	}
+
+	# The API accepts bodies up to 100 MB — keep the proxy in step.
+	request_body {
+		max_size 100MB
+	}
+}

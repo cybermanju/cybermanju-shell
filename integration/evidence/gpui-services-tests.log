@@ -1,0 +1,40 @@
+warning: Git tree '/workspace/asterinas-gpui/gpui-shell' is dirty
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+trace: evaluation warning: nixfmt-rfc-style is now the same as pkgs.nixfmt which should be used instead.
+   Compiling services v0.1.0 (/workspace/asterinas-gpui/gpui-shell/crates/services)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.69s
+     Running unittests src/lib.rs (target/debug/deps/services-d59b59ab14b867b7)
+
+running 19 tests
+test applications::tests::matches_exact_startup_wm_class ... ok
+test applications::tests::falls_back_to_exec_basename_when_no_startup_wm_class ... ok
+test applications::tests::falls_back_to_desktop_filename_when_other_identifiers_do_not_match ... ok
+test applications::tests::search_indices_agrees_with_search ... ok
+test applications::tests::startup_wm_class_match_is_case_insensitive ... ok
+test applications::tests::no_match_returns_none ... ok
+test lifecycle::tests::stop_and_restart_invalidate_the_previous_run ... ok
+test notification::tests::a_local_slot_holds_a_single_sticky_notification ... ok
+test notification::tests::decodes_lowercase_hex ... ok
+test notification::tests::clearing_a_slot_leaves_every_other_notification_alone ... ok
+test notification::tests::decodes_utf8_sequence ... ok
+test notification::tests::decodes_percent_space ... ok
+test notification::tests::keeps_invalid_hex_literal ... ok
+test notification::tests::keeps_trailing_short_percent ... ok
+test notification::tests::mixed_encoding ... ok
+test notification::tests::plain_path_unchanged ... ok
+test notification::tests::strips_file_scheme ... ok
+test applications::tests::parses_startup_wm_class_from_desktop_file ... ok
+test audio::tests::missing_pulse_socket_sets_lifecycle_error_without_panicking ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests services
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

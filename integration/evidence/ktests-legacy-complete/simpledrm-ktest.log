@@ -1,0 +1,85 @@
+    Updating crates.io index
+    Updating git repository `https://github.com/asterinas/inherit-methods-macro`
+    Updating git repository `https://github.com/asterinas/smoltcp`
+     Locking 192 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+warning: `typeflags-util` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-rights` (lib) generated 1 warning (1 duplicate)
+warning: `aster-util` (lib) generated 1 warning (1 duplicate)
+warning: `device-id` (lib) generated 1 warning (1 duplicate)
+warning: `io-util` (lib) generated 1 warning (1 duplicate)
+warning: `jhash` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+warning: `aster-softirq` (lib) generated 1 warning (1 duplicate)
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+warning: `aster-console` (lib) generated 1 warning (1 duplicate)
+warning: `dma-pool` (lib) generated 1 warning (1 duplicate)
+warning: `aster-bigtcp` (lib) generated 1 warning (1 duplicate)
+warning: `aster-block` (lib) generated 1 warning (1 duplicate)
+warning: `aster-systree` (lib) generated 1 warning (1 duplicate)
+warning: `aster-input` (lib) generated 1 warning (1 duplicate)
+warning: `aster-cmdline` (lib) generated 1 warning (1 duplicate)
+warning: `aster-network` (lib) generated 1 warning (1 duplicate)
+warning: `aster-fuse` (lib) generated 1 warning (1 duplicate)
+warning: `aster-framebuffer` (lib) generated 1 warning (1 duplicate)
+warning: `aster-virtio` (lib) generated 1 warning (1 duplicate)
+warning: `aster-device` (lib) generated 1 warning (1 duplicate)
+warning: `aster-nvme` (lib) generated 1 warning (1 duplicate)
+warning: `cpio-decoder` (lib) generated 1 warning (1 duplicate)
+warning: `aster-logger` (lib) generated 1 warning (1 duplicate)
+warning: `aster-time` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `ring-buffer` (lib) generated 1 warning (1 duplicate)
+warning: `xarray` (lib) generated 1 warning (1 duplicate)
+warning: `logo-ascii-art` (lib) generated 1 warning (1 duplicate)
+warning: `keyable-arc` (lib) generated 1 warning (1 duplicate)
+warning: `sparse-id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `aster-core` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-drm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/drm)
+   Compiling aster-simpledrm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm)
+warning: `aster-drm` (lib) generated 1 warning (1 duplicate)
+warning: `aster-simpledrm` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-simpledrm-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/aster-simpledrm-test-base)
+warning: `aster-simpledrm-osdk-bin` (bin "aster-simpledrm-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.92s
+  Installing linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)
+warning: default toolchain implicitly overridden with `nightly-2026-07-21-x86_64-unknown-linux-gnu` by environment variable
+  |
+  = help: use `cargo +stable install` if you meant to use the stable toolchain
+  = note: rustup selects the toolchain based on the parent environment and not the environment of the package being installed
+    Updating crates.io index
+     Locking 33 packages to latest compatible versions
+      Adding miniz_oxide v0.8.9 (available: v0.9.1)
+      Adding uart_16550 v0.3.2 (available: v0.9.0)
+      Adding uefi v0.37.0 (available: v0.41.0)
+      Adding uefi-raw v0.14.0 (available: v0.17.0)
+   Compiling linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)
+warning: unreachable `pub` item
+  --> ostd/libs/linux-bzimage/setup/src/x86/legacy_i386/alloc.rs:58:1
+   |
+58 | pub fn alloc_at(addr: usize, size: usize) -> &'static mut [MaybeUninit<u8>] {
+   | ---^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | |
+   | help: consider restricting its visibility: `pub(crate)`
+   |
+   = help: or consider exporting it for use by other crates
+   = note: requested on the command line with `-W unreachable-pub`
+
+warning: `linux-bzimage-setup` (bin "linux-bzimage-setup") generated 1 warning (run `cargo fix --bin "linux-bzimage-setup" -p linux-bzimage-setup` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 3.20s
+   Replacing /workspace/asterinas-gpui/asterinas/target/osdk/bin/linux-bzimage-setup
+    Replaced package `linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)` with `linux-bzimage-setup v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/setup)` (executable `linux-bzimage-setup`)
+warning: be sure to add `/workspace/asterinas-gpui/asterinas/target/osdk/bin` to your PATH to be able to run the installed binaries
+install_path: "/workspace/asterinas-gpui/asterinas/target/osdk/aster-simpledrm-osdk-bin"

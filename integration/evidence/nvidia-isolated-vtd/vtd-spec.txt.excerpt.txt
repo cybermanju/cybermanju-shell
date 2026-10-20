@@ -1,0 +1,878 @@
+COMPACT EXCERPT; original /workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/vtd-spec.txt
+Original bytes: 1249406
+Original SHA-256: f615220e025f251e45f2aa994a5e82cb31e41ede3a8361cd824e10c8668842d9
+Not the complete log.
+
+Intel® Virtualization
+Technology for Directed I/O
+Architecture Specification
+
+June 2022
+Revision 4.0
+
+
+
+
+                             Order Number: D51397-015
+Notices & Disclaimers
+Intel technologies may require enabled hardware, software or service activation.
+No product or component can be absolutely secure.
+Your costs and results may vary.
+You may not use or facilitate the use of this document in connection with any infringement or other legal analysis
+concerning Intel products described herein. You agree to grant Intel a non-exclusive, royalty-free license to any
+patent claim thereafter drafted which includes subject matter disclosed herein.
+All product plans and roadmaps are subject to change without notice.
+The products described may contain design defects or errors known as errata which may cause the product to
+deviate from published specifications. Current characterized errata are available on request.
+Intel disclaims all express and implied warranties, including without limitation, the implied warranties of
+merchantability, fitness for a particular purpose, and non-infringement, as well as any warranty arising from
+course of performance, course of dealing, or usage in trade.
+No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this
+document, with the sole exception that you may publish an unmodified copy. You may create software
+implementations based on this document and in compliance with the foregoing that are intended to execute on
+the Intel product(s) referenced in this document. No rights are granted to create modifications or derivatives of
+this document.
+© Intel Corporation. Intel, the Intel logo, and other Intel marks are trademarks of Intel Corporation or its
+subsidiaries. Other names and brands may be claimed as the property of others.
+
+
+
+
+Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015   2
+Contents—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+Contents
+
+1      Introduction .......................................................................................................... 1-1
+      1.1    Audience ........................................................................................................ 1-1
+      1.2    Glossary ........................................................................................................ 1-2
+      1.3    References ..................................................................................................... 1-3
+2      Overview ............................................................................................................... 2-1
+      2.1    Intel® Virtualization Technology Overview .......................................................... 2-1
+      2.2    VMM and Virtual Machines ................................................................................ 2-1
+      2.3    Hardware Support for Processor Virtualization ..................................................... 2-1
+      2.4    I/O Virtualization............................................................................................. 2-2
+      2.5    Intel® Virtualization Technology For Directed I/O Overview ................................... 2-2
+            2.5.1     Hardware Support for DMA Remapping.................................................... 2-3
+                     2.5.1.1       OS Usages of DMA Remapping.................................................. 2-3
+                     2.5.1.2       VMM Usages of DMA Remapping ............................................... 2-4
+                     2.5.1.3       DMA Remapping Usages by Guests............................................ 2-5
+                     2.5.1.4       Interaction with Processor Virtualization..................................... 2-5
+            2.5.2     Hardware Support for Interrupt Remapping ............................................. 2-6
+                     2.5.2.1       Interrupt Isolation................................................................... 2-6
+                     2.5.2.2       Interrupt Migration.................................................................. 2-6
+                     2.5.2.3       x2APIC Support ...................................................................... 2-6
+            2.5.3     Hardware Support for Interrupt Posting ................................................... 2-7
+                     2.5.3.1       Interrupt Vector Scalability....................................................... 2-7
+                     2.5.3.2       Interrupt Virtualization Efficiency .............................................. 2-7
+                     2.5.3.3       Virtual Interrupt Migration........................................................ 2-7
+3      DMA Remapping .................................................................................................... 3-1
+      3.1   Types of DMA Requests .................................................................................... 3-1
+      3.2   Domains and Address Translation ...................................................................... 3-1
+      3.3   Remapping Hardware - Software View................................................................ 3-2
+      3.4   Mapping Devices to Domains ............................................................................ 3-2
+           3.4.1     Source Identifier .................................................................................. 3-3
+           3.4.2     Legacy Mode Address Translation ........................................................... 3-4
+           3.4.3     Scalable Mode Address Translation ......................................................... 3-5
+           3.4.4     Abort DMA Mode .................................................................................. 3-6
+      3.5   Hierarchical Translation Structures..................................................................... 3-6
+      3.6   First-Stage Translation ..................................................................................... 3-8
+           3.6.1     Access Rights..................................................................................... 3-11
+           3.6.2     Accessed, Extended Accessed, and Dirty Flags ....................................... 3-12
+      3.7   Second-Stage Translation ............................................................................... 3-13
+           3.7.1     Access Rights..................................................................................... 3-16
+           3.7.2     Accessed and Dirty Flags ..................................................................... 3-16
+      3.8   Nested Translation......................................................................................... 3-17
+           3.8.1     Access Rights..................................................................................... 3-19
+      3.9   Pass-through Translation ................................................................................ 3-20
+      3.10 Snoop Behavior............................................................................................. 3-20
+      3.11 Memory Type................................................................................................ 3-22
+           3.11.1 Selecting Memory Type from Page Attribute Table .................................. 3-23
+           3.11.2 Selecting Memory Type from Memory Type Range Registers..................... 3-23
+           3.11.3 Selecting Effective Memory Type .......................................................... 3-23
+           3.11.4 Determining Memory Type................................................................... 3-25
+                    3.11.4.1 Memory Type in Legacy Mode (RTADDR_REG.TTM = 00b) .......... 3-25
+                    3.11.4.2 Memory Type in Scalable Mode (RTADDR_REG.TTM = 01b) ........ 3-25
+      3.12 Identifying Origination of DMA Requests ........................................................... 3-26
+           3.12.1 Devices Behind PCI Express* t
+
+[... middle omitted ...]
+
+     Reserved
+
+                                                             N-bit performance counter where N is the value of the Counter Width
+                                        CNTR: Counter
+  N-1:0           RWLV         0h                            field in PERFCAP_REG or corresponding PERFCNTRCAP_REG when the
+                                        Value
+                                                             Per-Counter Capabilities field is Set.
+
+
+
+
+11-100          Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.14             Enhanced Command Interface
+
+11.4.14.1           Enhanced Command Register
+
+
+
+ 6                                                                                           11
+ 3                                                                                           65             87            0
+
+
+
+                                             OA                                                                    CMD
+
+
+
+
+       RsvdZ
+
+
+                              Figure 11-66. Enhanced Command Register
+
+
+
+ Abbreviation            ECMD_REG
+
+ General                 Register to submit command and operand of enhanced commands to DMA Remapping hardware. 32-bit
+ Description             software must write the upper 32-bits in the operand first, prior to writing the lower 32-bits including the
+                         command field. If Operand B is required to issue a command, then the Enhanced Command Extended
+                         Operand Register (ECEO_REG) must be written prior to this register.
+                         This register is treated as RsvdZ by implementations reporting Enhanced Command Support (ECMDS) as
+                         not supported in the Capability register.
+
+ Register Offset         400h
+
+
+
+     Bits       Access      Default           Field                                           Description
+
+                                                                Operand specification is command-specific.
+                                                                See Table 47 below for details.
+  63:16           WO            0h      OA: Operand A
+                                                                Writes to this field are dropped while the In Progress field in the
+                                                                Enhanced Command Response Register (ECRSP_REG) is Set.
+
+     15:8        RsvdZ          0h      R: Reserved             Reserved
+
+                                                                See Table 47 for details.
+                                                                Writes to this field are dropped while the In Progress field in the
+     7:0          WO            0h      CMD: Command            Enhanced Command Response Register (ECRSP_REG) is Set.
+                                                                Writes to this field clear the Enhanced Command Response Register
+                                                                (ECRSP_REG) and set the In Progress field of ECRSP_REG.
+
+
+Table 47.           Enhanced Command Descriptions
+                                                 Command                        Operand A                           Operand B
+               Command Name
+                                              (ECMD_REG[7:0])                ECMD_REG[63:16]                     ECEO_REG[63:0]
+
+  Reserved                                            0 - 239                      Reserved                         Reserved
+
+                                                                               Counter Number
+  Enable Perfmon Counter                               240                                                           Unused
+
+
+                                                                               Counter Number
+  Disable Perfmon Counter                              241                                                           Unused
+
+
+  Reset All Perfmon Counter                                                                                          Unused
+                                                       242                          Unused
+  Configuration
+
+
+
+
+11-101         Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+                                              Command                    Operand A                      Operand B
+             Command Name
+                                           (ECMD_REG[7:0])            ECMD_REG[63:16]                ECEO_REG[63:0]
+
+                                                                             Unused                        Unused
+  Reset All Perfmon Counter Values                 243
+
+
+                                                                             Unused                        Unused
+  Freeze All Perfmon Counters                      244
+
+
+                                                                             Unused                        Unused
+  Unfreeze All Perfmon Counters                    245
+
+
+  Reserved                                      246-255                     Reserved                      Reserved
+
+
+
+
+11-102       Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.14.2          Enhanced Command Extended Operand Register
+
+
+  6
+  3                                                                                                                 0
+
+
+
+                                                        OB
+
+
+
+
+               Figure 11-67. Enhanced Command Extended Operand Register
+
+
+
+ Abbreviation           ECEO_REG
+
+ General                Register to submit additional operands of enhanced commands to DMA Remapping hardware.
+ Description            This register is treated as RsvdZ by implementations reporting Enhanced Command Support (ECMDS) as
+                        not supported in the Capability register.
+
+ Register Offset        408h
+
+
+
+   Bits        Access     Default          Field                                      Description
+
+                                                         Operand specification is command-specific.
+                                                         See Table 47 for details.
+   63:0         WO             0h    OB: Operand B
+                                                         Writes to this field are dropped while the In Progress field in the
+                                                         Enhanced Command Response Register (ECRSP_REG) is Set.
+
+
+
+
+11-103     Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.14.3               Enhanced Command Response Register
+
+
+
+  6                                                                                         11
+  3                                                                                         65               87        10
+
+
+
+                                                RSLT                                                              SC    I
+                                                                                                                        P
+
+
+
+
+           RsvdZ
+
+
+                           Figure 11-68. Enhanced Command Response Register
+
+
+
+ Abbreviation                ECRSP_REG
+
+ General                     Register to report status and results for enhanced commands submitted to DMA Remapping hardware.
+ Description                 This register is treated as RsvdZ by implementations reporting Enhanced Command Support (ECMDS) as
+                             not supported in the Capability register.
+
+ Register Offset             410h
+
+
+
+      Bits          Access      Default          Field                                       Description
+
+                                                                 Result specification is command-specific.
+  63:16               RO            0h     RSLT: Result
+                                                                 See Table 48 for details.
+
+      15:8           RsvdZ          0h      R: Reserved           Reserved.
+
+                                                                   •0: Command successful without any error.
+                                                                   •1: Undefined command.
+                                                                   •2: Command Abort due to in-flight command from GCMD/PMR
+                                                                    Registers.
+      7:1             RO            0h     SC: Status Code        • 3-15: Reserved.
+                                                                  • 16-127: All other Status Codes are command-specific. See
+                                                                    Table 48 below for details.
+                                                                 Usage of any command that is reported as unsupported by the
+                                                                 Enhanced Command Capability Register will return Undefined
+                                                                 Command.
+
+                                                                   •   0: Command has been completed.
+       0              RO            0h     IP: In Progress
+                                                                   •   1: Command is in progress.
+
+
+Table 48.               Enhanced Command Response Descriptions
+  Command                   Command                Command Specific Status
+                                                                                              Result (ECRSP_REG[63:16])
+    Name                 (ECMD_REG[7:0])           Code (ECRSP_REG[7:1])
+
+ Reserved                      0 - 239                           N/A                                     Reserved
+
+ Enable
+                                                  •    16: Enable counter failed
+ Perfmon                         240                                                                     Reserved
+                                                       due to error checks.
+ Counter
+
+ Disable                                          •    16: Disable counter failed
+ Perfmon                         241                   due to invalid counter                            Reserved
+ Counter                                               number
+
+
+
+
+11-104             Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+  Command              Command                Command Specific Status
+                                                                                       Result (ECRSP_REG[63:16])
+    Name            (ECMD_REG[7:0])           Code (ECRSP_REG[7:1])
+
+ Reset All
+ Perfmon                                                                                          Reserved
+                            242                           N/A
+ Counter
+ Configuration
+
+ Reset All
+ Perfmon                                                  N/A                                     Reserved
+                            243
+ Counter
+ Values
+
+ Freeze All                                               N/A                                     Reserved
+ Perfmon                    244
+ Counters
+
+ Unfreeze All                                             N/A                                     Reserved
+ Perfmon                    245
+ Counters
+
+ Reserved                 246-255                         N/A                                     Reserved
+
+
+
+
+11-105        Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.14.4             Enhanced Command Status Register
+
+
+  1
+  2
+  7                                                                                                                  0
+
+
+
+
+         RsvdZ
+
+
+                           Figure 11-69. Enhanced Command Status Register
+
+
+
+ Abbreviation              ECSTS_REG
+
+ General                   Register reporting hardware state of DMA Remapping hardware for enhanced commands issued through
+ Description               the Enhanced Command Interface.
+                           This register is treated as RsvdZ by implementations reporting Enhanced Command Support (ECMDS) as
+                           not supported in the Capability register.
+
+ Register Offset           420h
+
+
+
+   Bits           Access      Default          Field                                     Description
+
+  127:0            RsvdZ          0h     R: Reserved         Reserved.
+
+
+
+
+11-106           Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.14.5             Enhanced Command Capability Register
+
+
+  2                    22 2 2 2 2 22                                                                                 1
+  5                    44 4 4 4 4 43                                                                                 9
+  5                    65 4 3 2 1 09                                                                                 2
+                         UFRRDE
+                         F CCCC
+                         CCN
+                         NN    F NN
+                         TTS
+                             TGTT
+                             S S SS
+                         S
+
+  1                                                                                                                  1
+  9                                                                                                                  2
+  1                                                                                                                  8
+
+
+
+
+  1
+  2                                                                                                                  6
+  7                                                                                                                  4
+
+
+
+
+  6
+  3                                                                                                                  0
+
+
+
+
+         RsvdZ
+
+
+                         Figure 11-70. Enhanced Command Capability Register
+
+
+
+ Abbreviation              ECCAP_REG
+
+ General                   Register specifying the enhanced commands supported by DMA Remapping hardware. This register
+ Description               covers enhanced commands 0-255.
+                           This register is treated as RsvdZ by implementations reporting Enhanced Command Support (ECMDS) as
+                           not supported in the Capability register.
+
+ Register Offset            430h
+
+
+
+   Bits           Access      Default          Field                                     Description
+
+ 255:246           RsvdZ           0h    R: Reserved         Reserved.
+
+                                         UFCNTS:
+                                         Unfreeze All         •   0: Unfreeze All Perfmon Counters Command not supported
+   245              RO             X
+                                         Perfmon              •   1: Unfreeze All Perfmon Counters Command supported
+                                         Counters Support
+
+                                         FCNTS: Freeze All    •   0: Freeze All Perfmon Counters Command not supported
+   244              RO             X     Perfmon
+                                         Counters Support     •   1: Freeze All Perfmon Counters Command supported
+
+
+
+
+11-107           Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+   Bits     Access      Default          Field                                     Description
+
+                                   RCNTS: Reset All     •   0: Reset All Perfmon Counter Values not supported
+   243        RO           X       Perfmon Counter
+                                   Values Support       •   1: Reset All Perfmon Counter Values supported
+
+                                   RCFGS: Reset All     •   0: Reset All Perfmon Counter Configuration Command not
+                                   Perfmon Counter          supported
+   242        RO           X
+                                   Configuration
+                                   Support              •   1: Reset All Perfmon Counter Configuration Command supported
+
+                                   DCNTS: Disable       •   0: Disable Perfmon Counter Command not supported
+   241        RO           X       Perfmon Counter
+                                   Support              •   1: Disable Perfmon Counter Command supported
+
+                                   ECNTS: Enable        •   0: Enable Perfmon Counter Command not supported
+   240        RO           X       Perfmon Counter
+                                   Support              •   1: Enable Perfmon Counter Command supported
+
+  239:0      RsvdZ        0h       R: Reserved         Reserved.
+
+
+
+
+11-108     Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.15             Virtual Command Interface
+
+11.4.15.1           Virtual Command Register
+
+
+
+ 6                                                                                          11
+ 3                                                                                          65              87            0
+
+
+
+                                               OA                                                                 CMD
+
+
+
+
+       RsvdZ
+
+
+                                Figure 11-71. Virtual Command Register
+
+
+
+ Abbreviation            VCMD_REG
+
+ General                 Register to submit command and operand of virtual commands to virtual DMA Remapping hardware. This
+ Description             register is treated as RsvdZ by implementations reporting Virtual Command Support (VCS) as not
+                         supported in the Extended Capability register.
+
+ Register Offset         E00h
+
+
+
+     Bits       Access      Default             Field                                        Description
+
+                                                                Operand specification is command-specific.
+                                                                See Table 49 below for details.
+  63:16           RW            X          OA: Operand A
+                                                                Writes to this field are dropped while the In Progress field in the
+                                                                Virtual Command Response Register (VCRSP_REG) is Set.
+
+     15:8       RsvdZ           0h         R: Reserved          Reserved
+
+                                                                See Table 49 for details.
+                                                                Writes to this field are dropped while the In Progress field in the
+     7:0          RW            X          CMD: Command         Virtual Command Response Register (VCRSP_REG) is Set.
+                                                                Write to this field clear the Virtual Command Response Register
+                                                                (VCRSP_REG) and set the In Progress field of the VCRSP_REG.
+
+
+Table 49.           Virtual Command Descriptions
+                             Command                             Operand A                                  Operand B
+ Command Name
+                          (VCMD_REG[7:0])                     VCMD_REG[63:16]                           VCMD_EO_REG[63:0]
+
+                                                     Unused
+     Null Command                      0                                                         Unused
+
+
+                                                     Unused
+     Allocate PASID                    1                                                         Unused
+
+
+                                                     63:36 - Unused
+      Free PASID                       2             35:16 - PASID                               Unused
+
+
+       Reserved                      3 - 255         Reserved                                    Reserved
+
+
+
+
+11-109         Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.15.2          Virtual Command Extended Operand Register
+
+
+6
+3                                                                                                                    0
+
+
+
+                                                         OB
+
+
+
+
+                               Figure 11-72. Virtual Command Register
+
+
+
+ Abbreviation           VCMD_EO_REG
+
+ General                Register to submit additional operands of virtual commands to virtual DMA Remapping hardware. This
+ Description            register is treated as RsvdZ by implementations reporting Virtual Command Support (VCS) as not
+                        supported in the Extended Capability register.
+
+ Register Offset        E08h
+
+
+
+    Bits       Access     Default           Field                                     Description
+
+                                                         Operand specification is command-specific.
+                                                         See Table 49 for details.
+    63:0        RW             X      OB: Operand B
+                                                         Writes to this field are dropped while the In Progress field in the
+                                                         Virtual Command Response Register (VCRSP_REG) is Set.
+
+
+
+
+11-110     Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.15.3           Virtual Command Response Register
+
+
+
+ 6                                                                                    11
+ 3                                                                                    65               87        10
+
+
+
+                                           RSLT                                                             SC    I
+                                                                                                                  P
+
+
+
+
+       RsvdZ
+
+
+                         Figure 11-73. Virtual Command Response Register
+
+
+
+ Abbreviation            VCRSP_REG
+
+ General                 Register to report status and results for virtual commands submitted to virtual-DMA Remapping
+ Description             hardware. This register is treated as RsvdZ by implementations reporting Virtual Command Support
+                         (VCS) as not supported in the Extended Capability register.
+
+ Register Offset         E10h
+
+
+
+     Bits       Access      Default          Field                                     Description
+
+                                                           Result specification is command-specific.
+  63:16           RO            0h     RSLT: Result
+                                                           See Table 50 for details.
+
+     15:8        RsvdZ          0h      R: Reserved         Reserved.
+
+                                                            •   0: Command successful without any error.
+                                                            •   1: Undefined command.
+                                                            •   2-15: Reserved.
+     7:1          RO            0h     SC: Status Code      •   16-127: All other Status Codes are command-specific. See
+                                                                Table 50 below for details.
+                                                            •   Usage of any command that is reported as unsupported by the
+                                                                Virtual Command Capability Register will return Undefined
+                                                                Command.
+
+                                                            •   0: Command has been completed.
+      0           RO            0h     IP: In Progress
+                                                            •   1: Command is in progress.
+
+
+
+
+11-111         Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+Table 50.           Virtual Command Response Description
+  Command               Command                Command Specific Status
+                                                                                        Result (VCRSP_REG[63:16])
+    Name             (VCMD_REG[7:0])           Code (VCRSP_REG[7:1])
+
+     Null
+                              0              N/A                                •   63:16 - RsvdZ
+   Command
+
+                                                                                • 63:36 - RsvdZ
+    Allocate                                 16: No PASID available             • 35:16 - PASID
+                              1
+     PASID                                                                     The contents of this field are treated as reserved
+                                                                               when the status code is non-zero.
+
+                                             16: Invalid PASID
+  Free PASID                  2                                                 •   63:16 - RsvdZ
+
+
+   Reserved                3 - 255           N/A                                •   63:16 - RsvdZ
+
+
+
+
+11-112         Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Register Descriptions—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+11.4.15.4              Virtual Command Capability Register
+
+
+
+
+  6
+  3                                                                                                              32 1 0
+
+
+                                                                                                                  FP
+                                                                                                                  PAN
+                                                                                                                  SSS
+
+
+
+          RsvdZ
+
+                            Figure 11-74. Virtual Command Capability Register
+
+
+
+ Abbreviation               VCCAP_REG
+
+ General                    Register specifying the virtual commands supported by virtual DMA Remapping hardware. This register is
+ Description                treated as RsvdZ by implementations reporting Virtual Command Support (VCS) as not supported in the
+                            Extended Capability register.
+
+ Register Offset            E30h
+
+
+
+   Bits            Access      Default          Field                                     Description
+
+   63:3             RsvdZ          0h     R: Reserved         Reserved.
+
+                                                                • 0: Free PASID commands are not supported.
+                                                                • 1: Free PASID commands are supported.
+                                          FPS: Free PASID     If Set, software must use the Virtual Command Register interface to
+      2              RO            X                          free PASIDs.
+                                          Support
+                                                              Hardware implementations reporting Process Address Space ID
+                                                              Support (PASID) field in the Extended Capability Register as Clear
+                                                              also report this field as Clear.
+
+                                                               • 0: PASID allocate commands are not supported.
+                                                               • 1: PASID allocate commands are supported.
+                                          PAS: PASID          If Set, software must use the Virtual Command Register interface to
+      1              RO            X      Allocation          allocate PASIDs.
+                                          Support             Hardware implementations reporting Process Address Space ID
+                                                              Support (PASID) field in the Extended Capability Register as Clear
+                                                              also report this field as Clear.
+
+                                          NS: Null             •   0: Null commands are not supported.
+      0              RO            X      Command
+                                          Support              •   1: Null commands are supported.
+
+
+
+
+11-113            Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+Snoop and Memory Type for Various Structures—Intel® Virtualization Technology for Directed I/O
+
+
+
+
+Appendix A Snoop and Memory Type for Various
+           Structures
+
+
+
+  Translation Structure Operation                              Snoop                                  Memory Type
+
+                                                DMA Remapping Structures
+
+ Read of Root-table/ scalable-mode
+                                                               ECAP.C                                       WB
+ Root-table
+
+ Read of Context-table/ scalable-
+                                                               ECAP.C                                       WB
+ mode Context-table
+
+ Read of scalable-mode PASID-
+                                                               ECAP.C                                       WB
+ directory
+
+ Read of scalable-mode PASID-table                             ECAP.C                                       WB
+
+ Read of first-stage table                           PASID-table-entry.PWSNP                                WB
+
+ Atomic update of first-stage table                               1                                         WB
+
+                                         •   Legacy mode: ECAP.C                                •   Legacy mode: WB
+ Read of second-stage table
+                                         •   Scalable mode: PASID-table-entry.PWSNP             •   Scalable mode: WB
+
+ Atomic update of second-stage table                              1                                         WB
+
+ Read of page-frame                                            Table 6                                    Table 9
+
+
+
+                                              Interrupt Remapping Structures
+
+ Read of Interrupt Remap Table                                 ECAP.C                                       WB
+
+ Atomic update of Posted Interrupt
+                                                                  1                                         WB
+ Descriptor
+
+
+
+                                                     Command Queues
+
+ Read of Invalidation Queue                                       1                                         WB
+
+ Write of Page Request Queue                                      1                                         WB
+
+ Status Write from Invalidation Wait
+                                                                  1                                         WB
+ Descriptor (inv_wait_dsc)
+
+
+
+
+A-1         Intel® Virtualization Technology for Directed I/O Architecture Specification, Rev. 4.0, Order Number: D51397-015
+

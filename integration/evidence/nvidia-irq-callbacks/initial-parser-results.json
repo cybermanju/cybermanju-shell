@@ -1,0 +1,15 @@
+{
+  "runs": [
+    {
+      "name": "old-zst",
+      "exit": 1,
+      "expected": false,
+      "passed": false,
+      "baseline_failed": false,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-irq-callbacks/old-zst.log"
+    }
+  ],
+  "source_restored": true,
+  "source_sha256": "6e485e3f832b0a69d8faccc7556713f9c2d09a0c20dc64f6debb2dcb97c24046",
+  "hardware_gpu": false
+}

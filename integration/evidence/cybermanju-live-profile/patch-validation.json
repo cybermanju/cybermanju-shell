@@ -1,0 +1,89 @@
+{
+  "gpui": {
+    "patch": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/gpui-cybermanju-live-profile.patch",
+    "patch_sha256": "6a3e2d18d94fa0684d1fbd2de75c2623b470280e640e088252e35ecbba4f9f17",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "crates/app/src/args.rs",
+        "before_sha256": "72b2fb12023375e51919086c7bc64cc3faa089676f15b8d18d42a6b90af2a3b5",
+        "after_sha256": "b3a60e6e63fa6949b6f0f0a679a3a3832cb55ec1a3ac54f69dab2ed1295d4683"
+      },
+      {
+        "path": "crates/app/src/main.rs",
+        "before_sha256": "2a65cd3ed93e1161aca584306fb88edfc13391cea9afe51f33c1ff39a97f124e",
+        "after_sha256": "4503fda94b486100b458f37f183c243ce403ebe94f9503726987a0459989cdfe"
+      },
+      {
+        "path": "crates/app/src/config/mod.rs",
+        "before_sha256": "b0cec64b15d576db05247f32e5e3b63dd2ee59423ad4c2f2062bccd84a946c36",
+        "after_sha256": "7c5f9369ceb63f3b54facce4067b45c7635102593da03202cd2153e15976c5b1"
+      },
+      {
+        "path": "crates/app/src/config/appearance.rs",
+        "before_sha256": "191ffb83228e835ddb9f3912e44d66f3aee476e5fcb601761f40b06cae451826",
+        "after_sha256": "5372a86a15c413d46e27904b0d783b328acc7e55c79844292ad9bb4b72a3dac5"
+      },
+      {
+        "path": "crates/app/src/ipc/service.rs",
+        "before_sha256": "3b421b1c26bb192231aa049a87b9fffc762901e0cdbd1f20ce883bd27d9a14ad",
+        "after_sha256": "0877e10f5d71ea47005412088681ff12f8a35f7ad3ecf01860ad44473438aa92"
+      },
+      {
+        "path": "crates/services/src/notification/mod.rs",
+        "before_sha256": "e4ae6a8243cd5cd98e17e5e0cb1a71205a9b0a9243b797a9d199d35aac4efd8c",
+        "after_sha256": "102137e5d21252d51e73a51b68fe3705109945a02615488b1102c77d7dbae055"
+      },
+      {
+        "path": "crates/services/src/watcher.rs",
+        "before_sha256": "e50f3fc22182efc53b602cb6f198555bae3b6534604919697078b8fe0583ae0f",
+        "after_sha256": "096eb9e797a588343c8b919b8bcbc16b39c5308d7c38245d3790ebaaeda92431"
+      },
+      {
+        "path": "scripts/test_appearance_profile.py",
+        "before_sha256": "ea36d2ec7c75e549a23bdd3896833e8dd9e86386cb4dff88255b6dc65844556a",
+        "after_sha256": "c389a3d601a54be59fc0db85d854e650326b81fb6c3dc4240cf64328d418b00e"
+      },
+      {
+        "path": "docs/src/content/docs/developer/cybermanju-appearance.md",
+        "before_sha256": "a710b15b497a7dee302e7cbcd9d8dbdc3c0882e9bbb25d0e508709540cd58041",
+        "after_sha256": "b4beef1ddecfb54058ff8d84b4fd73a810ba96af037453a0cc601de6e8a0db35"
+      },
+      {
+        "path": "crates/app/src/config/appearance_live.rs",
+        "before_sha256": null,
+        "after_sha256": "717d9b5e9b171f7c7bad191ac5712273473ae786e7c99029e6521fc4ce629fe8"
+      }
+    ]
+  },
+  "app_docs": {
+    "patch": "/workspace/asterinas-gpui/evidence/cybermanju-live-profile/cybermanju-live-profile-docs.patch",
+    "patch_sha256": "8a2ff749c6de6c6ea9f4c360873a55439d3403c2ed399791d4b9b321a84add2a",
+    "applies_and_matches_final_bytes": true,
+    "files": [
+      {
+        "path": "docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+        "before_sha256": "227596c9125c63cc24b092efacb9d734af2b38b1b76e45da171bf605f10369b9",
+        "after_sha256": "efb22e23d0afe847774de66e34bd9fc43a7a5af3e2afc57b495dbf4c9a1c9e4d"
+      },
+      {
+        "path": "docs/CYBERMANJU-OS-PLAN.md",
+        "before_sha256": "b76d73676ec5f42c658edd77b45010360370e9d927de4665f14d331b05246316",
+        "after_sha256": "fd1052f5c30ebd9207d772a07ecfd2f8ad9d101ebf732ca70c2746e6b7c2a14a"
+      },
+      {
+        "path": "TASKS.md",
+        "before_sha256": "7503c73f014dc42a234d424b4b6dcaa4103d263a9a50145909397843a9f70553",
+        "after_sha256": "cd5a5f337da0978309e8f1841b310f73e9a1ae35b63496b728117ea03d12949c"
+      },
+      {
+        "path": "worklog.md",
+        "before_sha256": "2ecb91a560d1b64d13f638e02303cc9f6b0b7a2245b858848ec070b9439afde8",
+        "after_sha256": "33fe9a304f252d555637ac076328805aad47d0898d99b2eda95a9f525d0168f7"
+      }
+    ]
+  },
+  "gpui_index_unchanged": true,
+  "no_dependency_or_lockfile_changes": true,
+  "scope": "Local explicit file-to-native-theme implementation; not full app transport or target graphics acceptance"
+}

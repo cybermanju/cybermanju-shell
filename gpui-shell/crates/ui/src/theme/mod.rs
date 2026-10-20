@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 mod base16;
 mod color_string;
 mod colors;
+mod density;
 #[macro_use]
 mod refineable;
 mod refinement;
@@ -14,6 +15,7 @@ mod tokens;
 
 pub use base16::Base16Palette;
 pub use colors::{Color, StatusColors, ThemeColors};
+pub use density::LayoutDensity;
 pub use refinement::{StatusColorsRefinement, ThemeColorsRefinement};
 pub use schemes::{ThemeScheme, builtin_schemes};
 pub use tokens::{IconSize, Radius, Spacing, TextSize};
@@ -55,6 +57,8 @@ pub struct Theme {
     pub overrides: ThemeColorsRefinement,
     /// Base font size.
     pub font_size: Pixels,
+    /// Runtime profile overlay for launcher and shared list-row spacing. Not persisted.
+    pub density: LayoutDensity,
 }
 
 impl Global for Theme {}
@@ -73,6 +77,7 @@ impl Theme {
             palette,
             overrides: ThemeColorsRefinement::default(),
             font_size: Self::DEFAULT_FONT_SIZE,
+            density: LayoutDensity::default(),
         }
     }
 
@@ -254,6 +259,20 @@ mod tests {
         let encoded = toml::to_string_pretty(&StoredTheme::from_theme(&Theme::default())).unwrap();
         assert!(!encoded.contains("[colors]"), "{encoded}");
         assert!(encoded.contains("base00"), "{encoded}");
+    }
+
+    #[test]
+    fn profile_density_is_runtime_only_and_survives_a_palette_change() {
+        let mut theme = Theme {
+            density: LayoutDensity::Compact,
+            ..Theme::default()
+        };
+        theme.set_palette("Other", Base16Palette::default());
+        assert_eq!(theme.density, LayoutDensity::Compact);
+        let encoded = toml::to_string_pretty(&StoredTheme::from_theme(&theme)).unwrap();
+        assert!(!encoded.contains("density"));
+        let restored: StoredTheme = toml::from_str(&encoded).unwrap();
+        assert_eq!(restored.into_theme().density, LayoutDensity::Comfortable);
     }
 
     #[test]

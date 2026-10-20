@@ -1,0 +1,16 @@
+[package]
+name = "cybermanju-db"
+version = "0.1.1"
+edition = "2021"
+description = "redb database layer with parent index"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+cybermanju-types = { path = "../types" }
+rand_core = { version = "0.6", features = ["getrandom"] }
+redb = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "js"] }

@@ -1,0 +1,11 @@
+[2m2026-10-20T14:30:49.134509Z[0m [32m INFO[0m [2mniri[0m[2m:[0m starting version 26.04 (Nixpkgs)
+[2m2026-10-20T14:30:49.137693Z[0m [32m INFO[0m [1mbackend_winit[0m: [2msmithay::backend::winit[0m[2m:[0m Initializing a winit backend
+
+thread 'main' (349531) panicked at src/main.rs:186:6:
+called `Result::unwrap()` on an `Err` value: EventLoopCreation(Os(OsError { line: 788, file: "/build/niri-26.04-vendor/source-registry-0/winit-0.30.13/src/platform_impl/linux/mod.rs", error: XNotSupported(LibraryOpenError(OpenError { kind: Library, detail: "opening library failed (libXcursor.so.1: cannot open shared object file: No such file or directory); opening library failed (libXcursor.so: cannot open shared object file: No such file or directory)" })) }))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::result::unwrap_failed
+   3: niri::main
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.

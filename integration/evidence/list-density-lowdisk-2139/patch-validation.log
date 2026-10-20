@@ -1,0 +1,64 @@
+{
+  "patches": [
+    {
+      "patch": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/gpui-shared-list-density-source-only.patch",
+      "sha256": "63055aa7e193dceeb9299b464809d1dd3bd08bc7cd6bd488361a24dd9846cbe2",
+      "bytes": 10280,
+      "files": [
+        {
+          "path": "crates/ui/src/components/list.rs",
+          "old_sha256": "8d0a5962295d46375310d78e3ed37f290e28607092e97535ceabccaa2fffcde0",
+          "new_sha256": "2a28022bca5f7ad45601607d86d6918f4668fcb25ca98a6477c10e5fdb64f8dc",
+          "memory_replay_equal": true
+        },
+        {
+          "path": "crates/ui/src/theme/mod.rs",
+          "old_sha256": "38df52042af1e8c95a06b63b896bc8da624a6e2729e3b7b2a1ae0fe62267bca2",
+          "new_sha256": "f0126e45992f98414e02f80286c30b9e74ce9da9991ae355cc34e8c394ff4d52",
+          "memory_replay_equal": true
+        },
+        {
+          "path": "crates/app/src/config/appearance.rs",
+          "old_sha256": "fdaa4e4cab4dfda1222d1876ca3835b967cc224a4e7e93b1be7d2d203f349582",
+          "new_sha256": "e587b97995c053569de2a82fd03e40999b81b44517e1c31a5a079555e09b6bbb",
+          "memory_replay_equal": true
+        },
+        {
+          "path": "docs/src/content/docs/developer/cybermanju-appearance.md",
+          "old_sha256": "c84d593fab56138a8984a36b65acd3926dc10bb33cbeeab37060c1af01a55ae8",
+          "new_sha256": "192844cf903a23ea7b005ac76d54dcde26177ce588bcd6958c9c46d949a431a7",
+          "memory_replay_equal": true
+        }
+      ],
+      "reverse_check": true,
+      "git_index_unchanged": true
+    },
+    {
+      "patch": "/workspace/asterinas-gpui/evidence/list-density-lowdisk-2139/cybermanju-shared-list-density-contract.patch",
+      "sha256": "3446c5c4303fbd96557ae9ff2d0eeca6b720c50edd711078f4dcd94bdb29082b",
+      "bytes": 1972,
+      "files": [
+        {
+          "path": "docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+          "old_sha256": "1992ac3d321c0569746f57f0e59fe0780e742917fa52b22c4fa644aadbf8f84b",
+          "new_sha256": "8ffaa679143937b3026b8b223b023dfa66d39d1f3360ccef40ea2ba19e54f465",
+          "memory_replay_equal": true
+        }
+      ],
+      "reverse_check": true,
+      "git_index_unchanged": true
+    }
+  ],
+  "native_patch_order_unchanged": 21,
+  "new_native_patch_created": false,
+  "source_only": true,
+  "compiled": false,
+  "rust_tests_executed": 0,
+  "new_rust_tests_not_executed": 3,
+  "render_tests_executed": 0,
+  "no_deletions": true,
+  "no_cache_cleanup": true,
+  "no_build_or_iso_attempt": true,
+  "physical_gpu_acceptance": false,
+  "free_bytes": 1164591104
+}

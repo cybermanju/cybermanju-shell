@@ -1,0 +1,61 @@
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+warning: unnecessary qualification
+   --> ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+warning: feature `iter_advance_by` is declared but not used
+  --> ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 3 warnings (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+    Checking osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+    Checking aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+    Checking aster-fuse v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-fuse)
+    Checking aster-console v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/console)
+    Checking aster-cmdline v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline)
+    Checking aster-input v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/input)
+    Checking aster-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-util)
+    Checking aster-softirq v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq)
+    Checking device-id v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/device-id)
+    Checking dma-pool v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/dma-pool)
+warning: this lint expectation is unfulfilled
+  --> kernel/core/comps/pci/src/capability/msix.rs:61:14
+   |
+61 |     #[expect(dead_code)]
+   |              ^^^^^^^^^
+   |
+   = note: `#[warn(unfulfilled_lint_expectations)]` on by default
+
+    Checking aster-block v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/block)
+    Checking aster-bigtcp v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-bigtcp)
+warning: `aster-pci` (lib) generated 1 warning
+    Checking aster-nvidia-platform v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform)
+    Checking aster-nvme v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme)
+    Checking aster-network v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/network)
+    Checking aster-virtio v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.18s

@@ -1,0 +1,550 @@
+/* CyberManju OS — global foundation.
+   macOS-style flat: SF stack, 13px/1.4, sentence case, single system blue.
+   All values come from the `--ui-*` tokens published by useTheme(). */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--ui-font, -apple-system, system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  border: none;
+  outline: none;
+  background: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--ui-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+img,
+canvas {
+  display: block;
+}
+
+/* ── base primitives (used across all panels) ─────────────────────────── */
+
+.bw-card {
+  background: var(--ui-glass);
+  border: 1px solid color-mix(in srgb, var(--ui-text) 8%, transparent);
+  border-radius: var(--ui-radius-lg);
+  padding: calc(12px * var(--ui-unit, 1));
+  color: var(--ui-text-2);
+  box-shadow: var(--ui-shadow-1), inset 0 1px 0 var(--ui-glass-highlight);
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  transition:
+    border-color var(--ui-dur) var(--ui-ease-out),
+    background-color var(--ui-dur) var(--ui-ease-out),
+    box-shadow var(--ui-dur) var(--ui-ease-out);
+}
+
+.bw-card:hover {
+  border-color: var(--ui-border-hover);
+  box-shadow: var(--ui-shadow-2), inset 0 1px 0 var(--ui-glass-highlight);
+}
+
+.bw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ui-control-h);
+  padding: 0 14px;
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  cursor: pointer;
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-sm);
+  font-weight: 500;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition:
+    background-color var(--ui-dur-fast) var(--ui-ease-out),
+    border-color var(--ui-dur-fast) var(--ui-ease-out),
+    box-shadow var(--ui-dur-fast) var(--ui-ease-out);
+}
+
+.bw-btn:hover {
+  background: var(--ui-surface-3);
+  border-color: var(--ui-border-hover);
+  color: var(--ui-text);
+}
+
+.bw-btn:active {
+  background: color-mix(in srgb, var(--ui-text) 8%, var(--ui-surface-2));
+}
+
+.bw-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.bw-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-glow-soft);
+  border-color: var(--ui-accent);
+}
+
+.bw-btn-inverse {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.bw-btn-inverse:hover {
+  background: var(--ui-accent-strong);
+  border-color: transparent;
+  color: var(--ui-on-accent);
+  box-shadow: none;
+}
+
+.bw-input {
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  min-height: var(--ui-control-h);
+  padding: 6px 10px;
+  color: var(--ui-text);
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-sm);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition:
+    border-color var(--ui-dur) var(--ui-ease-out),
+    box-shadow var(--ui-dur) var(--ui-ease-out);
+}
+
+.bw-input::placeholder {
+  color: var(--ui-text-faint);
+}
+
+.bw-input:focus {
+  border-color: var(--ui-accent);
+  box-shadow: var(--ui-glow-soft);
+}
+
+.bw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-xs);
+  font-weight: 600;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-full);
+  background: color-mix(in srgb, var(--ui-text) 5%, var(--ui-surface-2));
+  color: var(--ui-text-2);
+}
+
+.bw-badge-inverse {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+  border-color: transparent;
+}
+
+.bw-hr {
+  height: 1px;
+  background: var(--ui-border);
+  border: none;
+  margin: calc(8px * var(--ui-unit, 1)) 0;
+}
+
+.bw-dot {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border: 1px solid var(--ui-text-faint);
+  background: transparent;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color var(--ui-dur) var(--ui-ease-out);
+}
+
+.bw-dot-on {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+}
+
+/* ── utilities ────────────────────────────────────────────────────────── */
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  font-family: var(--ui-font-mono);
+}
+
+.text-muted {
+  color: var(--ui-text-3) !important;
+}
+
+.text-inverse {
+  color: var(--ui-on-accent);
+}
+
+.text-white {
+  color: var(--ui-text);
+}
+
+/* Legacy coloured-text helpers: neutralised to plain text so old markup
+   inherits the quiet system palette instead of neon colours. */
+.text-neon,
+.text-gold,
+.text-cyan,
+.text-pink,
+.text-purple,
+.text-orange {
+  color: var(--ui-text-2);
+}
+
+.badge,
+.badge-green,
+.badge-gold,
+.badge-cyan,
+.badge-purple,
+.badge-pink,
+.badge-red,
+.badge-orange {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-xs);
+  font-weight: 600;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-full);
+  background: color-mix(in srgb, var(--ui-text) 5%, var(--ui-surface-2));
+  color: var(--ui-text-2);
+}
+
+/* ── context menu (macOS menu) ────────────────────────────────────────── */
+
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  background: var(--ui-glass-2);
+  backdrop-filter: blur(var(--ui-blur-strong)) saturate(170%);
+  -webkit-backdrop-filter: blur(var(--ui-blur-strong)) saturate(170%);
+  border: 1px solid color-mix(in srgb, var(--ui-text) 13%, transparent);
+  border-radius: var(--ui-radius-lg);
+  padding: 5px;
+  box-shadow: var(--ui-shadow-3), inset 0 1px 0 var(--ui-glass-highlight);
+  animation: ui-pop var(--ui-dur) var(--ui-ease-out) both;
+  transform-origin: top left;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: var(--ui-font);
+  font-size: var(--ui-fs-sm);
+  color: var(--ui-text);
+  background: transparent;
+  border-radius: var(--ui-radius-sm);
+  transition: background-color var(--ui-dur-fast) var(--ui-ease-out);
+}
+
+.context-menu-item:hover {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+
+.context-menu-item.danger {
+  color: var(--ui-danger);
+}
+
+.context-menu-item.danger:hover {
+  background: var(--ui-danger);
+  color: #fff;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--ui-border);
+  margin: 4px 6px;
+}
+
+/* ── legacy scanline hook: kept as a no-op so old markup doesn't break ── */
+
+.scanline-overlay::after {
+  content: none;
+}
+
+/* ── native form controls (single themed system) ──────────────────────
+   Every bare <select>, checkbox, radio and slider in the app inherits this
+   baseline, so all of them follow the active theme + shell automatically
+   (colors, radius, focus ring). Denser component classes (UiSelect,
+   .fm-select, .am-input, …) layer on top without re-declaring the basics. */
+
+/* Native popups, arrows and pickers follow the theme mode. */
+[data-ui-mode='dark'] {
+  color-scheme: dark;
+}
+
+[data-ui-mode='light'] {
+  color-scheme: light;
+}
+
+/* Dropdown selects: themed box; the arrow + popup tint come from
+   color-scheme above, the list rows from the option rules below. */
+select {
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text);
+  font: inherit;
+  padding: 4px 8px;
+  max-width: 100%;
+  outline: none;
+  cursor: pointer;
+  transition:
+    border-color var(--ui-dur-fast) ease-out,
+    box-shadow var(--ui-dur-fast) ease-out;
+}
+
+select:hover:not(:disabled) {
+  border-color: var(--ui-border-hover);
+}
+
+select:focus-visible {
+  border-color: var(--ui-accent);
+  box-shadow: var(--ui-focus-ring);
+}
+
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+select option,
+select optgroup {
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+
+/* Checkboxes + radios: flat custom boxes, accent fill when on. */
+input[type='checkbox'],
+input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-xs);
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    background-color var(--ui-dur-fast) ease-out,
+    border-color var(--ui-dur-fast) ease-out;
+}
+
+input[type='radio'] {
+  border-radius: 50%;
+}
+
+input[type='checkbox']:hover:not(:disabled),
+input[type='radio']:hover:not(:disabled) {
+  border-color: var(--ui-border-hover);
+}
+
+input[type='checkbox']:checked,
+input[type='radio']:checked {
+  background: var(--ui-accent);
+  border-color: transparent;
+}
+
+input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.5l3 3 5-7' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 72%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* plasma-dark pairs its breeze-blue fill with dark on-accent text, so the
+   check glyph follows it (white everywhere else). */
+[data-ui-theme='plasma-dark'] input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.5l3 3 5-7' fill='none' stroke='%23232629' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+input[type='radio']:checked {
+  background-image: radial-gradient(circle, var(--ui-on-accent) 0 32%, transparent 38%);
+}
+
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: none;
+  border-color: var(--ui-accent);
+  box-shadow: var(--ui-focus-ring);
+}
+
+input[type='checkbox']:disabled,
+input[type='radio']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Sliders: 4px groove with accent fill up to --p (set inline per slider),
+   14px round thumb. Firefox uses range-progress natively. */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 20px;
+  min-width: 60px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  --p: 50%;
+  --track: color-mix(in srgb, var(--ui-text) 14%, transparent);
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--ui-accent) 0 var(--p), var(--track) var(--p) 100%);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--ui-text);
+  border: 1px solid var(--ui-border-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--ui-text);
+  border: 1px solid var(--ui-border-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input[type='range']:focus-visible {
+  outline: none;
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--ui-focus-ring);
+}
+
+input[type='range']:focus-visible::-moz-range-thumb {
+  box-shadow: var(--ui-focus-ring);
+}
+
+input[type='range']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Placeholder text everywhere (components may refine per field). */
+::placeholder {
+  color: var(--ui-text-faint);
+}
+
+/* Coarse pointers: bigger hit targets for checks and slider thumbs. */
+@media (pointer: coarse) {
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    margin-top: -8px;
+  }
+
+  input[type='range']::-moz-range-thumb {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+/* ── keyframes (calm, no glitch/flicker) ──────────────────────────────── */
+
+@keyframes bw-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes bw-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

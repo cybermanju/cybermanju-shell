@@ -95,6 +95,25 @@ impl IrqLine {
         self.callbacks.push(callback_handle);
     }
 
+    /// Disconnects this handle's callbacks synchronously and permanently reserves its IRQ.
+    ///
+    /// Call only from task context, not from a callback or with locks needed by one held.
+    /// This waits for registry dispatch readers, destroys captures outside the lock, and
+    /// leaves an empty dispatch/EOI sink for late device messages. It does not claim a
+    /// cross-CPU APIC/IRTE drain or allow this IRQ number to be allocated again. Other
+    /// cloned handles, if any, retain their own callbacks and must be stopped separately.
+    pub fn retire(mut self) {
+        self.disconnect_callbacks();
+        core::mem::forget(self);
+    }
+
+    fn disconnect_callbacks(&mut self) {
+        // `clear()` alone retains Vec capacity, which would leak when retire forgets
+        // this handle. Drop the storage as well, while still owning the IRQ number.
+        // CallbackHandle waits for dispatch readers and drops captures outside its lock.
+        drop(core::mem::take(&mut self.callbacks));
+    }
+
     /// Checks if there are no registered callbacks.
     pub fn is_empty(&self) -> bool {
         self.callbacks.is_empty()
@@ -124,7 +143,7 @@ impl Drop for IrqLine {
         // allocator. Taking the callbacks write lock also waits for any in-flight `process`
         // readers to finish. Do not drop an IrqLine from an IRQ callback: that callback runs
         // under the read lock and would deadlock while waiting for the writer.
-        self.callbacks.clear();
+        self.disconnect_callbacks();
     }
 }
 
@@ -389,5 +408,56 @@ mod test {
         drop(line);
         assert_eq!(result.load(Ordering::SeqCst), 1);
         assert!(IrqLine::alloc_specific(irq_num).is_ok());
+    }
+
+    #[ktest]
+    fn retired_irq_destroys_captures_but_never_reuses_number() {
+        struct Probe(Arc<AtomicU8>);
+        impl Drop for Probe {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        let mut line = IrqLine::alloc().unwrap();
+        let num = line.num();
+        let index = (num - IRQ_NUM_MIN) as usize;
+        let dropped = Arc::new(AtomicU8::new(0));
+        let probe = Probe(dropped.clone());
+        line.on_active(move |_| {
+            let _ = &probe;
+        });
+        assert_eq!(INNERS[index].callbacks.read().len(), 1);
+        line.retire();
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
+        assert!(INNERS[index].callbacks.read().is_empty());
+        assert!(IrqLine::alloc_specific(num).is_err());
+    }
+
+    #[ktest]
+    fn disconnect_releases_callback_storage_before_retiring_with_clone() {
+        let mut line = IrqLine::alloc().unwrap();
+        let num = line.num();
+        let index = (num - IRQ_NUM_MIN) as usize;
+        let mut sibling = line.clone();
+        line.on_active(|_| {});
+        sibling.on_active(|_| {});
+        assert!(line.callbacks.capacity() > 0);
+        assert_eq!(INNERS[index].callbacks.read().len(), 2);
+
+        // Exercise the same cleanup that retire and Drop call. Merely clearing the
+        // Vec removes registrations but fails this zero-capacity ownership invariant.
+        line.disconnect_callbacks();
+        assert!(line.callbacks.is_empty());
+        assert_eq!(line.callbacks.capacity(), 0);
+        assert_eq!(INNERS[index].callbacks.read().len(), 1);
+        assert!(!sibling.is_empty());
+        assert!(IrqLine::alloc_specific(num).is_err());
+
+        line.retire();
+        assert_eq!(INNERS[index].callbacks.read().len(), 1);
+        assert!(IrqLine::alloc_specific(num).is_err());
+        drop(sibling);
+        assert!(INNERS[index].callbacks.read().is_empty());
+        assert!(IrqLine::alloc_specific(num).is_err());
     }
 }

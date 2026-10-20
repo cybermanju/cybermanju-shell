@@ -1,0 +1,170 @@
+diff --git a/kernel/comps/nvidia-platform/src/worker.rs b/kernel/comps/nvidia-platform/src/worker.rs
+--- a/kernel/comps/nvidia-platform/src/worker.rs
++++ b/kernel/comps/nvidia-platform/src/worker.rs
+@@ -9,6 +9,7 @@
+ use alloc::sync::Arc;
+ 
+ use ostd::{
++    irq::IrqLine,
+     sync::{LocalIrqDisabled, SpinLock, WaitQueue},
+     task::{Task, TaskOptions, atomic_mode::can_sleep},
+ };
+@@ -215,6 +216,35 @@
+     /// close admission. Completion proves callback quiescence, not scheduler task-exit,
+     /// posted-MSI drain, device reset or successful RM/GSP initialization.
+     pub fn shutdown(&mut self) -> Result<(), WorkerError> {
++        self.validate_shutdown_context()?;
++        self.shared.close();
++        self.wait_stopped();
++        Ok(())
++    }
++
++    /// Retires this IRQ handle's callbacks before closing and draining the worker.
++    ///
++    /// Before calling, the device-specific owner must mask/quiesce its interrupt source.
++    /// The supplied handle must own every callback that can signal this worker; retire
++    /// separately any other handles or producers. On success the slot is empty. On an
++    /// invalid-context or self-wait error it is left untouched. `IrqLine::retire` is a
++    /// software callback-dispatch barrier and permanently reserves the IRQ; it does not
++    /// mask the device or prove cross-CPU APIC/IRTE or DMA quiescence. After callback
++    /// retirement, this method drains accepted worker invocations and destroys captures.
++    pub fn shutdown_after_irq(
++        &mut self,
++        irq_line: &mut Option<IrqLine>,
++    ) -> Result<(), WorkerError> {
++        self.validate_shutdown_context()?;
++        if let Some(irq_line) = irq_line.take() {
++            irq_line.retire();
++        }
++        self.shared.close();
++        self.wait_stopped();
++        Ok(())
++    }
++
++    fn validate_shutdown_context(&self) -> Result<(), WorkerError> {
+         if !can_sleep() {
+             return Err(WorkerError::InvalidContext);
+         }
+@@ -222,11 +252,13 @@
+         if core::ptr::eq(&*current, &*self.task) {
+             return Err(WorkerError::SelfWait);
+         }
+-        self.shared.close();
++        Ok(())
++    }
++
++    fn wait_stopped(&self) {
+         self.shared
+             .progress
+             .wait_until(|| self.shared.state.lock().stopped.then_some(()));
+-        Ok(())
+     }
+ }
+ 
+diff --git a/kernel/comps/nvidia-platform/src/worker/tests.rs b/kernel/comps/nvidia-platform/src/worker/tests.rs
+--- a/kernel/comps/nvidia-platform/src/worker/tests.rs
++++ b/kernel/comps/nvidia-platform/src/worker/tests.rs
+@@ -1,7 +1,10 @@
+ // SPDX-License-Identifier: MPL-2.0
+ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+ 
+-use ostd::{irq::InterruptLevel, prelude::ktest};
++use ostd::{
++    irq::{InterruptLevel, IrqLine},
++    prelude::ktest,
++};
+ 
+ use super::*;
+ 
+@@ -350,3 +353,79 @@
+     assert_eq!(signal.schedule(), Err(WorkerError::Closed));
+     worker.shutdown().unwrap();
+ }
++
++#[ktest]
++fn irq_callbacks_retire_before_worker_drain_and_capture_release() {
++    let callback_started = Event::new();
++    let callback_release = Event::new();
++    let worker_captures_dropped = Event::new();
++    let irq_captures_dropped = Event::new();
++    let shutdown_returned = Event::new();
++    let worker_calls = Arc::new(AtomicUsize::new(0));
++    let worker_drops = Arc::new(AtomicUsize::new(0));
++    let irq_drops = Arc::new(AtomicUsize::new(0));
++    let worker_witness = DropWitness {
++        drops: worker_drops.clone(),
++        done: worker_captures_dropped.clone(),
++    };
++    let (worker_started, worker_release) = (callback_started.clone(), callback_release.clone());
++    let worker_calls_in_callback = worker_calls.clone();
++    let mut worker = DeviceWorker::start(move || {
++        let _ = &worker_witness;
++        worker_started.signal();
++        worker_release.wait();
++        worker_calls_in_callback.fetch_add(1, Ordering::AcqRel);
++    })
++    .unwrap();
++
++    let signal = worker.signal();
++    let mut irq_line = Some(IrqLine::alloc().unwrap());
++    let irq_witness = DropWitness {
++        drops: irq_drops.clone(),
++        done: irq_captures_dropped.clone(),
++    };
++    let irq_signal = signal.clone();
++    irq_line.as_mut().unwrap().on_active(move |_| {
++        let _ = (&irq_signal, &irq_witness);
++    });
++
++    assert_eq!(signal.schedule(), Ok(ScheduleResult::Queued));
++    callback_started.wait();
++    {
++        let guard = ostd::task::disable_preempt();
++        assert_eq!(
++            worker.shutdown_after_irq(&mut irq_line),
++            Err(WorkerError::InvalidContext)
++        );
++        assert!(
++            irq_line.is_some(),
++            "rejected shutdown consumed the IRQ owner"
++        );
++        assert!(!irq_captures_dropped.signaled.load(Ordering::Acquire));
++        drop(guard);
++    }
++
++    let shutdown_returned_task = shutdown_returned.clone();
++    spawn_task(move || {
++        worker.shutdown_after_irq(&mut irq_line).unwrap();
++        assert!(irq_line.is_none());
++        shutdown_returned_task.signal();
++    });
++
++    // `IrqLine::retire` synchronously drops this handle's callback captures before the
++    // worker shutdown can wait for the currently accepted invocation to finish.
++    irq_captures_dropped.wait();
++    assert_eq!(irq_drops.load(Ordering::Acquire), 1);
++    assert!(!shutdown_returned.signaled.load(Ordering::Acquire));
++    assert_eq!(worker_calls.load(Ordering::Acquire), 0);
++    callback_release.signal();
++    shutdown_returned.wait();
++
++    assert_eq!(worker_calls.load(Ordering::Acquire), 1);
++    assert_eq!(worker_drops.load(Ordering::Acquire), 1);
++    assert!(worker_captures_dropped.signaled.load(Ordering::Acquire));
++    assert_eq!(signal.schedule(), Err(WorkerError::Closed));
++    ostd::early_println!(
++        "NVIDIA native worker: IRQ callback retirement preceded accepted-work drain and capture release; not GPU IRQ/RM"
++    );
++}
+diff --git a/kernel/comps/nvidia-platform/README.md b/kernel/comps/nvidia-platform/README.md
+--- a/kernel/comps/nvidia-platform/README.md
++++ b/kernel/comps/nvidia-platform/README.md
+@@ -15,6 +15,8 @@
+ ## Native callback worker
+ 
+ `worker::DeviceWorker` owns one real OSTD task and one callback. `WorkSignal::schedule` coalesces requests while pending; a request during callback execution installs one subsequent invocation. `DeviceWorker::flush` takes a lock-protected snapshot of accepted invocation generations and waits only through that snapshot. Coalesced pending requests count as one invocation, while requests accepted after the snapshot do not extend it. Flush is sleepable-task-only, rejects self-wait, does not close admission, and does not destroy callback captures; use `shutdown` when capture destruction and admission closure are required. This deliberately is not full upstream multi-item or double-barrier `kthread_q_flush` compatibility. Generation overflow closes admission rather than wrapping. The worker is a primitive only: it does not call RM or implement an NVIDIA ISR/BH.
++
++When an IRQ callback can signal the worker, the owner may use `shutdown_after_irq` to retire that `IrqLine` handle's callbacks before closing admission and draining accepted work. The passed handle must own every producer for this worker. Mask/quiesce the actual device interrupt source first; this software callback-dispatch barrier does not mask hardware, prove cross-CPU APIC/IRTE drain, or stop DMA. Other callback handles/producers require their own retirement before resources are released.
+ 
+ ## Tests
+ 

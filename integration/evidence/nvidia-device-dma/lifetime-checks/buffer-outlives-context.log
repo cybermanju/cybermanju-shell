@@ -1,0 +1,45 @@
+   Compiling component-macro v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/comp-sys/component-macro)
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+    Checking component v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/comp-sys/component)
+    Checking aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+warning: unnecessary qualification
+  --> kernel/core/comps/pci/src/dma.rs:51:45
+   |
+51 | ...ves_context(owner: &crate::mmio::PciMmioGuard<'_>) {
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+   |
+51 - fn negative_buffer_outlives_context(owner: &crate::mmio::PciMmioGuard<'_>) {
+51 + fn negative_buffer_outlives_context(owner: &PciMmioGuard<'_>) {
+   |
+
+warning: unnecessary qualification
+  --> kernel/core/comps/pci/src/dma.rs:53:41
+   |
+53 | ...   let context = owner.dma_context(ostd::mm::dma::DmaMask::new(32).un...
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: remove the unnecessary path segments
+   |
+53 -         let context = owner.dma_context(ostd::mm::dma::DmaMask::new(32).unwrap()).unwrap();
+53 +         let context = owner.dma_context(DmaMask::new(32).unwrap()).unwrap();
+   |
+
+error[E0597]: `context` does not live long enough
+  --> kernel/core/comps/pci/src/dma.rs:54:9
+   |
+52 |     let buffer = {
+   |         ------ borrow later stored here
+53 |         let context = owner.dma_context(ostd::mm::dma::DmaMask::new(32)....
+   |             ------- binding `context` declared here
+54 |         context.alloc_coherent(1).unwrap()
+   |         ^^^^^^^ borrowed value does not live long enough
+55 |     };
+   |     - `context` dropped here while still borrowed
+
+For more information about this error, try `rustc --explain E0597`.
+warning: `aster-pci` (lib) generated 2 warnings
+error: could not compile `aster-pci` (lib) due to 1 previous error; 2 warnings emitted
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest) --cfg ktest" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" failed with status: ExitStatus(unix_wait_status(25856))

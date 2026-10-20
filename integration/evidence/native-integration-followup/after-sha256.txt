@@ -1,0 +1,2 @@
+54d170c0967f764567835263d8d004a2d625bebe76d7c420d1d58a659d92e1b6  /workspace/asterinas-gpui/evidence/native-integration-followup/after-worker.rs
+403006d5f2fbdce59103a59cdd69124eb238948a75a1d940eb002d652ea4f27e  /workspace/asterinas-gpui/evidence/native-integration-followup/patch19.patch

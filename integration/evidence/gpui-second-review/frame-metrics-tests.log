@@ -1,0 +1,13 @@
+
+running 8 tests
+test tests::equal_or_backwards_time_never_creates_infinite_rates ... ok
+test tests::includes_idle_gaps_and_tail_instead_of_hiding_them ... ok
+test tests::no_frames_or_one_entry_cannot_establish_a_rate ... ok
+test tests::probe_is_opt_in_bounded_and_expires_at_deadline ... ok
+test tests::interval_crossing_report_boundary_is_preserved ... ok
+test tests::software_and_virtual_devices_cannot_be_classed_as_physical ... ok
+test tests::rate_uses_interval_count_not_frame_count ... ok
+test tests::memory_is_bounded_and_truncation_is_reported ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

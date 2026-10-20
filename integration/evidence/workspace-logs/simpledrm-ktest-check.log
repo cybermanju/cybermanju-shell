@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on build directory
+    Checking aster-core v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core)
+    Checking aster-drm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/drm)
+    Checking aster-simpledrm v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6m 18s

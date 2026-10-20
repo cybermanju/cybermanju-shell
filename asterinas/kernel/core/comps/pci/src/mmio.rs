@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Pre-driver MMIO resource lifetime, with bus mastering and interrupts kept disabled.
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use ostd::{Error, io::IoMem, mm::VmIoOnce};
 
 use crate::{
@@ -10,7 +12,7 @@ use crate::{
 /// A rejected pre-driver resource acquisition. No error means RM or a GPU is initialized.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MmioPrepareError {
-    /// Mapping cannot be performed with IRQs disabled or from interrupt context.
+    /// Mapping requires a current task with IRQs and preemption enabled.
     InvalidContext,
     /// An absent, already mapped, invalid, or unallocatable memory BAR.
     Mapping(Error),
@@ -33,13 +35,16 @@ pub enum MmioPrepareError {
 /// This is not a DMA domain, IRQ registration, RM instance, hardware reset or working driver.
 /// The mutable device borrow prevents the reservation from returning to the PCI bus early.
 /// It rejects enabled MSI/MSI-X and non-D0 power states, disables bus mastering and INTx,
-/// enables memory decoding, and restores the exact command word after dropping the mapping.
-/// It must be acquired/dropped with IRQs enabled, as IoMem mapping uses cross-CPU TLB flushes.
+/// enables memory decoding, and verifies exact command restoration before dropping the mapping.
+/// Acquire/Drop require a current task with IRQs and preemption enabled because IoMem
+/// mapping uses cross-CPU TLB flushes. Invalid-context Drop retains resources in quarantine.
 /// No mapping reference/clone or MMIO write interface is exposed.
 pub struct PciMmioGuard<'a> {
     device: &'a mut PciCommonDevice,
     mapping: Option<IoMem>,
     original_command: u16,
+    bar_index: u8,
+    msix_owned: AtomicBool,
 }
 
 impl<'a> PciMmioGuard<'a> {
@@ -48,13 +53,14 @@ impl<'a> PciMmioGuard<'a> {
         device: &'a mut PciCommonDevice,
         bar_index: u8,
     ) -> Result<Self, MmioPrepareError> {
-        if !ostd::irq::is_local_enabled()
-            || ostd::irq::InterruptLevel::current().is_interrupt_context()
-        {
+        if !ostd::task::atomic_mode::can_sleep() {
             return Err(MmioPrepareError::InvalidContext);
         }
         if bar_index >= 6 {
             return Err(MmioPrepareError::Mapping(Error::InvalidArgs));
+        }
+        if device.irqs_quarantined() {
+            return Err(MmioPrepareError::Mapping(Error::AccessDenied));
         }
         let loc = device.location();
         if loc.read16(0) == 0xffff {
@@ -82,6 +88,8 @@ impl<'a> PciMmioGuard<'a> {
             device,
             mapping: None,
             original_command,
+            bar_index,
+            msix_owned: AtomicBool::new(false),
         };
         let bar = guard
             .device
@@ -93,6 +101,52 @@ impl<'a> PciMmioGuard<'a> {
         };
         guard.mapping = Some(memory.acquire_owned().map_err(MmioPrepareError::Mapping)?);
         Ok(guard)
+    }
+
+    /// Prepares masked MSI-X entries without enabling DMA or installing dummy handlers.
+    /// Only one transaction may exist. It borrows this guard and therefore the reservation.
+    pub fn prepare_msix(
+        &self,
+        count: u16,
+    ) -> Result<crate::msix_transaction::PciMsixGuard<'_>, Error> {
+        crate::msix_transaction::PciMsixGuard::prepare(self, count)
+    }
+
+    pub(crate) fn msix_descriptor(&self) -> Option<(u16, u16, u32, u32)> {
+        self.device.msix_descriptor()
+    }
+    pub(crate) fn claim_msix(&self) -> Result<(), Error> {
+        if self.device.irqs_quarantined() {
+            return Err(Error::AccessDenied);
+        }
+        self.msix_owned
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map(|_| ())
+            .map_err(|_| Error::AccessDenied)
+    }
+    pub(crate) fn release_msix(&self) {
+        self.msix_owned.store(false, Ordering::Release);
+    }
+    pub(crate) fn quarantine_irq_resources(&self) {
+        self.device.quarantine_irqs();
+    }
+    pub(crate) fn write_irq_command(&self, command: u16) {
+        self.device.write_command_raw(command);
+    }
+    pub(crate) fn bar_size(&self, index: u8) -> Result<usize, Error> {
+        match self.device.bar_manager().bar(index) {
+            Some(Bar::Memory(bar)) => usize::try_from(bar.size()).map_err(|_| Error::Overflow),
+            _ => Err(Error::InvalidArgs),
+        }
+    }
+    pub(crate) fn map_msix_bar(&self, index: u8) -> Result<IoMem, Error> {
+        if index == self.bar_index {
+            return Ok(self.mapping.as_ref().unwrap().clone());
+        }
+        match self.device.bar_manager().bar(index) {
+            Some(Bar::Memory(bar)) => bar.acquire_owned(),
+            _ => Err(Error::InvalidArgs),
+        }
     }
 
     /// Read a naturally aligned 32-bit register inside the mapped BAR.
@@ -160,14 +214,30 @@ impl<'a> PciMmioGuard<'a> {
 
 impl Drop for PciMmioGuard<'_> {
     fn drop(&mut self) {
-        // No DMA buffers, ISR callbacks, task queues or GPU commands are ever created here.
-        // Drop/unmap/recycle CPU mapping before restoring the prior function command state.
-        drop(self.mapping.take());
+        if self.msix_owned.load(Ordering::Acquire)
+            || self.device.irqs_quarantined()
+            || !ostd::task::atomic_mode::can_sleep()
+        {
+            // An active/forgotten IRQ transaction has no proven device stop. Retain its
+            // register mapping and prevent reservation reprobe, including group members.
+            self.device.quarantine_irqs();
+            core::mem::forget(self.mapping.take());
+            return;
+        }
+        // No live IRQ transaction remains; callbacks have been synchronously disconnected.
+        // Confirm rollback before releasing the mapping, not just that a read was possible.
         self.device.write_command_raw(self.original_command);
-        let _ = self
+        if self
             .device
             .location()
-            .read16(PciCommonCfgOffset::Command as u16);
+            .read16(PciCommonCfgOffset::Command as u16)
+            != self.original_command
+        {
+            self.device.quarantine_irqs();
+            core::mem::forget(self.mapping.take());
+            return;
+        }
+        drop(self.mapping.take());
     }
 }
 

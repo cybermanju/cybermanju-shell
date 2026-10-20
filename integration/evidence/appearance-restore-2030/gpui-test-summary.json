@@ -1,0 +1,81 @@
+{
+  "rust_suite_counts": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      83,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      19,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      82,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      4,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "rust_passed": 189,
+  "rust_failed": 0,
+  "python_tests": 32,
+  "python_ok": true,
+  "package_versions_unchanged": true,
+  "direct_dependency_added": "already-locked libc 0.2.187",
+  "negative_old_symlink_regression_reproduced": true
+}

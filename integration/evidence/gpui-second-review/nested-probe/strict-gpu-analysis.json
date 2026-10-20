@@ -1,0 +1,171 @@
+{
+  "renderer_by_window": [
+    {
+      "window": "AnyWindowHandle { id: WindowId(1v1), state_type: TypeId(0x521edaa2557395aae5b245ae79e65419) }",
+      "specs": {
+        "is_software_emulated": true,
+        "device_name": "llvmpipe (LLVM 21.1.8, 256 bits)",
+        "driver_name": "llvmpipe",
+        "driver_info": "Mesa 26.1.5 (LLVM 21.1.8)"
+      },
+      "device_name": "llvmpipe (LLVM 21.1.8, 256 bits)",
+      "classification": "software_cpu",
+      "backend": "Vulkan",
+      "backend_source": "upstream Selected GPU adapter log (GpuSpecs does not expose backend)",
+      "upstream_selected_adapter": {
+        "device": "llvmpipe (LLVM 21.1.8, 256 bits)",
+        "backend": "Vulkan"
+      },
+      "backend_device_match": true,
+      "hardware_acceleration_verified": false
+    }
+  ],
+  "telemetry": {
+    "observation_count": 4,
+    "observations": [
+      {
+        "window": "AnyWindowHandle { id: WindowId(1v1), state_type: TypeId(0x521edaa2557395aae5b245ae79e65419) }",
+        "mode": "bounded_redraw_probe",
+        "probe_seconds": 3,
+        "probe_finished": false,
+        "elapsed_seconds": 1.029728962,
+        "sample_entries": 5,
+        "sample_intervals": 4,
+        "dropped_samples": 0,
+        "invalid_intervals": 0,
+        "render_entry_rate_hz": 3.8850265061518106,
+        "render_entry_interval_ms": {
+          "p50": 39.396203,
+          "p95": 528.942503,
+          "p99": 528.942503,
+          "max": 528.942503
+        },
+        "view_build_wall_ms": {
+          "p50": 0.06651,
+          "p95": 0.09154599999999999,
+          "p99": 0.09154599999999999,
+          "max": 0.09154599999999999
+        },
+        "includes_idle_gaps": true,
+        "physical_presentation_fps": null,
+        "hardware_acceleration_verified": false
+      },
+      {
+        "window": "AnyWindowHandle { id: WindowId(1v1), state_type: TypeId(0x521edaa2557395aae5b245ae79e65419) }",
+        "mode": "bounded_redraw_probe",
+        "probe_seconds": 3,
+        "probe_finished": false,
+        "elapsed_seconds": 2.049204826,
+        "sample_entries": 23,
+        "sample_intervals": 23,
+        "dropped_samples": 0,
+        "invalid_intervals": 0,
+        "render_entry_rate_hz": 22.560612577680406,
+        "render_entry_interval_ms": {
+          "p50": 43.842000999999996,
+          "p95": 58.25035,
+          "p99": 67.01799799999999,
+          "max": 67.01799799999999
+        },
+        "view_build_wall_ms": {
+          "p50": 0.060327,
+          "p95": 0.09467,
+          "p99": 0.09521500000000001,
+          "max": 0.09521500000000001
+        },
+        "includes_idle_gaps": true,
+        "physical_presentation_fps": null,
+        "hardware_acceleration_verified": false
+      },
+      {
+        "window": "AnyWindowHandle { id: WindowId(1v1), state_type: TypeId(0x521edaa2557395aae5b245ae79e65419) }",
+        "mode": "bounded_redraw_probe",
+        "probe_seconds": 3,
+        "probe_finished": true,
+        "elapsed_seconds": 3.000686099,
+        "sample_entries": 24,
+        "sample_intervals": 24,
+        "dropped_samples": 0,
+        "invalid_intervals": 0,
+        "render_entry_rate_hz": 25.223828025882753,
+        "render_entry_interval_ms": {
+          "p50": 39.120712000000005,
+          "p95": 46.318869,
+          "p99": 51.635066,
+          "max": 51.635066
+        },
+        "view_build_wall_ms": {
+          "p50": 0.068259,
+          "p95": 0.09766,
+          "p99": 0.098385,
+          "max": 0.098385
+        },
+        "includes_idle_gaps": true,
+        "physical_presentation_fps": null,
+        "hardware_acceleration_verified": false
+      },
+      {
+        "window": "AnyWindowHandle { id: WindowId(1v1), state_type: TypeId(0x521edaa2557395aae5b245ae79e65419) }",
+        "mode": "bounded_redraw_probe",
+        "probe_seconds": 3,
+        "probe_finished": true,
+        "elapsed_seconds": 4.948136917,
+        "sample_entries": 3,
+        "sample_intervals": 3,
+        "dropped_samples": 0,
+        "invalid_intervals": 0,
+        "render_entry_rate_hz": 1.5404753600303758,
+        "render_entry_interval_ms": {
+          "p50": 694.162662,
+          "p95": 1023.7235790000001,
+          "p99": 1023.7235790000001,
+          "max": 1023.7235790000001
+        },
+        "view_build_wall_ms": {
+          "p50": 0.08286600000000001,
+          "p95": 0.17069900000000002,
+          "p99": 0.17069900000000002,
+          "max": 0.17069900000000002
+        },
+        "includes_idle_gaps": true,
+        "physical_presentation_fps": null,
+        "hardware_acceleration_verified": false
+      }
+    ]
+  },
+  "physical_presentation_fps": null,
+  "hardware_acceleration_verified": false,
+  "physical_gpu_certification": {
+    "verified": false,
+    "classification": "software_cpu",
+    "reason": "The selected renderer is classified as software CPU rendering; it is not physical-GPU evidence.",
+    "strict_requirement_met": false,
+    "strict_requirement_reason": "Physical GPU acceleration cannot be certified from this log: GpuSpecs lacks adapter type and PCI identity; software_cpu, virtual_or_remote, and unknown devices are rejected outright, and unverified_non_cpu is also insufficient. There is no override."
+  },
+  "not_hardware_performance_evidence": true,
+  "limitations": [
+    "GPUI bar_render_entry records measure render-entry observations, not completed GPU work, compositor presentation, or scanout.",
+    "render_entry_rate_hz is a render-entry statistic and is not presentation FPS.",
+    "view_build_wall_ms is elapsed wall time for element-tree construction, not thread CPU time.",
+    "Physical presentation timestamps are unavailable; physical_presentation_fps is null.",
+    "hardware_acceleration_verified is false: GpuSpecs has no adapter type or PCI identity, so hardware acceleration is not verified."
+  ],
+  "renderer": {
+    "specs": {
+      "is_software_emulated": true,
+      "device_name": "llvmpipe (LLVM 21.1.8, 256 bits)",
+      "driver_name": "llvmpipe",
+      "driver_info": "Mesa 26.1.5 (LLVM 21.1.8)"
+    },
+    "device_name": "llvmpipe (LLVM 21.1.8, 256 bits)",
+    "classification": "software_cpu",
+    "backend": "Vulkan",
+    "backend_source": "upstream Selected GPU adapter log (GpuSpecs does not expose backend)",
+    "upstream_selected_adapter": {
+      "device": "llvmpipe (LLVM 21.1.8, 256 bits)",
+      "backend": "Vulkan"
+    },
+    "backend_device_match": true,
+    "hardware_acceleration_verified": false
+  }
+}

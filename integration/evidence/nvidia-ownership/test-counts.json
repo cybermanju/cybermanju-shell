@@ -1,0 +1,26 @@
+{
+  "native-nvidia-nvport-tests.log": {
+    "reported_passed": 20,
+    "explicit_skip_markers": [],
+    "runner_finished": true
+  },
+  "native-nvidia-platform-tests.log": {
+    "reported_passed": 4,
+    "explicit_skip_markers": [],
+    "runner_finished": true
+  },
+  "native-pci-tests.log": {
+    "reported_passed": 5,
+    "explicit_skip_markers": [],
+    "runner_finished": true
+  },
+  "native-ostd-tests.log": {
+    "reported_passed": 228,
+    "explicit_skip_markers": [
+      "[skipped: VMX unavailable]",
+      "[skipped: VMX unavailable]",
+      "[skipped: VMX/EPT invalidation unavailable]"
+    ],
+    "runner_finished": true
+  }
+}

@@ -1,0 +1,361 @@
+[32m/workspace/asterinas-gpui/asterinas$ [0mnl -ba tools/nixos/build_nixos.sh; nl -ba test/nixos/tests/hello/src/main.rs; nl -ba test/nixos/common/framework/src/session.rs | sed -n '125,172p;325,348p'; nl -ba test/nixos/common/framework/src/lib.rs | sed -n '165,270p'; rg -n 'export|q35|cpu |kernel|initrd|boot |file=' Makefile tools/qemu_args.sh; find distro -maxdepth 2 -type f \( -name '*lock*' -o -name '*nixpkgs*' -o -name 'default.nix' -o -name '*sources*' \) -print; ls -l target/osdk/bin; git diff --quiet -- Makefile tools/nixos test/nixos distro rust-toolchain.toml; printf 'official_nixos_inputs_tracked_diff_exit=%s\n' "$?"
+     1#!/bin/bash
+     2
+     3# SPDX-License-Identifier: MPL-2.0
+     4
+     5set -e
+     6
+     7TARGET_ARCH=${TARGET_ARCH:-x86_64}
+     8# Accept config file name as parameter, default to "configuration.nix"
+     9CONFIG_FILE_NAME=${1:-"configuration.nix"}
+    10
+    11SCRIPT_DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
+    12ASTERINAS_DIR=$(realpath ${SCRIPT_DIR}/../..)
+    13ASTER_IMAGE_PATH=${ASTERINAS_DIR}/target/nixos/asterinas.img
+    14NIXOS_DISK_SIZE_IN_MB=${NIXOS_DISK_SIZE_IN_MB:-16384}
+    15DISTRO_DIR=$(realpath ${ASTERINAS_DIR}/distro)
+    16CONFIG_PATH=${DISTRO_DIR}/etc_nixos/${CONFIG_FILE_NAME}
+    17
+    18NIX_SYSTEM=$("${SCRIPT_DIR}/print_target_nix_system.sh" "${TARGET_ARCH}") 
+|| exit 1
+    19
+    20pushd $DISTRO_DIR
+    21nix-build aster_nixos_installer/default.nix \
+    22    --argstr target_platform "${NIX_SYSTEM}" \
+    23    --argstr disable-systemd "${NIXOS_DISABLE_SYSTEMD}" \
+    24    --argstr stage-2-hook "${NIXOS_STAGE_2_INIT}" \
+    25    --argstr log-level "${LOG_LEVEL}" \
+    26    --argstr console "${CONSOLE}" \
+    27    --argstr extra-substituters "${RELEASE_SUBSTITUTER} ${DEV_SUBSTITUTER}
+" \
+    28    --argstr extra-trusted-public-keys "${RELEASE_TRUSTED_PUBLIC_KEY} ${DE
+V_TRUSTED_PUBLIC_KEY}"
+    29popd
+    30
+    31mkdir -p ${ASTERINAS_DIR}/target/nixos
+    32# The installer skips partitioning and mkfs on an existing image,
+    33# so a new size takes effect only on a new image.
+    34if [ -e ${ASTER_IMAGE_PATH} ] \
+    35    && [ "$(stat -c %s ${ASTER_IMAGE_PATH})" -ne $((NIXOS_DISK_SIZE_IN_MB 
+* 1024 * 1024)) ]; then
+    36    echo "Removing ${ASTER_IMAGE_PATH}, because its size is not ${NIXOS_DI
+SK_SIZE_IN_MB}MB......"
+    37    rm ${ASTER_IMAGE_PATH}
+    38fi
+    39if [ ! -e ${ASTER_IMAGE_PATH} ]; then
+    40    echo "Creating image at ${ASTER_IMAGE_PATH} of size ${NIXOS_DISK_SIZE_
+IN_MB}MB......"
+    41    fallocate -l ${NIXOS_DISK_SIZE_IN_MB}M ${ASTER_IMAGE_PATH}
+    42    echo "Image created successfully!"
+    43fi
+    44
+    45DISK=$(losetup -fP --show ${ASTER_IMAGE_PATH})
+    46cleanup() {
+    47    losetup -d ${DISK} 2>/dev/null || true
+    48}
+    49trap cleanup EXIT INT TERM ERR
+    50
+    51${DISTRO_DIR}/result/bin/aster-nixos-install --config ${CONFIG_PATH} --dis
+k ${DISK}
+     1// SPDX-License-Identifier: MPL-2.0
+     2
+     3//! The test suite for hello-asterinas on Asterinas NixOS.
+     4
+     5use nixos_test_framework::*;
+     6
+     7nixos_test_main!();
+     8
+     9#[nixos_test]
+    10fn hello(nixos_shell: &mut Session) -> Result<(), Error> {
+    11    nixos_shell.run_cmd_and_expect("hello-asterinas", "Hello Asterinas!")?
+;
+    12    Ok(())
+    13}
+   125    ///     // Verify output contains expected string
+   126    ///     nixos_shell.run_cmd_and_expect("echo 'Hello, World!'", "Hello"
+)?;
+   127    ///
+   128    ///     // Check if a file exists
+   129    ///     nixos_shell.run_cmd_and_expect("ls /etc/hostname", "/etc/hostn
+ame")?;
+   130    ///
+   131    ///     // Verify system information
+   132    ///     nixos_shell.run_cmd_and_expect("cat /etc/os-release", "NixOS")
+?;
+   133    ///
+   134    ///     Ok(())
+   135    /// }
+   136    /// ```
+   137    pub fn run_cmd_and_expect(&mut self, command: &str, expected: &str) ->
+ Result<(), Error> {
+   138        println!("--> Running: {} (expecting: {})", command, expected);
+   139        self.pty_session.send_line(command).map_err(Error::from)?;
+   140        // Read and consume the echoed command line
+   141        self.pty_session.exp_string(command).map_err(Error::from)?;
+   142
+   143        match self
+   144            .pty_session
+   145            .exp_string(&self.desc.prompt)
+   146            .map_err(Error::from)
+   147        {
+   148            Ok(unread) => {
+   149                let cleaned_unread = clean_output(&unread);
+   150                if !cleaned_unread.contains(expected) {
+   151                    let error = Error::UnexpectedOutput {
+   152                        expected: expected.to_string(),
+   153                        got: truncate_output_for_error(&cleaned_unread),
+   154                    };
+   155                    Self::output_error(&error);
+   156                    return Err(error);
+   157                }
+   158            }
+   159            Err(e) => {
+   160                Self::output_error(&e);
+   161                return Err(e);
+   162            }
+   163        }
+   164
+   165        Ok(())
+   166    }
+   167
+   168    /// Executes a command and verifies its output matches the expected re
+gex.
+   169    ///
+   170    /// This method runs the command and checks that the specified regex m
+atches
+   171    /// the output before the prompt reappears.
+   172    ///
+   325            &guard.background_process.ready,
+   326            READY_TIMEOUT,
+   327            "background process to become ready",
+   328        )?;
+   329
+   330        test_ops(guard.session)
+   331    }
+   332
+   333    pub(super) fn shutdown(&mut self) -> Result<(), Error> {
+   334        self.pty_session
+   335            .send_line(&self.desc.exit_cmd)
+   336            .map_err(Error::from)?;
+   337
+   338        self.pty_session.process().wait().map_err(Error::from)?;
+   339
+   340        Ok(())
+   341    }
+   342
+   343    fn output_error(error: &Error) {
+   344        match error {
+   345            Error::Pty(rexpect::error::Error::EOF {
+   346                expected,
+   347                got,
+   348                exit_code,
+   165        print_help();
+   166        return Ok(());
+   167    }
+   168
+   169    // Parse --qemu-cmd argument
+   170    let qemu_cmd = parse_arg(&args, "--qemu-cmd").ok_or("Missing --qemu-cm
+d argument")?;
+   171
+   172    // Parse optional --test argument
+   173    let test_filter = parse_arg(&args, "--test");
+   174
+   175    // Parse timeout from NIXOS_TEST_TIMEOUT environment variable
+   176    let timeout_ms = env::var("NIXOS_TEST_TIMEOUT")
+   177        .ok()
+   178        .map(|v| parse_timeout(&v))
+   179        .transpose()?
+   180        .unwrap_or(600_000); // Default: 10 minutes
+   181
+   182    let all_test_cases: Vec<&TestCase> = inventory::iter::<TestCase>().col
+lect();
+   183
+   184    if all_test_cases.is_empty() {
+   185        return Err("No test cases found".into());
+   186    }
+   187
+   188    // Filter test cases if --test is specified
+   189    let test_cases: Vec<&TestCase> = if let Some(ref filter) = test_filter
+ {
+   190        let filtered: Vec<&TestCase> = all_test_cases
+   191            .into_iter()
+   192            .filter(|tc| tc.name == filter)
+   193            .collect();
+   194
+   195        if filtered.is_empty() {
+   196            return Err(format!("Test case '{}' not found", filter).into())
+;
+   197        }
+   198
+   199        filtered
+   200    } else {
+   201        all_test_cases
+   202    };
+   203
+   204    if let Some(ref filter) = test_filter {
+   205        println!("=== Running single test case: {} ===", filter);
+   206    } else {
+   207        println!("=== Found {} test case(s) ===", test_cases.len());
+   208        for tc in &test_cases {
+   209            println!("  - {}", tc.name);
+   210        }
+   211        println!();
+   212    }
+   213
+   214    let mut session = rexpect::spawn(&qemu_cmd, Some(timeout_ms)).map_err(
+Error::from)?;
+   215
+   216    println!("--> Waiting for login prompt...");
+   217    let init_prompt = "root@asterinas:";
+   218    session.exp_string(init_prompt).map_err(Error::from)?;
+   219
+   220    let desc = SessionDesc::new(init_prompt, "", "poweroff");
+   221    let mut session = Session::new(desc, session);
+   222    // `emacs` and `vi` are the two line-editing modes of Bash. Turn both 
+off,
+   223    // because the line editor wraps a long echoed command line at the ter
+minal width
+   224    // and `Session` would then fail to match it against the command it se
+nt.
+   225    session.run_cmd("set +o emacs +o vi")?;
+   226
+   227    let mut passed = 0;
+   228    let mut failed = 0;
+   229    let mut failed_tests = Vec::new();
+   230
+   231    for test_case in test_cases {
+   232        println!("=== Running test case: {} ===", test_case.name);
+   233
+   234        match (test_case.test_fn)(&mut session) {
+   235            Ok(_) => {
+   236                println!("✓ Test case '{}' passed\n", test_case.name);
+   237                passed += 1;
+   238            }
+   239            Err(_) => {
+   240                println!("✗ Test case '{}' failed\n", test_case.name);
+   241                failed += 1;
+   242                failed_tests.push(test_case.name);
+   243            }
+   244        }
+   245    }
+   246
+   247    println!("=== Test Summary ===");
+   248    println!("Passed: {}", passed);
+   249    println!("Failed: {}", failed);
+   250
+   251    let res = if !failed_tests.is_empty() {
+   252        println!("\nFailed tests:");
+   253        for name in failed_tests {
+   254            println!("  - {}", name);
+   255        }
+   256
+   257        Err("Some tests failed")
+   258    } else {
+   259        Ok(())
+   260    };
+   261
+   262    let shutdown_res = session.shutdown();
+   263
+   264    res?;
+   265    shutdown_res?;
+   266
+   267    Ok(())
+   268}
+   269
+   270pub(crate) fn truncate_output_for_error(output: &str) -> String {
+[0m[35mtools/qemu_args.sh
+[0m[0m[32m33[0m:# Docker image's path; the Nix dev shell [0m[1m[31mexport[0ms this to the Nix store instea
+d.
+[0m[32m62[0m:# QEMU_OPT_ARG_DUMP_PACKETS="-object filter-dump,id=filter0,netdev=net01,[0m[1m[31mfile
+=[0mvirtio-net.pcap"
+[0m[32m89[0m:    ROOTFS_DRIVE_ARGS="-drive if=none,format=raw,id=rootfs,[0m[1m[31mfile=[0m./test/initra
+mfs/build/rootfs.img"
+[0m[32m127[0m:        -[0m[1m[31mcpu [0mrv64,svpbmt=true,zkr=true \
+[0m[32m131[0m:        --no-re[0m[1m[31mboot [0m\
+[0m[32m135[0m:        -chardev stdio,id=mux,mux=on,signal=off,log[0m[1m[31mfile=[0mqemu.log \
+[0m[32m137[0m:        -drive if=none,format=raw,id=x0,[0m[1m[31mfile=[0m./test/initramfs/build/ext2.img
+ \
+[0m[32m138[0m:        -drive if=none,format=raw,id=x1,[0m[1m[31mfile=[0m./test/initramfs/build/exfat.im
+g \
+[0m[32m139[0m:        -drive if=none,format=raw,id=x2,[0m[1m[31mfile=[0m./test/initramfs/build/ltp_dev.
+img \
+[0m[32m161[0m:        -[0m[1m[31mcpu [0m${CPU_MODEL} \
+[0m[32m165[0m:        --no-re[0m[1m[31mboot [0m\
+[0m[32m169[0m:        -chardev stdio,id=mux,mux=on,signal=off,log[0m[1m[31mfile=[0mqemu.log \
+[0m[32m170[0m:        -drive if=none,format=raw,id=x0,[0m[1m[31mfile=[0m./test/initramfs/build/ext2.img
+ \
+[0m[32m171[0m:        -drive if=none,format=raw,id=x1,[0m[1m[31mfile=[0m./test/initramfs/build/exfat.im
+g \
+[0m[32m172[0m:        -drive if=none,format=raw,id=x2,[0m[1m[31mfile=[0m./test/initramfs/build/ltp_dev.
+img \
+[0m[32m198[0m:        -[0m[1m[31mcpu [0mhost,-kvm-steal-time,pmu=off \
+[0m[32m199[0m:        -machine [0m[1m[31mq35[0m,[0m[1m[31mkernel[0m-irqchip=split,confidential-guest-support=tdx0 \
+[0m[32m201[0m:        -drive if=none,format=raw,id=x0,[0m[1m[31mfile=[0m./test/initramfs/build/ext2.img
+ \
+[0m[32m202[0m:        -drive if=none,format=raw,id=x1,[0m[1m[31mfile=[0m./test/initramfs/build/exfat.im
+g \
+[0m[32m203[0m:        -drive if=none,format=raw,id=x2,[0m[1m[31mfile=[0m./test/initramfs/build/ltp_dev.
+img \
+[0m[32m213[0m:        -chardev stdio,id=mux,mux=on,log[0m[1m[31mfile=[0mqemu.log \
+[0m[32m214[0m:        -device virtio-serial,rom[0m[1m[31mfile=[0m \
+[0m[32m225[0m:    -[0m[1m[31mcpu [0mIcelake-Server,+x2apic,+vmx \
+[0m[32m228[0m:    --no-re[0m[1m[31mboot [0m\
+[0m[32m232[0m:    -chardev stdio,id=mux,mux=on,signal=off,log[0m[1m[31mfile=[0mqemu.log \
+[0m[32m236[0m:    -drive if=none,format=raw,id=x0,[0m[1m[31mfile=[0m./test/initramfs/build/ext2.img \
+[0m[32m237[0m:    -drive if=none,format=raw,id=x1,[0m[1m[31mfile=[0m./test/initramfs/build/exfat.img \
+[0m[32m238[0m:    -drive if=none,format=raw,id=x2,[0m[1m[31mfile=[0m./test/initramfs/build/ltp_dev.img 
+\
+[0m[32m245[0m:    -drive if=none,format=raw,id=x3,[0m[1m[31mfile=[0m./test/initramfs/build/xfstests_tes
+t.img \
+[0m[32m246[0m:    -drive if=none,format=raw,id=x4,[0m[1m[31mfile=[0m./test/initramfs/build/xfstests_scr
+atch.img \
+[0m[32m292[0m:        -machine [0m[1m[31mq35[0m,[0m[1m[31mkernel[0m-irqchip=split \
+[0m[32m301[0m:        -drive if=none,format=raw,id=nvme0n1,[0m[1m[31mfile=[0m./test/initramfs/build/nvm
+e0n1.img \
+[0m[32m358[0m:# When using direct ELF boot, OVMF depends on the [0m[1m[31mboot [0mprotocol:
+[0m[35mMakefile
+[0m[0m[32m32[0m:# linux-efi-handover64 and linux-efi-pe64 [0m[1m[31mboot [0mprotocol.
+[0m[32m47[0m:# The Makefile provides a way to run arbitrary tests in the [0m[1m[31mkernel
+[0m[0m[32m48[0m:# mode using the [0m[1m[31mkernel[0m command line.
+[0m[32m125[0m:[0m[1m[31mexport[0m OSDK_TARGET_ARCH=$(TARGET_ARCH)
+[0m[32m165[0m:[0m[1m[31mexport[0m VSOCK=on
+[0m[32m184[0m:# If the BENCHMARK is set, we will run the benchmark in the [0m[1m[31mkernel[0m mode.
+[0m[32m194[0m:ifneq (,$(filter multi[0m[1m[31mboot [0mpvh,$(BOOT_PROTOCOL)))
+[0m[32m233[0m:# To test the linux-efi-handover64 [0m[1m[31mboot [0mprotocol, we need to use Debian's
+[0m[32m241[0m:CARGO_OSDK_COMMON_ARGS += --linux-x86-legacy-[0m[1m[31mboot [0m--grub-boot-protocol="linu
+x" --strip-elf
+[0m[32m243[0m:# PVH uses the vmm-direct [0m[1m[31mboot [0mmethod, so there is no GRUB [0m[1m[31mboot [0mprotocol to 
+pass.
+[0m[32m278[0m:[0m[1m[31mexport
+[0m[0m[32m285[0m:all: [0m[1m[31mkernel
+[0m[0m[32m329[0m:# Build the [0m[1m[31mkernel[0m with an initramfs
+[0m[32m330[0m:.PHONY: [0m[1m[31mkernel
+[0m[0m[32m331[0m:[0m[1m[31mkernel[0m: $(CARGO_OSDK)
+[0m[32m333[0m:[0m[1m[31mkernel[0m: initramfs
+[0m[32m335[0m:[0m[1m[31mkernel[0m: rootfs
+[0m[32m337[0m:[0m[1m[31mkernel[0m:
+[0m[32m338[0m:@cd [0m[1m[31mkernel[0m && cargo osdk build $(CARGO_OSDK_BUILD_ARGS)
+[0m[32m340[0m:# Build the [0m[1m[31mkernel[0m with an initramfs and then run it
+[0m[32m341[0m:.PHONY: run_[0m[1m[31mkernel
+[0m[0m[32m342[0m:run_[0m[1m[31mkernel[0m: $(CARGO_OSDK)
+[0m[32m344[0m:run_[0m[1m[31mkernel[0m: initramfs
+[0m[32m346[0m:run_[0m[1m[31mkernel[0m: rootfs
+[0m[32m348[0m:run_[0m[1m[31mkernel[0m:
+[0m[32m349[0m:@cd [0m[1m[31mkernel[0m && cargo osdk run $(CARGO_OSDK_BUILD_ARGS)
+[0m[32m368[0m:@make [0m[1m[31mkernel
+[0m[0m[32m383[0m:@make [0m[1m[31mkernel
+[0m[0m[32m419[0m:@cd [0m[1m[31mkernel[0m && cargo osdk run $(CARGO_OSDK_BUILD_ARGS) --gdb-server wait-clie
+nt,vscode,addr=:$(GDB_TCP_PORT)
+[0m[32m423[0m:@cd [0m[1m[31mkernel[0m && cargo osdk debug $(CARGO_OSDK_BUILD_ARGS) --remote :$(GDB_TCP_
+PORT)
+[0m[32m427[0m:@cd [0m[1m[31mkernel[0m && cargo osdk run $(CARGO_OSDK_BUILD_ARGS) --gdb-server addr=:$(G
+DB_TCP_PORT)
+[0m[32m431[0m:@cd [0m[1m[31mkernel[0m && cargo osdk profile $(CARGO_OSDK_BUILD_ARGS) --remote :$(GDB_TC
+P_PORT) \
+distro/aster_nixos_installer/default.nix
+distro/cachix/default.nix
+distro/iso_image/default.nix
+distro/nixpkgs.nix
+total 20468
+-rwxr-xr-x 1 ubuntu ubuntu 20956200 Oct 20 12:39 linux-bzimage-setup
+official_nixos_inputs_tracked_diff_exit=0

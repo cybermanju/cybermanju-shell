@@ -1,0 +1,92 @@
+{
+  "rust_suite_summaries": [
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 88,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 82,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "rust_passed": 201,
+  "rust_failed": 0,
+  "rust_ignored": 0,
+  "python_tests": 36,
+  "python_ok": true,
+  "profile_cli_tests": 13,
+  "new_real_inotify_watcher_tests": 6,
+  "build_exit": 0,
+  "clippy_exit": 0,
+  "clippy_warnings": [
+    "warning: using `chunks_exact` with a constant chunk size",
+    "warning: `ui` (test \"icon_assets\") generated 1 warning (run `cargo clippy --fix --test \"icon_assets\" -p ui -- ` to apply 1 suggestion)",
+    "warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1"
+  ],
+  "binary": "/workspace/asterinas-gpui/gpui-shell/target/debug/gpuishell",
+  "binary_sha256": "dc9bd7d968d022f86cc430f2dcf437719d828acd3d0fb5f907fff4a0d8ca31f5",
+  "completion_job": "job_GvXJ9B7O",
+  "scope": "Local native file-to-theme checks, not Asterinas desktop or physical-GPU acceptance"
+}

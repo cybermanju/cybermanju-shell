@@ -1,0 +1,11 @@
+--- patched/kernel/comps/drm/src/ioctl/gem.rs
++++ incoming-worktree/kernel/comps/drm/src/ioctl/gem.rs
+@@ -84,7 +84,7 @@
+ mod tests {
+     use ostd::prelude::*;
+ 
+-    use super::{dumb_buffer_layout, PAGE_SIZE};
++    use super::{PAGE_SIZE, dumb_buffer_layout};
+ 
+     #[ktest]
+     fn dumb_buffer_rows_round_pixel_size_up_before_multiplying_width() {

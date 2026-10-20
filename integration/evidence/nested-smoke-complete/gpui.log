@@ -1,0 +1,21 @@
+[2m2026-10-20T14:32:29.299625Z[0m [32m INFO[0m [2mgpuishell::ipc::service[0m[2m:[0m Prepared as primary instance, socket at "/tmp/gpui-nested-themxs49/runtime/gpuishell.sock"
+[2m2026-10-20T14:32:29.299728Z[0m [32m INFO[0m [2mservices::compositor[0m[2m:[0m Detected compositor backend: Niri
+[2m2026-10-20T14:32:29.820257Z[0m [32m INFO[0m [2mgpuishell::state[0m[2m:[0m Connected to the compositor in 520.529842ms
+[2m2026-10-20T14:32:29.820441Z[0m [32m INFO[0m [2mservices::compositor::niri[0m[2m:[0m Starting Niri event listener
+[2m2026-10-20T14:32:29.935210Z[0m [32m INFO[0m [2mservices::mpris[0m[2m:[0m MPRIS subscriber started
+[2m2026-10-20T14:32:29.935365Z[0m [31mERROR[0m [2mservices::upower[0m[2m:[0m Failed to initialize UPower data: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[2m2026-10-20T14:32:29.935668Z[0m [31mERROR[0m [2mservices::bluetooth[0m[2m:[0m Failed to fetch initial bluetooth data: org.freedesktop.DBus.Error.ServiceUnknown: The name org.bluez was not provided by any .service files
+[2m2026-10-20T14:32:29.935926Z[0m [33m WARN[0m [1m{}[0m[1m{[0m[3mtask_name[0m[2m=[0m"org.freedesktop.portal.Settings proxy caching"[1m}[0m[2m:[0m [2mzbus::proxy[0m[2m:[0m Failed to populate properties cache via GetAll: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.portal.Desktop was not provided by any .service files. Property change streams will not produce values.
+[2m2026-10-20T14:32:29.936232Z[0m [31mERROR[0m [2mservices::bluetooth[0m[2m:[0m Bluetooth listener error: org.freedesktop.DBus.Error.ServiceUnknown: The name org.bluez was not provided by any .service files
+[2m2026-10-20T14:32:29.936476Z[0m [32m INFO[0m [2mservices::tray::dbus[0m[2m:[0m Acquired bus name: org.kde.StatusNotifierWatcher
+[2m2026-10-20T14:32:29.937059Z[0m [33m WARN[0m [1m{}[0m[1m{[0m[3mtask_name[0m[2m=[0m"org.freedesktop.NetworkManager proxy caching"[1m}[0m[2m:[0m [2mzbus::proxy[0m[2m:[0m Failed to populate properties cache via GetAll: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files. Property change streams will not produce values.
+[2m2026-10-20T14:32:29.937159Z[0m [31mERROR[0m [2mservices::network[0m[2m:[0m Failed to fetch initial network data: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files
+[2m2026-10-20T14:32:29.937318Z[0m [32m INFO[0m [2mservices::network[0m[2m:[0m Network subscriber started
+[2m2026-10-20T14:32:29.939209Z[0m [32m INFO[0m [2mservices::tray[0m[2m:[0m Tray service started with 0 items
+[2m2026-10-20T14:32:29.939246Z[0m [33m WARN[0m [1m{}[0m[1m{[0m[3mtask_name[0m[2m=[0m"org.freedesktop.NetworkManager proxy caching"[1m}[0m[2m:[0m [2mzbus::proxy[0m[2m:[0m Failed to populate properties cache via GetAll: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files. Property change streams will not produce values.
+[2m2026-10-20T14:32:29.939381Z[0m [31mERROR[0m [2mservices::network[0m[2m:[0m Network listener error: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files
+
+thread '<unnamed>' (350741) panicked at crates/services/src/audio/mod.rs:209:14:
+Failed to connect to PulseAudio: PAErr(-1)
+stack backtrace:
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.

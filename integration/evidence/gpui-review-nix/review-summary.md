@@ -1,0 +1,9 @@
+# GPUi Shell Nix review
+
+Reviewed `gpui-shell/nix/nixos-module.nix`, `gpui-shell/nix/nixos-module-test.nix`, and `docs/src/content/docs/developer/setup.md`, preserving existing staged and unstaged changes. Updated the setup guide to stress that the module neither imports compositor variables nor configures a compositor: Niri's `NIRI_SOCKET` or `NIRI_SOCKET_PATH` must reach the user service manager before `graphical-session.target` starts. Added a relative link to the sibling rendering/performance guide. No flake or Cargo files were changed.
+
+The locked nixpkgs input is `nixos/nixpkgs` revision `0182a361324364ae3f436a63005877674cf45efb` (from `gpui-shell/flake.lock`). Its NixOS modules include `ConditionEnvironment` on a user service and `graphical-session.target` wantedBy/PartOf wiring, consistent with this module's approach.
+
+The module evaluator passed with exit 0 using `nix --extra-experimental-features 'nix-command flakes' build --no-link --print-build-logs .#checks.x86_64-linux.nixos-module-evaluation`; see `module-test-build.log`. It evaluates against the locked nixpkgs NixOS `eval-config.nix`. Assertions cover disabled/enabled/override behavior, opt-in autostart, service dependencies/condition, `ExecStart`, and generated unit text.
+
+Full flake evaluation via `nix --extra-experimental-features 'nix-command flakes' flake check --no-build --show-trace` failed before completing output evaluation. The trace follows `packages.x86_64-linux.default` into Crane's `vendorCargoDeps` / Cargo-file traversal and ends with `error: path '/nix/store/zc27xhzgcwshqn0n99k8sgpd7i8j6drp-source' is not valid`; see `flake-check.log`. No bounded defect was found in the module/startup implementation requiring a source fix. The module check passes; full flake-check remains blocked by that package-evaluation store-path failure.

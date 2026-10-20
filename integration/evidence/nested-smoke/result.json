@@ -1,0 +1,7 @@
+{
+  "platform": "Linux nested X11/Wayland",
+  "hardware_acceleration_verified": false,
+  "vulkan_icd": "/workspace/asterinas-gpui/installed/mesa/share/vulkan/icd.d/lvp_icd.x86_64.json",
+  "result": "FAIL",
+  "error": "Process exited before readiness: 101"
+}

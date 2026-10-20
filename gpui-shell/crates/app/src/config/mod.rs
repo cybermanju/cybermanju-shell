@@ -1,5 +1,7 @@
 //! Application configuration stored as a GPUI global.
 
+pub mod appearance;
+pub mod appearance_live;
 mod persistence;
 mod state;
 mod theme;
@@ -116,7 +118,9 @@ impl Config {
 
     /// Reload theme from disk and replace the global theme.
     fn reload_theme(cx: &mut App) {
-        match theme::persistence::load_theme() {
+        match theme::persistence::load_theme()
+            .and_then(|theme| appearance_live::AppearanceOverlay::over_native_theme(theme, cx))
+        {
             Ok(theme) => {
                 Theme::set(theme, cx);
                 AppState::notification(cx).clear_local(LocalSlot::ThemeError);

@@ -1,0 +1,13 @@
+# NOT EXECUTED: disk capacity guard prevented build and guest run.
+# Official CI baseline, from the actual worktree root:
+make nixos NIXOS_TEST_SUITE=hello NIXOS_DISK_SIZE_IN_MB=6144
+make run_nixos NIXOS_TEST_SUITE=hello
+
+# Intended headless CPU/QEMU-only adaptation using existing supported options;
+# NOT EXECUTED or validated. Requires sufficient space and project environment first.
+make nixos NIXOS_TEST_SUITE=hello NIXOS_DISK_SIZE_IN_MB=6144 ENABLE_KVM=0 QEMU_DISPLAY=none
+make run_nixos NIXOS_TEST_SUITE=hello ENABLE_KVM=0 QEMU_DISPLAY=none NIXOS_TEST_TIMEOUT=10min
+
+# Root target internally invokes make kernel and the test/nixos wrapper.
+# No direct cargo/nix-build/QEMU build/run commands were invoked by this probe.
+# No sparse-image substitution, smaller image, configuration patch, or cache cleanup.

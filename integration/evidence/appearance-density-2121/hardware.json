@@ -1,0 +1,10 @@
+{
+  "time_utc": "2026-10-20T21:24:47.276222+00:00",
+  "nodes": {
+    "dri": [],
+    "nvidia": [],
+    "kvm": []
+  },
+  "display_class_pci": [],
+  "physical_gpu_acceptance": false
+}

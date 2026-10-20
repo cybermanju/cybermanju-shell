@@ -1,0 +1,167 @@
+{
+  "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-msix-transaction.patch",
+  "patch_sha256": "ae4b4d8401319bddb185b353204a45534f0cc0c222a024e18d5c361bae49fd5e",
+  "files": [
+    {
+      "path": ".github/workflows/graphics_gpu.yml",
+      "old_sha256": "db345476903f4dd41de2139dc13284fadf2ef3bc066d8cac472a4ab8d08db29e",
+      "new_sha256": "47efcb79248755d9c84d5627e1472ff7a10066ff31f832003cf63e3e0a6539fd",
+      "new_file": false
+    },
+    {
+      "path": "kernel/comps/nvidia-platform/src/device.rs",
+      "old_sha256": "c9fdd00c304793df06087991dca3fe2377bad1fdc4ff21d89c922f91885e6a42",
+      "new_sha256": "3e787d17f7997cbbd0127bcafee564451e891f932923ef79efa8711ad35f2eae",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/nvme/src/device/block_device.rs",
+      "old_sha256": "47866bf447f28366a0918952ff691e3c82ecea59781fc6ea78871b9bf0a077db",
+      "new_sha256": "fa2d1210ab0a4a924b5e1fa392a2252f9747cc6ec70de9fa2382691684ffdff9",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/nvme/src/msix.rs",
+      "old_sha256": "7956c38960aa44b97d5aaa9c8b2bb440a934ef83dae21eaec60f577d7da981a1",
+      "new_sha256": "42c1121862938a718fef1a7748bc010a33219f91a18bcee55c182e1dba43468d",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/nvme/src/transport/pci/transport.rs",
+      "old_sha256": "812787de0f96089262c558e0ff8b18561f6b3d21b0ed091579900901d6e7f845",
+      "new_sha256": "53a8af8489eae4baed00d79d2428ebffa8b705006c4c61d2fbf040421dbd8e34",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/bus.rs",
+      "old_sha256": "9ceadf71c64deabc8499113591bb48caaca71e0acef42aaeb5ec6896da48fa54",
+      "new_sha256": "581670f86322e0c6bcfe95340fbba95e7345d682047f12c54df944f2e868b276",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/capability/mod.rs",
+      "old_sha256": "f72853e274b7c026fa22ade17cd23ee547cc36edc6773c19b758b59f85052744",
+      "new_sha256": "995b9476a8d815a82c25b8af55ef01a406eebe9da57ce621622e9e6104587115",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/capability/msix.rs",
+      "old_sha256": "a3ed6daddea9dbb4fd3efe1b53d1f81ed8c700233321e4065f292052acbde0c8",
+      "new_sha256": "a55e321a7cd30904ff1c30cbddbb37df342a886563105481fabc45c26193642b",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/cfg_space.rs",
+      "old_sha256": "ce5627f736013cc585ec2468050ac1b7a44d2470a87cef0fd62a97a2e8e48759",
+      "new_sha256": "cc76b748cb6f0704f9fa385bf93979b9f8ff99779aa3231c66fd9d139a59b82f",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/common_device.rs",
+      "old_sha256": "8979f44194872803ae469cbb7883c4541fbf49874ace945661e0fff82220f877",
+      "new_sha256": "a6c53f4143a50e637c9c3be106a0c01e68e72f7155b2ebac5d9bc6b218b75cca",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/lib.rs",
+      "old_sha256": "42beb6650135abf2c049c10c8e61d1e6f29050ccb18ab77a4c42cf636cc05b88",
+      "new_sha256": "a044c39dbb00e1a808fcbe4af6161bea8cabc7643ace5609c42b3e53844b4b55",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/mmio.rs",
+      "old_sha256": "c362ef86f660af129ea7bc9872e56179df10b3fd0554d3ceb22b7b0ee812967b",
+      "new_sha256": "6406aeb43cbbba324bec35523bac6dd768b37b39cf22ab5fe01f254b906aec52",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/pci/src/msix_tests.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "ef50b174a55c3353b92a6b9b8c65bd7b6d5d748b54bd2d5d1c1721d29ea4a7f7",
+      "new_file": true
+    },
+    {
+      "path": "kernel/core/comps/pci/src/msix_transaction.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "2ed1de778f946bb62e403dc31e42ec4c7339797bec740ce17e29fc75a7e62b5f",
+      "new_file": true
+    },
+    {
+      "path": "kernel/core/comps/pci/src/reservation.rs",
+      "old_sha256": "88cc4bf74fce53c43e2472cf42691e9d4f3d7b162ea667fe0330c20311b28f47",
+      "new_sha256": "abf89b066b6a65706398ae353751f59fb3b8d8ff783bf5af5580710e4624df3c",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/virtio/src/transport/pci/capability.rs",
+      "old_sha256": "bdc07fc14ae5fbe5877af363d792521be186fcc62a8e8a7937a2a6b99bdaf1ca",
+      "new_sha256": "83f50f669b4213af88b927c07adb25518e7dd8f9b5f30bcdec68960c4628b9cd",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/virtio/src/transport/pci/device.rs",
+      "old_sha256": "90e0f00c543e4146dccb03ec28490aaff1a41dd3899e71f005c02891504c08a1",
+      "new_sha256": "71d1316c0cec37acf9665ee448833d548c9a77dd9a0ccd6e767cc4d6ab3c2acf",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/virtio/src/transport/pci/legacy.rs",
+      "old_sha256": "decc39cb64fd7e6da551be51c8adf2e64b64df71a43c60cefcfbab9d2698626f",
+      "new_sha256": "fa36acb9e7e2e45d6f504e9a75890ee4bfce6f85494f8792c507773944c1ecc8",
+      "new_file": false
+    },
+    {
+      "path": "kernel/core/comps/virtio/src/transport/pci/msix.rs",
+      "old_sha256": "2d3740a3017976d6c0721f172e428588f3eadd96830a433f5cfd51f815790bf2",
+      "new_sha256": "3ab6f18c63cdc09e14931c523227ae05fee129f312aba863d7444072994d77f7",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/io/io_port/mod.rs",
+      "old_sha256": "8447d874669abc91be38d2d17cc6f2b6b33f213f53af608417110c7d82490076",
+      "new_sha256": "45a4da959b9592a9eb32c6b9e64303250443c5aa994881942cc98c65c3ab001f",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/io/io_port/range.rs",
+      "old_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "new_sha256": "21a331c2bd56aa02943a5c9e7e938382a2abd2e4fb478a536436339bfad4d6ae",
+      "new_file": true
+    },
+    {
+      "path": "ostd/src/io/mod.rs",
+      "old_sha256": "82f35a1d17e473e49effcee4d59e49c3826a3daaacf9838ddf4767a01a53dabc",
+      "new_sha256": "dbcb7727a50ead1c0c7b8d6eddbd93343304272b2c3136f862d3cf874a392e90",
+      "new_file": false
+    },
+    {
+      "path": "ostd/src/irq/top_half.rs",
+      "old_sha256": "6e485e3f832b0a69d8faccc7556713f9c2d09a0c20dc64f6debb2dcb97c24046",
+      "new_sha256": "9a362f390e8943b548333e24a8a4e66b16b5f179ca0408c3ad3d23f4fe397eee",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/NATIVE_NVIDIA.md",
+      "old_sha256": "ef7753e1e206de93900b6cdb7d1e7750057654ea62b536a0c7b310de0d0eecf7",
+      "new_sha256": "e487d07e74cd4952e2aea5aa77135eb97b2a6eeaf6caebdf0feed8f4c7ca1fc8",
+      "new_file": false
+    },
+    {
+      "path": "tools/graphics/run_cpu_kernel_tests.sh",
+      "old_sha256": "1c62655c7612f2fd64678e0a85089cce14982da140dbf30c5485545155b37ab8",
+      "new_sha256": "b1b05c06b6ee0ad783702ec746281b2e9719a5896122f5a963f8db17f15d36c7",
+      "new_file": false
+    }
+  ],
+  "source_snapshot": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/source-msix-final",
+  "prerequisite": "All thirteen Asterinas patches through asterinas-nvidia-irq-callbacks.patch",
+  "exact_incremental_round_trip": true,
+  "index_unchanged": true,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false,
+  "hardware_gpu_test": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false
+}

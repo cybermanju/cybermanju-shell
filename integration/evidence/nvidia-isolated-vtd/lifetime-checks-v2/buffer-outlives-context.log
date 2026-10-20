@@ -1,0 +1,43 @@
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+    Checking aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+warning: unnecessary qualification
+   --> kernel/core/comps/pci/src/dma.rs:154:45
+    |
+154 | ...es_context(owner: &crate::mmio::PciMmioGuard<'_>) {
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+154 - fn negative_buffer_outlives_context(owner: &crate::mmio::PciMmioGuard<'_>) {
+154 + fn negative_buffer_outlives_context(owner: &PciMmioGuard<'_>) {
+    |
+
+warning: unnecessary qualification
+   --> kernel/core/comps/pci/src/dma.rs:156:50
+    |
+156 | ...solated_dma_context(ostd::mm::dma::DmaMask::new(32).unwrap()).unwrap();
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+156 -         let context = owner.isolated_dma_context(ostd::mm::dma::DmaMask::new(32).unwrap()).unwrap();
+156 +         let context = owner.isolated_dma_context(DmaMask::new(32).unwrap()).unwrap();
+    |
+
+error[E0597]: `context` does not live long enough
+   --> kernel/core/comps/pci/src/dma.rs:157:9
+    |
+155 |     let buffer = {
+    |         ------ borrow later stored here
+156 |         let context = owner.isolated_dma_context(ostd::mm::dma::DmaMask...
+    |             ------- binding `context` declared here
+157 |         context.alloc_coherent(1).unwrap()
+    |         ^^^^^^^ borrowed value does not live long enough
+158 |     };
+    |     - `context` dropped here while still borrowed
+
+For more information about this error, try `rustc --explain E0597`.
+warning: `aster-pci` (lib) generated 2 warnings
+error: could not compile `aster-pci` (lib) due to 1 previous error; 2 warnings emitted
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest) --cfg ktest" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" failed with status: ExitStatus(unix_wait_status(25856))

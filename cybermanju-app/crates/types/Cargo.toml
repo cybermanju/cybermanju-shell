@@ -1,0 +1,9 @@
+[package]
+name = "cybermanju-types"
+version = "0.1.1"
+edition = "2021"
+description = "Shared data types for CyberManju OS"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

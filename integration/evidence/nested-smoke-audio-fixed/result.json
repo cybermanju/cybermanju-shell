@@ -1,0 +1,45 @@
+{
+  "platform": "Linux nested X11/Wayland",
+  "hardware_acceleration_verified": false,
+  "vulkan_icd": "/nix/store/3967gykw3wcyq3svf238nk31jlhxnl7c-mesa-26.1.5/share/vulkan/icd.d/lvp_icd.x86_64.json",
+  "outputs": {
+    "winit": {
+      "name": "winit",
+      "make": "Smithay",
+      "model": "Winit",
+      "serial": null,
+      "physical_size": null,
+      "modes": [
+        {
+          "width": 1280,
+          "height": 800,
+          "refresh_rate": 60000,
+          "is_preferred": true
+        }
+      ],
+      "current_mode": 0,
+      "is_custom_mode": true,
+      "vrr_supported": false,
+      "vrr_enabled": false,
+      "logical": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 800,
+        "scale": 1.0,
+        "transform": "Flipped180"
+      }
+    }
+  },
+  "layers": [
+    {
+      "namespace": "bar",
+      "output": "winit",
+      "layer": "Background",
+      "keyboard_interactivity": "None"
+    }
+  ],
+  "result": "PASS: real GPUI bar layer registered with nested Niri and process stayed alive for 5 seconds",
+  "screenshot": "/workspace/asterinas-gpui/evidence/nested-smoke-audio-fixed/gpui-nested.png",
+  "limitations": "Software Vulkan only; no Asterinas kernel, physical GPU, modesetting, input interaction, or full desktop services validated."
+}

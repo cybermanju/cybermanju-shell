@@ -1,0 +1,20 @@
+[
+  {
+    "namespace": "bar",
+    "output": "winit",
+    "layer": "Top",
+    "keyboard_interactivity": "None"
+  },
+  {
+    "namespace": "dock",
+    "output": "winit",
+    "layer": "Top",
+    "keyboard_interactivity": "None"
+  },
+  {
+    "namespace": "notification-popup",
+    "output": "winit",
+    "layer": "Overlay",
+    "keyboard_interactivity": "None"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "recorded_utc": "2026-10-20T21:40:35.310119+00:00",
+  "no_deletions": true,
+  "no_builds": true,
+  "no_cargo_tests": true,
+  "no_iso": true,
+  "reported_nixos_image_reserved_gb": 6.44,
+  "device_nodes": {
+    "dri": [],
+    "nvidia": [],
+    "kvm": []
+  }
+}

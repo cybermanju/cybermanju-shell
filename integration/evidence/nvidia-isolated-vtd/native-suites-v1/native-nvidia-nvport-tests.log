@@ -1,0 +1,150 @@
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `ostd-pod` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+   Compiling osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+   Compiling osdk-test-kernel v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/test-kernel)
+   Compiling osdk-frame-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/frame-allocator)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd-nvidia-nvport-osdk-bin v0.1.0 (/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-test-base)
+warning: `ostd-nvidia-nvport-osdk-bin` (bin "ostd-nvidia-nvport-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.09s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 16.4g free
+Added to ISO image: directory '/'='/tmp/grub.wyAYjK'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5503 sectors
+Written to medium : 5503 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas/target/osdk/ostd-nvidia-nvport-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a635000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2624668720 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0xd6a, current 0x17d30b, init 0x3cdb
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 283 tests in 5 crates
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+[ktest runner] skipping crate "ostd".
+
+running 20 tests in crate "ostd-nvidia-nvport"
+
+test ostd_nvidia_nvport::diagnostics::tests::actual_freestanding_formatter_through_c_abi ...nvidia-nvport: native formatter CPU-only check=17
+ [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::upstream_release_and_family_selection ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_exact_image_and_no_cross_release_fallback ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_rejects_every_truncation_and_bad_numeric_header ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::archive_rejects_alias_duplicates_links_empty_and_traversal ... [32mok[39m
+test ostd_nvidia_nvport::firmware::tests::actual_rm_ffi_handles_own_distinct_leases_of_static_fixture ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::allocation_alignment_and_free ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::reject_invalid_sizes_and_clear_output ... [32mok[39m
+test ostd_nvidia_nvport::os::tests::usercopy_does_not_report_false_success ... [32mok[39m
+test ostd_nvidia_nvport::runtime::native_tests::actual_timer_and_distinct_live_tasks_through_upstream_c ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::upstream_semaphore_rwlock_and_irq_spinlock ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::upstream_mutex_contention_across_ostd_tasks ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::upstream_semaphore_and_rwlock_wake_contenders ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::semaphore_overflow_is_reported_without_wrapping ... [32mok[39m
+test ostd_nvidia_nvport::sync::tests::sleep_predicate_tracks_atomic_mode_and_nested_spin_irqs ... [32mok[39m
+test ostd_nvidia_nvport::tests::upstream_memory_self_test ... [32mok[39m
+test ostd_nvidia_nvport::tests::copy_fill_compare_many_lengths ... [32mok[39m
+test ostd_nvidia_nvport::tests::invalid_operations_leave_buffer_unchanged ... [32mok[39m
+test ostd_nvidia_nvport::tests::patterned_fill_including_partial_repetition ... [32mok[39m
+test ostd_nvidia_nvport::tests::overlapping_move_matches_rust_both_directions ... [32mok[39m
+
+test result: [32mok[39m. 20 passed; 0 failed; 0 filtered out.
+
+[ktest runner] All crates tested.

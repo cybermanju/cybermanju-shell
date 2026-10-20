@@ -23,7 +23,7 @@ pub mod vendor;
 /// Raw PCI Capabilities.
 #[derive(Debug, Default)]
 pub(super) struct RawCapabilities {
-    msix: Option<RawCapabilityMsix>,
+    pub(crate) msix: Option<RawCapabilityMsix>,
     vndr: Vec<RawCapabilityVndr>,
 }
 

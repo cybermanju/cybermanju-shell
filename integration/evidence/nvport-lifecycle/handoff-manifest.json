@@ -1,0 +1,25 @@
+{
+  "source_release": "615.78.08",
+  "source_commit": "1a82fbfda8f321b056eb3568850f9316c5e465c5",
+  "patch_sha256": "e1203b8a5ceacfa91e6de35aa45c7187a6daee9ab86f4279b1e0039137a93978",
+  "patch_files": 26,
+  "native_reported_total": 251,
+  "native_hardware_condition_skips": {
+    "native-nvidia-nvport-tests.log": [],
+    "native-nvidia-platform-tests.log": [],
+    "native-ostd-tests.log": [
+      "test ostd::arch::vm::vmx::test::multiple_vmx_guards_lifecycle ... [skipped: VMX unavailable] ok",
+      "test ostd::arch::vm::vmx::vmcs::test::switch_and_reuse_vmcs ... [skipped: VMX unavailable] ok",
+      " [skipped: VMX/EPT invalidation unavailable] ok"
+    ]
+  },
+  "host_tests_passed": 14,
+  "graphics_tests_passed": 38,
+  "formatter_libc_comparison_passed": true,
+  "cpu_firmware_runtime_init_boot_passed": true,
+  "ordinary_tcg_full_boot_failure_preserved": true,
+  "gpu_benchmark_passed": false,
+  "full_gpui_wayland_acceptance": false,
+  "github_authentication_or_publication": false,
+  "git_index_unchanged": true
+}

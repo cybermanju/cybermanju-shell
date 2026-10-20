@@ -88,6 +88,11 @@ impl<'a> PciGroupReservation<'a> {
 
 impl Drop for PciGroupReservation<'_> {
     fn drop(&mut self) {
+        if self.devices.iter().any(PciCommonDevice::irqs_quarantined) {
+            for device in &self.devices {
+                device.quarantine_irqs();
+            }
+        }
         for device in self.devices.drain(..) {
             self.bus.return_reserved(device);
         }

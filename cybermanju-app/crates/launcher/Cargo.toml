@@ -1,0 +1,14 @@
+[package]
+name = "cybermanju-launcher"
+version = "0.1.1"
+edition = "2021"
+description = "CyberManju OS launcher bridge: list/open Android apps with icons, icon packs, uninstall — reusable crate behind Tauri commands"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1"

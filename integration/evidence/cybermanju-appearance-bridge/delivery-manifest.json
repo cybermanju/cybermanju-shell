@@ -1,0 +1,252 @@
+{
+  "completed_at_utc": "2026-10-20T20:12:25.193178+00:00",
+  "scope": "local source implementation only; Asterinas remains primary",
+  "gpui_tests": {
+    "suites": [
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 83,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 19,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 82,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "total": {
+      "passed": 189,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    "python_tests": 29,
+    "python_ok": true
+  },
+  "frontend_tests_reported_by_completed_subtask": {
+    "job": "job_X1mvx4qY",
+    "files": 125,
+    "passed": 1203,
+    "profile_tests": 7,
+    "vue_typecheck": "passed",
+    "version_headers_whitespace": "passed"
+  },
+  "native_matrix": {
+    "nvport": 20,
+    "platform": 12,
+    "pci": 13,
+    "pci_vtd": 13,
+    "ostd_reported": 256,
+    "explicitly_skipped_vmx_ept_bodies": 3,
+    "matrix_exit": 0,
+    "full_kernel_boot_rerun": false
+  },
+  "gpu_acceptance": false,
+  "physical_gpu_benchmark_run": false,
+  "hardware": {
+    "checked_at_utc": "2026-10-20T20:08:50.617387+00:00",
+    "device_nodes": {
+      "/dev/dri": [],
+      "/dev/nvidia*": [],
+      "/dev/kvm": []
+    },
+    "display_class_pci": [],
+    "gpu_acceptance": "blocked: no compatible physical GPU exposed; no GPU benchmark run"
+  },
+  "patch_validation": {
+    "gpui": {
+      "patch": "/workspace/asterinas-gpui/evidence/cybermanju-appearance-bridge/gpui-cybermanju-appearance.patch",
+      "patch_sha256": "d7e5c558b5478cb2e8a33da1813c3bfff379ae0c5693830738396150a62f5389",
+      "applies_and_matches_final_bytes": true,
+      "files": [
+        {
+          "path": "Cargo.lock",
+          "before_sha256": "63eeaa828de5533ff0e47116796a14b0d8815bc7b62e88635aba4fb9fde676cc",
+          "after_sha256": "d6760de7f644d06b060d4b57e6b7e3889b3c4000f21e1a31c77234ca9d60c213"
+        },
+        {
+          "path": "crates/app/Cargo.toml",
+          "before_sha256": "0fa7d3ff71f975c233e83fcfc3a720419d42e054ed32948b9abee0ee874b0810",
+          "after_sha256": "3f7499b53fcab0d2a0d4cbca6b28f7ba04e845f5cbfd56625ab5a74e231f2432"
+        },
+        {
+          "path": "crates/app/src/args.rs",
+          "before_sha256": "471cbacf5fee96e82c311239b8cd8eb8aae0ee179d16a01bf5d51b2209501e2d",
+          "after_sha256": "72b2fb12023375e51919086c7bc64cc3faa089676f15b8d18d42a6b90af2a3b5"
+        },
+        {
+          "path": "crates/app/src/main.rs",
+          "before_sha256": "d5fc92ef48504aa2d0605c47dc6bb26fb23ff75fcfe14d0aa5853cd43e1ca755",
+          "after_sha256": "2a65cd3ed93e1161aca584306fb88edfc13391cea9afe51f33c1ff39a97f124e"
+        },
+        {
+          "path": "crates/app/src/config/mod.rs",
+          "before_sha256": "7b382bb098371fd2a790e77f2e450ac04dbdf22ee18e67c5e7d18d47cd1aceab",
+          "after_sha256": "b0cec64b15d576db05247f32e5e3b63dd2ee59423ad4c2f2062bccd84a946c36"
+        },
+        {
+          "path": "crates/app/src/ipc/service.rs",
+          "before_sha256": "1aa8401f57cb3c0aebe1e45e7d0ec6321c028866a49f77eb2fe23c620c33f9e7",
+          "after_sha256": "3b421b1c26bb192231aa049a87b9fffc762901e0cdbd1f20ce883bd27d9a14ad"
+        },
+        {
+          "path": "crates/app/src/config/appearance.rs",
+          "before_sha256": null,
+          "after_sha256": "45dadb72eac23949fd8a0507a2866a42815a0787bf63442f77cf12571ed38958"
+        },
+        {
+          "path": "crates/app/src/config/appearance/fixtures/appearance-profile-v1.json",
+          "before_sha256": null,
+          "after_sha256": "287945f257fdef684053d455e3d15075f3e0e244948c3ca79c705a9ae23fa6f9"
+        },
+        {
+          "path": "scripts/test_appearance_profile.py",
+          "before_sha256": null,
+          "after_sha256": "2ed597ff930c6c8f21702e18b2a332e9f3ac72634ca321a634d6aab92d7431bc"
+        },
+        {
+          "path": "docs/src/content/docs/developer/cybermanju-appearance.md",
+          "before_sha256": null,
+          "after_sha256": "76fc2b0b5f410bebc8d16a380b81fb7e21fead07346ecd7c8d60c4d1729d7fa4"
+        }
+      ]
+    },
+    "app_source": {
+      "patch": "/workspace/asterinas-gpui/evidence/cybermanju-appearance-bridge/cybermanju-appearance-export.patch",
+      "patch_sha256": "32460623ff60c8e4c29555e3e9b2309a4396b9960ad324ba94d3d5e8e633a404",
+      "applies_and_matches_final_bytes": true,
+      "files": [
+        {
+          "path": "src/components/SettingsPage.vue",
+          "before_sha256": "e858ba3b6edcd86e1034d5f712aaa9d7f6634dae30b9fa15a219633c6e951f8f",
+          "after_sha256": "48b4b92def3fc6db0f18470b299b31fd6796a06b68d4cac540aed46537eb8ae0"
+        },
+        {
+          "path": "src/composables/useCustomWallpaper.ts",
+          "before_sha256": "b99fbbab547fd4ede7ddfe0a762fa9a9d01788f49db90d76f0684e8ee7772b13",
+          "after_sha256": "8df948e1321d7b0abeb8763557230ec69380d5c30aa40196fb3953c007450f59"
+        },
+        {
+          "path": "src/utils/appearanceProfile.ts",
+          "before_sha256": null,
+          "after_sha256": "f56ff1efc84fa70e538e2cacfcaef39e8350c39b5dfcd97398e315f627d32618"
+        },
+        {
+          "path": "tests/frontend/appearance-profile.test.ts",
+          "before_sha256": null,
+          "after_sha256": "9901835e0505af720aa23310e5b9455236e4b85992ca6b7b08db222833a2d4c6"
+        },
+        {
+          "path": "tests/fixtures/appearance-profile-v1.json",
+          "before_sha256": null,
+          "after_sha256": "287945f257fdef684053d455e3d15075f3e0e244948c3ca79c705a9ae23fa6f9"
+        }
+      ]
+    },
+    "app_documentation_not_in_source_patch": [
+      "docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "docs/CYBERMANJU-OS-PLAN.md",
+      "TASKS.md",
+      "worklog.md"
+    ],
+    "shared_fixture_sha256": "287945f257fdef684053d455e3d15075f3e0e244948c3ca79c705a9ae23fa6f9",
+    "gpui_index_unchanged": true,
+    "scope": "Local source patches only; no native desktop/GPU acceptance and no publication"
+  },
+  "supporting_artifacts": [
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-worker-flush.patch",
+      "sha256": "993b437a611f3ee3c6a8ed73b6517c2a57b1b863ab5dd427a789593ac09b9e33"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/nvidia-worker-flush/stack-validation.json",
+      "sha256": "9f54525aca8a1f1c7a1ef16201173257dc36d234fd9c4bc92fdbe0cf72e0ebc4"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/cybermanju-appearance-bridge/continuation-notes.md",
+      "sha256": "35fbaac983d673e6e5c726174c969abda3b8106bdec22889285943e60b63f2b6"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "sha256": "c476e8b0855e2fb4d397d66b5d9b58086e1da6dee441253a839325700b803f8d"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "sha256": "c5122e8d419bddad2d435cd51cfe591ab6ce2da2ce082648ba50bea465b01fe3"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/docs/CYBERMANJU-OS-PLAN.md",
+      "sha256": "833d32fa3860dd192b374326eb3f5b0a2282aab6496b97f9d1be646f8fa165f4"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/TASKS.md",
+      "sha256": "940bfaa98c6e25b3273e3c2cbdea9626f19624cd12edafe3172093fcc34d9c70"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/worklog.md",
+      "sha256": "bd8aa01f06929602b09f8f41ad660f4c6937fc9f6c7da6d2d50a799940f91e69"
+    }
+  ],
+  "restrictions": "No credentials/authentication/staging/commit/push/PR/publication/remote Actions or schedule change; older published snapshot untouched"
+}

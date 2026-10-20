@@ -1,0 +1,10 @@
+test_empty_wayland_display_is_not_a_session (test_session_startup.SessionStartupTests.test_empty_wayland_display_is_not_a_session) ... ok
+test_missing_supported_compositor_exits_without_abort (test_session_startup.SessionStartupTests.test_missing_supported_compositor_exits_without_abort) ... ok
+test_primary_without_wayland_exits_cleanly_and_removes_socket (test_session_startup.SessionStartupTests.test_primary_without_wayland_exits_cleanly_and_removes_socket) ... ok
+test_secondary_ipc_only_invocation_does_not_require_wayland (test_session_startup.SessionStartupTests.test_secondary_ipc_only_invocation_does_not_require_wayland) ... ok
+test_validate_does_not_require_wayland (test_session_startup.SessionStartupTests.test_validate_does_not_require_wayland) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.136s
+
+OK

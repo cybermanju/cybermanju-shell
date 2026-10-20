@@ -1,0 +1,25 @@
+{
+  "files": {
+    "patch": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-device-worker.patch",
+    "notes": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+    "source": "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform/src/worker.rs",
+    "tests": "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform/src/worker/tests.rs",
+    "reproducer": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/run_platform.py",
+    "counts": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/test-counts.json",
+    "stack": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/full-stack-validation.json",
+    "environment": "/workspace/asterinas-gpui/evidence/nvidia-device-worker/environment.json"
+  },
+  "cpu_boot_results": [
+    "/workspace/asterinas-gpui/evidence/nvidia-device-worker/cpu-boot/result-plain.json",
+    "/workspace/asterinas-gpui/evidence/nvidia-device-worker/cpu-boot/result-iommu.json",
+    "/workspace/asterinas-gpui/evidence/nvidia-device-worker/cpu-boot/result-multifunction-iommu.json"
+  ],
+  "original_index_unchanged": true,
+  "local_implementation_in_main_tree": true,
+  "hardware_gpu_acceptance": false,
+  "rm_gsp_initialized": false,
+  "authenticated": false,
+  "committed": false,
+  "pushed": false,
+  "remote_actions_run": false
+}

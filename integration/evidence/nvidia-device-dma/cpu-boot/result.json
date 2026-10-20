@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "scope": "CPU-only full-kernel regression, not GPU evidence",
+  "qemu_exit": 33,
+  "virtual_time": "instruction-counted TCG, not performance evidence",
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "image_sha256": "43c24a2f189976ab839e2e7c97fa177a9f9f50499ae1d680da49a91661766378",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "7d2e3272455034617d7f13a45e63334668fa43ed1784c1023c58688c27387b3e",
+  "errors": []
+}

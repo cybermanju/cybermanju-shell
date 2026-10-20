@@ -1,0 +1,20 @@
+{
+  "runs": [
+    {
+      "name": "legacy-clear-operation",
+      "exit": 0,
+      "expected": false,
+      "kernel_passed": false,
+      "baseline_assertion": false,
+      "reported_counts": [],
+      "explicit_skips": [],
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-run-1900/legacy-clear-operation.log"
+    }
+  ],
+  "source_restored": true,
+  "source_sha256": "08dd2ee446140c2b2301288f8bde3e707dbe97f828a12d93109aac22e25d7539",
+  "isolated_source": "/workspace/asterinas-gpui/asterinas-irq-retire-local",
+  "baseline_note": "Same incoming clear() operation, extracted into the private cleanup helper for the capacity regression; not a byte-identical old source.",
+  "hardware_gpu": false,
+  "shared_tree_modified": false
+}

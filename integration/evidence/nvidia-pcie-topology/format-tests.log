@@ -1,0 +1,1 @@
+tools/graphics/run_nvport_format_tests.sh: line 6: NVIDIA_SOURCE_DIR: Set NVIDIA_SOURCE_DIR to the clean official 615.78.08 checkout

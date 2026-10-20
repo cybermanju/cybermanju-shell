@@ -1,0 +1,12 @@
+......................................
+----------------------------------------------------------------------
+Ran 38 tests in 2.245s
+
+OK
+GPUI graphics readiness (prerequisite probe; not integration certification)
+PASS  ok: fixture
+FAIL  required: fixture failure
+      Action: fixture action
+PASS  ok: fixture
+
+Not ready: 1 required check(s) failed.

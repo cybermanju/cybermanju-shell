@@ -1,0 +1,13 @@
+{
+  "release": "615.78.08",
+  "official_annotated_tag_object": "4bfe30bb78e7364959e59c16cfefd88e8c14670e",
+  "official_peeled_commit": "1a82fbfda8f321b056eb3568850f9316c5e465c5",
+  "prior_commit": "ca2d03e6fafd4d4b56b383497d931c25b283bfcf",
+  "prior_tree": "e121e9c407c996e4aaca25a801232a53f7dc1b5b",
+  "official_tree": "e121e9c407c996e4aaca25a801232a53f7dc1b5b",
+  "tree_diff": "",
+  "old_checkout_preserved": "/workspace/asterinas-gpui/vendor-drivers/open-gpu-kernel-modules",
+  "new_checkout": "/workspace/asterinas-gpui/vendor-drivers/open-gpu-kernel-modules-615.78.08-tag",
+  "authentication_used": false,
+  "tag_signature_independently_verified": false
+}

@@ -1,0 +1,63 @@
+diff --git a/ostd/src/irq/top_half.rs b/ostd/src/irq/top_half.rs
+--- a/ostd/src/irq/top_half.rs
++++ b/ostd/src/irq/top_half.rs
+@@ -103,8 +103,15 @@
+     /// cross-CPU APIC/IRTE drain or allow this IRQ number to be allocated again. Other
+     /// cloned handles, if any, retain their own callbacks and must be stopped separately.
+     pub fn retire(mut self) {
+-        self.callbacks.clear();
++        self.disconnect_callbacks();
+         core::mem::forget(self);
++    }
++
++    fn disconnect_callbacks(&mut self) {
++        // `clear()` alone retains Vec capacity, which would leak when retire forgets
++        // this handle. Drop the storage as well, while still owning the IRQ number.
++        // CallbackHandle waits for dispatch readers and drops captures outside its lock.
++        drop(core::mem::take(&mut self.callbacks));
+     }
+ 
+     /// Checks if there are no registered callbacks.
+@@ -136,7 +143,7 @@
+         // allocator. Taking the callbacks write lock also waits for any in-flight `process`
+         // readers to finish. Do not drop an IrqLine from an IRQ callback: that callback runs
+         // under the read lock and would deadlock while waiting for the writer.
+-        self.callbacks.clear();
++        self.disconnect_callbacks();
+     }
+ }
+ 
+@@ -425,4 +432,32 @@
+         assert!(INNERS[index].callbacks.read().is_empty());
+         assert!(IrqLine::alloc_specific(num).is_err());
+     }
+-}
++
++    #[ktest]
++    fn disconnect_releases_callback_storage_before_retiring_with_clone() {
++        let mut line = IrqLine::alloc().unwrap();
++        let num = line.num();
++        let index = (num - IRQ_NUM_MIN) as usize;
++        let mut sibling = line.clone();
++        line.on_active(|_| {});
++        sibling.on_active(|_| {});
++        assert!(line.callbacks.capacity() > 0);
++        assert_eq!(INNERS[index].callbacks.read().len(), 2);
++
++        // Exercise the same cleanup that retire and Drop call. Merely clearing the
++        // Vec removes registrations but fails this zero-capacity ownership invariant.
++        line.disconnect_callbacks();
++        assert!(line.callbacks.is_empty());
++        assert_eq!(line.callbacks.capacity(), 0);
++        assert_eq!(INNERS[index].callbacks.read().len(), 1);
++        assert!(!sibling.is_empty());
++        assert!(IrqLine::alloc_specific(num).is_err());
++
++        line.retire();
++        assert_eq!(INNERS[index].callbacks.read().len(), 1);
++        assert!(IrqLine::alloc_specific(num).is_err());
++        drop(sibling);
++        assert!(INNERS[index].callbacks.read().is_empty());
++        assert!(IrqLine::alloc_specific(num).is_err());
++    }
++}

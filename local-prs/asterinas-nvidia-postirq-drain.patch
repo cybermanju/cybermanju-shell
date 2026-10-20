@@ -1,0 +1,110 @@
+--- a/kernel/comps/nvidia-platform/src/worker.rs
++++ b/kernel/comps/nvidia-platform/src/worker.rs
+@@ -273,10 +273,10 @@
+ /// Owns the transactional MSI-X lease and the bottom-half worker as one lifecycle.
+ ///
+ /// Every registered interrupt callback receives this owner's `WorkSignal`. Shutdown
+-/// first masks MSI-X and runs the caller's real device-source stop/drain protocol through
+-/// `PciMsixGuard::shutdown`; that guard then synchronously retires the IRQ callbacks.
+-/// Only after the guard returns does this owner close and drain the worker. The source
+-/// callback is mandatory because MSI-X masking alone cannot stop a device interrupt source.
++/// first masks MSI-X and runs the caller's real device-source stop protocol through
++/// `PciMsixGuard::shutdown_with_post_irq`; that guard synchronously retires the IRQ
++/// callbacks, then this owner closes and drains the worker before MSI-X state restoration.
++/// The source callback is mandatory because MSI-X masking alone cannot stop a device source.
+ /// It must not claim success until the hardware source is stopped and its pending work
+ /// drained. This wrapper does not implement an NVIDIA-specific source mask or RM callback.
+ #[must_use = "Keep the IRQ/worker owner and explicitly shut it down before releasing device state"]
+@@ -347,12 +347,22 @@
+     ) -> Result<(), WorkerError> {
+         self.worker.validate_shutdown_context()?;
+         if let Some(mut msix) = self.msix.take() {
+-            if let Err(error) = msix.shutdown(quiesce_source) {
++            let mut worker_error = None;
++            let result = msix.shutdown_with_post_irq(quiesce_source, || {
++                self.worker.shutdown().map_err(|error| {
++                    worker_error = Some(error);
++                    ostd::Error::AccessDenied
++                })
++            });
++            if let Err(error) = result {
+                 self.msix = Some(msix);
+-                return Err(WorkerError::Msix(error));
++                return Err(
++                    worker_error.map_or(WorkerError::Msix(error), |worker_error| worker_error)
++                );
+             }
+             // The closed guard's Drop releases its lease; activated IRQ numbers remain
+-            // retired sinks as required by the PCI API's delayed-message contract.
++            // retired sinks as required by the PCI API's delayed-message contract. The
++            // callback worker has also drained before the MSI-X state was restored.
+         }
+         self.worker.shutdown()
+     }
+--- a/kernel/core/comps/pci/src/msix_transaction.rs
++++ b/kernel/core/comps/pci/src/msix_transaction.rs
+@@ -273,6 +273,20 @@
+     /// Failure retains every resource and allows retry; no success is inferred from masking.
+     /// Activated IRQ numbers remain reserved as empty sinks for delayed posted messages.
+     pub fn shutdown(&mut self, quiesce: impl FnOnce() -> Result<(), Error>) -> Result<(), Error> {
++        self.shutdown_with_post_irq(quiesce, || Ok(()))
++    }
++
++    /// Like [`Self::shutdown`], but runs a fallible deferred-work drain after IRQ callback
++    /// retirement and before restoring MSI-X state or releasing the transaction.
++    ///
++    /// This ordering lets an owner first stop device producers, then retire the IRQ callbacks,
++    /// then drain work they already admitted while all device resources remain owned. A drain
++    /// failure retains the masked transaction for retry; IRQ callbacks remain retired.
++    pub fn shutdown_with_post_irq(
++        &mut self,
++        quiesce: impl FnOnce() -> Result<(), Error>,
++        drain: impl FnOnce() -> Result<(), Error>,
++    ) -> Result<(), Error> {
+         self.mask_all()?;
+         quiesce()?;
+         if self.owner.location().read16(4) & Command::BUS_MASTER.bits() != 0 {
+@@ -292,6 +306,7 @@
+             }
+         }
+         self.disconnect();
++        drain()?;
+         self.restore()?;
+         self.closed = true;
+         Ok(())
+--- a/kernel/core/comps/pci/src/msix_tests.rs
++++ b/kernel/core/comps/pci/src/msix_tests.rs
+@@ -299,9 +299,22 @@
+             assert_eq!(handler_drops.load(Ordering::SeqCst), 0,
+                 "failed quiesce must retain callback captures");
+ 
+-            // Shutdown invokes the device-specific stop and waits for RDY=0 before the
+-            // guard can release its mapping/callback. A failed stop quarantines DMA memory.
+-            let shutdown = msix.shutdown(|| quiesce_controller(&$regs, $loc, $command));
++            // Shutdown stops the controller, retires the callback, then drains deferred
++            // work while MSI-X is still enabled-but-function-masked. Only then may restore
++            // release/restore the transaction. A failed stop quarantines DMA memory.
++            let mut drained_after_irq = false;
++            let shutdown = msix.shutdown_with_post_irq(
++                || quiesce_controller(&$regs, $loc, $command),
++                || {
++                    assert_eq!(handler_drops.load(Ordering::SeqCst), 1,
++                        "deferred drain follows synchronous IRQ callback retirement");
++                    let control = $loc.read16(msix_cap_offset($loc).unwrap() + 2);
++                    assert_eq!(control & 0xc000, 0xc000,
++                        "deferred drain precedes MSI-X disable/unmask restoration");
++                    drained_after_irq = true;
++                    Ok(())
++                },
++            );
+             if let Err(error) = shutdown {
+                 core::mem::forget(sq);
+                 core::mem::forget(cq);
+@@ -309,6 +322,7 @@
+                 core::mem::forget($context);
+                 panic!("MSI-X NVMe shutdown failed ({error:?}); DMA resources quarantined");
+             }
++            assert!(drained_after_irq, "successful teardown invokes the deferred drain");
+             assert_eq!(handler_drops.load(Ordering::SeqCst), 1,
+                 "successful shutdown must synchronously release the actual IRQ capture");
+             assert_eq!(

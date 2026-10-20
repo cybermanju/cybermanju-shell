@@ -1,0 +1,234 @@
+     Locking 97 packages to latest Rust 1.99.0-nightly compatible versions
+      Adding minicov v0.3.8 (available: v0.3.9)
+   Compiling compiler_builtins v0.1.160 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/compiler-builtins/compiler-builtins)
+   Compiling core v0.0.0 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core)
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling libc v0.2.191
+   Compiling syn v1.0.109
+   Compiling zerocopy v0.8.63
+   Compiling getrandom v0.3.4
+   Compiling cfg-if v1.0.5
+   Compiling rustversion v1.0.23
+   Compiling ident_case v1.0.1
+   Compiling const_fn v0.4.12
+   Compiling fnv v1.0.7
+   Compiling thiserror v2.0.21
+   Compiling strsim v0.10.0
+   Compiling radium v0.7.0
+   Compiling autocfg v1.5.1
+   Compiling syn v2.0.119
+   Compiling syn v3.0.9
+   Compiling num-traits v0.2.19
+   Compiling x86 v0.52.0
+   Compiling paste v1.0.15
+   Compiling rand_core v0.9.5
+   Compiling ppv-lite86 v0.2.21
+   Compiling darling_core v0.13.4
+   Compiling thiserror-impl v2.0.21
+   Compiling ptr_meta_derive v0.3.2
+   Compiling rand_chacha v0.9.0
+   Compiling rand v0.9.5
+   Compiling zerocopy-derive v0.8.63
+   Compiling ostd-pod-macros v0.4.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-pod/macros)
+   Compiling int-to-c-enum-derive v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/int-to-c-enum/derive)
+   Compiling padding-struct v0.2.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/padding-struct)
+   Compiling ostd-macros v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-macros)
+   Compiling darling_macro v0.13.4
+   Compiling darling v0.13.4
+   Compiling inherit-methods-macro v0.1.0 (https://github.com/asterinas/inherit-methods-macro?rev=98f7e3e#98f7e3eb)
+   Compiling alloc v0.0.0 (/usr/local/rustup/toolchains/nightly-2026-07-21-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc)
+   Compiling bitflags v2.13.2
+   Compiling scopeguard v1.2.0
+   Compiling bit_field v0.10.3
+   Compiling uguid v2.2.1
+   Compiling tap v1.0.1
+   Compiling bitflags v1.3.2
+   Compiling log v0.4.34
+   Compiling lock_api v0.4.14
+   Compiling raw-cpuid v10.7.0
+   Compiling wyz v0.5.1
+   Compiling funty v2.0.0
+   Compiling volatile v0.4.6
+   Compiling ptr_meta v0.3.2
+   Compiling spin v0.9.9
+   Compiling x86_64 v0.15.5
+   Compiling uefi-raw v0.12.0
+   Compiling multiboot2-common v0.3.0
+   Compiling lazy_static v1.5.1
+   Compiling uefi-raw v0.14.0
+   Compiling iced-x86 v1.21.0
+   Compiling gimli v0.34.0
+   Compiling bitvec v1.1.1
+   Compiling unwinding v0.2.10
+   Compiling acpi v5.2.0
+   Compiling align_ext v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/align_ext)
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `align_ext` (lib) generated 1 warning
+   Compiling id-alloc v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/id-alloc)
+   Compiling multiboot2 v0.24.1
+   Compiling gimli v0.28.1
+   Compiling ostd-test v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-test)
+   Compiling smallvec v1.16.3
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+   Compiling int-to-c-enum v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/int-to-c-enum)
+   Compiling linux-boot-params v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/linux-bzimage/boot-params)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+   Compiling volatile v0.6.1
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+   Compiling owo-colors v4.4.0
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+   Compiling tdx-guest v0.5.0
+   Compiling ostd-pod v0.4.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/ostd-pod)
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:356:20
+    |
+356 |         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+    |
+356 -         assert_eq!(core::mem::size_of_val(&first_callback), 0);
+356 +         assert_eq!(size_of_val(&first_callback), 0);
+    |
+
+warning: unnecessary qualification
+   --> /workspace/asterinas-gpui/asterinas/ostd/src/irq/top_half.rs:357:20
+    |
+357 |         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+    |                    ^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+357 -         assert_eq!(core::mem::size_of_val(&second_callback), 0);
+357 +         assert_eq!(size_of_val(&second_callback), 0);
+    |
+
+   Compiling osdk-frame-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/frame-allocator)
+   Compiling osdk-test-kernel v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/test-kernel)
+   Compiling osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 4 warnings (1 duplicate) (run `cargo fix --lib -p ostd` to apply 2 suggestions)
+   Compiling ostd-osdk-bin v0.19.0 (/workspace/asterinas-gpui/asterinas-irq-retire-local/target/osdk/ostd-test-base)
+warning: `ostd-osdk-bin` (bin "ostd-osdk-bin") generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 48.19s
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/workspace/asterinas-gpui/asterinas-irq-retire-local/target/osdk/ostd-osdk-bin.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 13.9g free
+Added to ISO image: directory '/'='/tmp/grub.orsOH3'
+xorriso : UPDATE :     295 files added in 1 seconds
+Added to ISO image: directory '/'='/workspace/asterinas-gpui/asterinas-irq-retire-local/target/osdk/iso_root'
+xorriso : UPDATE :     299 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 512 bytes from file '/usr/lib/grub/i386-pc/boot_hybrid.img'
+ISO image produced: 5557 sectors
+Written to medium : 5557 sectors at LBA 0
+Writing to 'stdio:/workspace/asterinas-gpui/asterinas-irq-retire-local/target/osdk/ostd-osdk-bin.iso' completed successfully.
+
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: a651000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2594271340 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x779, current 0x17ba90, init 0x3cab
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+
+[ktest runner] running 271 tests in 4 crates
+
+[ktest runner] skipping crate "osdk-frame-allocator".
+
+[ktest runner] skipping crate "osdk-heap-allocator".
+
+[ktest runner] skipping crate "osdk-test-kernel".
+
+running 252 tests in crate "ostd"
+
+
+test result: [32mok[39m. 0 passed; 0 failed; 252 filtered out.
+
+[ktest runner] All crates tested.

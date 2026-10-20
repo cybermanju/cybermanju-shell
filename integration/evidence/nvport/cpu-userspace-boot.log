@@ -1,0 +1,734 @@
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 104000..8000000
+INFO: Adding free frames to the allocator: b453000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2554940800 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x56e, current 0x17d47f, init 0x3cf3
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+NVIDIA NVport CPU memory self-test passed (not a GPU test)
+OSTD initialized. Preparing components.
+WARN: framebuffer: Framebuffer not found
+DEBUG: Try to acquire security-insensitive MMIO range: 0xb0000000..0xc0000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff88df88c0 on CPU CpuId(
+    1,
+)
+INFO: pci: initializing the PCI bus with bus numbers `0..=255`
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x29c0,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x1111,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x3,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfd000000,
+                        size: 0x1000000,
+                        prefetchable: true,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf0000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2918,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x1,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2922,
+        revision_id: 0x2,
+        prog_if: 0x1,
+        subclass: 0x6,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x2,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc040,
+                        size: 0x20,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf1000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2930,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x5,
+        class: 0xc,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x3,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0x700,
+                        size: 0x40,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+}
+DEBUG: Try to acquire PIO range: 0x70..0x71
+DEBUG: Try to acquire PIO range: 0x71..0x72
+DEBUG: pci: Register PCI driver: NvmePciDriver {
+    devices: UnsafeCell { .. },
+}
+[32m[     0.399][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.402][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }[0m
+[32m[     0.406][0m [93mWARN  [0m: [39mnvidia-platform: [0m[39mNVIDIA PCI diagnostics: no unclaimed NVIDIA display controller; RM/GSP not initialized[0m
+[32m[     0.408][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.410][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }[0m
+[32m[     0.415][0m [34mINFO  [0m: [39muart: [0m[39mRegistered NS16550A as a console[0m
+[32m[     0.417][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.418][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }[0m
+[32m[     0.422][0m [92mDEBUG [0m: [39mpci: [0m[39mRegister PCI driver: VirtioPciDriver {
+    devices: UnsafeCell { .. },
+}[0m
+[32m[     0.424][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire security-insensitive MMIO range: 0xfeb00000..0xfeb00200 with cache policy: Uncacheable[0m
+[32m[     0.426][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88df88c0 on CPU CpuId(
+    1,
+)[0m
+[32m[     0.428][0m [92mDEBUG [0m: [39mvirtio: [0m[39mAbort MMIO detection at 0xfeb00000 because the magic number does not match[0m
+[32m[     0.432][0m [92mDEBUG [0m: [39mvirtio: [0m[39mRegister driver: VirtioMmioDriver {
+    devices: UnsafeCell { .. },
+}[0m
+[32m[     0.469][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.471][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }[0m
+[32m[     0.472][0m [34mINFO  [0m: [39mi8042: [0m[39mACPI says i8042 controller is present[0m
+[32m[     0.474][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0x60..0x61[0m
+[32m[     0.475][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0x64..0x65[0m
+[32m[     0.480][0m [34mINFO  [0m: [39mi8042: [0m[39mPS/2 keyboard device ID: 0xAB[0m
+[32m[     0.489][0m [34mINFO  [0m: [39minput: [0m[39mregistered device i8042_keyboard[0m
+[32m[     0.491][0m [34mINFO  [0m: [39mi8042: [0m[39mPS/2 mouse device ID: 0x00[0m
+[32m[     0.493][0m [34mINFO  [0m: [39mi8042: [0m[39mPS/2 mouse upgraded device ID: 0x03[0m
+[32m[     0.497][0m [34mINFO  [0m: [39minput: [0m[39mregistered device i8042_mouse[0m
+[32m[     0.500][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.502][0m [34mINFO  [0m: [39m[0m[39mAll components initialization in Bootstrap stage completed[0m
+[32m[     0.508][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xcf9..0xcfa[0m
+[32m[     0.514][0m [34mINFO  [0m: [39m[0m[39muse randomness generated by hardware[0m
+[32m[     0.521][0m [34mINFO  [0m: [39m[0m[39mFound an input device, name: i8042_keyboard[0m
+[32m[     0.523][0m [34mINFO  [0m: [39m[0m[39mFound an input device, name: i8042_mouse[0m
+[32m[     0.898][0m [34mINFO  [0m: [39m[0m[39m[kernel] LSM module enabled: capability[0m
+[32m[     0.900][0m [34mINFO  [0m: [39m[0m[39m[kernel] LSM module enabled: yama[0m
+[32m[     0.935][0m [34mINFO  [0m: [39m[0m[39mIdle thread for CPU #0 started[0m
+Spawn the first kernel thread
+[32m[     0.985][0m [92mDEBUG [0m: [39m[0m[39mAll component: [ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }, ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }][0m
+[32m[     0.993][0m [92mDEBUG [0m: [39m[0m[39mRemain components: {"/workspace/asterinas-gpui/asterinas/kernel/comps/i8042": ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform": ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm": ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/uart": ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core": ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block": ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline": ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console": ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device": ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer": ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input": ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger": ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk": ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network": ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme": ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci": ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq": ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree": ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time": ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio": ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }}[0m
+[32m[     0.993][0m [34mINFO  [0m: [39m[0m[39mIdle thread for CPU #1 started[0m
+[32m[     0.996][0m [34mINFO  [0m: [39m[0m[39mExists components that are not initialized[0m
+[32m[     0.997][0m [92mDEBUG [0m: [39m[0m[39mcomponent infos: [][0m
+[32m[     0.998][0m [34mINFO  [0m: [39m[0m[39mComponents initializing in Kthread stage...[0m
+[32m[     0.999][0m [34mINFO  [0m: [39m[0m[39mAll components initialization in Kthread stage completed[0m
+[32m[     1.005][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 279050185506 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.006][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 304397883650 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.007][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355091323804 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.009][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 380437539896 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.010][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 405784007530 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.012][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 456476894124 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.013][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 481824029980 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.014][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 507171461566 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.015][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 532519205440 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.016][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 583212512664 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.018][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 608558912762 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.019][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 633905603002 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.020][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 659252560832 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.021][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 684599788894 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.022][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 709947282162 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.024][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 760641283194 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.025][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 785988268348 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.026][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 811335494628 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.027][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 836683053964 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.028][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 862030854896 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.030][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 912725076356 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.031][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 938071924836 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.032][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 963419142934 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.033][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 988766695758 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.034][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1039459829092 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.036][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1064806178228 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.037][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1090152937674 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.038][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1115500178802 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.039][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1140847763380 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.040][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1166195566260 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.042][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1216889850072 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.043][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1242236774760 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.044][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1267583978314 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.045][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1292931446594 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.046][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1318279221648 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.048][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1368973333656 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.049][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1394320120060 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.050][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1419667178728 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.051][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1445014483270 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.052][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1470362130048 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.054][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1521055793920 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.055][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1546402535816 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.056][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1571749626216 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.057][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1597097097072 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.058][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1622444863864 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.060][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1673138885426 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.061][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1698485757966 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.062][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1723833122516 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.063][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1749180851286 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.064][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1799874127194 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.067][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1850566619014 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.068][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1875913662962 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.069][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1901261319542 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.070][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1926609014076 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.088][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.092][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 506958930184 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.093][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 557651845766 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.095][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 582998473900 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.096][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 608345387940 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.098][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 659039607276 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.100][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 709733953704 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.101][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 735081333472 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.102][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 760429069622 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.103][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 811122366768 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.105][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 836468594692 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.107][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 887162317414 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.108][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937855406942 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.110][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 963201696410 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.111][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 988548276382 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.112][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1013895562342 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.114][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1064589264028 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.115][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1089936454476 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.116][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1115284112046 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.117][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1165977650886 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.119][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1191323989450 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.121][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1242016918844 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.122][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1267364015328 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.123][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1292711597308 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.124][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1318059541542 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.125][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1368753347220 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.128][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1419452191796 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.130][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1444801083204 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.131][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1470148081402 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.132][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1495495599602 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.133][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1520843499748 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.135][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1571537780300 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.136][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1596884702376 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.137][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1622231980708 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.138][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1647579611132 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.139][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1698272853148 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.141][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1723619187318 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.142][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1748965979192 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.143][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1774313229504 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.144][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1799660856594 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.145][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1850354002732 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.147][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1875700369146 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.148][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1901047182502 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.149][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1926394582790 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.150][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1951742265376 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.151][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2002435483642 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.153][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2027782724374 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.154][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2053130387626 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.155][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2103823731668 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.157][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2129170177624 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.158][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2154517159856 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.162][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.164][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2255913239170 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.166][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2331954257758 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.170][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2407996336090 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.173][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[kernel] unpacking initramfs.cpio to rootfs ...
+[32m[     1.182][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 278825991020 cycles exceeds the maximum delay 255494080000(s)[0m
+[kernel] initramfs is ready
+[32m[     1.270][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2483962633636 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.286][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.288][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.289][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 456236380116 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.297][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 608321151764 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.299][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 659015194350 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.320][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.321][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1191289456124 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.322][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1241983525022 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.334][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.335][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1571487642730 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.337][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1622182601060 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.348][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.349][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1926339146086 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.370][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2103844466542 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.390][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.394][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.400][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.402][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.413][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.418][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.425][0m [34mINFO  [0m: [39minput: [0m[39msuccessfully connected handler class evdev to device i8042_keyboard[0m
+[32m[     1.428][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.432][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.440][0m [34mINFO  [0m: [39minput: [0m[39msuccessfully connected handler class evdev to device i8042_mouse[0m
+[32m[     1.442][0m [34mINFO  [0m: [39minput: [0m[39mregistered handler class evdev[0m
+[32m[     1.444][0m [34mINFO  [0m: [39m[0m[39mEvdev device support initialized[0m
+[32m[     1.452][0m [92mDEBUG [0m: [39m[0m[39mspawn background poll thread for "lo"[0m
+
+                                  [38;2;87;180;249m.[39m[38;2;89;185;249m.[39m[38;2;91;189;250m.[39m[38;2;93;193;250m.[39m[38;2;94;197;250m.[39m[38;2;96;201;250m.[39m
+                                [38;2;83;172;249m.[39m[38;2;85;176;249m-[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m:[39m
+                               [38;2;82;168;249m.[39m[38;2;83;172;249m=[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m:[39m
+                              [38;2;80;163;249m:[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m:[39m
+                            [38;2;76;155;248m.[39m[38;2;78;159;248m-[39m[38;2;80;163;249m+[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                           [38;2;74;151;248m.[39m[38;2;76;155;248m=[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m=[39m[38;2;87;180;249m=[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                          [38;2;73;147;248m:[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m-[39m[38;2;85;176;249m.[39m[38;2;87;180;249m=[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                        [38;2;69;138;248m.[39m[38;2;71;142;248m=[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m+[39m[38;2;82;168;249m:[39m [38;2;85;176;249m.[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                       [38;2;67;134;248m.[39m[38;2;69;138;248m+[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m=[39m[38;2;80;163;249m.[39m  [38;2;85;176;249m.[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m-[39m
+                     [38;2;63;125;247m.[39m[38;2;65;130;247m-[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m=[39m[38;2;78;159;248m.[39m   [38;2;85;176;249m:[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m-[39m
+    [38;2;33;54;245m.[39m[38;2;34;58;245m:[39m[38;2;36;62;245m:[39m[38;2;38;66;245m-[39m[38;2;40;70;245m=[39m[38;2;42;75;245m=[39m[38;2;43;79;245m=[39m[38;2;45;83;246m=[39m[38;2;47;87;246m=[39m[38;2;49;92;246m=[39m[38;2;51;96;246m=[39m[38;2;53;100;246m=[39m[38;2;54;104;246m=[39m[38;2;56;108;247m=[39m[38;2;58;113;247m=[39m[38;2;60;117;247m=[39m[38;2;62;121;247m=[39m[38;2;63;125;247m+[39m[38;2;65;130;247m*[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m+[39m[38;2;76;155;248m-[39m[38;2;78;159;248m-[39m[38;2;80;163;249m-[39m[38;2;82;168;249m-[39m[38;2;83;172;249m-[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m-[39m[38;2;98;206;250m:[39m[38;2;100;210;250m:[39m[38;2;102;214;251m:[39m[38;2;103;218;251m:[39m[38;2;105;223;251m:[39m[38;2;107;227;251m:[39m[38;2;109;231;251m:[39m[38;2;111;235;251m.[39m
+        [38;2;40;70;245m.[39m[38;2;42;75;245m.[39m[38;2;43;79;245m:[39m[38;2;45;83;246m-[39m[38;2;47;87;246m*[39m[38;2;49;92;246m#[39m[38;2;51;96;246m#[39m[38;2;53;100;246m#[39m[38;2;54;104;246m#[39m[38;2;56;108;247m#[39m[38;2;58;113;247m#[39m[38;2;60;117;247m#[39m[38;2;62;121;247m#[39m[38;2;63;125;247m#[39m[38;2;65;130;247m*[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m=[39m[38;2;98;206;250m=[39m[38;2;100;210;250m=[39m[38;2;102;214;251m=[39m[38;2;103;218;251m=[39m[38;2;105;223;251m=[39m[38;2;107;227;251m:[39m[38;2;109;231;251m.[39m
+              [38;2;51;96;246m.[39m[38;2;53;100;246m:[39m[38;2;54;104;246m+[39m[38;2;56;108;247m*[39m[38;2;58;113;247m#[39m[38;2;60;117;247m#[39m[38;2;62;121;247m#[39m[38;2;63;125;247m#[39m[38;2;65;130;247m#[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m+[39m[38;2;76;155;248m+[39m[38;2;78;159;248m+[39m[38;2;80;163;249m+[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m=[39m[38;2;98;206;250m=[39m[38;2;100;210;250m=[39m[38;2;102;214;251m=[39m[38;2;103;218;251m-[39m[38;2;105;223;251m.[39m[38;2;107;227;251m.[39m
+                 [38;2;56;108;247m.[39m[38;2;58;113;247m.[39m[38;2;60;117;247m-[39m[38;2;62;121;247m+[39m[38;2;63;125;247m#[39m[38;2;65;130;247m*[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m=[39m[38;2;78;159;248m.[39m[38;2;80;163;249m.[39m  [38;2;85;176;249m-[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m.[39m
+                [38;2;54;104;246m-[39m[38;2;56;108;247m+[39m[38;2;58;113;247m=[39m[38;2;60;117;247m.[39m[38;2;62;121;247m.[39m[38;2;63;125;247m.[39m[38;2;65;130;247m:[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m=[39m[38;2;82;168;249m.[39m[38;2;83;172;249m.[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m.[39m
+              [38;2;51;96;246m.[39m[38;2;53;100;246m+[39m[38;2;54;104;246m*[39m[38;2;56;108;247m+[39m[38;2;58;113;247m+[39m[38;2;60;117;247m+[39m[38;2;62;121;247m=[39m[38;2;63;125;247m.[39m [38;2;67;134;248m.[39m[38;2;69;138;248m.[39m[38;2;71;142;248m=[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m-[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m.[39m
+            [38;2;47;87;246m.[39m[38;2;49;92;246m:[39m[38;2;51;96;246m*[39m[38;2;53;100;246m*[39m[38;2;54;104;246m*[39m[38;2;56;108;247m+[39m[38;2;58;113;247m=[39m[38;2;60;117;247m.[39m[38;2;62;121;247m.[39m     [38;2;73;147;248m.[39m[38;2;74;151;248m-[39m[38;2;76;155;248m+[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m=[39m[38;2;94;197;250m.[39m
+           [38;2;45;83;246m.[39m[38;2;47;87;246m-[39m[38;2;49;92;246m*[39m[38;2;51;96;246m*[39m[38;2;53;100;246m*[39m[38;2;54;104;246m+[39m[38;2;56;108;247m:[39m          [38;2;76;155;248m.[39m[38;2;78;159;248m-[39m[38;2;80;163;249m+[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m=[39m
+          [38;2;43;79;245m.[39m[38;2;45;83;246m*[39m[38;2;47;87;246m#[39m[38;2;49;92;246m*[39m[38;2;51;96;246m=[39m[38;2;53;100;246m.[39m              [38;2;80;163;249m.[39m[38;2;82;168;249m=[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m=[39m
+        [38;2;40;70;245m.[39m[38;2;42;75;245m-[39m[38;2;43;79;245m*[39m[38;2;45;83;246m#[39m[38;2;47;87;246m+[39m[38;2;49;92;246m.[39m[38;2;51;96;246m.[39m                [38;2;82;168;249m.[39m[38;2;83;172;249m:[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m-[39m
+       [38;2;38;66;245m.[39m[38;2;40;70;245m=[39m[38;2;42;75;245m#[39m[38;2;43;79;245m=[39m[38;2;45;83;246m.[39m                     [38;2;85;176;249m.[39m[38;2;87;180;249m=[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m-[39m
+      [38;2;36;62;245m:[39m[38;2;38;66;245m*[39m[38;2;40;70;245m=[39m[38;2;42;75;245m.[39m                         [38;2;89;185;249m.[39m[38;2;91;189;250m.[39m[38;2;93;193;250m.[39m
+    [38;2;33;54;245m.[39m[38;2;34;58;245m:[39m[38;2;36;62;245m-[39m[38;2;38;66;245m.[39m [38;2;42;75;245mP[39m[38;2;43;79;245mr[39m[38;2;45;83;246me[39m[38;2;47;87;246ms[39m[38;2;49;92;246me[39m[38;2;51;96;246mn[39m[38;2;53;100;246mt[39m[38;2;54;104;246me[39m[38;2;56;108;247md[39m [38;2;60;117;247mb[39m[38;2;62;121;247my[39m [38;2;65;130;247mt[39m[38;2;67;134;248mh[39m[38;2;69;138;248me[39m [38;2;73;147;248mA[39m[38;2;74;151;248ms[39m[38;2;76;155;248mt[39m[38;2;78;159;248me[39m[38;2;80;163;249mr[39m[38;2;82;168;249mi[39m[38;2;83;172;249mn[39m[38;2;85;176;249ma[39m[38;2;87;180;249ms[39m [38;2;91;189;250md[39m[38;2;93;193;250me[39m[38;2;94;197;250mv[39m[38;2;96;201;250me[39m[38;2;98;206;250ml[39m[38;2;100;210;250mo[39m[38;2;102;214;251mp[39m[38;2;103;218;251me[39m[38;2;105;223;251mr[39m[38;2;107;227;251ms[39m
+    [38;2;33;54;245m.[39m[38;2;34;58;245m.[39m [38;2;38;66;245mR[39m[38;2;40;70;245me[39m[38;2;42;75;245ml[39m[38;2;43;79;245me[39m[38;2;45;83;246ma[39m[38;2;47;87;246ms[39m[38;2;49;92;246me[39m[38;2;51;96;246md[39m [38;2;54;104;246mu[39m[38;2;56;108;247mn[39m[38;2;58;113;247md[39m[38;2;60;117;247me[39m[38;2;62;121;247mr[39m [38;2;65;130;247mM[39m[38;2;67;134;248mo[39m[38;2;69;138;248mz[39m[38;2;71;142;248mi[39m[38;2;73;147;248ml[39m[38;2;74;151;248ml[39m[38;2;76;155;248ma[39m [38;2;80;163;249mP[39m[38;2;82;168;249mu[39m[38;2;83;172;249mb[39m[38;2;85;176;249ml[39m[38;2;87;180;249mi[39m[38;2;89;185;249mc[39m [38;2;93;193;250mL[39m[38;2;94;197;250mi[39m[38;2;96;201;250mc[39m[38;2;98;206;250me[39m[38;2;100;210;250mn[39m[38;2;102;214;251ms[39m[38;2;103;218;251me[39m [38;2;107;227;251mv[39m[38;2;109;231;251m2[39m[38;2;111;235;251m.[39m[38;2;113;240;252m0[39m
+
+[kernel] running /init as the init process
+[32m[     1.545][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x3000, offset = FixedNoReplace(400000), align = 0x1000[0m
+[32m[     1.568][0m [92mDEBUG [0m: [39m[0m[39mELF segment: virt_range = 0x400000..0x400120, file_range = 0x0..0x120[0m
+[32m[     1.571][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedReplace(400000), align = 0x1000[0m
+[32m[     1.578][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4194304..4198400[0m
+[32m[     1.585][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4194304..4198400[0m
+[32m[     1.590][0m [92mDEBUG [0m: [39m[0m[39mELF segment: virt_range = 0x401000..0x401045, file_range = 0x1000..0x1045[0m
+[32m[     1.592][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedReplace(401000), align = 0x1000[0m
+[32m[     1.594][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | EXEC | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4198400..4202496[0m
+[32m[     1.596][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | EXEC | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4198400..4202496[0m
+[32m[     1.599][0m [92mDEBUG [0m: [39m[0m[39mELF segment: virt_range = 0x402000..0x402036, file_range = 0x2000..0x2036[0m
+[32m[     1.600][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedReplace(402000), align = 0x1000[0m
+[32m[     1.602][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4202496..4206592[0m
+[32m[     1.604][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4202496..4206592[0m
+[32m[     1.616][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x5000, offset = Any, align = 0x1000[0m
+[32m[     1.627][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x800000, offset = FixedNoReplace(7fffff762000), align = 0x1000[0m
+[32m[     1.632][0m [92mDEBUG [0m: [39m[0m[39margv address = 0x7ffffff61ffa[0m
+[32m[     1.649][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedNoReplace(4cc000), align = 0x1000[0m
+[32m[     1.670][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2433261952404 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.700][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.701][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 760395435288 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.702][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 785744550174 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.702][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 811091107516 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.704][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.704][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 836442782950 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.704][0m [92mDEBUG [0m: [39m[0m[39mtask entry: rip = 0x401000, rsp = 0x7ffffff61f30, rax = 0x0[0m
+[32m[     1.706][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 887138741956 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.708][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 912487093512 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.708][0m [92mDEBUG [0m: [39m[0m[39mAll component: [ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }, ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }][0m
+[32m[     1.710][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937836794620 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.711][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937840336612 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.713][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937846734064 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.715][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937850211736 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.716][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937853555590 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.716][0m [92mDEBUG [0m: [39m[0m[39mRemain components: {"/workspace/asterinas-gpui/asterinas/kernel/comps/i8042": ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform": ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/uart": ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core": ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block": ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline": ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console": ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device": ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer": ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input": ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger": ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk": ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network": ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme": ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci": ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq": ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree": ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time": ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio": ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }}[0m
+[32m[     1.718][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 937858119180 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.718][0m [34mINFO  [0m: [39m[0m[39mExists components that are not initialized[0m
+[32m[     1.720][0m [92mDEBUG [0m: [39m[0m[39mcomponent infos: [ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }][0m
+[32m[     1.722][0m [34mINFO  [0m: [39m[0m[39mComponents initializing in Process stage...[0m
+[32m[     1.723][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1039316523498 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.723][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }[0m
+[32m[     1.725][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1064667339958 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.725][0m [93mWARN  [0m: [39msimpledrm: [0m[39mFailed to init: boot framebuffer is unavailable[0m
+[32m[     1.727][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1090017173690 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.727][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     1.728][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1115367126602 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.728][0m [34mINFO  [0m: [39m[0m[39mAll components initialization in Process stage completed[0m
+[32m[     1.729][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1140717149454 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.730][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1191410829316 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.731][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1191414670748 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.733][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1216763571284 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.734][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1242111065998 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.735][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1292804616242 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.738][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1343497343334 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.739][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1368844570888 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.740][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1394192590558 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.741][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1444885849728 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.743][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1470232080964 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.744][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1495579085156 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.745][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1495582126970 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.746][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1520930175636 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.747][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1571623220878 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.748][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1622314648448 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.750][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1647661155852 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.751][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1673009307352 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.752][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1698357413606 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.753][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1723704890182 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.754][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1749052764492 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.755][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1774400993920 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.757][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1799747305708 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.758][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1825093813280 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.759][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1850441372948 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.760][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1875788658660 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.762][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1926482406916 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.763][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1951829305482 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.764][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 1977176597052 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.765][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2002524059132 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.766][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2053218001884 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.767][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2078564471146 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.768][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2129256328034 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.769][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2179949987422 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.770][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 2205297135636 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.778][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 278834715266 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.779][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 304182885026 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.779][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 329530656852 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.781][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354879587008 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.782][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354882752370 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.783][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354885557462 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.784][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354888526490 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.785][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354891364194 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.787][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354894424368 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.788][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354897396824 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.789][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354900522304 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.790][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354903337896 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.793][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354909491732 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.794][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354912706454 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.795][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354915607962 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.796][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354918484040 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.797][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354921436878 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.798][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354924438208 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.799][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354927469096 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.800][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354930426088 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.801][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354933382600 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.803][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354936425770 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.805][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354941954184 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.806][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354944864728 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.807][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354947821982 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.808][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354950647580 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.809][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354953534764 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.811][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354956470468 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.812][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354959541108 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.813][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354963537556 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.821][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354982357182 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.822][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354985688592 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.824][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354989422662 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.825][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354992217656 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.826][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354995087890 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.827][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354997991428 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.830][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355004381192 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.831][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355007413296 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.832][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355010480376 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.833][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355013138344 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.834][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355016011190 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.836][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355019178256 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.837][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355022118132 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.838][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355024989490 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.839][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355028079696 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.841][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.841][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355033091914 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.842][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355040080256 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.843][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355043011532 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.844][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355046112054 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.846][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355049401390 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.847][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355052501320 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.848][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355055280086 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.849][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355058155866 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.850][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355060904566 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.852][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355064335724 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.853][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355067193996 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.854][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355070227324 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.855][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355073111018 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.856][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355075991370 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.858][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355079215244 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.859][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355082325340 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.860][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355085198090 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.861][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355088330482 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.863][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355091558546 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.864][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355094518996 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.865][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355097322918 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.866][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355100197174 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.867][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355103030454 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.868][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355105962466 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.870][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 355109024846 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.942][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e41970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.967][0m [34mINFO  [0m: [39m[0m[39mVirtual terminal keyboard handler connected to device: i8042_keyboard[0m
+[32m[     1.969][0m [34mINFO  [0m: [39minput: [0m[39msuccessfully connected handler class vt_keyboard to device i8042_keyboard[0m
+[32m[     1.973][0m [34mINFO  [0m: [39minput: [0m[39mfailed to connect handler class vt_keyboard to device i8042_mouse: IncompatibleDevice[0m
+[32m[     1.975][0m [34mINFO  [0m: [39minput: [0m[39mregistered handler class vt_keyboard[0m
+[32m[     1.984][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 278828659032 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.985][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 304177666324 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.985][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 329525078650 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.987][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 354874071776 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.988][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 380221794896 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.990][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 405570952760 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.990][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     1.991][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 405576586086 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.992][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 405582800382 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.994][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 430931240072 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.996][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 430935158136 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.997][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 430938786846 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     1.999][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 430942222014 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.000][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 456289078586 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.001][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 481638466566 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.001][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.002][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 506986831010 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.002][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 1, user_buf_ptr = 0x402000, user_buf_len = 0x36[0m
+[32m[     2.003][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 532337663266 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.004][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 557687125990 cycles exceeds the maximum delay 255494080000(s)[0mASTERINAS_CPU_USERSPACE_SMOKE passed (not a GPU test)
+
+[32m[     2.006][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 583036211448 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.007][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 608383845962 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.009][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 633732745606 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.009][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=169][SYS_REBOOT][0m
+[32m[     2.011][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 633738459450 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.011][0m [92mDEBUG [0m: [39m[0m[39m[sys_reboot]: magic1 = 0xfee1dead, magic2 = 0x28121969, op = 0x4321fedc[0m
+[32m[     2.012][0m [93mWARN  [0m: [39mtime: [0m[39mThe clock source becomes not reliable since an interval of 659089350792 cycles exceeds the maximum delay 255494080000(s)[0m
+[32m[     2.013][0m [93mWARN  [0m: 

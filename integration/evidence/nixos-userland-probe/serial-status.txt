@@ -1,0 +1,1 @@
+NOT CAPTURED: guest never started. Capacity guard blocked make nixos and make run_nixos before execution. No serial/qemu log is claimed for this probe. Existing unrelated qemu logs were not copied or modified.

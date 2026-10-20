@@ -1,0 +1,14 @@
+[package]
+name = "cybermanju-compression"
+version = "0.1.1"
+edition = "2021"
+description = "Triple-layer compression (LZ4 → Zstd → Brotli)"
+
+[dependencies]
+anyhow = "1"
+blake3 = "1"
+lz4_flex = "0.11"
+serde = { version = "1", features = ["derive"] }
+zstd = "0.13"
+brotli = "7"
+log = "0.4"

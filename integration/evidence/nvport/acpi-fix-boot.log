@@ -1,0 +1,166 @@
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 101000..8000000
+INFO: Adding free frames to the allocator: b449000..7ffdf000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 2602789480 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x5fc, current 0x17ce9c, init 0x3ce2
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+NVIDIA NVport CPU memory self-test passed (not a GPU test)
+OSTD initialized. Preparing components.
+DEBUG: Try to acquire security-insensitive MMIO range: 0xb8000..0xb9000 with cache policy: WriteCombining
+ERROR: Uncaught panic:
+	called `Result::unwrap()` on an `Err` value: AccessDenied
+	at /workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer/src/framebuffer.rs:118
+	on CPU 0 by thread None
+Printing stack trace:
+   1: fn 0xffffffff88e02cd0 - pc 0xffffffff88e02d1b / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff880485a0;
+
+   2: fn 0xffffffff88136950 - pc 0xffffffff8813710e / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff880485c0;
+
+   3: fn 0xffffffff8813a970 - pc 0xffffffff8813a97a / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff880489e0;
+
+   4: fn 0xffffffff8804b000 - pc 0xffffffff8804b00a / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff880489f0;
+
+   5: fn 0xffffffff88f1e0f0 - pc 0xffffffff88f1e136 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88048a00;
+
+   6: fn 0xffffffff88f1dc10 - pc 0xffffffff88f1dca6 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88048a40;
+
+   7: fn 0xffffffff88ccaa80 - pc 0xffffffff88ccad53 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88048ac0;
+
+   8: fn 0xffffffff88cd31f0 - pc 0xffffffff88cd3203 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88048f50;
+
+   9: fn 0xffffffff88ccb670 - pc 0xffffffff88ccb685 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88048f70;
+
+  10: fn 0xffffffff88d3b1d0 - pc 0xffffffff88d3b9e7 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88048f90;
+
+  11: fn 0xffffffff88d3c380 - pc 0xffffffff88d3c410 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff880497b0;
+
+  12: fn 0xffffffff884c34e0 - pc 0xffffffff884c3a53 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88049880;
+
+  13: fn 0xffffffff88156a10 - pc 0xffffffff88156a16 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88049f50;
+
+  14: fn 0xffffffff8804b020 - pc 0xffffffff8804b062 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88049f60;
+
+  15: fn 0xffffffff8804b070 - pc 0xffffffff8804b076 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88049f70;
+
+  16: fn 0xffffffff88d74450 - pc 0xffffffff88d7445b / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88049f80;
+
+  17: fn 0xffffffff88de4e90 - pc 0xffffffff88de4f71 / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff88049f90;
+
+  18: fn                0x0 - pc 0xffffffff88deb3da / registers:
+
+     rax 0xffffffff89436510; rdx   0xffffff89436510; rcx                0x1; rbx 0xffffffff80000000;
+     rsi  0x100ffff880484c8; rdi 0xffffffff88dcd9b3; rbp                0x0; rsp 0xffffffff8804a000;
+
+ERROR: Failed to power off the system
+ERROR: Halting the machine...
+qemu-system-x86_64: terminating on signal 15 from pid 408149 (timeout)

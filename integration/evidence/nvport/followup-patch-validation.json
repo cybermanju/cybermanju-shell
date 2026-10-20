@@ -1,0 +1,35 @@
+{
+  "status": "pass",
+  "scope": "incremental source patch application/equality and host script tests; not GPU evidence",
+  "base": "00a4842d976db6723b8224be2e57ac8105f13ee2",
+  "prerequisites": [
+    "asterinas-dumb-buffer-layout.patch",
+    "asterinas-simpledrm-exact-pixel-format.patch",
+    "asterinas-graphics-prerequisite-check.patch",
+    "asterinas-vulkan-compute-ci.patch",
+    "asterinas-nvidia-nvport-native-ci.patch"
+  ],
+  "patch": "asterinas-nvidia-boot-pci-tcg.patch",
+  "sha256": "8ffef89f8987416e4899c84a83cb67912f3693e4e1f0378fedffea2a0ed89cde",
+  "changed_files": [
+    ".github/workflows/graphics_gpu.yml",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Components.toml",
+    "kernel/Cargo.toml",
+    "kernel/comps/nvidia-platform/Cargo.toml",
+    "kernel/comps/nvidia-platform/README.md",
+    "kernel/comps/nvidia-platform/src/lib.rs",
+    "kernel/core/comps/pci/src/bus.rs",
+    "kernel/src/lib.rs",
+    "ostd/src/arch/x86/boot/multiboot2/mod.rs",
+    "ostd/src/arch/x86/boot/multiboot2/tests.rs",
+    "tools/graphics/NATIVE_NVIDIA.md",
+    "tools/graphics/run_cpu_kernel_tests.sh",
+    "tools/graphics/run_nvport_smoke.py",
+    "tools/graphics/test_native_gpu_evidence.py",
+    "tools/graphics/test_run_nvport_smoke.py",
+    "tools/graphics/validate_native_gpu_evidence.py"
+  ],
+  "original_index_unchanged": true
+}

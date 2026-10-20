@@ -1,0 +1,10 @@
+{
+  "checked_at_utc": "2026-10-20T20:08:50.617387+00:00",
+  "device_nodes": {
+    "/dev/dri": [],
+    "/dev/nvidia*": [],
+    "/dev/kvm": []
+  },
+  "display_class_pci": [],
+  "gpu_acceptance": "blocked: no compatible physical GPU exposed; no GPU benchmark run"
+}

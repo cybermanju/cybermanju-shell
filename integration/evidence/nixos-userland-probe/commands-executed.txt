@@ -1,0 +1,11 @@
+# Read-only collection commands (Python hash/stat operations also described in collect_preflight.py)
+git rev-parse HEAD
+git status --short --untracked-files=all
+git diff --stat
+df -B1 /workspace/asterinas-gpui/asterinas
+df -i /workspace/asterinas-gpui/asterinas
+du -sh target /nix/store
+nix --version
+qemu-system-x86_64 --version
+make --version
+git diff --quiet -- Makefile tools/nixos test/nixos distro rust-toolchain.toml

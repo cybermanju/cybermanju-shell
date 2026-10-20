@@ -1,0 +1,14 @@
+   Compiling services v0.1.0 (/workspace/asterinas-gpui/gpui-shell/crates/services)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.28s
+     Running unittests src/lib.rs (target/debug/deps/services-d59b59ab14b867b7)
+
+running 6 tests
+test watcher::tests::registration_requires_a_runtime_and_reports_invalid_target ... ok
+test watcher::tests::registration_errors_are_synchronous_for_bad_targets ... ok
+test watcher::tests::parent_rename_notifies_then_closes_the_watcher ... ok
+test watcher::tests::unrelated_files_are_filtered ... ok
+test watcher::tests::dropping_receiver_releases_inotify_descriptor ... ok
+test watcher::tests::atomic_replacement_delivers_one_trailing_edge_for_final_valid_file ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.58s
+

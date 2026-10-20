@@ -1,0 +1,21 @@
+test_cpu_only_vulkan_does_not_pass (test_check_graphics.GraphicsDiagnosticTests.test_cpu_only_vulkan_does_not_pass) ... ok
+test_drm_regular_file_is_not_a_device_node (test_check_graphics.GraphicsDiagnosticTests.test_drm_regular_file_is_not_a_device_node) ... ok
+test_drm_requires_accessible_character_node_fixtures_of_each_kind (test_check_graphics.GraphicsDiagnosticTests.test_drm_requires_accessible_character_node_fixtures_of_each_kind) ... ok
+test_main_returns_nonzero_when_a_required_check_fails (test_check_graphics.GraphicsDiagnosticTests.test_main_returns_nonzero_when_a_required_check_fails) ... ok
+test_unrecognized_device_type_does_not_pass (test_check_graphics.GraphicsDiagnosticTests.test_unrecognized_device_type_does_not_pass) ... ok
+test_vulkan_inspects_each_indexed_json_device (test_check_graphics.GraphicsDiagnosticTests.test_vulkan_inspects_each_indexed_json_device) ... ok
+test_vulkan_missing_command_fails_actionably (test_check_graphics.GraphicsDiagnosticTests.test_vulkan_missing_command_fails_actionably) ... ok
+test_wayland_connection_without_layer_shell_fails (test_check_graphics.GraphicsDiagnosticTests.test_wayland_connection_without_layer_shell_fails) ... ok
+test_wayland_global_is_parsed_from_mocked_real_format_output (test_check_graphics.GraphicsDiagnosticTests.test_wayland_global_is_parsed_from_mocked_real_format_output) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.079s
+
+OK
+GPUI graphics readiness (prerequisite probe; not integration certification)
+PASS  ok: fixture
+FAIL  required: fixture failure
+      Action: fixture action
+PASS  ok: fixture
+
+Not ready: 1 required check(s) failed.

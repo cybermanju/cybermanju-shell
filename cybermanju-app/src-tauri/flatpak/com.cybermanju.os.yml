@@ -1,0 +1,69 @@
+app-id: com.cybermanju.os
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: cybermanju-os-desktop
+
+finish-args:
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --share=network
+  - --device=dri
+  - --env=FLATPAK=1
+
+modules:
+  - name: cybermanju-os-desktop
+    buildsystem: simple
+    build-commands:
+      - |
+        set -e
+        deb_file=$(find . -name '*.deb' -type f | head -1)
+        if [ -z "$deb_file" ]; then
+          echo "ERROR: No .deb file found"
+          exit 1
+        fi
+        echo "Extracting: $deb_file"
+        mkdir -p deb-extracted
+        ar x "$deb_file" --output=deb-extracted
+        # Handle different compression formats (xz, zst, gz)
+        data_tar=$(ls deb-extracted/data.tar.* 2>/dev/null | head -1)
+        if [ -z "$data_tar" ]; then
+          echo "ERROR: No data.tar.* found in deb"
+          exit 1
+        fi
+        echo "Extracting data: $data_tar"
+        mkdir -p deb-root
+        tar -xf "$data_tar" -C deb-root
+        # '/' is read-only during a module build, so stage the payload in the
+        # sandbox build dir and copy it into the writable '/app' prefix.
+        for d in usr opt; do
+          if [ -d "deb-root/$d" ]; then
+            cp -a "deb-root/$d/." /app/
+          fi
+        done
+        # Make sure the launcher ends up at /app/bin (what 'command:' resolves)
+        if [ ! -x /app/bin/cybermanju-os-desktop ]; then
+          binary_path=$(find /app -name 'cybermanju-os-desktop' -type f 2>/dev/null | head -1)
+          if [ -z "$binary_path" ]; then
+            echo "ERROR: cybermanju-os-desktop binary not found after extraction"
+            ls -R deb-root || true
+            exit 1
+          fi
+          mkdir -p /app/bin
+          ln -sf "$binary_path" /app/bin/cybermanju-os-desktop
+        fi
+        # Rewrite Exec/TryExec: the deb ships host paths (/usr/bin/...), which
+        # do not exist inside the sandbox.
+        for desktop in /app/share/applications/*.desktop; do
+          [ -f "$desktop" ] || continue
+          sed -i 's|^Exec=.*|Exec=cybermanju-os-desktop|' "$desktop"
+          sed -i 's|^TryExec=.*|TryExec=cybermanju-os-desktop|' "$desktop"
+        done
+        echo "Staged app files:"
+        ls -l /app/bin/cybermanju-os-desktop
+        ls /app/share/applications/ || true
+    sources:
+      - type: dir
+        path: ../../artifacts

@@ -1,0 +1,36 @@
+## work/nixos-session-module
+ M Cargo.lock
+ M crates/app/Cargo.toml
+ M crates/app/src/args.rs
+ M crates/app/src/bar/view.rs
+ M crates/app/src/config/mod.rs
+ M crates/app/src/ipc/service.rs
+ M crates/app/src/main.rs
+ M crates/services/src/audio/mod.rs
+ M crates/services/src/notification/mod.rs
+ M crates/services/src/watcher.rs
+ M crates/ui/src/components/list.rs
+ M crates/ui/src/patterns/launcher.rs
+ M crates/ui/src/theme/mod.rs
+ M crates/ui/src/ui.rs
+MM docs/src/content/docs/developer/setup.md
+M  flake.nix
+ M nix/build.nix
+AM nix/nixos-module-test.nix
+AM nix/nixos-module.nix
+?? crates/app/src/config/appearance.rs
+?? crates/app/src/config/appearance/
+?? crates/app/src/config/appearance_live.rs
+?? crates/app/src/frame_metrics.rs
+?? crates/app/src/frame_telemetry.rs
+?? crates/app/src/presentation_contract.rs
+?? crates/ui/src/theme/density.rs
+?? docs/src/content/docs/developer/cybermanju-appearance.md
+?? docs/src/content/docs/developer/performance.md
+?? docs/src/content/docs/developer/presentation-feedback.md
+?? scripts/__pycache__/
+?? scripts/analyze_frame_telemetry.py
+?? scripts/test_appearance_profile.py
+?? scripts/test_frame_telemetry.py
+?? scripts/test_nested_presentation_boundary.py
+?? scripts/test_session_startup.py

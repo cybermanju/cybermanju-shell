@@ -1,0 +1,640 @@
+/**
+ * CyberManju OS — vibrancy & motion layer.
+ *
+ * Utilities shared by every window, panel and overlay. Values come from the
+ * `--ui-*` custom properties published by `useTheme()`, so this whole file
+ * re-themes itself when the user switches theme/accent/density/glass.
+ */
+
+/* ── surfaces ───────────────────────────────────────────────────────────
+   Flat remake: ONE glass class for chrome (menu bar, dock, sidebar,
+   titlebar, menus, popovers, sheets) — blur(40px) saturate(180%) with a
+   0.5px hairline. Body content uses .ui-solid (flat, no blur). */
+
+.ui-glass {
+  background: var(--ui-glass);
+  backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur)) saturate(var(--ui-saturate));
+  border: 1px solid var(--ui-border);
+}
+
+.ui-glass-strong {
+  background: var(--ui-glass-2);
+  backdrop-filter: blur(var(--ui-blur-strong)) saturate(var(--ui-saturate));
+  -webkit-backdrop-filter: blur(var(--ui-blur-strong)) saturate(var(--ui-saturate));
+  border: 1px solid var(--ui-border);
+}
+
+.ui-solid {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+}
+
+.ui-surface {
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+
+.ui-raised {
+  box-shadow: var(--ui-shadow-2);
+}
+
+/* Legacy shine hook: neutralised (flat chrome, no top highlight). */
+.ui-shine {
+  position: relative;
+}
+
+.ui-shine::before {
+  content: none;
+}
+
+/* ── interaction ──────────────────────────────────────────────────────── */
+
+.ui-press {
+  transition:
+    background-color var(--ui-dur-fast) var(--ui-ease-out),
+    border-color var(--ui-dur-fast) var(--ui-ease-out),
+    box-shadow var(--ui-dur-fast) var(--ui-ease-out);
+}
+
+.ui-press:active {
+  transform: scale(0.99);
+}
+
+.ui-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  border-color: var(--ui-accent);
+}
+
+/* Legacy sweep hook: neutralised (no cursor-tracking glow). */
+.ui-sweep {
+  position: relative;
+  isolation: isolate;
+}
+
+.ui-sweep::after {
+  content: none;
+}
+
+/* ── typography helpers ───────────────────────────────────────────────── */
+
+.ui-overline {
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-text-2);
+}
+
+.ui-mono {
+  font-family: var(--ui-font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Legacy gradient-text hook: plain semibold text for compatibility. */
+.ui-gradient-text {
+  color: var(--ui-text);
+  font-weight: 600;
+}
+
+.ui-accent-text {
+  color: var(--ui-accent);
+}
+
+/* ── animation primitives ─────────────────────────────────────────────── */
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ui-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ui-sweep-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ui-anim-fade {
+  animation: ui-fade-in var(--ui-dur) var(--ui-ease-out) both;
+}
+
+.ui-anim-rise {
+  animation: ui-rise var(--ui-dur-slow) var(--ui-ease-out) both;
+}
+
+.ui-anim-pop {
+  animation: ui-pop var(--ui-dur) var(--ui-ease-out) both;
+}
+
+.ui-anim-stagger > * {
+  animation: ui-rise var(--ui-dur-slow) var(--ui-ease-out) both;
+}
+
+.ui-anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.ui-anim-stagger > *:nth-child(2) { animation-delay: 25ms; }
+.ui-anim-stagger > *:nth-child(3) { animation-delay: 50ms; }
+.ui-anim-stagger > *:nth-child(4) { animation-delay: 75ms; }
+.ui-anim-stagger > *:nth-child(5) { animation-delay: 100ms; }
+.ui-anim-stagger > *:nth-child(6) { animation-delay: 125ms; }
+.ui-anim-stagger > *:nth-child(7) { animation-delay: 150ms; }
+.ui-anim-stagger > *:nth-child(8) { animation-delay: 175ms; }
+
+/* ── reduced motion (theme `motion: reduced` or OS preference) ────────── */
+
+[data-ui-motion='reduced'] *,
+[data-ui-motion='reduced'] *::before,
+[data-ui-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ── scrollbars / selection ─────────────────────────────────────────────
+   Quiet macOS-style system: slim neutral thumb, no accent flash. Firefox
+   uses `scrollbar-*`; Chromium uses the `::-webkit-scrollbar` family. */
+
+::selection {
+  background: color-mix(in srgb, var(--ui-accent) 30%, transparent);
+  color: var(--ui-text);
+}
+
+/* Overlay-style thin scrollbars (auto-hide look). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-text) 28%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-text) 28%, transparent);
+  border-radius: var(--ui-radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  min-height: 32px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ui-text) 42%, transparent);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--ui-text) 52%, transparent);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Shared scroll-container behaviour: native panning on touch, wheel + touch
+   stay inside the panel, layout stays stable when bars appear. */
+.ui-scroll,
+.window-content,
+.term-scroll,
+.cs-term,
+.cs-thread,
+.cs-tree,
+.cs-problems,
+.cs-tabs,
+.desktop-strip,
+.desktop-overview,
+.fm-grid,
+.fm-lbody,
+.fm-side,
+.fm-crumbs,
+.fm-sub {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Thin variant for dense chrome (tab strips, crumb bars, docks). */
+.ui-scroll-thin {
+  scrollbar-width: thin;
+}
+.ui-scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ui-scroll-thin::-webkit-scrollbar-thumb {
+  border-width: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── plasma shell style (Kubuntu/Breeze-like) ───────────────────────
+   Structure switches in the shell registry; this block only retunes the
+   shared primitives when [data-ui-shell="plasma"]: Noto Sans type, flat
+   2px focus, 28px menu rows, hover washes and centered dialogs. */
+
+[data-ui-shell='plasma'] {
+  --ui-font: 'Noto Sans', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Breeze hover wash for rows, tabs and task buttons. */
+[data-ui-shell='plasma'] .ui-menu__row:hover:not(:disabled),
+[data-ui-shell='plasma'] .ui-menu__row.is-active:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+
+[data-ui-shell='plasma'] .ui-menu__row {
+  min-height: 28px;
+}
+
+/* Dialogs stay centered in plasma — no top sheets. */
+[data-ui-shell='plasma'] .ui-modal-layer:has(.ui-modal--sheet) {
+  align-items: center;
+  padding: 24px;
+}
+
+[data-ui-shell='plasma'] .ui-modal-enter-from .ui-modal--sheet,
+[data-ui-shell='plasma'] .ui-modal-leave-to .ui-modal--sheet {
+  transform: translateY(14px);
+  opacity: 0;
+}
+
+/* Breeze switch is square-ish with a 2px focus outline. */
+[data-ui-shell='plasma'] .ui-toggle__track {
+  border-radius: var(--ui-radius-sm);
+}
+
+[data-ui-shell='plasma'] .ui-toggle:focus-visible .ui-toggle__track {
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Plasma hides the macOS chrome even if it stays mounted. */
+[data-ui-shell='plasma'] .top-menu-bar,
+[data-ui-shell='plasma'] .dock-container,
+[data-ui-shell='plasma'] .shell-dock {
+  display: none;
+}
+
+/* ── mobile safe-area + viewport ────────────────────────────────────
+   Android WebView with viewport-fit=cover draws under the status/nav bars:
+   pad the shell by the system insets and use dynamic viewport units so the
+   1400×900 desktop layout degrades to a full-height column on phones.
+   `100dvh` falls back to `100vh` where unsupported. */
+.cybermanju-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Offline state: set on <body> by App.vue (online/offline events). Panels
+   can key off it to disable server-only actions instead of hanging. */
+body.cybermanju-offline .server-only {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* ── mobile desktop (phones ≤768px, Android WebView) ────────────────────
+   The window manager stays mounted, but phones get one fullscreen sheet at
+   a time: no desktop icons, no floating drag/resize, bottom nav owns the
+   last 64px + safe-area. Form fields stay at 16px to prevent WebView zoom;
+   compact icon controls keep their intended dimensions. */
+
+/* Phone header height — status-bar sized, NOT a desktop menu bar. The
+   notch/system status bar is already absorbed by `.cybermanju-shell`'s
+   safe-area padding (the shell starts below the OS status bar), so this is
+   the whole top chrome: one slim strip + its one shared sheet offset.
+   TopMenuBar renders it; every fixed sheet top's off it (below). */
+:root {
+  --mobile-header-h: 26px;
+}
+
+@media (max-width: 768px) {
+  /* Perf: phones get zero backdrop-blur (GPU killer) — vibrancy surfaces
+     fall back to near-opaque tints, so solid fills look identical. */
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .desktop-icons,
+  .dock-context-overlay,
+  .dock-container,
+  .desktop-wallpaper,
+  .desktop-aurora,
+  .shell-dock {
+    display: none !important;
+  }
+
+  /* Single unified mobile header (logo + status + theme + one clock) on
+     every surface. Desktop menus/search stay in the launcher and palette.
+     Slim status-bar strip: the notch is the shell's safe-area padding, so
+     the bar never grows around it — sheets (top = inset + --mobile-header-h)
+     start exactly at its bottom edge. */
+  .top-menu-bar {
+    min-height: var(--mobile-header-h);
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+  }
+  .top-menu-bar .menu-items,
+  .top-menu-bar .tmb-center {
+    display: none !important;
+  }
+
+  /* Sheets snap instead of blur-fading: transform + opacity only. */
+  .win-enter-active,
+  .win-leave-active {
+    transition: opacity 140ms ease-out, transform 160ms ease-out !important;
+  }
+  .win-enter-from {
+    opacity: 0;
+    transform: translateY(14px) !important;
+    filter: none !important;
+  }
+  .win-leave-to {
+    opacity: 0;
+    transform: translateY(8px) !important;
+    filter: none !important;
+  }
+
+  .desktop-workspace,
+  .desktop-strip,
+  .desktop-overview {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-window {
+    position: fixed !important;
+    inset: auto !important;
+    top: calc(env(safe-area-inset-top, 0px) + var(--mobile-header-h)) !important;
+    right: env(safe-area-inset-right, 0px) !important;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+    left: env(safe-area-inset-left, 0px) !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    box-sizing: border-box !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .statusbar { display: none !important; }
+  [data-ui-shell='plasma'] .top-menu-bar { display: flex !important; }
+
+  .window-titlebar {
+    /* Standard phone nav bar height (iOS 44px / Android ~48dp bar). */
+    min-height: 44px;
+    border-radius: 0 !important;
+    flex-shrink: 0;
+  }
+
+  .resize-handle {
+    display: none !important;
+  }
+
+  .am-providers,
+  .am-fields,
+  .sw-fields {
+    grid-template-columns: 1fr !important;
+  }
+
+  .am-providers-wrap,
+  .am-detail-col,
+  .am-list-col {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .am-tabs,
+  .dm-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .am-tab,
+  .dm-tabs button,
+  .org-tabs button,
+  .sh-tabs button {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .bw-btn,
+  .am-btn,
+  .sw-btn,
+  .ghost-btn,
+  .fm-pill,
+  .fm-mobile-tool,
+  .cs-btn,
+  .mn-btn {
+    min-height: 44px;
+  }
+
+  .disk-panel .cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Tab strips that crush at phone widths become horizontal scrollers. */
+  .org-tabs,
+  .sh-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .org-tabs button,
+  .sh-tabs button {
+    flex: 1 0 auto;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* Process table + transfer canvas scroll inside the sheet, never widen it. */
+  .task-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tf-canvas {
+    min-width: 440px;
+    min-height: 360px;
+  }
+  .tf-node { width: 170px; }
+  .tf-node.prov { width: 190px; }
+
+  /* Long locator strings wrap instead of pushing the sheet sideways. */
+  .api-row { flex-wrap: wrap; }
+  .api-path {
+    flex: 1 1 160px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .perm-row { flex-wrap: wrap; }
+  .dv-row { flex-wrap: wrap; }
+  .sh-shield .nist-viz { flex-wrap: wrap; }
+  .sh-shield .status-meta { flex-wrap: wrap; }
+  .panel-header { flex-wrap: wrap; row-gap: 8px; }
+}
+
+/* ── narrow windows on any viewport (≤560px live window width) ──────────
+   `@media` sees the viewport, not the floating window: a 420px window on a
+   1400px monitor never trips it. `AppWindow` mirrors the same breakpoint as
+   `.app-window--narrow` (via ResizeObserver + useWindowUi), so this block
+   re-applies the collapse rules per-window. Keep it in sync with the blocks
+   above: tab scroll, single-column grids, hidden side rails. */
+.app-window--narrow .fm-main,
+.app-window--narrow .fm-main.no-side,
+.app-window--narrow .fm-main.no-insp {
+  grid-template-columns: 1fr;
+}
+.app-window--narrow .fm-side,
+.app-window--narrow .fm-insp,
+.app-window--narrow .hide-sm {
+  display: none;
+}
+.app-window--narrow .fm-top {
+  flex-wrap: wrap;
+}
+.app-window--narrow .fm-crumbs {
+  order: 5;
+  flex-basis: 100%;
+}
+  .app-window--narrow .fm-topactions .fm-pill:not(.fm-mobile-more) span {
+  display: none;
+}
+.app-window--narrow .cs-ai,
+.app-window--narrow .cs-side,
+.app-window--narrow .hide-mid {
+  display: none;
+}
+/* On phones Code Studio's rail is a temporary drawer, not a desktop sidebar. */
+.app-window--narrow .cs-side.is-mobile-drawer {
+  display: flex;
+}
+.app-window--narrow .am-tabs,
+.app-window--narrow .dm-tabs,
+.app-window--narrow .org-tabs,
+.app-window--narrow .sh-tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.app-window--narrow .org-tabs button,
+.app-window--narrow .sh-tabs button {
+  flex: 1 0 auto;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.app-window--narrow .stats-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+.app-window--narrow .disk-panel .cards {
+  grid-template-columns: 1fr;
+}
+.app-window--narrow .task-table {
+  display: block;
+  overflow-x: auto;
+}
+.app-window--narrow .tf-canvas {
+  min-width: 440px;
+  min-height: 360px;
+}
+.app-window--narrow .tf-node { width: 170px; }
+.app-window--narrow .tf-node.prov { width: 190px; }
+.app-window--narrow .api-row { flex-wrap: wrap; }
+.app-window--narrow .api-path {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-window--narrow .perm-row,
+.app-window--narrow .dv-row,
+.app-window--narrow .panel-header,
+.app-window--narrow .sh-shield .nist-viz,
+.app-window--narrow .sh-shield .status-meta {
+  flex-wrap: wrap;
+}

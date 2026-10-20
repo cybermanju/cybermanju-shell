@@ -64,6 +64,7 @@ impl ParentElement for LauncherFrame {
 
 impl RenderOnce for LauncherFrame {
     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let density = cx.theme().density;
         let colors = cx.theme().colors();
         let (text, muted, disabled) = (colors.text, colors.text_muted, colors.text_disabled);
         let (background, border, badge_bg) =
@@ -85,11 +86,11 @@ impl RenderOnce for LauncherFrame {
             .child(
                 div()
                     .w_full()
-                    .px(Spacing::XLarge.pixels())
-                    .py(Spacing::Large.pixels())
+                    .px(density.spacing(Spacing::XLarge))
+                    .py(density.spacing(Spacing::Large))
                     .flex()
                     .items_center()
-                    .gap(Spacing::Large.pixels())
+                    .gap(density.spacing(Spacing::Large))
                     .child(
                         Icon::new(self.icon)
                             .size(IconSize::Medium)
@@ -104,7 +105,7 @@ impl RenderOnce for LauncherFrame {
                     .when_some(self.badge, |el, badge| {
                         el.child(
                             div()
-                                .px(Spacing::Medium.pixels())
+                                .px(density.spacing(Spacing::Medium))
                                 .py(px(3.))
                                 .rounded(Radius::Small.pixels())
                                 .bg(badge_bg)
@@ -123,19 +124,19 @@ impl RenderOnce for LauncherFrame {
                     .flex()
                     .flex_col()
                     .overflow_hidden()
-                    .py(Spacing::XSmall.pixels())
+                    .py(density.spacing(Spacing::XSmall))
                     .children(self.body),
             )
             .when(has_footer, |el| {
                 el.child(hairline()).child(
                     div()
                         .w_full()
-                        .px(Spacing::XLarge.pixels())
-                        .py(Spacing::Medium.pixels())
+                        .px(density.spacing(Spacing::XLarge))
+                        .py(density.spacing(Spacing::Medium))
                         .flex()
                         .items_center()
                         .justify_between()
-                        .gap(Spacing::XLarge.pixels())
+                        .gap(density.spacing(Spacing::XLarge))
                         .child(
                             // Hints yield to the actions: clip rather than
                             // push them off the edge.
@@ -156,6 +157,7 @@ impl RenderOnce for LauncherFrame {
 
 /// Render `(action, key)` pairs as the footer's right-hand hints - `Open ⏎ Close Esc`.
 pub fn footer_hints(actions: Vec<(&'static str, &'static str)>, cx: &App) -> AnyElement {
+    let density = cx.theme().density;
     let colors = cx.theme().colors();
     let muted = colors.text_muted;
     let key_bg = colors.element_background;
@@ -163,7 +165,7 @@ pub fn footer_hints(actions: Vec<(&'static str, &'static str)>, cx: &App) -> Any
     div()
         .flex()
         .items_center()
-        .gap(Spacing::XLarge.pixels())
+        .gap(density.spacing(Spacing::XLarge))
         .text_size(TextSize::Small.rems())
         .text_color(muted)
         .children(actions.into_iter().map(|(action, key)| {

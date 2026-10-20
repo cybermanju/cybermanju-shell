@@ -1,0 +1,53 @@
+warning: using `chunks_exact` with a constant chunk size
+  --> crates/ui/tests/icon_assets.rs:98:29
+   |
+98 |         let opaque = pixels.chunks_exact(4).filter(|px| px[3] > 8).count();
+   |                             ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<4>().0.iter()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#chunks_exact_to_as_chunks
+   = note: `#[warn(clippy::chunks_exact_to_as_chunks)]` on by default
+
+warning: `ui` (test "icon_assets") generated 1 warning (run `cargo clippy --fix --test "icon_assets" -p ui -- ` to apply 1 suggestion)
+    Checking services v0.1.0 (/workspace/asterinas-gpui/gpui-shell/crates/services)
+    Checking gpuishell v0.1.0 (/workspace/asterinas-gpui/gpui-shell/crates/app)
+warning: this `if` statement can be collapsed
+  --> crates/app/src/main.rs:63:5
+   |
+63 | /     if let Some(profile) = &appearance {
+64 | |         if let Err(error) = profile.project_theme(&ui::Theme::default(...
+65 | |             eprintln!("Appearance token projection failed: {error:#}");
+66 | |             std::process::exit(1);
+67 | |         }
+68 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if
+   = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+   |
+63 ~     if let Some(profile) = &appearance
+64 ~         && let Err(error) = profile.project_theme(&ui::Theme::default()) {
+65 |             eprintln!("Appearance token projection failed: {error:#}");
+66 |             std::process::exit(1);
+67 ~         }
+   |
+
+warning: `gpuishell` (bin "gpuishell") generated 1 warning (run `cargo clippy --fix --bin "gpuishell" -p gpuishell -- ` to apply 1 suggestion)
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> crates/app/src/config/appearance_live.rs:206:9
+    |
+206 |         native.font_size = gpui::px(19.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `ui::Theme { font_size: gpui::px(19.0), ..Default::default() }` and removing relevant reassignments
+   --> crates/app/src/config/appearance_live.rs:205:9
+    |
+205 |         let mut native = Theme::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: `gpuishell` (bin "gpuishell" test) generated 2 warnings (1 duplicate)
+    Finished `dev` profile [unoptimized] target(s) in 24.07s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

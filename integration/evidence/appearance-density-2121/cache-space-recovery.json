@@ -1,0 +1,25 @@
+{
+  "reason": "critical root disk pressure after completed GPUI checks, no active GPUI compiler",
+  "removed": "only reproducible incremental cache entries",
+  "paths": [
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/gpuishell-2kthb0fwyzn2n",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/services-1w6rtg8xbiqcx",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/services-25vc31m02yl2n",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/gpuishell-3sr2rhwrv2deb",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/gpuishell-3sowtusw3qksf",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/gpuishell-0c04l0eqc63lw",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/ui-1hgm6xg8tsmpb",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/ui-3n6u4m1rg7oe6",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/icon_assets-2as6zxwxnzrfa",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/story-0robhfc5fgspu",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/showcase-355bfsvbc801m",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/ui-3emvgm30qqp6k",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/ui-2cxnw5ful4g9u",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/icon_assets-0l97gnrzng1i5",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/showcase-0xfo6qln29d95",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/story-12ypgazdtlq0h",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/showcase-3m5xj7nybrg8d",
+    "/workspace/asterinas-gpui/gpui-shell/target/debug/incremental/story-01qwmyglar11n"
+  ],
+  "preserved": "sources, binary, test binaries, patches, logs and dependency archives"
+}

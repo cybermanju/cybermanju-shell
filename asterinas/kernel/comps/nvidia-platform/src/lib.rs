@@ -8,6 +8,7 @@
 
 extern crate alloc;
 pub mod device;
+pub mod worker;
 
 #[cfg(feature = "nvport-runtime")]
 mod runtime;

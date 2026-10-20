@@ -1,0 +1,31 @@
+{
+  "passed": false,
+  "qemu_exit": 33,
+  "errors": [
+    "missing verified-I/O marker: CONSUMER_IO DEVICE PASS: nvme0n1 (NVMe)",
+    "missing verified-I/O marker: CONSUMER_IO DEVICE PASS: vda (VirtIO modern)",
+    "missing verified-I/O marker: CONSUMER_IO DEVICE PASS: vdb (VirtIO legacy)"
+  ],
+  "scope": "Full Asterinas kernel; real block reads and writes under QEMU TCG; not GPU/firmware/performance evidence",
+  "hardware_gpu": false,
+  "gpu_firmware_loaded": false,
+  "devices": {
+    "nvme": "/dev/nvme0n1",
+    "virtio_modern": "/dev/vda",
+    "virtio_legacy": "/dev/vdb"
+  },
+  "verified": "4096 known patterned bytes at offset 0 plus 4096-byte scratch write/read at offset 4096 per device",
+  "iso_sha256": "5f4dbb74dd85829c21191daba8241ea46b08f025a06100284ec5434e7c2f57e3",
+  "initramfs_sha256": "f58277259e15745ce8eb9abee171d669e18332761dbef209a22f3eb2effdbe2c",
+  "serial_sha256": "449226e5a629919873d90910973510c1ab941d01b15b275ff0a72b2116db7f41",
+  "host_raw_disk_bytes_verified": {
+    "nvme": true,
+    "virtio-modern": true,
+    "virtio-legacy": true
+  },
+  "disks_sha256_after_guest": {
+    "nvme": "ca493a27912c7fec46f5e6e1a6050e65c5c1d074a1ce4430d244641097eea3be",
+    "virtio-modern": "56668e728417d75c68ee2f4ee1ca59cd6f37e8daa4bf14e735ab9b22226d39cf",
+    "virtio-legacy": "155c211e035f30da50a228dce04c9e3d9b664fdcbc1e670f08a811a0389bd329"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "dev_kvm": false,
+  "nvidia_nodes": [],
+  "dri_nodes": [],
+  "hardware_gpu_acceptance": false,
+  "remote_actions_run": false,
+  "local_only": true,
+  "firmware_loaded": false
+}

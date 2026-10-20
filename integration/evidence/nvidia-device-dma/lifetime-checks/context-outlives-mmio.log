@@ -1,0 +1,42 @@
+    Checking aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+warning: unnecessary qualification
+  --> kernel/core/comps/pci/src/dma.rs:53:21
+   |
+53 |         let owner = crate::mmio::PciMmioGuard::prepare(device, 0).unwrap();
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-W unused-qualifications`
+help: remove the unnecessary path segments
+   |
+53 -         let owner = crate::mmio::PciMmioGuard::prepare(device, 0).unwrap();
+53 +         let owner = PciMmioGuard::prepare(device, 0).unwrap();
+   |
+
+warning: unnecessary qualification
+  --> kernel/core/comps/pci/src/dma.rs:54:27
+   |
+54 | ...   owner.dma_context(ostd::mm::dma::DmaMask::new(32).unwrap()).unwrap()
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: remove the unnecessary path segments
+   |
+54 -         owner.dma_context(ostd::mm::dma::DmaMask::new(32).unwrap()).unwrap()
+54 +         owner.dma_context(DmaMask::new(32).unwrap()).unwrap()
+   |
+
+error[E0597]: `owner` does not live long enough
+  --> kernel/core/comps/pci/src/dma.rs:54:9
+   |
+52 |     let context = {
+   |         ------- borrow later stored here
+53 |         let owner = crate::mmio::PciMmioGuard::prepare(device, 0).unwrap();
+   |             ----- binding `owner` declared here
+54 |         owner.dma_context(ostd::mm::dma::DmaMask::new(32).unwrap()).unwr...
+   |         ^^^^^ borrowed value does not live long enough
+55 |     };
+   |     - `owner` dropped here while still borrowed
+
+For more information about this error, try `rustc --explain E0597`.
+warning: `aster-pci` (lib) generated 2 warnings
+error: could not compile `aster-pci` (lib) due to 1 previous error; 2 warnings emitted
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest) --cfg ktest" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" failed with status: ExitStatus(unix_wait_status(25856))

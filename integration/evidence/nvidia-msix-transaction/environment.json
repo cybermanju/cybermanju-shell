@@ -1,0 +1,9 @@
+{
+  "nvidia_nodes": [],
+  "dri_exists": false,
+  "kvm_exists": false,
+  "pci_sysfs_entries": [],
+  "physical_gpu_test_available": false,
+  "firmware_loaded": false,
+  "remote_actions_executed": false
+}

@@ -1,0 +1,55 @@
+     Locking 117 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `ostd-pod` (lib) generated 1 warning
+warning: `int-to-c-enum` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `ostd` (lib) generated 1 warning (1 duplicate)
+warning: `typeflags-util` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-heap-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `aster-rights` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-nvidia-nvport` (lib) generated 1 warning (1 duplicate)
+warning: `osdk-test-kernel` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-util)
+warning: `osdk-frame-allocator` (lib) generated 1 warning (1 duplicate)
+warning: `component` (lib) generated 1 warning (1 duplicate)
+   Compiling aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+error[E0308]: mismatched types
+  --> /workspace/asterinas-gpui/asterinas/kernel/core/comps/pci/src/dma.rs:35:9
+   |
+34 |     pub fn requester(&self) -> PciDmaRequester {
+   |                                --------------- expected `PciDmaRequester` because of return type
+35 |         self.inner.requester()
+   |         ^^^^^^^^^^^^^^^^^^^^^^ expected `PciDmaRequester`, found `&PciDmaRequester`
+   |
+help: consider dereferencing the borrow
+   |
+35 |         *self.inner.requester()
+   |         +
+
+error[E0308]: mismatched types
+  --> /workspace/asterinas-gpui/asterinas/kernel/core/comps/pci/src/dma.rs:40:9
+   |
+39 |     pub fn mask(&self) -> DmaMask {
+   |                           ------- expected `DmaMask` because of return type
+40 |         self.inner.mask()
+   |         ^^^^^^^^^^^^^^^^^ expected `DmaMask`, found `&DmaMask`
+   |
+help: consider dereferencing the borrow
+   |
+40 |         *self.inner.mask()
+   |         +
+
+   Compiling aster-time v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/time)
+For more information about this error, try `rustc --explain E0308`.
+warning: `aster-pci` (lib) generated 1 warning (1 duplicate)
+error: could not compile `aster-pci` (lib) due to 2 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `aster-util` (lib) generated 1 warning (1 duplicate)
+warning: `aster-time` (lib) generated 1 warning (1 duplicate)
+[Error]: Cargo build failed

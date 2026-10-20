@@ -1,0 +1,15 @@
+Building full kernel; CPU-only initramfs, no GPU firmware
+Booting full kernel under instruction-counted TCG; no GPU/KVM/passthrough/network
+{
+  "passed": true,
+  "scope": "CPU-only full-kernel regression, not GPU evidence",
+  "qemu_exit": 33,
+  "virtual_time": "instruction-counted TCG, not performance evidence",
+  "hardware_gpu": false,
+  "rm_gsp_initialized": false,
+  "gpu_firmware_loaded": false,
+  "image_sha256": "2dc7fc35bb8729da75adca5dfd4020e78d1e2c376c75957a2f3663e51948e5ce",
+  "initramfs_sha256": "aabc6fb56d1400c345e06e4d170fe4a2205324b563834344f3f62cdc8cbdf60a",
+  "serial_sha256": "a93d3b5fdee12c919ac1abd4ee472dff7cfbba78e0b5e68ddf1cccb93dad938f",
+  "errors": []
+}

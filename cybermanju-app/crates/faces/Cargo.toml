@@ -1,0 +1,26 @@
+[package]
+name = "cybermanju-faces"
+version = "0.1.1"
+edition = "2021"
+description = "Face detection, embedding, and clustering"
+
+[features]
+default = ["onnx-face"]
+onnx-face = ["ort", "dirs", "dep:reqwest", "dep:ndarray"]
+
+[dependencies]
+anyhow = "1"
+blake3 = "1"
+cybermanju-types = { path = "../types" }
+log = "0.4"
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Mandatory (not optional): the heuristic fallback decodes the file's own
+# bytes on every build — jpeg/png/webp here are pure-Rust, so this stays
+# link-safe on mobile (no ort) and compiles for any target.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["blocking", "rustls-tls"] }
+ndarray = { version = "0.17", optional = true }
+ort = { version = "2.0.0-rc.12", features = ["download-binaries", "ndarray"], optional = true }
+dirs = { version = "6", optional = true }

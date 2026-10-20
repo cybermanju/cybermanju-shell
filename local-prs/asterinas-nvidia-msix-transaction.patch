@@ -1,0 +1,2363 @@
+diff --git a/.github/workflows/graphics_gpu.yml b/.github/workflows/graphics_gpu.yml
+--- a/.github/workflows/graphics_gpu.yml
++++ b/.github/workflows/graphics_gpu.yml
+@@ -90,7 +90,7 @@
+           set -euo pipefail
+           bash tools/graphics/run_nvport_format_tests.sh \
+             2>&1 | tee "$NVPORT_OUTPUT/formatter-host-tests.log"
+-      - name: Execute NVport, platform, PCI/EDU DMA, IOMMU rejection and OSTD inside Asterinas
++      - name: Execute NVport, platform, PCIe NVMe MSI-X/DMA, VT-d and OSTD regressions inside Asterinas
+         run: bash tools/graphics/run_cpu_kernel_tests.sh "$NVPORT_OUTPUT"
+       - name: Build grub-rescue multiboot2 ISO with serial console
+         shell: bash
+diff --git a/kernel/comps/nvidia-platform/src/device.rs b/kernel/comps/nvidia-platform/src/device.rs
+--- a/kernel/comps/nvidia-platform/src/device.rs
++++ b/kernel/comps/nvidia-platform/src/device.rs
+@@ -99,6 +99,16 @@
+         self.registers.isolated_dma_context(mask)
+     }
+ 
++    /// Reserves real MSI-X vectors masked, without enabling DMA or inventing RM callbacks.
++    /// The caller must register real device handlers before activation, and implement NVIDIA
++    /// hardware/worker quiescence before shutdown. This is not probe or RM/GSP success.
++    pub fn prepare_msix(
++        &self,
++        count: u16,
++    ) -> Result<aster_pci::msix_transaction::PciMsixGuard<'_>, ostd::Error> {
++        self.registers.prepare_msix(count)
++    }
++
+     /// Read a register via the real bounded MMIO mapping.
+     ///
+     /// Do not call until NVIDIA's BAR firewall/power prerequisites have been satisfied.
+diff --git a/kernel/core/comps/nvme/src/device/block_device.rs b/kernel/core/comps/nvme/src/device/block_device.rs
+--- a/kernel/core/comps/nvme/src/device/block_device.rs
++++ b/kernel/core/comps/nvme/src/device/block_device.rs
+@@ -93,7 +93,8 @@
+ 
+         block_device
+             .device
+-            .setup_msix_handlers(&block_device, io_msix_vectors);
++            .setup_msix_handlers(&block_device, io_msix_vectors)
++            .map_err(|_| NvmeDeviceError::MsixAllocationFailed)?;
+ 
+         aster_block::register(block_device)
+             .map_err(|_| NvmeDeviceError::BlockDeviceRegisterFailed)?;
+@@ -293,12 +294,12 @@
+         &self,
+         block_device: &Arc<NvmeBlockDevice>,
+         io_msix_vectors: IoMsixVectors,
+-    ) {
++    ) -> Result<(), NvmeDeviceError> {
+         let mut transport = self.transport.lock();
+         let msix_manager = transport.msix_manager_mut();
+ 
+         // Admin queue interrupt (vector 0)
+-        let (_admin_vec, admin_irq) = msix_manager.admin_irq();
++        let (admin_vec, admin_irq) = msix_manager.admin_irq();
+         let device_weak = Arc::downgrade(block_device);
+         admin_irq.on_active(move |_| {
+             if let Some(block_device) = device_weak.upgrade() {
+@@ -318,6 +319,18 @@
+                 }
+             });
+         }
++
++        // Every real handler is now registered; only then unmask the vectors
++        // actually routed to the admin and I/O completion queues.
++        msix_manager
++            .enable_vector(admin_vec)
++            .map_err(|_| NvmeDeviceError::MsixAllocationFailed)?;
++        for vector in io_msix_vectors.0.iter().copied() {
++            msix_manager
++                .enable_vector(vector)
++                .map_err(|_| NvmeDeviceError::MsixAllocationFailed)?;
++        }
++        Ok(())
+     }
+ 
+     fn read(&self, request: BioRequest) {
+diff --git a/kernel/core/comps/nvme/src/msix.rs b/kernel/core/comps/nvme/src/msix.rs
+--- a/kernel/core/comps/nvme/src/msix.rs
++++ b/kernel/core/comps/nvme/src/msix.rs
+@@ -9,7 +9,7 @@
+ use alloc::vec::Vec;
+ 
+ use aster_pci::capability::msix::CapabilityMsixData;
+-use ostd::irq::IrqLine;
++use ostd::{Error, Result, irq::IrqLine};
+ 
+ /// MSI-X interrupt manager for NVMe devices.
+ ///
+@@ -51,7 +51,7 @@
+         }
+ 
+         for (i, irq) in irqs.into_iter().enumerate() {
+-            msix.set_interrupt_vector(irq, i as u16);
++            msix.set_interrupt_vector(irq, i as u16).ok()?;
+         }
+ 
+         // Reserve the first vector for admin queue
+@@ -92,4 +92,11 @@
+     pub(crate) fn irq_for_vector_mut(&mut self, vector: u16) -> Option<&mut IrqLine> {
+         self.msix.irq_mut(vector as usize)
+     }
++
++    /// Enables a vector after its actual completion handler is registered.
++    pub(crate) fn enable_vector(&mut self, vector: u16) -> Result<()> {
++        self.msix
++            .enable_vector(vector)
++            .map_err(|_| Error::InvalidArgs)
++    }
+ }
+diff --git a/kernel/core/comps/nvme/src/transport/pci/transport.rs b/kernel/core/comps/nvme/src/transport/pci/transport.rs
+--- a/kernel/core/comps/nvme/src/transport/pci/transport.rs
++++ b/kernel/core/comps/nvme/src/transport/pci/transport.rs
+@@ -103,6 +103,10 @@
+         let msix_opt = common_device.acquire_msix_capability().ok()?;
+         let msix_data = msix_opt?;
+         let manager = NvmeMsixManager::new(msix_data)?;
++        // DMA is a driver decision, not an implicit effect of acquiring MSI-X.
++        common_device.write_command_raw(
++            common_device.location().read16(4) | aster_pci::cfg_space::Command::BUS_MASTER.bits(),
++        );
+         info!("MSI-X enabled with {} vectors", manager.table_size());
+         Some(manager)
+     }
+diff --git a/kernel/core/comps/pci/src/bus.rs b/kernel/core/comps/pci/src/bus.rs
+--- a/kernel/core/comps/pci/src/bus.rs
++++ b/kernel/core/comps/pci/src/bus.rs
+@@ -43,6 +43,7 @@
+     common_devices: VecDeque<PciCommonDevice>,
+     devices: Vec<Arc<dyn PciDevice>>,
+     drivers: Vec<Arc<dyn PciDriver>>,
++    quarantined_devices: Vec<PciCommonDevice>,
+ }
+ 
+ impl PciBus {
+@@ -63,7 +64,11 @@
+     }
+ 
+     pub(crate) fn return_reserved(&mut self, device: PciCommonDevice) {
+-        self.common_devices.push_back(device);
++        if device.irqs_quarantined() {
++            self.quarantined_devices.push(device);
++        } else {
++            self.common_devices.push_back(device);
++        }
+     }
+ 
+     /// Reserves every physically present function of one slot, or none.
+@@ -90,8 +95,9 @@
+                 .unwrap();
+             devices.push(self.common_devices.remove(index).unwrap());
+         }
+-        // Recheck presence and BME after taking ownership; rollback the whole
+-        // group if configuration changed. Hotplug is deliberately unsupported.
++        // Recheck presence after taking ownership; rollback the whole group if
++        // configuration changed. prepare_mmio separately rejects active BME.
++        // Hotplug is deliberately unsupported.
+         if super::topology::present_slot_functions(location).as_ref() != Ok(&locations) {
+             for device in devices {
+                 self.return_reserved(device);
+@@ -144,7 +150,7 @@
+                     common_device
+                 }
+             };
+-            self.common_devices.push_back(device);
++            self.return_reserved(device);
+         }
+         self.drivers.push(driver);
+     }
+@@ -153,6 +159,9 @@
+         debug!("found common device: {:#x?}", common_device);
+         let device_id = *common_device.device_id();
+         for driver in self.drivers.iter() {
++            if common_device.irqs_quarantined() {
++                break;
++            }
+             common_device = match driver.probe(common_device) {
+                 Ok(device) => {
+                     debug_assert!(device_id == device.device_id());
+@@ -168,7 +177,7 @@
+                 }
+             };
+         }
+-        self.common_devices.push_back(common_device);
++        self.return_reserved(common_device);
+     }
+ 
+     pub(super) const fn new() -> Self {
+@@ -176,6 +185,7 @@
+             common_devices: VecDeque::new(),
+             devices: Vec::new(),
+             drivers: Vec::new(),
++            quarantined_devices: Vec::new(),
+         }
+     }
+ }
+diff --git a/kernel/core/comps/pci/src/capability/mod.rs b/kernel/core/comps/pci/src/capability/mod.rs
+--- a/kernel/core/comps/pci/src/capability/mod.rs
++++ b/kernel/core/comps/pci/src/capability/mod.rs
+@@ -23,7 +23,7 @@
+ /// Raw PCI Capabilities.
+ #[derive(Debug, Default)]
+ pub(super) struct RawCapabilities {
+-    msix: Option<RawCapabilityMsix>,
++    pub(crate) msix: Option<RawCapabilityMsix>,
+     vndr: Vec<RawCapabilityVndr>,
+ }
+ 
+diff --git a/kernel/core/comps/pci/src/capability/msix.rs b/kernel/core/comps/pci/src/capability/msix.rs
+--- a/kernel/core/comps/pci/src/capability/msix.rs
++++ b/kernel/core/comps/pci/src/capability/msix.rs
+@@ -4,7 +4,12 @@
+ 
+ use alloc::vec::Vec;
+ 
+-use ostd::{Error, Result, io::IoMem, irq::IrqLine, mm::VmIoOnce};
++use ostd::{
++    Error, Result,
++    io::IoMem,
++    irq::IrqLine,
++    mm::{HasSize, VmIoOnce},
++};
+ 
+ use crate::{
+     PciDeviceLocation,
+@@ -13,13 +18,17 @@
+     common_device::{BarManager, PciCommonDevice},
+ };
+ 
++const MSIX_ENABLE: u16 = 1 << 15;
++const MSIX_FUNCTION_MASK: u16 = 1 << 14;
++const MSIX_VECTOR_MASK: u32 = 1;
++
+ /// Raw information about MSI-X capability.
+ #[derive(Debug)]
+-pub(super) struct RawCapabilityMsix {
+-    cap_ptr: u16,
++pub(crate) struct RawCapabilityMsix {
++    pub(crate) cap_ptr: u16,
+     msg_ctrl: u16,
+-    table_info: u32,
+-    pba_info: u32,
++    pub(crate) table_info: u32,
++    pub(crate) pba_info: u32,
+ }
+ 
+ impl RawCapabilityMsix {
+@@ -49,7 +58,6 @@
+     /// | Vector Control: u32 | Msg Data: u32 | Msg Upper Addr: u32 | Msg Addr: u32 |
+     table_bar: IoMem,
+     /// Pending bits table.
+-    #[expect(dead_code)]
+     pending_table_bar: IoMem,
+     table_offset: usize,
+     #[expect(dead_code)]
+@@ -69,7 +77,7 @@
+             .acquire()?
+         {
+             BarAccess::Memory(io_mem) => io_mem,
+-            BarAccess::Io => return Err(Error::InvalidArgs),
++            BarAccess::Io(_) => return Err(Error::InvalidArgs),
+         };
+         let pba_offset = (raw_cap.pba_info & !(0b111u32)) as usize;
+ 
+@@ -79,37 +87,70 @@
+             .acquire()?
+         {
+             BarAccess::Memory(io_mem) => io_mem,
+-            BarAccess::Io => return Err(Error::InvalidArgs),
++            BarAccess::Io(_) => return Err(Error::InvalidArgs),
+         };
+         let table_offset = (raw_cap.table_info & !(0b111u32)) as usize;
+ 
+-        let table_size = (raw_cap.msg_ctrl & 0b11_1111_1111) + 1;
+-
+-        // Set the message address and disable all MSI-X vectors.
+-        let message_address = MSIX_DEFAULT_MSG_ADDR;
+-        let message_upper_address = 0u32;
++        let table_size = (raw_cap.msg_ctrl & 0x7ff) + 1;
++        let table_bytes = usize::from(table_size)
++            .checked_mul(16)
++            .ok_or(Error::Overflow)?;
++        let pba_bytes = usize::from(table_size).div_ceil(64) * 8;
++        if table_offset
++            .checked_add(table_bytes)
++            .ok_or(Error::Overflow)?
++            > table_bar.size()
++            || pba_offset.checked_add(pba_bytes).ok_or(Error::Overflow)? > pba_bar.size()
++        {
++            return Err(Error::InvalidArgs);
++        }
++        let table_bir = raw_cap.table_info & 0b111;
++        let pba_bir = raw_cap.pba_info & 0b111;
++        if table_bir == pba_bir {
++            let table_end = table_offset + table_bytes;
++            let pba_end = pba_offset + pba_bytes;
++            if table_offset < pba_end && pba_offset < table_end {
++                return Err(Error::InvalidArgs);
++            }
++        }
++
++        // Function-mask and verify before the first MSI-X table write. This prevents
++        // partially initialized entries from delivering interrupts.
++        let control = loc.read16(raw_cap.cap_ptr + 2) | MSIX_FUNCTION_MASK;
++        loc.write16(raw_cap.cap_ptr + 2, control);
++        if loc.read16(raw_cap.cap_ptr + 2) & MSIX_FUNCTION_MASK == 0 {
++            return Err(Error::IoError);
++        }
++
++        // First mask and read back every entry; only then program any message fields.
+         for i in 0..table_size {
+-            table_bar
+-                .write_once((16 * i) as usize + table_offset, &message_address)
+-                .unwrap();
+-            table_bar
+-                .write_once((16 * i + 4) as usize + table_offset, &message_upper_address)
+-                .unwrap();
+-            table_bar
+-                .write_once((16 * i + 12) as usize + table_offset, &1_u32)
+-                .unwrap();
+-        }
+-
+-        // Enable MSI-X (bit 15: MSI-X Enable).
+-        loc.write16(
+-            raw_cap.cap_ptr + 2,
+-            loc.read16(raw_cap.cap_ptr + 2) | 0x8000,
+-        );
+-        // Disable INTx. Enable bus master.
+-        loc.write16(
++            let vector_control = table_offset + usize::from(i) * 16 + 12;
++            table_bar.write_once(vector_control, &MSIX_VECTOR_MASK)?;
++            if table_bar.read_once::<u32>(vector_control)? & MSIX_VECTOR_MASK == 0 {
++                return Err(Error::IoError);
++            }
++        }
++        for i in 0..table_size {
++            let entry = table_offset + usize::from(i) * 16;
++            table_bar.write_once(entry, &MSIX_DEFAULT_MSG_ADDR)?;
++            table_bar.write_once(entry + 4, &0_u32)?;
++            table_bar.write_once(entry + 8, &0_u32)?;
++        }
++
++        // Enable MSI-X while retaining Function Mask until an actual handler is installed.
++        loc.write16(raw_cap.cap_ptr + 2, control | MSIX_ENABLE);
++        if loc.read16(raw_cap.cap_ptr + 2) & (MSIX_ENABLE | MSIX_FUNCTION_MASK)
++            != MSIX_ENABLE | MSIX_FUNCTION_MASK
++        {
++            return Err(Error::IoError);
++        }
++        // Disable INTx, but never authorize DMA as a side effect of IRQ acquisition.
++        // Zero the adjacent W1C Status half rather than using config write16's RMW.
++        loc.write32(
+             PciCommonCfgOffset::Command as u16,
+-            loc.read16(PciCommonCfgOffset::Command as u16)
+-                | (Command::INTERRUPT_DISABLE | Command::BUS_MASTER).bits(),
++            u32::from(
++                loc.read16(PciCommonCfgOffset::Command as u16) | Command::INTERRUPT_DISABLE.bits(),
++            ),
+         );
+ 
+         let mut irqs = Vec::with_capacity(table_size as usize);
+@@ -134,12 +175,18 @@
+         self.table_size
+     }
+ 
+-    /// Enables an interrupt line.
+-    ///
+-    /// If the interrupt line has already been enabled, the old [`IrqLine`] will be replaced.
+-    pub fn set_interrupt_vector(&mut self, irq: IrqLine, index: u16) {
+-        if index >= self.table_size {
+-            return;
++    /// Programs an interrupt message while leaving its vector masked.
++    /// An existing active line cannot be replaced.
++    pub fn set_interrupt_vector(&mut self, irq: IrqLine, index: u16) -> Result<()> {
++        if index >= self.table_size || self.irqs[index as usize].is_some() {
++            return Err(Error::InvalidArgs);
++        }
++
++        let vector_control = self.table_offset + usize::from(index) * 16 + 12;
++        self.table_bar
++            .write_once(vector_control, &MSIX_VECTOR_MASK)?;
++        if self.table_bar.read_once::<u32>(vector_control)? & MSIX_VECTOR_MASK == 0 {
++            return Err(Error::IoError);
+         }
+ 
+         // If interrupt remapping is enabled, then we need to change the value of the message address.
+@@ -147,32 +194,50 @@
+             let address = construct_remappable_msix_address(remapping_index as u32);
+ 
+             self.table_bar
+-                .write_once((16 * index) as usize + self.table_offset, &address)
+-                .unwrap();
++                .write_once(self.table_offset + usize::from(index) * 16, &address)?;
+             self.table_bar
+-                .write_once((16 * index + 8) as usize + self.table_offset, &0)
+-                .unwrap();
++                .write_once(self.table_offset + usize::from(index) * 16 + 8, &0)?;
+         } else {
+-            self.table_bar
+-                .write_once(
+-                    (16 * index + 8) as usize + self.table_offset,
+-                    &(irq.num() as u32),
+-                )
+-                .unwrap();
+-        }
+-
+-        let _old_irq = self.irqs[index as usize].replace(irq);
+-        // Enable this MSI-X vector.
+-        self.table_bar
+-            .write_once((16 * index + 12) as usize + self.table_offset, &0_u32)
+-            .unwrap();
++            self.table_bar.write_once(
++                self.table_offset + usize::from(index) * 16 + 8,
++                &(irq.num() as u32),
++            )?;
++        }
++
++        self.irqs[index as usize] = Some(irq);
++        Ok(())
++    }
++
++    /// Unmasks a vector after a real callback has been registered on its IRQ line.
++    pub fn enable_vector(&mut self, index: u16) -> Result<()> {
++        let irq = self
++            .irqs
++            .get(index as usize)
++            .and_then(Option::as_ref)
++            .ok_or(Error::InvalidArgs)?;
++        if irq.is_empty() {
++            return Err(Error::AccessDenied);
++        }
++
++        let vector_control = self.table_offset + usize::from(index) * 16 + 12;
++        self.table_bar.write_once(vector_control, &0_u32)?;
++        if self.table_bar.read_once::<u32>(vector_control)? & MSIX_VECTOR_MASK != 0 {
++            return Err(Error::IoError);
++        }
++
++        let control = self.loc.read16(self.ptr + 2) & !MSIX_FUNCTION_MASK;
++        self.loc.write16(self.ptr + 2, control);
++        if self.loc.read16(self.ptr + 2) & MSIX_FUNCTION_MASK != 0 {
++            return Err(Error::IoError);
++        }
++        Ok(())
+     }
+ 
+     /// Returns a mutable reference to the [`IrqLine`].
+     ///
+     /// Users can register callbacks using the returned [`IrqLine`] reference.
+     pub fn irq_mut(&mut self, index: usize) -> Option<&mut IrqLine> {
+-        self.irqs[index].as_mut()
++        self.irqs.get_mut(index)?.as_mut()
+     }
+ 
+     /// Returns true if the MSI-X Enable bit is set.
+@@ -181,3 +246,45 @@
+         msg_ctrl & 0x8000 != 0
+     }
+ }
++
++impl Drop for CapabilityMsixData {
++    fn drop(&mut self) {
++        // Legacy owners have no stop/quiesce proof: this does not stop/reset the
++        // function, prove posted messages drained, or restore an active function's
++        // previous table/control state. NVIDIA should use the newer transactional
++        // MSI-X API instead. In a context where synchronously disconnecting callbacks
++        // is unsafe, intentionally retain IRQs and MMIO.
++        if !ostd::irq::is_local_enabled()
++            || ostd::irq::InterruptLevel::current().is_interrupt_context()
++        {
++            core::mem::forget(core::mem::take(&mut self.irqs));
++            core::mem::forget(self.table_bar.clone());
++            core::mem::forget(self.pending_table_bar.clone());
++            return;
++        }
++
++        let control = self.loc.read16(self.ptr + 2) | MSIX_FUNCTION_MASK;
++        self.loc.write16(self.ptr + 2, control);
++        let mut masked = self.loc.read16(self.ptr + 2) & MSIX_FUNCTION_MASK != 0;
++        for i in 0..self.table_size {
++            let at = self.table_offset + usize::from(i) * 16 + 12;
++            let entry_masked = self
++                .table_bar
++                .write_once(at, &MSIX_VECTOR_MASK)
++                .and_then(|()| self.table_bar.read_once::<u32>(at))
++                .is_ok_and(|value| value & MSIX_VECTOR_MASK != 0);
++            masked &= entry_masked;
++        }
++
++        // Masking is not a physical message drain. Retire each initialized IRQ
++        // before the MMIO fields are dropped, leaving late deliveries as sinks.
++        for irq in core::mem::take(&mut self.irqs).into_iter().flatten() {
++            irq.retire();
++        }
++        if !masked {
++            // A failed mask readback is not proof the device stopped using these mappings.
++            core::mem::forget(self.table_bar.clone());
++            core::mem::forget(self.pending_table_bar.clone());
++        }
++    }
++}
+diff --git a/kernel/core/comps/pci/src/cfg_space.rs b/kernel/core/comps/pci/src/cfg_space.rs
+--- a/kernel/core/comps/pci/src/cfg_space.rs
++++ b/kernel/core/comps/pci/src/cfg_space.rs
+@@ -4,11 +4,12 @@
+ //!
+ //! Reference: <https://wiki.osdev.org/PCI>
+ 
++use alloc::sync::Arc;
++
+ use bitflags::bitflags;
+ use ostd::{
+     Error, Result,
+-    arch::device::io_port::{PortRead, PortWrite},
+-    io::IoMem,
++    io::{IoMem, IoPortRange},
+     mm::{PodOnce, VmIoOnce},
+ };
+ 
+@@ -248,8 +249,7 @@
+     pub fn acquire(&mut self) -> Result<BarAccess> {
+         match self {
+             Self::Memory(mem_bar) => mem_bar.acquire().cloned().map(BarAccess::Memory),
+-            // TODO: Implement the `acquire` operation based on `IoPortAllocator`.
+-            Self::Io(_) => Ok(BarAccess::Io),
++            Self::Io(io_bar) => io_bar.acquire().cloned().map(BarAccess::Io),
+         }
+     }
+ 
+@@ -261,8 +261,7 @@
+     pub fn access(&self) -> Option<BarAccess> {
+         match self {
+             Self::Memory(mem_bar) => mem_bar.access().cloned().map(BarAccess::Memory),
+-            // TODO: Implement the `access` operation based on `IoPortAllocator`.
+-            Self::Io(_) => Some(BarAccess::Io),
++            Self::Io(io_bar) => io_bar.access().cloned().map(BarAccess::Io),
+         }
+     }
+ 
+@@ -292,25 +291,23 @@
+     /// Memory BAR
+     Memory(IoMem),
+     /// I/O BAR
+-    Io,
++    Io(Arc<IoPortRange>),
+ }
+ 
+ impl BarAccess {
+     /// Reads a value of a specified type at a specified offset.
+-    pub fn read_once<T: PodOnce + PortRead>(&self, offset: usize) -> Result<T> {
++    pub fn read_once<T: PodOnce>(&self, offset: usize) -> Result<T> {
+         match self {
+             Self::Memory(io_mem) => io_mem.read_once(offset),
+-            // TODO: Implement the `read` operation based on `IoPortAllocator`.
+-            Self::Io => Err(Error::IoError),
++            Self::Io(io_ports) => io_ports.read_pod(offset),
+         }
+     }
+ 
+     /// Writes a value of a specified type at a specified offset.
+-    pub fn write_once<T: PodOnce + PortWrite>(&self, offset: usize, value: T) -> Result<()> {
++    pub fn write_once<T: PodOnce>(&self, offset: usize, value: T) -> Result<()> {
+         match self {
+             Self::Memory(io_mem) => io_mem.write_once(offset, &value),
+-            // TODO: Implement the `write` operation based on `IoPortAllocator`.
+-            Self::Io => Err(Error::IoError),
++            Self::Io(io_ports) => io_ports.write_pod(offset, value),
+         }
+     }
+ }
+@@ -363,7 +360,7 @@
+     /// The MMIO allocator enforces physical range exclusivity. A pre-existing cached
+     /// mapping is rejected; the caller must keep exclusive device ownership until the
+     /// returned mapping (including all its clones/slices) is dropped.
+-    pub fn acquire_owned(&mut self) -> Result<IoMem> {
++    pub fn acquire_owned(&self) -> Result<IoMem> {
+         if self.io_memory.is_some() {
+             return Err(Error::AccessDenied);
+         }
+@@ -493,13 +490,27 @@
+ }
+ 
+ /// I/O port BAR.
+-#[derive(Clone, Copy, Debug)]
++#[derive(Debug)]
+ pub struct IoBar {
+     base: u32,
+     size: u32,
++    io_ports: Option<Arc<IoPortRange>>,
+ }
+ 
+ impl IoBar {
++    /// Acquires and caches exclusive access to the I/O BAR.
++    pub fn acquire(&mut self) -> Result<&Arc<IoPortRange>> {
++        if self.io_ports.is_none() {
++            self.io_ports = Some(Arc::new(IoPortRange::acquire(self.base, self.size)?));
++        }
++        Ok(self.io_ports.as_ref().unwrap())
++    }
++
++    /// Returns the cached access to the I/O BAR, if acquired.
++    pub fn access(&self) -> Option<&Arc<IoPortRange>> {
++        self.io_ports.as_ref()
++    }
++
+     /// Returns the BAR's base port.
+     pub fn base(&self) -> u32 {
+         self.base
+@@ -524,9 +535,9 @@
+         // Decode the BAR's size.
+         let size = decode_size(size_encoded as u64, BarKind::Io) as u32;
+ 
+-        // Restore the original base address.
++        // Restore the original base address and I/O BAR flag bits.
+         let base = raw & IO_ADDRESS_MASK;
+-        location.write32(offset, base);
++        location.write32(offset, base | (raw & !IO_ADDRESS_MASK));
+ 
+         // FIXME: As with the memory BAR check, we assume that a zero base address means that the
+         // BAR has not been initialized. In the future, we may need to add the ability to manually
+@@ -541,7 +552,18 @@
+             return Err(Error::InvalidArgs);
+         }
+ 
+-        Ok(Self { base, size })
++        // x86 PIO uses u16 port addresses and the allocator stores exclusive
++        // ends in u16. Reject malformed/unsupported metadata before reserving.
++        let end = base.checked_add(size).ok_or(Error::Overflow)?;
++        if size == 0 || end > u16::MAX as u32 {
++            return Err(Error::InvalidArgs);
++        }
++
++        Ok(Self {
++            base,
++            size,
++            io_ports: None,
++        })
+     }
+ }
+ 
+diff --git a/kernel/core/comps/pci/src/common_device.rs b/kernel/core/comps/pci/src/common_device.rs
+--- a/kernel/core/comps/pci/src/common_device.rs
++++ b/kernel/core/comps/pci/src/common_device.rs
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: MPL-2.0
+ 
+ //! PCI device common definitions or functions.
++
++use core::sync::atomic::{AtomicBool, Ordering};
+ 
+ use ostd::Result;
+ 
+@@ -20,9 +22,27 @@
+     header_type: PciHeaderType,
+     bar_manager: BarManager,
+     capabilities: RawCapabilities,
++    irq_quarantined: AtomicBool,
+ }
+ 
+ impl PciCommonDevice {
++    pub(crate) fn msix_descriptor(&self) -> Option<(u16, u16, u32, u32)> {
++        let raw = self.capabilities.msix.as_ref()?;
++        Some((
++            raw.cap_ptr,
++            self.location.read16(raw.cap_ptr + 2),
++            raw.table_info,
++            raw.pba_info,
++        ))
++    }
++
++    pub(crate) fn quarantine_irqs(&self) {
++        self.irq_quarantined.store(true, Ordering::Release);
++    }
++    pub(crate) fn irqs_quarantined(&self) -> bool {
++        self.irq_quarantined.load(Ordering::Acquire)
++    }
++
+     /// Returns the PCI device ID.
+     pub fn device_id(&self) -> &PciDeviceId {
+         &self.device_id
+@@ -132,6 +152,7 @@
+             header_type,
+             bar_manager,
+             capabilities,
++            irq_quarantined: AtomicBool::new(false),
+         };
+ 
+         // While setting up the BARs, we need to ensure that
+@@ -225,12 +246,12 @@
+ impl BarManager {
+     /// Gains access to the BAR space and returns `None` if that BAR is absent.
+     pub fn bar(&self, idx: u8) -> Option<&Bar> {
+-        self.bars[idx as usize].as_ref()
++        self.bars.get(idx as usize)?.as_ref()
+     }
+ 
+     /// Gains mutable access to the BAR space and returns `None` if that BAR is absent.
+     pub fn bar_mut(&mut self, idx: u8) -> Option<&mut Bar> {
+-        self.bars[idx as usize].as_mut()
++        self.bars.get_mut(idx as usize)?.as_mut()
+     }
+ 
+     /// Parses the BAR space by PCI device location.
+diff --git a/kernel/core/comps/pci/src/lib.rs b/kernel/core/comps/pci/src/lib.rs
+--- a/kernel/core/comps/pci/src/lib.rs
++++ b/kernel/core/comps/pci/src/lib.rs
+@@ -76,13 +76,16 @@
+ pub mod dma;
+ #[cfg(ktest)]
+ mod lifecycle_tests;
++pub mod mmio;
++#[cfg(ktest)]
++mod msix_tests;
++pub mod msix_transaction;
++#[cfg(ktest)]
++mod multifunction_tests;
+ #[cfg(ktest)]
+ mod pcie_tests;
+-pub mod mmio;
+-#[cfg(ktest)]
+-mod multifunction_tests;
++pub mod reservation;
+ mod topology;
+-pub mod reservation;
+ 
+ extern crate alloc;
+ 
+diff --git a/kernel/core/comps/pci/src/mmio.rs b/kernel/core/comps/pci/src/mmio.rs
+--- a/kernel/core/comps/pci/src/mmio.rs
++++ b/kernel/core/comps/pci/src/mmio.rs
+@@ -1,5 +1,7 @@
+ // SPDX-License-Identifier: MPL-2.0
+ //! Pre-driver MMIO resource lifetime, with bus mastering and interrupts kept disabled.
++use core::sync::atomic::{AtomicBool, Ordering};
++
+ use ostd::{Error, io::IoMem, mm::VmIoOnce};
+ 
+ use crate::{
+@@ -10,7 +12,7 @@
+ /// A rejected pre-driver resource acquisition. No error means RM or a GPU is initialized.
+ #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+ pub enum MmioPrepareError {
+-    /// Mapping cannot be performed with IRQs disabled or from interrupt context.
++    /// Mapping requires a current task with IRQs and preemption enabled.
+     InvalidContext,
+     /// An absent, already mapped, invalid, or unallocatable memory BAR.
+     Mapping(Error),
+@@ -33,13 +35,16 @@
+ /// This is not a DMA domain, IRQ registration, RM instance, hardware reset or working driver.
+ /// The mutable device borrow prevents the reservation from returning to the PCI bus early.
+ /// It rejects enabled MSI/MSI-X and non-D0 power states, disables bus mastering and INTx,
+-/// enables memory decoding, and restores the exact command word after dropping the mapping.
+-/// It must be acquired/dropped with IRQs enabled, as IoMem mapping uses cross-CPU TLB flushes.
++/// enables memory decoding, and verifies exact command restoration before dropping the mapping.
++/// Acquire/Drop require a current task with IRQs and preemption enabled because IoMem
++/// mapping uses cross-CPU TLB flushes. Invalid-context Drop retains resources in quarantine.
+ /// No mapping reference/clone or MMIO write interface is exposed.
+ pub struct PciMmioGuard<'a> {
+     device: &'a mut PciCommonDevice,
+     mapping: Option<IoMem>,
+     original_command: u16,
++    bar_index: u8,
++    msix_owned: AtomicBool,
+ }
+ 
+ impl<'a> PciMmioGuard<'a> {
+@@ -48,13 +53,14 @@
+         device: &'a mut PciCommonDevice,
+         bar_index: u8,
+     ) -> Result<Self, MmioPrepareError> {
+-        if !ostd::irq::is_local_enabled()
+-            || ostd::irq::InterruptLevel::current().is_interrupt_context()
+-        {
++        if !ostd::task::atomic_mode::can_sleep() {
+             return Err(MmioPrepareError::InvalidContext);
+         }
+         if bar_index >= 6 {
+             return Err(MmioPrepareError::Mapping(Error::InvalidArgs));
++        }
++        if device.irqs_quarantined() {
++            return Err(MmioPrepareError::Mapping(Error::AccessDenied));
+         }
+         let loc = device.location();
+         if loc.read16(0) == 0xffff {
+@@ -82,6 +88,8 @@
+             device,
+             mapping: None,
+             original_command,
++            bar_index,
++            msix_owned: AtomicBool::new(false),
+         };
+         let bar = guard
+             .device
+@@ -93,6 +101,52 @@
+         };
+         guard.mapping = Some(memory.acquire_owned().map_err(MmioPrepareError::Mapping)?);
+         Ok(guard)
++    }
++
++    /// Prepares masked MSI-X entries without enabling DMA or installing dummy handlers.
++    /// Only one transaction may exist. It borrows this guard and therefore the reservation.
++    pub fn prepare_msix(
++        &self,
++        count: u16,
++    ) -> Result<crate::msix_transaction::PciMsixGuard<'_>, Error> {
++        crate::msix_transaction::PciMsixGuard::prepare(self, count)
++    }
++
++    pub(crate) fn msix_descriptor(&self) -> Option<(u16, u16, u32, u32)> {
++        self.device.msix_descriptor()
++    }
++    pub(crate) fn claim_msix(&self) -> Result<(), Error> {
++        if self.device.irqs_quarantined() {
++            return Err(Error::AccessDenied);
++        }
++        self.msix_owned
++            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
++            .map(|_| ())
++            .map_err(|_| Error::AccessDenied)
++    }
++    pub(crate) fn release_msix(&self) {
++        self.msix_owned.store(false, Ordering::Release);
++    }
++    pub(crate) fn quarantine_irq_resources(&self) {
++        self.device.quarantine_irqs();
++    }
++    pub(crate) fn write_irq_command(&self, command: u16) {
++        self.device.write_command_raw(command);
++    }
++    pub(crate) fn bar_size(&self, index: u8) -> Result<usize, Error> {
++        match self.device.bar_manager().bar(index) {
++            Some(Bar::Memory(bar)) => usize::try_from(bar.size()).map_err(|_| Error::Overflow),
++            _ => Err(Error::InvalidArgs),
++        }
++    }
++    pub(crate) fn map_msix_bar(&self, index: u8) -> Result<IoMem, Error> {
++        if index == self.bar_index {
++            return Ok(self.mapping.as_ref().unwrap().clone());
++        }
++        match self.device.bar_manager().bar(index) {
++            Some(Bar::Memory(bar)) => bar.acquire_owned(),
++            _ => Err(Error::InvalidArgs),
++        }
+     }
+ 
+     /// Read a naturally aligned 32-bit register inside the mapped BAR.
+@@ -160,14 +214,30 @@
+ 
+ impl Drop for PciMmioGuard<'_> {
+     fn drop(&mut self) {
+-        // No DMA buffers, ISR callbacks, task queues or GPU commands are ever created here.
+-        // Drop/unmap/recycle CPU mapping before restoring the prior function command state.
+-        drop(self.mapping.take());
++        if self.msix_owned.load(Ordering::Acquire)
++            || self.device.irqs_quarantined()
++            || !ostd::task::atomic_mode::can_sleep()
++        {
++            // An active/forgotten IRQ transaction has no proven device stop. Retain its
++            // register mapping and prevent reservation reprobe, including group members.
++            self.device.quarantine_irqs();
++            core::mem::forget(self.mapping.take());
++            return;
++        }
++        // No live IRQ transaction remains; callbacks have been synchronously disconnected.
++        // Confirm rollback before releasing the mapping, not just that a read was possible.
+         self.device.write_command_raw(self.original_command);
+-        let _ = self
++        if self
+             .device
+             .location()
+-            .read16(PciCommonCfgOffset::Command as u16);
++            .read16(PciCommonCfgOffset::Command as u16)
++            != self.original_command
++        {
++            self.device.quarantine_irqs();
++            core::mem::forget(self.mapping.take());
++            return;
++        }
++        drop(self.mapping.take());
+     }
+ }
+ 
+diff --git a/kernel/core/comps/pci/src/msix_tests.rs b/kernel/core/comps/pci/src/msix_tests.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/msix_tests.rs
+@@ -0,0 +1,632 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Real QEMU NVMe MSI-X lifecycle and completion interrupt test; not GPU validation.
++use alloc::{sync::Arc, vec::Vec};
++use core::sync::atomic::{AtomicUsize, Ordering, fence};
++
++use ostd::{
++    Error,
++    arch::trap::TrapFrame,
++    mm::{
++        HasDaddr, PAGE_SIZE, VmIo, VmIoOnce,
++        dma::{DeviceDmaError, DmaMask},
++    },
++    prelude::ktest,
++};
++
++use crate::{
++    PCI_BUS, PciDeviceLocation,
++    cfg_space::{Bar, Command},
++    mmio::PciMmioGuard,
++    pcie_tests::init_pci_for_tests,
++};
++
++const NVME_VENDOR: u16 = 0x1b36;
++const NVME_MODEL: &[u8] = b"QEMU NVMe Ctrl";
++const EXPECTED_SERIAL: &[u8] = b"ASTER-MSIX";
++
++struct HandlerDropProbe(Arc<AtomicUsize>);
++impl Drop for HandlerDropProbe {
++    fn drop(&mut self) {
++        self.0.fetch_add(1, Ordering::SeqCst);
++    }
++}
++
++fn function(bus: u8, device: u8, function: u8) -> PciDeviceLocation {
++    PciDeviceLocation {
++        bus,
++        device,
++        function,
++    }
++}
++
++fn find_capability(loc: PciDeviceLocation, id: u8) -> Option<u8> {
++    let mut at = loc.read8(0x34) & !3;
++    let mut visited = [false; 64];
++    while at != 0 {
++        assert!((0x40..=0xfc).contains(&at) && at & 3 == 0);
++        assert!(!visited[usize::from(at / 4)]);
++        visited[usize::from(at / 4)] = true;
++        let header = loc.read8(u16::from(at));
++        if header == id {
++            return Some(at);
++        }
++        at = loc.read8(u16::from(at) + 1) & !3;
++    }
++    None
++}
++
++fn find_ext_capability(loc: PciDeviceLocation, id: u16) -> Option<u16> {
++    let mut at = 0x100u16;
++    let mut visited = [false; 1024];
++    loop {
++        assert!((0x100..=0xffc).contains(&at) && at & 3 == 0);
++        assert!(!visited[usize::from(at / 4)]);
++        visited[usize::from(at / 4)] = true;
++        let header = crate::arch::read32(&loc, u32::from(at)).expect("root-port ECAM read");
++        if header == 0 || header == u32::MAX {
++            return None;
++        }
++        if header as u16 == id {
++            return Some(at);
++        }
++        at = ((header >> 20) & 0xfff) as u16;
++        if at == 0 {
++            return None;
++        }
++    }
++}
++
++/// This test-only fixture enables the ACS redirects that isolated DMA admission requires.
++struct AcsFixture {
++    port: PciDeviceLocation,
++    control: u16,
++    original: u16,
++}
++
++impl AcsFixture {
++    fn enable(port: PciDeviceLocation) -> Self {
++        let capability = find_ext_capability(port, 0x0d).expect("real root-port ACS capability");
++        assert_eq!(port.read16(capability + 4) & 0x1d, 0x1d);
++        let original = port.read16(capability + 6);
++        port.write16(capability + 6, original | 0x1d);
++        assert_eq!(port.read16(capability + 6) & 0x1d, 0x1d);
++        Self {
++            port,
++            control: capability + 6,
++            original,
++        }
++    }
++}
++
++impl Drop for AcsFixture {
++    fn drop(&mut self) {
++        self.port.write16(self.control, self.original);
++    }
++}
++
++fn quiesce_qemu_nvme(bus: &mut crate::bus::PciBus, loc: PciDeviceLocation) {
++    let mut device = bus
++        .test_take_unclaimed(loc)
++        .expect("own dedicated QEMU NVMe");
++    assert_eq!(device.device_id().vendor_id, NVME_VENDOR);
++    assert_eq!(device.device_id().class, 1);
++    assert_eq!(device.device_id().subclass, 8);
++    let command = loc.read16(4);
++    assert_ne!(command & Command::MEMORY_SPACE.bits(), 0);
++    let Bar::Memory(bar) = device.bar_manager_mut().bar_mut(0).unwrap() else {
++        panic!("NVMe BAR0 must be memory");
++    };
++    let regs = bar.acquire_owned().expect("map NVMe for fixture reset");
++    regs.write_once(0x14, &0u32).unwrap();
++    let mut stopped = false;
++    for _ in 0..20_000_000 {
++        if regs.read_once::<u32>(0x1c).unwrap() & 1 == 0 {
++            stopped = true;
++            break;
++        }
++        core::hint::spin_loop();
++    }
++    assert!(stopped, "NVMe must reach CSTS.RDY=0 before test ownership");
++    device.write_command_raw(command & !Command::BUS_MASTER.bits());
++    assert_eq!(loc.read16(4) & Command::BUS_MASTER.bits(), 0);
++    drop(regs);
++    bus.return_reserved(device);
++}
++
++fn wait(regs: &PciMmioGuard<'_>, offset: usize, mask: u32, value: u32) -> Result<bool, Error> {
++    for _ in 0..20_000_000 {
++        if regs.read32(offset)? & mask == value {
++            return Ok(true);
++        }
++        core::hint::spin_loop();
++    }
++    Ok(false)
++}
++
++fn quiesce_controller(
++    regs: &PciMmioGuard<'_>,
++    loc: PciDeviceLocation,
++    prepared_command: u16,
++) -> Result<(), Error> {
++    regs.test_write32(0x14, 0)?;
++    if !wait(regs, 0x1c, 1, 0)? {
++        // Do not clear BME or release DMA resources unless the controller actually stopped.
++        return Err(Error::IoError);
++    }
++    loc.write32(4, u32::from(prepared_command));
++    if loc.read16(4) != prepared_command {
++        return Err(Error::IoError);
++    }
++    Ok(())
++}
++
++/// Shared body for direct-DMA and isolated-DMA contexts (their buffer types differ).
++macro_rules! run_nvme_msix_cycles {
++    (
++        $regs:ident,
++        $loc:ident,
++        $context:ident,
++        $table_size:ident,
++        $command:ident,
++        $original_msix_control:ident
++    ) => {{
++        let calls = Arc::new(AtomicUsize::new(0));
++        for cycle in 0..2 {
++            assert_eq!($loc.read16(4), $command, "BME remains off between cycles");
++            let sq = $context.alloc_coherent(1).expect("private admin SQ");
++            let cq = $context.alloc_coherent(1).expect("private admin CQ");
++            let identify = $context.alloc_coherent(1).expect("private Identify page");
++            let mut command_bytes = [0u8; 64];
++            command_bytes[0] = 6; // Identify Controller.
++            command_bytes[2..4].copy_from_slice(&(cycle as u16 + 1).to_le_bytes());
++            command_bytes[24..32].copy_from_slice(&(identify.daddr() as u64).to_le_bytes());
++            command_bytes[40..44].copy_from_slice(&1u32.to_le_bytes()); // CNS=1.
++            sq.write_bytes(0, &command_bytes).unwrap();
++
++            let baseline = calls.load(Ordering::SeqCst);
++            let mut msix = $regs
++                .prepare_msix(1)
++                .expect("prepare one real MSI-X vector");
++            assert_eq!(msix.table_size() as u16, $table_size);
++            assert_eq!(msix.vector_count(), 1);
++            msix.mask_all()
++                .expect("mask all MSI-X vectors before queue setup");
++            assert!(
++                msix.activate().is_err(),
++                "activation must reject a missing callback"
++            );
++
++            // Once BME is enabled, every recoverable test failure must first stop the
++            // controller; otherwise retain all DMA and MSI-X resources before panicking.
++            macro_rules! stop_before_failure {
++                ($reason:expr) => {{
++                    match msix.shutdown(|| quiesce_controller(&$regs, $loc, $command)) {
++                        Ok(()) => {
++                            drop(identify);
++                            drop(cq);
++                            drop(sq);
++                            panic!("{reason}", reason = $reason);
++                        }
++                        Err(stop_error) => {
++                            core::mem::forget(identify);
++                            core::mem::forget(cq);
++                            core::mem::forget(sq);
++                            core::mem::forget($context);
++                            core::mem::forget(msix);
++                            panic!(
++                                "{reason}; controller quiesce failed ({stop_error:?}); DMA quarantined",
++                                reason = $reason
++                            );
++                        }
++                    }
++                }};
++            }
++
++            // Register the actual completion callback before starting DMA. While masked,
++            // the installed handler must remain silent even after a real CQ/PBA completion.
++            let handler_drops = Arc::new(AtomicUsize::new(0));
++            let probe = HandlerDropProbe(handler_drops.clone());
++            let callback_calls = Arc::clone(&calls);
++            if let Err(error) = msix.register_handler(0, move |_: &TrapFrame| {
++                let _keep_probe_live = &probe;
++                callback_calls.fetch_add(1, Ordering::SeqCst);
++            }) {
++                stop_before_failure!(format_args!("failed to register CQ callback: {error:?}"));
++            }
++
++            // Program actual QEMU NVMe admin queues and issue Identify with BME enabled only
++            // after all request-specific DMA buffers and the masked MSI-X vector are ready.
++            $regs.test_write32(0x24, (7 << 16) | 7).unwrap(); // AQA: 8-entry queues.
++            $regs.test_write64(0x28, sq.daddr() as u64).unwrap();
++            $regs.test_write64(0x30, cq.daddr() as u64).unwrap();
++            $loc.write32(4, u32::from($command | Command::BUS_MASTER.bits()));
++            if let Err(error) = $regs.test_write32(0x14, (6 << 16) | (4 << 20) | 1) {
++                stop_before_failure!(format_args!("failed to enable NVMe: {error:?}"));
++            }
++            let ready = match wait(&$regs, 0x1c, 3, 1) {
++                Ok(ready) => ready,
++                Err(error) => {
++                    stop_before_failure!(format_args!("failed to poll NVMe readiness: {error:?}"));
++                }
++            };
++            let mut completion = [0u8; 16];
++            let mut completed = false;
++            if ready {
++                fence(Ordering::SeqCst);
++                if let Err(error) = $regs.test_write32(0x1000, 1) {
++                    stop_before_failure!(format_args!("failed to ring NVMe SQ: {error:?}"));
++                }
++                for _ in 0..20_000_000 {
++                    if let Err(error) = cq.read_bytes(0, &mut completion) {
++                        stop_before_failure!(format_args!("failed to read NVMe CQ: {error:?}"));
++                    }
++                    if completion[14] & 1 != 0 {
++                        completed = true;
++                        break;
++                    }
++                    core::hint::spin_loop();
++                }
++            }
++            fence(Ordering::SeqCst);
++
++            // A completed CQ while MSI-X is masked must not invoke the installed callback.
++            for _ in 0..100_000 {
++                core::hint::spin_loop();
++            }
++            let remained_masked = calls.load(Ordering::SeqCst) == baseline;
++            let actual_masked = msix.test_vector_masked(0);
++            let actual_pending = msix.test_pending(0);
++
++            let mut delivered = false;
++            if completed {
++                if let Err(error) = msix.activate() {
++                    stop_before_failure!(format_args!("failed to activate MSI-X: {error:?}"));
++                }
++                for _ in 0..20_000_000 {
++                    if calls.load(Ordering::SeqCst) > baseline {
++                        delivered = true;
++                        break;
++                    }
++                    core::hint::spin_loop();
++                }
++            }
++
++            let pending_cleared = !msix.test_pending(0);
++            // Test a failed real shutdown transaction: no callback/vector/resource release.
++            assert!(msix.shutdown(|| Err(Error::IoError)).is_err());
++            assert_eq!(msix.vector_count(), 1);
++            assert!(msix.test_vector_masked(0));
++            assert_eq!(handler_drops.load(Ordering::SeqCst), 0,
++                "failed quiesce must retain callback captures");
++
++            // Shutdown invokes the device-specific stop and waits for RDY=0 before the
++            // guard can release its mapping/callback. A failed stop quarantines DMA memory.
++            let shutdown = msix.shutdown(|| quiesce_controller(&$regs, $loc, $command));
++            if let Err(error) = shutdown {
++                core::mem::forget(sq);
++                core::mem::forget(cq);
++                core::mem::forget(identify);
++                core::mem::forget($context);
++                panic!("MSI-X NVMe shutdown failed ({error:?}); DMA resources quarantined");
++            }
++            assert_eq!(handler_drops.load(Ordering::SeqCst), 1,
++                "successful shutdown must synchronously release the actual IRQ capture");
++            assert_eq!(
++                $loc.read16(4),
++                $command,
++                "shutdown restores prepared command"
++            );
++            assert_eq!(
++                $loc.read16(msix_cap_offset($loc).unwrap() + 2),
++                $original_msix_control,
++                "shutdown restores the exact MSI-X control word"
++            );
++
++            // Controller is stopped, so the DMA buffers can now be inspected and reclaimed.
++            let mut identify_data = [0u8; PAGE_SIZE];
++            identify.read_bytes(0, &mut identify_data).unwrap();
++            drop(identify);
++            drop(cq);
++            drop(sq);
++            assert!(
++                ready && completed,
++                "NVMe Identify CQ completion in cycle {cycle}"
++            );
++            assert_eq!(
++                u16::from_le_bytes(completion[12..14].try_into().unwrap()),
++                cycle as u16 + 1,
++                "real Identify command CID"
++            );
++            assert_eq!(
++                u16::from_le_bytes(completion[14..16].try_into().unwrap()),
++                1,
++                "real NVMe CQ success and phase"
++            );
++            assert_eq!(u16::from_le_bytes(completion[8..10].try_into().unwrap()), 1);
++            assert_eq!(
++                u16::from_le_bytes(completion[10..12].try_into().unwrap()),
++                0
++            );
++            assert_eq!(
++                u16::from_le_bytes(identify_data[..2].try_into().unwrap()),
++                NVME_VENDOR
++            );
++            assert!(
++                identify_data[4..24].starts_with(EXPECTED_SERIAL),
++                "actual NVMe serial"
++            );
++            assert!(
++                identify_data[24..64].starts_with(NVME_MODEL),
++                "actual NVMe model"
++            );
++            assert!(
++                remained_masked,
++                "CQ interrupt was delivered while function-masked"
++            );
++            assert!(actual_masked && actual_pending, "physical table mask and pending bit required");
++            assert!(pending_cleared, "physical PBA clears after interrupt delivery");
++            assert!(
++                delivered,
++                "real NVMe CQ interrupt reached the registered callback"
++            );
++        }
++    }};
++}
++
++fn msix_cap_offset(loc: PciDeviceLocation) -> Option<u16> {
++    find_capability(loc, 0x11).map(u16::from)
++}
++
++#[ktest]
++fn qemu_nvme_msix_masked_pending_interrupt_and_shutdown_cycles() {
++    init_pci_for_tests();
++    let mut bus = PCI_BUS.lock();
++    let root_port = function(0, 12, 0); // Dedicated runner fixture: chassis=12.
++    assert_ne!(
++        root_port.read16(0),
++        0xffff,
++        "dedicated QEMU root port 0c.0 required"
++    );
++    assert_eq!(root_port.read8(0x0b), 6);
++    assert_eq!(root_port.read8(0x0a), 4);
++    assert_eq!(root_port.read8(0x0e) & 0x7f, 1);
++    let _acs = AcsFixture::enable(root_port);
++    let downstream_bus = root_port.read8(0x19);
++    assert_ne!(
++        downstream_bus, 0,
++        "root port must route to a downstream bus"
++    );
++    let loc = *bus
++        .unclaimed_devices()
++        .find(|device| {
++            let id = device.device_id();
++            id.vendor_id == NVME_VENDOR
++                && id.class == 1
++                && id.subclass == 8
++                && device.location().bus == downstream_bus
++        })
++        .expect("runner NVMe nvme serial=ASTER-MSIX behind dedicated 0c.0")
++        .location();
++    assert_eq!(loc.device, 0, "NVMe fixture occupies downstream slot zero");
++    let capability = msix_cap_offset(loc).expect("real NVMe MSI-X capability");
++    quiesce_qemu_nvme(&mut bus, loc);
++
++    let mut reserved = bus.reserve_unclaimed(loc).expect("reserve dedicated NVMe");
++    let original_command = loc.read16(4);
++    let original_msix_control = loc.read16(capability + 2);
++    assert_eq!(
++        original_msix_control & 0x8000,
++        0,
++        "firmware MSI-X initially disabled"
++    );
++    let regs = reserved
++        .prepare_mmio(0)
++        .expect("prepare NVMe BAR0 without BME");
++    let prepared_command = loc.read16(4);
++    assert_eq!(prepared_command & Command::BUS_MASTER.bits(), 0);
++    let table_size = (original_msix_control & 0x07ff) + 1;
++    assert!(table_size > 0);
++
++    // Invalid requests are transactional: neither MSI-X control nor PCI command may change.
++    assert!(
++        regs.prepare_msix(0).is_err(),
++        "zero vector request is invalid"
++    );
++    assert_eq!(loc.read16(capability + 2), original_msix_control);
++    assert_eq!(loc.read16(4), prepared_command);
++    assert!(
++        regs.prepare_msix(table_size + 1).is_err(),
++        "request cannot exceed table size"
++    );
++    assert_eq!(loc.read16(capability + 2), original_msix_control);
++    assert_eq!(loc.read16(4), prepared_command);
++
++    // Both invalid contexts must be rejected before acquiring a lease or touching hardware.
++    {
++        let _preempt = ostd::task::disable_preempt();
++        assert!(regs.prepare_msix(1).is_err());
++    }
++    {
++        let _irq = ostd::irq::disable_local();
++        assert!(regs.prepare_msix(1).is_err());
++    }
++    assert_eq!(loc.read16(capability + 2), original_msix_control);
++    assert_eq!(loc.read16(4), prepared_command);
++
++    // Exhaust the actual global IRQ allocator: failure after mapping must release its lease
++    // and leave every hardware configuration bit unchanged, not just reject invalid input.
++    let mut held = Vec::new();
++    while let Ok(line) = ostd::irq::IrqLine::alloc() {
++        held.push(line);
++    }
++    assert!(regs.prepare_msix(1).is_err());
++    assert!(table_size >= 2, "QEMU NVMe fixture needs two table entries");
++    drop(held.pop().expect("at least one exhausted IRQ"));
++    assert!(
++        regs.prepare_msix(2).is_err(),
++        "second IRQ allocation must fail"
++    );
++    let recovered = ostd::irq::IrqLine::alloc().expect("partial vector allocation rolls back");
++    assert!(ostd::irq::IrqLine::alloc().is_err());
++    drop(recovered);
++    assert_eq!(loc.read16(capability + 2), original_msix_control);
++    assert_eq!(loc.read16(4), prepared_command);
++    drop(held);
++
++    // Missing-handler activation and dropping an unactivated guard also roll back exactly.
++    {
++        let mut probe = regs.prepare_msix(1).expect("prepare probe vector");
++        assert_eq!(probe.table_size() as u16, table_size);
++        assert_eq!(probe.vector_count(), 1);
++        assert!(
++            probe.activate().is_err(),
++            "missing callbacks must reject activation"
++        );
++        assert_eq!(loc.read16(4), prepared_command);
++        drop(probe);
++    }
++    assert_eq!(loc.read16(capability + 2), original_msix_control);
++    assert_eq!(loc.read16(4), prepared_command);
++
++    let mask = DmaMask::new(32).unwrap();
++    #[cfg(target_arch = "x86_64")]
++    {
++        match regs.isolated_dma_context(mask) {
++            Ok(context) => run_nvme_msix_cycles!(
++                regs,
++                loc,
++                context,
++                table_size,
++                prepared_command,
++                original_msix_control
++            ),
++            Err(DeviceDmaError::UnsupportedPlatform) => match regs.dma_context(mask) {
++                Ok(context) => {
++                    ostd::early_println!(
++                        "PCI MSI-X test using direct DMA; no IOMMU isolation claim"
++                    );
++                    run_nvme_msix_cycles!(
++                        regs,
++                        loc,
++                        context,
++                        table_size,
++                        prepared_command,
++                        original_msix_control
++                    );
++                }
++                Err(error) => panic!("Required real NVMe MSI-X DMA unavailable: {error:?}"),
++            },
++            Err(error) => panic!("NVMe isolated DMA context failed: {error:?}"),
++        }
++    }
++    #[cfg(not(target_arch = "x86_64"))]
++    {
++        match regs.dma_context(mask) {
++            Ok(context) => run_nvme_msix_cycles!(
++                regs,
++                loc,
++                context,
++                table_size,
++                prepared_command,
++                original_msix_control
++            ),
++            Err(error) => panic!("Required real NVMe MSI-X DMA unavailable: {error:?}"),
++        }
++    }
++
++    assert_eq!(loc.read16(capability + 2), original_msix_control);
++    drop(regs);
++    assert_eq!(
++        loc.read16(4),
++        original_command,
++        "MMIO drop restores exact PCI command"
++    );
++    drop(reserved);
++    ostd::early_println!(
++        "PCI real NVMe MSI-X masked-pending IRQ and quiesced shutdown cycles passed; not GPU validation"
++    );
++}
++
++/// No GPU identity spoofing: use another real QEMU NVMe endpoint for the legacy API.
++#[ktest]
++fn qemu_legacy_msix_never_grants_dma_and_checks_indices() {
++    init_pci_for_tests();
++    let mut bus = PCI_BUS.lock();
++    let port = function(0, 13, 0);
++    assert_ne!(port.read16(0), 0xffff);
++    let loc = *bus
++        .unclaimed_devices()
++        .find(|d| d.location().bus == port.read8(0x19) && d.device_id().vendor_id == NVME_VENDOR)
++        .expect("dedicated legacy MSI-X NVMe")
++        .location();
++    quiesce_qemu_nvme(&mut bus, loc);
++    let mut device = bus.test_take_unclaimed(loc).unwrap();
++    let command = loc.read16(4);
++    let cap = msix_cap_offset(loc).unwrap();
++    let control = loc.read16(cap + 2);
++    let mut msix = device.acquire_msix_capability().unwrap().unwrap();
++    assert_eq!(
++        loc.read16(4) & Command::BUS_MASTER.bits(),
++        0,
++        "MSI-X acquisition must not authorize DMA"
++    );
++    assert!(msix.irq_mut(usize::MAX).is_none());
++    assert!(msix.irq_mut(usize::from(msix.table_size())).is_none());
++    assert!(msix.enable_vector(0).is_err());
++    let line = ostd::irq::IrqLine::alloc().unwrap();
++    msix.set_interrupt_vector(line, 0).unwrap();
++    assert!(
++        msix.enable_vector(0).is_err(),
++        "no handler must remain masked"
++    );
++    assert!(
++        msix.set_interrupt_vector(ostd::irq::IrqLine::alloc().unwrap(), 0)
++            .is_err()
++    );
++    drop(msix);
++    // Fixture stopped before acquisition; restore control without pretending generic Drop reset it.
++    loc.write16(cap + 2, control);
++    device.write_command_raw(command);
++    bus.return_reserved(device);
++    ostd::early_println!(
++        "PCI legacy MSI-X passed: no implicit BME, checked indices, no handler unmask, no vector replacement"
++    );
++}
++
++#[ktest]
++fn qemu_active_msix_abandonment_quarantines_function() {
++    init_pci_for_tests();
++    let mut bus = PCI_BUS.lock();
++    let port = function(0, 14, 0);
++    assert_ne!(port.read16(0), 0xffff);
++    let loc = *bus
++        .unclaimed_devices()
++        .find(|d| d.location().bus == port.read8(0x19) && d.device_id().vendor_id == NVME_VENDOR)
++        .expect("dedicated quarantine NVMe")
++        .location();
++    quiesce_qemu_nvme(&mut bus, loc);
++    let mut reserved = bus.reserve_unclaimed(loc).unwrap();
++    let regs = reserved.prepare_mmio(0).unwrap();
++    let calls = Arc::new(AtomicUsize::new(0));
++    let mut msix = regs.prepare_msix(1).unwrap();
++    let callback_calls = calls.clone();
++    msix.register_handler(0, move |_| {
++        callback_calls.fetch_add(1, Ordering::SeqCst);
++    })
++    .unwrap();
++    msix.activate().unwrap();
++    // No commands/DMA started in this negative lifecycle fixture. This tests abandonment,
++    // not hardware completion; the separate Identify test requires actual device IRQs.
++    drop(msix);
++    assert!(regs.prepare_msix(1).is_err());
++    assert_eq!(calls.load(Ordering::SeqCst), 0);
++    drop(regs);
++    drop(reserved);
++    assert!(
++        bus.reserve_unclaimed(loc).is_none(),
++        "quarantined device must not be reprobed"
++    );
++    ostd::early_println!(
++        "PCI MSI-X abandonment passed: function and MMIO quarantined, no reprobe; not a hardware completion test"
++    );
++}
+diff --git a/kernel/core/comps/pci/src/msix_transaction.rs b/kernel/core/comps/pci/src/msix_transaction.rs
+new file mode 100644
+--- /dev/null
++++ b/kernel/core/comps/pci/src/msix_transaction.rs
+@@ -0,0 +1,392 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Exclusive, masked MSI-X preparation for pre-driver resource owners.
++//!
++//! This is not a GPU driver. Activated vectors are deliberately retired, not recycled:
++//! OSTD has no cross-CPU APIC/interrupt-remapping drain primitive for delayed messages.
++use alloc::vec::Vec;
++
++use ostd::{Error, io::IoMem, irq::IrqLine, mm::VmIoOnce};
++
++use crate::{
++    arch::{MSIX_DEFAULT_MSG_ADDR, construct_remappable_msix_address},
++    cfg_space::Command,
++    mmio::PciMmioGuard,
++};
++
++const ENABLE: u16 = 1 << 15;
++const FUNCTION_MASK: u16 = 1 << 14;
++
++/// A borrowed MSI-X transaction. All methods and Drop require a current task,
++/// enabled preemption and enabled local IRQs (a non-atomic task context).
++///
++/// Preparation never enables BME. Every allocated entry must have a real handler before
++/// activation. No IRQ clone or mutable line escapes. After activation, shutdown requires
++/// device-specific stop/completion and worker draining; masking/BME-off alone is not that.
++/// Dropping without successful shutdown masks and disconnects handlers, retires vectors,
++/// and quarantines the function and its MMIO mappings against reprobe/reuse.
++/// Even successful shutdown permanently retires activated IRQ numbers until a real
++/// architecture-specific posted-message drain/reclamation protocol is implemented.
++/// Neither shutdown nor Drop may run while holding a lock required by a handler:
++/// both synchronously wait for callback dispatch readers, and would otherwise deadlock.
++#[must_use]
++pub struct PciMsixGuard<'a> {
++    owner: &'a PciMmioGuard<'a>,
++    table: Option<IoMem>,
++    pba: Option<IoMem>,
++    cap: u16,
++    original_control: u16,
++    original_command: u16,
++    offset: usize,
++    pba_offset: usize,
++    table_size: u16,
++    saved_entries: Vec<[u32; 4]>,
++    irqs: Vec<IrqLine>,
++    activated: bool,
++    closed: bool,
++}
++
++fn task_context() -> Result<(), Error> {
++    if !ostd::task::atomic_mode::can_sleep() {
++        return Err(Error::AccessDenied);
++    }
++    Ok(())
++}
++
++fn checked_range(info: u32, bytes: usize, size: usize) -> Result<(u8, usize), Error> {
++    let bir = (info & 7) as u8;
++    let offset = (info & !7) as usize;
++    if bir >= 6 || offset.checked_add(bytes).ok_or(Error::Overflow)? > size {
++        return Err(Error::InvalidArgs);
++    }
++    Ok((bir, offset))
++}
++
++impl<'a> PciMsixGuard<'a> {
++    pub(crate) fn prepare(owner: &'a PciMmioGuard<'a>, count: u16) -> Result<Self, Error> {
++        task_context()?;
++        let (cap, original_control, ti, pi) = owner.msix_descriptor().ok_or(Error::InvalidArgs)?;
++        let table_size = (original_control & 0x7ff) + 1;
++        if count == 0 || count > table_size || original_control & ENABLE != 0 {
++            return Err(Error::InvalidArgs);
++        }
++        let original_command = owner.location().read16(4);
++        if original_command & Command::BUS_MASTER.bits() != 0 {
++            return Err(Error::AccessDenied);
++        }
++        let (_, offset) = checked_range(
++            ti,
++            usize::from(table_size) * 16,
++            owner.bar_size((ti & 7) as u8)?,
++        )?;
++        let (_, pba_offset) = checked_range(
++            pi,
++            usize::from(table_size).div_ceil(64) * 8,
++            owner.bar_size((pi & 7) as u8)?,
++        )?;
++        if ti & 7 == pi & 7 {
++            let te = offset + usize::from(table_size) * 16;
++            let pe = pba_offset + usize::from(table_size).div_ceil(64) * 8;
++            if offset < pe && pba_offset < te {
++                return Err(Error::InvalidArgs);
++            }
++        }
++        owner.claim_msix()?;
++        // Nothing may escape after claiming the lease without rollback.
++        let result = (|| {
++            let table = owner.map_msix_bar((ti & 7) as u8)?;
++            let pba = if ti & 7 == pi & 7 {
++                table.clone()
++            } else {
++                owner.map_msix_bar((pi & 7) as u8)?
++            };
++            for i in 0..usize::from(table_size).div_ceil(32) {
++                let pending: u32 = pba.read_once(pba_offset + i * 4)?;
++                if pending != 0 {
++                    return Err(Error::AccessDenied);
++                }
++            }
++            let mut irqs = Vec::with_capacity(usize::from(count));
++            for _ in 0..count {
++                irqs.push(IrqLine::alloc()?);
++            }
++            let mut saved_entries = Vec::with_capacity(usize::from(table_size));
++            for i in 0..table_size {
++                let at = offset + usize::from(i) * 16;
++                saved_entries.push([
++                    table.read_once(at)?,
++                    table.read_once(at + 4)?,
++                    table.read_once(at + 8)?,
++                    table.read_once(at + 12)?,
++                ]);
++            }
++            let guard = Self {
++                owner,
++                table: Some(table),
++                pba: Some(pba),
++                cap,
++                original_control,
++                original_command,
++                offset,
++                pba_offset,
++                table_size,
++                saved_entries,
++                irqs,
++                activated: false,
++                closed: false,
++            };
++            guard.write_control(original_control | FUNCTION_MASK);
++            if guard.owner.location().read16(cap + 2) & FUNCTION_MASK == 0 {
++                return Err(Error::IoError);
++            }
++            for i in 0..table_size {
++                guard.write_entry(i, 12, 1)?;
++            }
++            for (i, irq) in guard.irqs.iter().enumerate() {
++                let (addr, data) = match irq.remapping_index() {
++                    Some(index) => (construct_remappable_msix_address(u32::from(index)), 0),
++                    None => (MSIX_DEFAULT_MSG_ADDR, u32::from(irq.num())),
++                };
++                guard.write_entry(i as u16, 0, addr)?;
++                guard.write_entry(i as u16, 4, 0)?;
++                guard.write_entry(i as u16, 8, data)?;
++            }
++            guard.flush_table()?;
++            // Command writes use zero in the adjacent W1C Status half.
++            guard
++                .owner
++                .write_irq_command(original_command | Command::INTERRUPT_DISABLE.bits());
++            if guard.owner.location().read16(4)
++                != original_command | Command::INTERRUPT_DISABLE.bits()
++            {
++                return Err(Error::IoError);
++            }
++            guard.write_control(original_control | ENABLE | FUNCTION_MASK);
++            if guard.owner.location().read16(cap + 2) & (ENABLE | FUNCTION_MASK)
++                != ENABLE | FUNCTION_MASK
++            {
++                return Err(Error::IoError);
++            }
++            Ok(guard)
++        })();
++        if result.is_err() {
++            owner.release_msix();
++        }
++        result
++    }
++
++    fn write_control(&self, control: u16) {
++        self.owner.location().write16(self.cap + 2, control);
++    }
++    fn write_entry(&self, index: u16, field: usize, value: u32) -> Result<(), Error> {
++        self.table
++            .as_ref()
++            .unwrap()
++            .write_once(self.offset + usize::from(index) * 16 + field, &value)
++    }
++    fn flush_table(&self) -> Result<(), Error> {
++        let _: u32 = self.table.as_ref().unwrap().read_once(self.offset + 12)?;
++        Ok(())
++    }
++    /// Hardware table capacity, including entries not assigned by this transaction.
++    pub fn table_size(&self) -> u16 {
++        self.table_size
++    }
++    /// Number of IRQ lines owned by this live transaction (excluding retired sinks).
++    pub fn vector_count(&self) -> u16 {
++        self.irqs.len() as u16
++    }
++    #[cfg(ktest)]
++    pub(crate) fn test_vector_masked(&self, index: u16) -> bool {
++        assert!(index < self.table_size);
++        let control: u32 = self
++            .table
++            .as_ref()
++            .unwrap()
++            .read_once(self.offset + usize::from(index) * 16 + 12)
++            .unwrap();
++        control & 1 != 0
++    }
++    #[cfg(ktest)]
++    pub(crate) fn test_pending(&self, index: u16) -> bool {
++        assert!(index < self.table_size);
++        let bits: u32 = self
++            .pba
++            .as_ref()
++            .unwrap()
++            .read_once(self.pba_offset + usize::from(index / 32) * 4)
++            .unwrap();
++        bits & (1 << (index % 32)) != 0
++    }
++    /// Registers a caller-supplied real device handler while function-masked.
++    pub fn register_handler<F>(&mut self, index: u16, callback: F) -> Result<(), Error>
++    where
++        F: Fn(&ostd::arch::trap::TrapFrame) + Send + Sync + 'static,
++    {
++        task_context()?;
++        if self.activated || self.closed {
++            return Err(Error::AccessDenied);
++        }
++        self.irqs
++            .get_mut(usize::from(index))
++            .ok_or(Error::InvalidArgs)?
++            .on_active(callback);
++        Ok(())
++    }
++    /// Unmasks only configured vectors after every vector has an installed handler.
++    /// BME remains the device driver's separate DMA decision.
++    pub fn activate(&mut self) -> Result<(), Error> {
++        task_context()?;
++        if self.closed || self.activated || self.irqs.iter().any(IrqLine::is_empty) {
++            return Err(Error::AccessDenied);
++        }
++        // Mark before any unmask: all subsequent error/Drop paths must retire vectors.
++        self.activated = true;
++        for i in 0..self.vector_count() {
++            self.write_entry(i, 12, 0)?;
++        }
++        self.flush_table()?;
++        self.write_control((self.original_control | ENABLE) & !FUNCTION_MASK);
++        if self.owner.location().read16(self.cap + 2) & (ENABLE | FUNCTION_MASK) != ENABLE {
++            return Err(Error::IoError);
++        }
++        Ok(())
++    }
++    /// Masks the whole function with config and MMIO readback. This is NOT a message drain.
++    pub fn mask_all(&mut self) -> Result<(), Error> {
++        task_context()?;
++        if self.closed {
++            return Err(Error::AccessDenied);
++        }
++        self.write_control(self.owner.location().read16(self.cap + 2) | FUNCTION_MASK);
++        if self.owner.location().read16(self.cap + 2) & FUNCTION_MASK == 0 {
++            return Err(Error::IoError);
++        }
++        for i in 0..self.table_size {
++            self.write_entry(i, 12, 1)?;
++        }
++        self.flush_table()
++    }
++    /// Stops producers using the actual driver's protocol, then synchronously removes handlers.
++    ///
++    /// `quiesce` must stop/ack hardware, complete DMA, and drain all deferred work that uses
++    /// these resources. It must not hold locks needed by a handler. IRQ task context only.
++    /// Failure retains every resource and allows retry; no success is inferred from masking.
++    /// Activated IRQ numbers remain reserved as empty sinks for delayed posted messages.
++    pub fn shutdown(&mut self, quiesce: impl FnOnce() -> Result<(), Error>) -> Result<(), Error> {
++        self.mask_all()?;
++        quiesce()?;
++        if self.owner.location().read16(4) & Command::BUS_MASTER.bits() != 0 {
++            return Err(Error::AccessDenied);
++        }
++        // PBA bits cannot be cleared by software writes. A driver must really drain
++        // pending sources/delivery (or reset the function) before restoring its table.
++        // This is not evidence that an already emitted message reached every CPU.
++        for i in 0..usize::from(self.table_size).div_ceil(32) {
++            let pending: u32 = self
++                .pba
++                .as_ref()
++                .unwrap()
++                .read_once(self.pba_offset + i * 4)?;
++            if pending != 0 {
++                return Err(Error::IoError);
++            }
++        }
++        self.disconnect();
++        self.restore()?;
++        self.closed = true;
++        Ok(())
++    }
++    fn disconnect(&mut self) {
++        for irq in self.irqs.drain(..) {
++            if self.activated {
++                irq.retire();
++            } else {
++                drop(irq);
++            }
++        }
++    }
++    fn restore(&mut self) -> Result<(), Error> {
++        // Keep the function masked and MSI-X disabled while restoring table contents.
++        self.write_control((self.original_control | FUNCTION_MASK) & !ENABLE);
++        for (i, saved) in self.saved_entries.iter().enumerate() {
++            for field in [0, 4, 8] {
++                self.write_entry(i as u16, field, saved[field / 4])?;
++            }
++            self.write_entry(i as u16, 12, saved[3])?;
++        }
++        self.flush_table()?;
++        self.write_control(self.original_control);
++        if self.owner.location().read16(self.cap + 2) != self.original_control {
++            return Err(Error::IoError);
++        }
++        self.owner.write_irq_command(self.original_command);
++        if self.owner.location().read16(4) != self.original_command {
++            return Err(Error::IoError);
++        }
++        for (i, saved) in self.saved_entries.iter().enumerate() {
++            for field in [0, 4, 8, 12] {
++                let actual: u32 = self
++                    .table
++                    .as_ref()
++                    .unwrap()
++                    .read_once(self.offset + i * 16 + field)?;
++                if actual != saved[field / 4] {
++                    return Err(Error::IoError);
++                }
++            }
++        }
++        Ok(())
++    }
++}
++
++impl Drop for PciMsixGuard<'_> {
++    fn drop(&mut self) {
++        // A forgotten transaction leaves the owner's lease set, also causing quarantine.
++        let context_ok = task_context().is_ok();
++        if !context_ok {
++            self.owner.quarantine_irq_resources();
++            core::mem::forget(core::mem::take(&mut self.irqs));
++            core::mem::forget(self.table.take());
++            core::mem::forget(self.pba.take());
++            return;
++        }
++        if !self.closed {
++            let masked = context_ok && self.mask_all().is_ok();
++            if !self.activated && masked {
++                self.disconnect();
++                self.closed = self.restore().is_ok();
++            }
++            if !self.closed {
++                self.owner.quarantine_irq_resources();
++                if context_ok {
++                    self.disconnect();
++                } else {
++                    core::mem::forget(core::mem::take(&mut self.irqs));
++                }
++                // Do not unmap tables still potentially reachable by hardware/workers.
++                core::mem::forget(self.table.take());
++                core::mem::forget(self.pba.take());
++            }
++        }
++        if self.closed {
++            self.owner.release_msix();
++        }
++    }
++}
++
++#[cfg(ktest)]
++mod tests {
++    use ostd::prelude::ktest;
++
++    use super::*;
++    #[ktest]
++    fn msix_table_and_pba_ranges_fail_closed() {
++        assert_eq!(checked_range(7, 16, 4096), Err(Error::InvalidArgs));
++        assert_eq!(checked_range(4096, 16, 4096), Err(Error::InvalidArgs));
++        assert_eq!(checked_range(4088, 16, 4096), Err(Error::InvalidArgs));
++        assert_eq!(checked_range(0, usize::MAX, 4096), Err(Error::InvalidArgs));
++        assert_eq!(checked_range(8, usize::MAX, 4096), Err(Error::Overflow));
++        assert_eq!(checked_range(4080, 16, 4096), Ok((0, 4080)));
++        assert_eq!((0x7ffu16 & 0x7ff) + 1, 2048);
++    }
++}
+diff --git a/kernel/core/comps/pci/src/reservation.rs b/kernel/core/comps/pci/src/reservation.rs
+--- a/kernel/core/comps/pci/src/reservation.rs
++++ b/kernel/core/comps/pci/src/reservation.rs
+@@ -88,6 +88,11 @@
+ 
+ impl Drop for PciGroupReservation<'_> {
+     fn drop(&mut self) {
++        if self.devices.iter().any(PciCommonDevice::irqs_quarantined) {
++            for device in &self.devices {
++                device.quarantine_irqs();
++            }
++        }
+         for device in self.devices.drain(..) {
+             self.bus.return_reserved(device);
+         }
+diff --git a/kernel/core/comps/virtio/src/transport/pci/capability.rs b/kernel/core/comps/virtio/src/transport/pci/capability.rs
+--- a/kernel/core/comps/virtio/src/transport/pci/capability.rs
++++ b/kernel/core/comps/virtio/src/transport/pci/capability.rs
+@@ -71,7 +71,7 @@
+         let memory_bar = if let Some(bar) = bar_manager.bar_mut(bar) {
+             match bar.acquire() {
+                 Ok(BarAccess::Memory(io_mem)) => Some(io_mem),
+-                Ok(BarAccess::Io) => {
++                Ok(BarAccess::Io(_io_ports)) => {
+                     warn!("I/O BAR is not supported");
+                     None
+                 }
+diff --git a/kernel/core/comps/virtio/src/transport/pci/device.rs b/kernel/core/comps/virtio/src/transport/pci/device.rs
+--- a/kernel/core/comps/virtio/src/transport/pci/device.rs
++++ b/kernel/core/comps/virtio/src/transport/pci/device.rs
+@@ -249,6 +249,9 @@
+         field_ptr!(&self.common_cfg, VirtioPciCommonCfg, queue_msix_vector)
+             .write_once(&vector)
+             .unwrap();
++        self.msix_manager
++            .enable_vector(vector)
++            .map_err(|_| VirtioTransportError::InvalidArgs)?;
+         Ok(())
+     }
+ 
+@@ -256,8 +259,11 @@
+         &mut self,
+         func: Box<IrqCallbackFunction>,
+     ) -> Result<(), VirtioTransportError> {
+-        let (_, irq) = self.msix_manager.config_msix_irq();
++        let (vector, irq) = self.msix_manager.config_msix_irq();
+         irq.on_active(func);
++        self.msix_manager
++            .enable_vector(vector)
++            .map_err(|_| VirtioTransportError::InvalidArgs)?;
+         Ok(())
+     }
+ 
+@@ -320,6 +326,10 @@
+         // TODO: Support interrupt without MSI-X.
+         let msix = common_device.acquire_msix_capability().unwrap().unwrap();
+         let msix_manager = VirtioMsixManager::new(msix);
++        // Preserve the existing transport DMA policy, explicitly at the driver boundary.
++        common_device.write_command_raw(
++            common_device.location().read16(4) | aster_pci::cfg_space::Command::BUS_MASTER.bits(),
++        );
+ 
+         Ok(Self {
+             device_type,
+diff --git a/kernel/core/comps/virtio/src/transport/pci/legacy.rs b/kernel/core/comps/virtio/src/transport/pci/legacy.rs
+--- a/kernel/core/comps/virtio/src/transport/pci/legacy.rs
++++ b/kernel/core/comps/virtio/src/transport/pci/legacy.rs
+@@ -118,6 +118,10 @@
+             return Err((BusProbeError::ConfigurationSpaceError, common_device));
+         };
+         let msix_manager = VirtioMsixManager::new(msix);
++        // DMA remains an explicit transport policy, not an IRQ-acquisition side effect.
++        common_device.write_command_raw(
++            common_device.location().read16(4) | aster_pci::cfg_space::Command::BUS_MASTER.bits(),
++        );
+ 
+         Ok(Self {
+             device_type,
+@@ -293,6 +297,9 @@
+         self.config_bar
+             .write_once(QUEUE_MSIX_VECTOR_OFFSET, vector)
+             .unwrap();
++        self.msix_manager
++            .enable_vector(vector)
++            .map_err(|_| VirtioTransportError::InvalidArgs)?;
+         Ok(())
+     }
+ 
+@@ -306,6 +313,9 @@
+         self.config_bar
+             .write_once(CONFIG_MSIX_VECTOR_OFFSET, vector)
+             .unwrap();
++        self.msix_manager
++            .enable_vector(vector)
++            .map_err(|_| VirtioTransportError::InvalidArgs)?;
+         Ok(())
+     }
+ 
+diff --git a/kernel/core/comps/virtio/src/transport/pci/msix.rs b/kernel/core/comps/virtio/src/transport/pci/msix.rs
+--- a/kernel/core/comps/virtio/src/transport/pci/msix.rs
++++ b/kernel/core/comps/virtio/src/transport/pci/msix.rs
+@@ -3,7 +3,7 @@
+ use alloc::vec::Vec;
+ 
+ use aster_pci::capability::msix::CapabilityMsixData;
+-use ostd::irq::IrqLine;
++use ostd::{Error, Result, irq::IrqLine};
+ 
+ pub(super) struct VirtioMsixManager {
+     config_msix_vector: u16,
+@@ -22,7 +22,8 @@
+         let mut msix_vector_list: Vec<u16> = (0..msix.table_size()).collect();
+         for i in msix_vector_list.iter() {
+             let irq = IrqLine::alloc().unwrap();
+-            msix.set_interrupt_vector(irq, *i);
++            msix.set_interrupt_vector(irq, *i)
++                .expect("fresh MSI-X vector must be programmable");
+         }
+         let config_msix_vector = msix_vector_list.pop().unwrap();
+         let shared_interrupt_vector = msix_vector_list.pop().unwrap();
+@@ -68,4 +69,11 @@
+     pub(super) fn is_enabled(&self) -> bool {
+         self.msix.is_enabled()
+     }
++
++    /// Enables a vector after its real callback and device routing are installed.
++    pub(super) fn enable_vector(&mut self, vector: u16) -> Result<()> {
++        self.msix
++            .enable_vector(vector)
++            .map_err(|_| Error::InvalidArgs)
++    }
+ }
+diff --git a/ostd/src/io/io_port/mod.rs b/ostd/src/io/io_port/mod.rs
+--- a/ostd/src/io/io_port/mod.rs
++++ b/ostd/src/io/io_port/mod.rs
+@@ -4,10 +4,12 @@
+ 
+ use crate::arch::device::io_port::{IoPortReadAccess, IoPortWriteAccess, PortRead, PortWrite};
+ mod allocator;
++mod range;
+ 
+ use core::marker::PhantomData;
+ 
+ pub(super) use self::allocator::init;
++pub use self::range::IoPortRange;
+ use crate::{Error, prelude::*};
+ 
+ /// An I/O port, representing a specific address in the I/O address of x86.
+diff --git a/ostd/src/io/io_port/range.rs b/ostd/src/io/io_port/range.rs
+new file mode 100644
+--- /dev/null
++++ b/ostd/src/io/io_port/range.rs
+@@ -0,0 +1,155 @@
++// SPDX-License-Identifier: MPL-2.0
++//! Exclusively owned, bounded ranges of I/O ports.
++
++use alloc::vec::Vec;
++use core::mem::size_of;
++
++use super::IoPort;
++use crate::{
++    Error, Result,
++    arch::device::io_port::{PortRead, PortWrite, ReadWriteAccess},
++    mm::PodOnce,
++};
++
++/// An exclusively allocated, byte-granular I/O-port range.
++///
++/// Every byte is reserved independently through [`IoPort::acquire`]. If any
++/// reservation fails, dropping the partially built vector releases all bytes
++/// already reserved. This type deliberately exposes no raw port address.
++#[derive(Debug)]
++pub struct IoPortRange {
++    ports: Vec<IoPort<u8, ReadWriteAccess>>,
++}
++
++impl IoPortRange {
++    /// Exclusively acquires `size` consecutive ports starting at `base`.
++    ///
++    /// Port zero, empty ranges, and ranges whose exclusive end cannot be
++    /// represented by the allocator's `u16` range arithmetic are rejected.
++    /// In particular, this rejects ranges reaching port `0xffff` and any range
++    /// ending at `0x1_0000` before issuing allocator reservations.
++    pub fn acquire(base: u32, size: u32) -> Result<Self> {
++        if base == 0 || size == 0 {
++            return Err(Error::InvalidArgs);
++        }
++        let end = base.checked_add(size).ok_or(Error::Overflow)?;
++        if end > u16::MAX as u32 || base > u16::MAX as u32 {
++            return Err(Error::InvalidArgs);
++        }
++
++        let mut ports = Vec::with_capacity(size as usize);
++        for port in base..end {
++            // IoPort::acquire reserves exactly this byte. If this fails, `ports`
++            // is dropped and its IoPort elements return all prior reservations.
++            ports.push(IoPort::<u8, ReadWriteAccess>::acquire(port as u16)?);
++        }
++        Ok(Self { ports })
++    }
++
++    /// Returns the number of exclusively owned ports.
++    pub fn size(&self) -> usize {
++        self.ports.len()
++    }
++
++    /// Reads one POD value using exactly one 8-, 16- or 32-bit PIO operation.
++    /// Wider values fail closed; MMIO callers retain their separate 64-bit support.
++    pub fn read_pod<T: PodOnce>(&self, offset: usize) -> Result<T> {
++        match size_of::<T>() {
++            1 => Ok(T::from_bytes(&self.read::<u8>(offset)?.to_ne_bytes())),
++            2 => Ok(T::from_bytes(&self.read::<u16>(offset)?.to_ne_bytes())),
++            4 => Ok(T::from_bytes(&self.read::<u32>(offset)?.to_ne_bytes())),
++            _ => Err(Error::InvalidArgs),
++        }
++    }
++
++    /// Writes one POD value using exactly one 8-, 16- or 32-bit PIO operation.
++    pub fn write_pod<T: PodOnce>(&self, offset: usize, value: T) -> Result<()> {
++        let bytes = value.as_bytes();
++        match bytes.len() {
++            1 => self.write(offset, bytes[0]),
++            2 => self.write(offset, u16::from_ne_bytes([bytes[0], bytes[1]])),
++            4 => self.write(
++                offset,
++                u32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
++            ),
++            _ => Err(Error::InvalidArgs),
++        }
++    }
++
++    /// Reads one supported port value after checking that its entire width is
++    /// inside this exclusively allocated range.
++    pub fn read<T: PortRead>(&self, offset: usize) -> Result<T> {
++        let port = self.checked_port::<T>(offset)?;
++        // SAFETY: checked_port verifies the complete value width lies within
++        // `self.ports`; every byte in that range is exclusively allocated and
++        // remains owned for the duration of this borrow.
++        Ok(unsafe { T::read_from_port(port) })
++    }
++
++    /// Writes one supported port value after checking that its entire width is
++    /// inside this exclusively allocated range.
++    pub fn write<T: PortWrite>(&self, offset: usize, value: T) -> Result<()> {
++        let port = self.checked_port::<T>(offset)?;
++        // SAFETY: checked_port verifies the complete value width lies within
++        // `self.ports`; every byte in that range is exclusively allocated and
++        // remains owned for the duration of this borrow.
++        unsafe { T::write_to_port(port, value) };
++        Ok(())
++    }
++
++    fn checked_port<T>(&self, offset: usize) -> Result<u16> {
++        let width = size_of::<T>();
++        let end = offset.checked_add(width).ok_or(Error::Overflow)?;
++        if !matches!(width, 1 | 2 | 4) || end > self.ports.len() {
++            return Err(Error::InvalidArgs);
++        }
++        let port = self.ports[offset].port();
++        // Also ensure the computed last byte is representable. This is
++        // redundant with acquire's range validation but keeps the unsafe
++        // boundary locally auditable.
++        port.checked_add((width - 1) as u16)
++            .ok_or(Error::Overflow)?;
++        Ok(port)
++    }
++}
++
++#[cfg(ktest)]
++mod tests {
++    use super::IoPortRange;
++    use crate::{arch::device::io_port::ReadWriteAccess, io::IoPort, prelude::*};
++
++    #[ktest]
++    fn conflicts_and_partial_acquisition_roll_back() {
++        let held = IoPort::<u8, ReadWriteAccess>::acquire(0xd001).unwrap();
++        assert!(IoPortRange::acquire(0xd000, 3).is_err());
++        // Failure on the second byte must have released the first byte.
++        let first = IoPort::<u8, ReadWriteAccess>::acquire(0xd000).unwrap();
++        let last = IoPort::<u8, ReadWriteAccess>::acquire(0xd002).unwrap();
++        drop((first, last, held));
++
++        let range = IoPortRange::acquire(0xd010, 2).unwrap();
++        assert!(IoPort::<u8, ReadWriteAccess>::acquire(0xd011).is_err());
++        drop(range);
++        assert!(IoPort::<u8, ReadWriteAccess>::acquire(0xd011).is_ok());
++    }
++
++    #[ktest]
++    fn invalid_bounds_are_rejected_before_reservation() {
++        assert!(IoPortRange::acquire(0xd020, 0).is_err());
++        assert!(IoPortRange::acquire(0xfffe, 2).is_err());
++        assert!(IoPortRange::acquire(u32::MAX, 2).is_err());
++        // Invalid requests perform no I/O and reserve no ports.
++        assert!(IoPort::<u8, ReadWriteAccess>::acquire(0xfffe).is_ok());
++    }
++
++    #[ktest]
++    fn invalid_accesses_fail_before_any_port_instruction() {
++        let range = IoPortRange::acquire(0xd030, 4).unwrap();
++        assert!(range.read::<u32>(1).is_err());
++        assert!(range.write::<u16>(3, 0).is_err());
++        assert!(range.read::<u8>(4).is_err());
++        assert!(range.read::<u32>(usize::MAX).is_err());
++        assert!(range.read_pod::<u64>(0).is_err());
++        assert!(range.write_pod(0, 0u64).is_err());
++    }
++}
+diff --git a/ostd/src/io/mod.rs b/ostd/src/io/mod.rs
+--- a/ostd/src/io/mod.rs
++++ b/ostd/src/io/mod.rs
+@@ -18,9 +18,36 @@
+         mod io_port;
+ 
+         pub use self::io_port::IoPort;
++        pub use self::io_port::IoPortRange;
+         pub(crate) use self::io_port::{reserve_io_port_range, sensitive_io_port, RawIoPortRange};
+     }
+     _ => {},
++}
++
++// PCI configuration code is built on architectures without x86 PIO too. Keep
++// its BAR access type available there, but fail closed: only x86_64 has an I/O
++// port allocator and this fallback never attempts port access.
++#[cfg(not(target_arch = "x86_64"))]
++#[derive(Clone, Debug)]
++/// Unsupported-architecture placeholder that never performs port I/O.
++pub struct IoPortRange;
++
++#[cfg(not(target_arch = "x86_64"))]
++impl IoPortRange {
++    /// Fails closed because this architecture has no port allocator.
++    pub fn acquire(_base: u32, _size: u32) -> crate::Result<Self> {
++        Err(crate::Error::IoError)
++    }
++
++    /// Fails closed because this architecture has no port I/O instructions.
++    pub fn read_pod<T: crate::mm::PodOnce>(&self, _offset: usize) -> crate::Result<T> {
++        Err(crate::Error::IoError)
++    }
++
++    /// Fails closed because this architecture has no port I/O instructions.
++    pub fn write_pod<T: crate::mm::PodOnce>(&self, _offset: usize, _value: T) -> crate::Result<()> {
++        Err(crate::Error::IoError)
++    }
+ }
+ 
+ /// Initializes the static allocator based on builder.
+diff --git a/ostd/src/irq/top_half.rs b/ostd/src/irq/top_half.rs
+--- a/ostd/src/irq/top_half.rs
++++ b/ostd/src/irq/top_half.rs
+@@ -95,6 +95,18 @@
+         self.callbacks.push(callback_handle);
+     }
+ 
++    /// Disconnects this handle's callbacks synchronously and permanently reserves its IRQ.
++    ///
++    /// Call only from task context, not from a callback or with locks needed by one held.
++    /// This waits for registry dispatch readers, destroys captures outside the lock, and
++    /// leaves an empty dispatch/EOI sink for late device messages. It does not claim a
++    /// cross-CPU APIC/IRTE drain or allow this IRQ number to be allocated again. Other
++    /// cloned handles, if any, retain their own callbacks and must be stopped separately.
++    pub fn retire(mut self) {
++        self.callbacks.clear();
++        core::mem::forget(self);
++    }
++
+     /// Checks if there are no registered callbacks.
+     pub fn is_empty(&self) -> bool {
+         self.callbacks.is_empty()
+@@ -390,4 +402,27 @@
+         assert_eq!(result.load(Ordering::SeqCst), 1);
+         assert!(IrqLine::alloc_specific(irq_num).is_ok());
+     }
+-}
++
++    #[ktest]
++    fn retired_irq_destroys_captures_but_never_reuses_number() {
++        struct Probe(Arc<AtomicU8>);
++        impl Drop for Probe {
++            fn drop(&mut self) {
++                self.0.fetch_add(1, Ordering::SeqCst);
++            }
++        }
++        let mut line = IrqLine::alloc().unwrap();
++        let num = line.num();
++        let index = (num - IRQ_NUM_MIN) as usize;
++        let dropped = Arc::new(AtomicU8::new(0));
++        let probe = Probe(dropped.clone());
++        line.on_active(move |_| {
++            let _ = &probe;
++        });
++        assert_eq!(INNERS[index].callbacks.read().len(), 1);
++        line.retire();
++        assert_eq!(dropped.load(Ordering::SeqCst), 1);
++        assert!(INNERS[index].callbacks.read().is_empty());
++        assert!(IrqLine::alloc_specific(num).is_err());
++    }
++}
+diff --git a/tools/graphics/NATIVE_NVIDIA.md b/tools/graphics/NATIVE_NVIDIA.md
+--- a/tools/graphics/NATIVE_NVIDIA.md
++++ b/tools/graphics/NATIVE_NVIDIA.md
+@@ -70,3 +70,17 @@
+ The `pci-iommu` run requires real Identify Controller DMA from both NVMe functions across repeated group attach/detach cycles, actual CID/status/vendor/serial/model verification, live duplicate-domain rejection, controller shutdown and BME-off checks. Both PCI runs require missing-sibling, active-BME, invalid-sibling-BAR rollback and single-function/subset rejection checks. A second real NVMe-plus-conventional-EDU slot must be rejected as an unsupported group. The no-IOMMU run must reject group DMA; it is not a passing isolated-DMA test. The OSTD suite also tests that IRQ callbacks are removed before an interrupt number can be recycled; this is a teardown-order prerequisite, not NVIDIA IRQ integration.
+ 
+ This is a deliberately narrow group contract: slot zero directly below one segment-zero ACS-verified root port, with all functions exclusively owned and each selected MMIO BAR usable. Device-specific quiescence is still the caller's obligation; BME-off is not proof of completion. Hotplug and route reconfiguration are unsupported. All functions share one trust boundary—there is no isolation between siblings. These tests do not establish support for any actual NVIDIA GPU, RM/GSP, firmware authentication, the NVIDIA ioctl/mmap ABI, Vulkan userspace, Wayland, display or GPUI. The protected native-GPU job remains a separate failing-until-implemented gate and cannot be satisfied by these QEMU devices or a host-Linux benchmark.
++
++## Transactional MSI-X prerequisites (current local checkpoint)
++
++`PciMmioGuard::prepare_msix` and `NvidiaDeviceResources::prepare_msix` prepare a borrowed, exclusive transaction: bounded table/PBA mappings, actual IRQ allocation, saved entries/control/command, Function Mask and per-vector masks before message programming. Preparation never enables BME and rejects enabled MSI-X, inherited pending messages, invalid contexts, duplicate ownership and insufficient vectors. Every assigned vector needs a caller-supplied real handler before `activate` can unmask it. No RM handler or successful NVIDIA probe is fabricated.
++
++`shutdown` masks with readback, requires the actual driver's stop/completion/worker-drain operation to succeed, checks BME-off and empty PBA, synchronously disconnects callbacks, and verifies exact table/control/command restoration. A failed stop retains the transaction for retry. Abandoning an activated transaction quarantines its device and MMIO against reprobe instead of declaring a successful stop. A forgotten transaction also leaves its owner's lease set and causes quarantine. Neither shutdown nor Drop may hold a lock required by a handler.
++
++The current interrupt core cannot prove that an already posted MSI has reached every CPU or that APIC/IRTE state is fully drained. Activated IRQ numbers are therefore **permanently retired as empty sinks**, not returned to the allocator. This deliberately bounded fail-closed policy consumes vectors until reboot; it is not a reusable production GPU IRQ lifecycle or an SMP-drain proof. Device-specific deferred work/DMA must still be drained by the real driver, not by a no-op success closure.
++
++The existing NVMe and modern/legacy Virtio PCI consumers now configure masked vectors, register their actual callbacks, and explicitly enable only routed vectors afterward. Their BME decision lives in the transport, not the PCI interrupt constructor. Their legacy MSI-X owner's Drop masks and retires IRQs before mappings are dropped, but cannot supply controller reset, active-state rollback or arbitrary driver-worker drainage; NVIDIA must use the borrowed transactional path.
++
++The CPU runner requires a genuine QEMU NVMe Identify completion while masked with its real callback already registered, a physical PBA pending bit, callback delivery only after unmask, a cleared PBA afterward, and two stop/reconfigure cycles in both direct-DMA and VT-d runs. Capture-destruction probes must survive a failed quiesce and be synchronously released after a successful stop. It also checks real allocator exhaustion/rollback, atomic-context rejection, missing handlers, legacy BME/index/replacement rejection and abandoned-transaction quarantine. These are PCI/IRQ prerequisites, **not NVIDIA/GPU execution**. Current local counts before the separate IRQ-storage follow-up are 20 NVport, 4 platform, 13 PCI, 13 PCI-with-VT-d and 255 reported OSTD tests; three virtualization-dependent bodies explicitly skip unavailable VMX/EPT hardware. The strict NVIDIA benchmark still rejects the CPU-only sandbox and emits no passing GPU JSON. The workflow changes are local and have not been pushed or executed remotely.
++
++The first additional full-kernel storage boot exposed a pre-existing Virtio-legacy blocker: PCI I/O BAR access was an unimplemented unit variant that returned `IoError`. The port path now owns each byte through the existing OSTD allocator, rolls back partial acquisition, caches shared ownership per BAR and checks the full access width before executing an 8/16/32-bit port instruction. The existing generic `PodOnce` MMIO API, including 64-bit accesses, is preserved; unsupported PIO widths/architectures fail closed. Three real kernel tests cover port conflicts, partial rollback and invalid accesses without issuing hardware I/O. Port access is not implemented through overlapping reservations or unowned raw instructions. See the local evidence index for the separate full-kernel consumer read/write/flush result rather than inferring it from these allocation tests.
+diff --git a/tools/graphics/run_cpu_kernel_tests.sh b/tools/graphics/run_cpu_kernel_tests.sh
+--- a/tools/graphics/run_cpu_kernel_tests.sh
++++ b/tools/graphics/run_cpu_kernel_tests.sh
+@@ -26,6 +26,9 @@
+             pci_test_device+=" -device pcie-root-port,id=rp-noacs,addr=08.0,chassis=8,hotplug=off,disable-acs=on -device nvme,bus=rp-noacs,addr=00.0,serial=ASTER-NO-ACS"
+             pci_test_device+=" -device pci-bridge,id=legacy,addr=09.0,chassis_nr=9,shpc=off -device edu,bus=legacy,addr=01.0,dma_mask=4294967295"
+             pci_test_device+=" -device pcie-root-port,id=rp-group,addr=0a.0,chassis=10,hotplug=off -device nvme,bus=rp-group,addr=00.0,multifunction=on,serial=ASTER-GROUP-F0 -device nvme,bus=rp-group,addr=00.1,serial=ASTER-GROUP-F1"
++            pci_test_device+=" -device pcie-root-port,id=rp-msix,addr=0c.0,chassis=12,hotplug=off -device nvme,bus=rp-msix,addr=00.0,serial=ASTER-MSIX"
++            pci_test_device+=" -device pcie-root-port,id=rp-msix-legacy,addr=0d.0,chassis=13,hotplug=off -device nvme,bus=rp-msix-legacy,addr=00.0,serial=ASTER-MSIX-LEGACY"
++            pci_test_device+=" -device pcie-root-port,id=rp-msix-quarantine,addr=0e.0,chassis=14,hotplug=off -device nvme,bus=rp-msix-quarantine,addr=00.0,serial=ASTER-MSIX-QUARANTINE"
+             pci_test_device+=" -device pcie-root-port,id=rp-group-bad,addr=0b.0,chassis=11,hotplug=off -device nvme,bus=rp-group-bad,addr=00.0,multifunction=on,serial=ASTER-GROUP-BAD -device edu,bus=rp-group-bad,addr=00.1,dma_mask=4294967295"
+         fi
+         if [[ "$suite" == pci-iommu ]]; then
+@@ -62,6 +65,11 @@
+ if "[ktest runner] All crates tested." not in text:
+     raise SystemExit("Missing final kernel runner marker in " + sys.argv[1])
+ PY
++    if [[ "$suite" == pci || "$suite" == pci-iommu ]]; then
++        grep -Fq 'PCI real NVMe MSI-X masked-pending IRQ and quiesced shutdown cycles passed; not GPU validation' "$log"
++        grep -Fq 'PCI legacy MSI-X passed: no implicit BME, checked indices, no handler unmask, no vector replacement' "$log"
++        grep -Fq 'PCI MSI-X abandonment passed: function and MMIO quarantined, no reprobe; not a hardware completion test' "$log"
++    fi
+     if [[ "$suite" == pci ]]; then
+         grep -Fq 'PCI device DMA passed: 8 real EDU 4096-byte RAM->device->RAM cycles;' "$log"
+         grep -Fq 'PCIe topology negative cases passed without IOMMU; no PCIe DMA issued' "$log"

@@ -1,0 +1,7 @@
+buffer-outlives-context {'case': 'buffer-outlives-context', 'exit': 101, 'expected_borrow_failure': False}
+Traceback (most recent call last):
+  File "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/check_lifetimes.py", line 72, in <module>
+    main()
+  File "/workspace/asterinas-gpui/evidence/nvidia-isolated-vtd/check_lifetimes.py", line 55, in main
+    raise RuntimeError('Missing actual borrow-checker rejection: ' + name)
+RuntimeError: Missing actual borrow-checker rejection: buffer-outlives-context

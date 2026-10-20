@@ -1,0 +1,46 @@
+{
+  "scope": "local GPUI changes; Asterinas reviewed read-only",
+  "host": "Linux",
+  "shell_profile": "dev, unoptimized, debug info disabled",
+  "binary": "/workspace/asterinas-gpui/gpui-shell/target/debug/gpuishell",
+  "binary_sha256": "58213d2fed942da6e2324b39a3781184d289d107725dfc2a1e047cfdf89ba526",
+  "rust_test_pass_count_including_doctests": 166,
+  "analyzer_tests_passed": 15,
+  "session_startup_tests_passed": 5,
+  "asterinas_graphics_host_tests_passed": 38,
+  "asterinas_tests_source": "read-only reviewer executed existing tools/graphics host tests; no kernel tests run",
+  "renderer": {
+    "specs": {
+      "is_software_emulated": true,
+      "device_name": "llvmpipe (LLVM 21.1.8, 256 bits)",
+      "driver_name": "llvmpipe",
+      "driver_info": "Mesa 26.1.5 (LLVM 21.1.8)"
+    },
+    "device_name": "llvmpipe (LLVM 21.1.8, 256 bits)",
+    "classification": "software_cpu",
+    "backend": "Vulkan",
+    "backend_source": "upstream Selected GPU adapter log (GpuSpecs does not expose backend)",
+    "upstream_selected_adapter": {
+      "device": "llvmpipe (LLVM 21.1.8, 256 bits)",
+      "backend": "Vulkan"
+    },
+    "backend_device_match": true,
+    "hardware_acceleration_verified": false
+  },
+  "probe_observations": 4,
+  "probe_deadline_observed": true,
+  "passive_observations": 3,
+  "physical_presentation_fps": null,
+  "hardware_acceleration_verified": false,
+  "linux_performance_parity_demonstrated": false,
+  "drm_directory_present": false,
+  "kvm_present": false,
+  "nvidia_device_nodes": [],
+  "strict_physical_gpu_check_exit_status": 3,
+  "commits_or_pushes_performed": false,
+  "nix_full_flake_evaluation_passed": true,
+  "nix_x86_64_module_evaluation_passed": true,
+  "nix_aarch64_module_derivation_evaluated": true,
+  "nix_release_package_rebuilt": false,
+  "live_nixos_session_tested": false
+}

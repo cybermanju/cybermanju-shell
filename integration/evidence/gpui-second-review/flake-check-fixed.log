@@ -1,0 +1,44 @@
+evaluating flake...
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: passing in an `stdenv` override into `mkCargoDerivation` is now deprecated.
+Changing the default `stdenv` must be done at the `craneLib` level like so:
+
+  craneLib = (inputs.crane.mkLib pkgs).overrideScope (final: prev: {
+    # Set this to the chosen stdenv, e.g. `p.clangStdenv`
+    stdenvSelector = p: p.stdenv;
+  })
+
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libxcb' has been renamed to 'libxcb'
+trace: evaluation warning: The xorg package set has been deprecated, 'xorg.libX11' has been renamed to 'libx11'
+trace: evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+trace: evaluation warning: nixfmt-rfc-style is now the same as pkgs.nixfmt which should be used instead.
+warning: The check omitted these incompatible systems: aarch64-linux
+Use '--all-systems' to check all.

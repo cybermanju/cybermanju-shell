@@ -1,0 +1,41 @@
+{
+  "source_url": "https://us.download.nvidia.com/XFree86/Linux-x86_64/615.78.08/NVIDIA-Linux-x86_64-615.78.08.run",
+  "release": "615.78.08",
+  "installer_sha256": null,
+  "downloaded_prefix_sha256": "aace88281562c74b472d742974334721f75e9c0b5d73c8cdfc9baf63a1d19912",
+  "downloaded_bytes": 479208552,
+  "expected_installer_bytes": 529834675,
+  "installer_download_complete": false,
+  "partial_archive_cpu_only": true,
+  "embedded_md5_corruption_check": false,
+  "vendor_signature_verified": false,
+  "installer_executed": false,
+  "installed_on_host": false,
+  "gpu_firmware_executed": false,
+  "files": [
+    {
+      "archive_entry": "firmware/gsp_ga10x.bin",
+      "path": "/workspace/asterinas-gpui/vendor-drivers/firmware-615.78.08/gsp_ga10x.bin",
+      "size": 27043992,
+      "sha256": "a20100cafd5a85e22b3e13188339730c6ced94bd5f654984dd2ed274ed58d584"
+    },
+    {
+      "archive_entry": "firmware/gsp_tu10x.bin",
+      "path": "/workspace/asterinas-gpui/vendor-drivers/firmware-615.78.08/gsp_tu10x.bin",
+      "size": 22901632,
+      "sha256": "0c6124c11d59900a05ab5461e5fc7087fc6687a1badead49a7eeca6ed13eeb3b"
+    },
+    {
+      "archive_entry": "firmware/ucodes_ga10x.bin",
+      "path": "/workspace/asterinas-gpui/vendor-drivers/firmware-615.78.08/ucodes_ga10x.bin",
+      "size": 58215936,
+      "sha256": "eed53d76248582d71c629e8b6230aee48ce673c91d782301c94e98ac6a6db7aa"
+    },
+    {
+      "archive_entry": "firmware/ucodes_tu10x.bin",
+      "path": "/workspace/asterinas-gpui/vendor-drivers/firmware-615.78.08/ucodes_tu10x.bin",
+      "size": 8837632,
+      "sha256": "6027ab3736f733b5a06e6e61aaae957d1f990426a263849ebcfa8a49eeb4a5d0"
+    }
+  ]
+}

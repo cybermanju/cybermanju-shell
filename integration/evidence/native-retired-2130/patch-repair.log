@@ -1,0 +1,7 @@
+{
+  "corrected_patch": "/workspace/asterinas-gpui/local-prs/asterinas-msix-retired-activation.patch",
+  "sha256": "12843ef3d57c61872b06d1ae7967a48edc33ecf2a2f6edd29cf984de97ade3dd",
+  "bytes": 3774,
+  "tested_kernel_sources_changed": false,
+  "reason": "Original reconstructed baseline retained multiline predicate formatting; canonical patch20 predicate is single-line. Initial artifact is retained, not canonical."
+}

@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "case": "buffer-outlives-context",
+      "exit": 101,
+      "expected_borrow_failure": false
+    }
+  ],
+  "restored_source": true,
+  "source_sha256": "31184ba1f66c23dd95db775b2f812688dfc0e9341baa5d183a0d89670a0a7f46",
+  "scope": "Real compiler ownership/lifetime checks, not hardware DMA quiescence proof"
+}

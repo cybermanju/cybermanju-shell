@@ -1,0 +1,31 @@
+[package]
+name = "cybermanju-os"
+version = "0.1.1"
+edition = "2021"
+description = "CyberManju OS layer: cybsh terminal, task table, compute fan-out, syscall boundary"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+blake3 = "1"
+# RFC3339 timestamps for task rows and shell history (same 0.4 as cybermanju-sync).
+chrono = { version = "0.4", features = ["serde"] }
+cybermanju-compression = { path = "../compression" }
+cybermanju-crypto = { path = "../crypto" }
+cybermanju-db = { path = "../db" }
+cybermanju-disk = { path = "../disk" }
+cybermanju-erasure = { path = "../erasure" }
+cybermanju-search = { path = "../search" }
+cybermanju-sync = { path = "../sync" }
+cybermanju-types = { path = "../types" }
+log = "0.4"
+rayon = "1.10"
+# Direct table access for the shared `disks`/`compute_tasks`/`shell_history`
+# rows (AGENT-6's registry, AGENT-8's own tables). Same major as cybermanju-db.
+redb = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,3 @@
+/tmp/tmp.b1AhyKeUHy/gpuishell/config.toml: absent, defaults apply
+/tmp/tmp.b1AhyKeUHy/gpuishell/theme.toml: absent, defaults apply
+/tmp/tmp.b1AhyKeUHy/gpuishell/state.toml: absent, defaults apply

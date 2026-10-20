@@ -19,6 +19,7 @@ struct Bar {
     start_widgets: Vec<Widget>,
     center_widgets: Vec<Widget>,
     end_widgets: Vec<Widget>,
+    frame_telemetry: Option<crate::frame_telemetry::FrameTelemetry>,
 }
 
 impl Bar {
@@ -31,12 +32,17 @@ impl Bar {
             start_widgets: Widget::create_many(&config.start, cx),
             center_widgets: Widget::create_many(&config.center, cx),
             end_widgets: Widget::create_many(&config.end, cx),
+            frame_telemetry: crate::frame_telemetry::FrameTelemetry::from_env(),
         }
     }
 }
 
 impl Render for Bar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let entry = self
+            .frame_telemetry
+            .as_ref()
+            .map(|_| std::time::Instant::now());
         window.set_rem_size(cx.theme().font_size);
         let bar = &cx.config().bar;
 
@@ -44,12 +50,16 @@ impl Render for Bar {
         let center: Vec<AnyElement> = self.center_widgets.iter().map(|w| w.render()).collect();
         let end: Vec<AnyElement> = self.end_widgets.iter().map(|w| w.render()).collect();
 
-        BarSurface::new(self.position.edge())
+        let surface = BarSurface::new(self.position.edge())
             .border(bar.show_border)
             .padding(px(bar.padding))
             .start(start)
             .center(center)
-            .end(end)
+            .end(end);
+        if let (Some(telemetry), Some(entry)) = (&mut self.frame_telemetry, entry) {
+            telemetry.record(entry, window);
+        }
+        surface
     }
 }
 
@@ -145,6 +155,7 @@ pub fn init(cx: &mut App) {
 pub fn open_with_config(display_id: Option<DisplayId>, cx: &mut App) -> bool {
     match cx.open_window(window_options(display_id, cx), move |window, cx| {
         crate::state::record_window_display(window.window_handle(), display_id);
+        crate::frame_telemetry::report_renderer(window);
         cx.new(Bar::new)
     }) {
         Ok(_) => true,

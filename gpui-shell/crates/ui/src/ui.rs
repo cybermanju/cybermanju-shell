@@ -13,9 +13,9 @@ pub use components::*;
 // primitive set. See the module docs.
 pub use styles::ElevationIndex;
 pub use theme::{
-    ActiveTheme, Appearance, Base16Palette, Color, IconSize, Radius, Spacing, StatusColors,
-    StatusColorsRefinement, StoredTheme, TextSize, Theme, ThemeColors, ThemeColorsRefinement,
-    ThemeScheme, builtin_schemes,
+    ActiveTheme, Appearance, Base16Palette, Color, IconSize, LayoutDensity, Radius, Spacing,
+    StatusColors, StatusColorsRefinement, StoredTheme, TextSize, Theme, ThemeColors,
+    ThemeColorsRefinement, ThemeScheme, builtin_schemes,
 };
 pub use traits::*;
 

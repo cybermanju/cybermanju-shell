@@ -1,0 +1,11 @@
+## main...origin/main
+ M TASKS.md
+ M docs/CYBERMANJU-OS-PLAN.md
+ M src/components/SettingsPage.vue
+ M src/composables/useCustomWallpaper.ts
+ M worklog.md
+?? docs/ASTERINAS-ABI-BASELINE.md
+?? docs/ASTERINAS-PERSONALIZATION-BRIDGE.md
+?? src/utils/appearanceProfile.ts
+?? tests/fixtures/
+?? tests/frontend/appearance-profile.test.ts

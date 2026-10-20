@@ -1,0 +1,39 @@
+     Locking 89 packages to latest Rust 1.99.0-nightly compatible versions
+warning: unstable feature specified for `-Ctarget-feature`: `ermsb`
+  |
+  = note: this feature is not stably supported; its behavior can change in the future
+
+warning: `int-to-c-enum` (lib) generated 1 warning
+warning: `ostd-pod` (lib) generated 1 warning (1 duplicate)
+warning: `id-alloc` (lib) generated 1 warning (1 duplicate)
+warning: `ostd-test` (lib) generated 1 warning (1 duplicate)
+warning: `align_ext` (lib) generated 1 warning (1 duplicate)
+warning: `linux-boot-params` (lib) generated 1 warning (1 duplicate)
+   Compiling ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+   Compiling ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)
+error: failed to run custom build command for `ostd-nvidia-nvport v0.1.0 (/workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport)`
+
+Caused by:
+  process didn't exit successfully: `/workspace/asterinas-gpui/asterinas/target/debug/build/ostd-nvidia-nvport-c5213b846e28c8fa/build-script-build` (exit status: 101)
+  --- stdout
+  cargo:rerun-if-env-changed=NVIDIA_SOURCE_DIR
+  cargo:rerun-if-env-changed=CC
+  cargo:rerun-if-env-changed=AR
+  cargo:rerun-if-env-changed=TARGET
+
+  --- stderr
+
+  thread 'main' (518607) panicked at /workspace/asterinas-gpui/asterinas/ostd/libs/nvidia-nvport/build.rs:87:13:
+  nvidia-nvport build: NVIDIA_SOURCE_DIR is required; expected the NVIDIA 615.78.08 source checkout
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...
+warning: feature `iter_advance_by` is declared but not used
+  --> /workspace/asterinas-gpui/asterinas/ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 2 warnings (1 duplicate)
+[Error]: Cargo build failed

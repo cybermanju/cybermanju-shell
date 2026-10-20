@@ -1,0 +1,284 @@
+{
+  "_doc": "Scene-heuristic keyword tables. Single source of truth: Rust (crates/scene, include_str!) and TypeScript (src/utils/scene.ts) parse this same file, so matching behaves identically on desktop, server and WASM. Languages: en pt es fr de it nl ru zh ja. Matching folds latin diacritics and lowercases everything (Cyrillic/CJK/Arabic-safe substring match).",
+  "parents": {
+    "baby": "human",
+    "dog": "animal",
+    "cat": "animal",
+    "bird": "animal",
+    "wedding": "party"
+  },
+  "categories": [
+    {
+      "id": "human",
+      "label": "Human",
+      "keywords": {
+        "en": ["human", "person", "people", "portrait", "face", "selfie", "man", "woman", "child", "kid"],
+        "pt": ["pessoa", "pessoas", "retrato", "rosto", "homem", "mulher", "crianca", "menino", "menina", "selfie"],
+        "es": ["persona", "personas", "retrato", "cara", "hombre", "mujer", "nino", "nina", "selfi"],
+        "fr": ["personne", "gens", "portrait", "visage", "homme", "femme", "enfant", "selfie"],
+        "de": ["mensch", "menschen", "portrat", "gesicht", "mann", "frau", "kind", "selfie"],
+        "it": ["persona", "persone", "ritratto", "volto", "uomo", "donna", "bambino", "selfie"],
+        "nl": ["mens", "mensen", "portret", "gezicht", "man", "vrouw", "kind", "selfie"],
+        "ru": ["человек", "люди", "портрет", "лицо", "мужчина", "женщина", "ребенок", "селфи"],
+        "zh": ["人", "人物", "人像", "脸", "男人", "女人", "孩子", "自拍"],
+        "ja": ["人", "人物", "ポートレート", "顔", "男性", "女性", "子供", "自撮り"]
+      }
+    },
+    {
+      "id": "baby",
+      "label": "Baby",
+      "keywords": {
+        "en": ["baby", "newborn", "infant", "toddler", "baptism"],
+        "pt": ["bebe", "recem-nascido", "batizado"],
+        "es": ["bebe", "recien nacido", "bautizo"],
+        "fr": ["bebe", "nouveau-ne", "bapteme"],
+        "de": ["baby", "neugeborenes", "taufe"],
+        "it": ["neonato", "bebe", "battesimo"],
+        "nl": ["baby", "pasgeborene", "doop"],
+        "ru": ["малыш", "новорожденный", "крещение"],
+        "zh": ["宝宝", "婴儿", "新生儿", "洗礼"],
+        "ja": ["赤ちゃん", "新生児", "洗礼"]
+      }
+    },
+    {
+      "id": "forest",
+      "label": "Forest",
+      "keywords": {
+        "en": ["forest", "woods", "jungle", "trees", "pine", "trail"],
+        "pt": ["floresta", "mata", "selva", "arvores", "trilha"],
+        "es": ["bosque", "selva", "arboles", "sendero"],
+        "fr": ["foret", "bois", "jungle", "arbres", "sentier"],
+        "de": ["wald", "dschungel", "baume", "pfad"],
+        "it": ["foresta", "bosco", "giungla", "alberi", "sentiero"],
+        "nl": ["bos", "oerwoud", "bomen", "pad"],
+        "ru": ["лес", "джунгли", "деревья", "тропа"],
+        "zh": ["森林", "树林", "丛林", "树木", "小径"],
+        "ja": ["森", "森林", "ジャングル", "木", "小道"]
+      }
+    },
+    {
+      "id": "mountain",
+      "label": "Mountain",
+      "keywords": {
+        "en": ["mountain", "peak", "alps", "hiking", "summit"],
+        "pt": ["montanha", "pico", "cume"],
+        "es": ["montana", "pico", "cumbre", "excursion"],
+        "fr": ["montagne", "sommet", "rando"],
+        "de": ["berg", "gipfel", "wandern"],
+        "it": ["montagna", "vetta", "escursione"],
+        "nl": ["berg", "top", "wandeling"],
+        "ru": ["гора", "вершина", "поход"],
+        "zh": ["山", "山峰", "登山", "峰顶"],
+        "ja": ["山", "山頂", "登山"]
+      }
+    },
+    {
+      "id": "beach",
+      "label": "Beach",
+      "keywords": {
+        "en": ["beach", "seaside", "shore", "coast", "sand", "dune", "ocean", "sea", "waves", "surf"],
+        "pt": ["praia", "orla", "costa", "areia", "mar", "oceano", "ondas", "surf"],
+        "es": ["playa", "costa", "arena", "orilla", "mar", "oceano", "olas"],
+        "fr": ["plage", "littoral", "cote", "sable", "mer", "ocean", "vagues"],
+        "de": ["strand", "kuste", "sand", "meer", "ozean", "wellen"],
+        "it": ["spiaggia", "costa", "sabbia", "litorale", "mare", "oceano", "onde"],
+        "nl": ["strand", "kust", "zand", "zee", "oceaan", "golven"],
+        "ru": ["пляж", "берег", "песок", "побережье", "море", "океан", "волны"],
+        "zh": ["海滩", "沙滩", "海岸", "沙", "海", "大海", "海浪", "冲浪"],
+        "ja": ["ビーチ", "浜", "海岸", "砂浜", "海", "大海", "波", "サーフィン"]
+      }
+    },
+    {
+      "id": "sunset",
+      "label": "Sunset",
+      "keywords": {
+        "en": ["sunset", "sunrise", "dusk", "golden hour", "twilight"],
+        "pt": ["por do sol", "nascer do sol", "crepusculo"],
+        "es": ["atardecer", "amanecer", "crepusculo"],
+        "fr": ["coucher de soleil", "lever de soleil", "crepuscule"],
+        "de": ["sonnenuntergang", "sonnenaufgang", "abendrot"],
+        "it": ["tramonto", "alba", "crepuscolo"],
+        "nl": ["zonsondergang", "zonsopgang", "schemering"],
+        "ru": ["закат", "рассвет", "сумерки"],
+        "zh": ["日落", "日出", "黄昏"],
+        "ja": ["日没", "日の出", "夕暮れ"]
+      }
+    },
+    {
+      "id": "snow",
+      "label": "Snow",
+      "keywords": {
+        "en": ["snow", "winter", "ski", "snowboard", "frost"],
+        "pt": ["neve", "inverno", "esqui", "geada"],
+        "es": ["nieve", "invierno", "esqui", "escarcha"],
+        "fr": ["neige", "hiver", "ski", "gel"],
+        "de": ["schnee", "winter", "ski", "frost"],
+        "it": ["neve", "inverno", "sci", "gelo"],
+        "nl": ["sneeuw", "winter", "skien", "vorst"],
+        "ru": ["снег", "зима", "лыжи", "мороз"],
+        "zh": ["雪", "冬天", "滑雪", "霜"],
+        "ja": ["雪", "冬", "スキー", "霜"]
+      }
+    },
+    {
+      "id": "city",
+      "label": "City",
+      "keywords": {
+        "en": ["city", "urban", "downtown", "skyline", "street"],
+        "pt": ["cidade", "urbano", "centro", "rua"],
+        "es": ["ciudad", "urbano", "centro", "calle"],
+        "fr": ["ville", "urbain", "centre", "rue"],
+        "de": ["stadt", "urban", "zentrum", "strasse"],
+        "it": ["citta", "urbano", "centro", "strada"],
+        "nl": ["stad", "stedelijk", "centrum", "straat"],
+        "ru": ["город", "городской", "центр", "улица"],
+        "zh": ["城市", "市区", "市中心", "街道"],
+        "ja": ["都市", "都会", "街", "通り"]
+      }
+    },
+    {
+      "id": "party",
+      "label": "Party",
+      "keywords": {
+        "en": ["party", "celebration", "birthday", "festival", "carnival"],
+        "pt": ["festa", "comemoracao", "aniversario", "carnaval", "festival"],
+        "es": ["fiesta", "celebracion", "cumpleanos", "carnaval"],
+        "fr": ["fete", "celebration", "anniversaire", "carnaval"],
+        "de": ["party", "feier", "geburtstag", "karneval", "festival"],
+        "it": ["festa", "compleanno", "carnevale"],
+        "nl": ["feest", "verjaardag", "carnaval"],
+        "ru": ["вечеринка", "праздник", "день рождения", "карнавал"],
+        "zh": ["派对", "庆祝", "生日", "嘉年华", "节日"],
+        "ja": ["パーティー", "祝い", "誕生日", "祭り"]
+      }
+    },
+    {
+      "id": "wedding",
+      "label": "Wedding",
+      "keywords": {
+        "en": ["wedding", "bride", "groom", "honeymoon"],
+        "pt": ["casamento", "noiva", "noivo", "lua de mel"],
+        "es": ["boda", "novia", "novio", "luna de miel"],
+        "fr": ["mariage", "mariee", "marie", "lune de miel"],
+        "de": ["hochzeit", "braut", "brautigam", "flitterwochen"],
+        "it": ["matrimonio", "sposa", "sposo", "luna di miele"],
+        "nl": ["bruiloft", "bruid", "bruidegom", "huwelijksreis"],
+        "ru": ["свадьба", "невеста", "жених", "медовый месяц"],
+        "zh": ["婚礼", "新娘", "新郎", "蜜月"],
+        "ja": ["結婚式", "花嫁", "花婿", "新婚旅行"]
+      }
+    },
+    {
+      "id": "animal",
+      "label": "Animal",
+      "keywords": {
+        "en": ["animal", "wildlife", "pet", "zoo", "safari"],
+        "pt": ["animal", "fauna", "pet", "zoologico", "safari"],
+        "es": ["animal", "fauna", "mascota", "zoo", "safari"],
+        "fr": ["animal", "faune", "zoo", "safari"],
+        "de": ["tier", "wildtier", "haustier", "zoo", "safari"],
+        "it": ["animale", "fauna", "zoo", "safari"],
+        "nl": ["dier", "wild", "huisdier", "dierentuin", "safari"],
+        "ru": ["животное", "дикая природа", "питомец", "зоопарк", "сафари"],
+        "zh": ["动物", "野生动物", "宠物", "动物园"],
+        "ja": ["動物", "野生動物", "ペット", "動物園", "サファリ"]
+      }
+    },
+    {
+      "id": "dog",
+      "label": "Dog",
+      "keywords": {
+        "en": ["dog", "puppy", "canine"],
+        "pt": ["cachorro", "cao", "filhote"],
+        "es": ["perro", "cachorro", "canino"],
+        "fr": ["chien", "chiot", "canin"],
+        "de": ["hund", "welpe"],
+        "it": ["cane", "cucciolo"],
+        "nl": ["hond", "puppy"],
+        "ru": ["собака", "щенок"],
+        "zh": ["狗", "小狗", "犬"],
+        "ja": ["犬", "子犬"]
+      }
+    },
+    {
+      "id": "cat",
+      "label": "Cat",
+      "keywords": {
+        "en": ["cat", "kitten", "feline"],
+        "pt": ["gato", "gatinho", "felino"],
+        "es": ["gato", "gatito", "felino"],
+        "fr": ["chat", "chaton", "felin"],
+        "de": ["katze", "katzchen"],
+        "it": ["gatto", "gattino", "felino"],
+        "nl": ["kat", "kitten"],
+        "ru": ["кошка", "котенок"],
+        "zh": ["猫", "小猫", "猫科"],
+        "ja": ["猫", "子猫"]
+      }
+    },
+    {
+      "id": "bird",
+      "label": "Bird",
+      "keywords": {
+        "en": ["bird", "parrot", "eagle", "sparrow", "seagull"],
+        "pt": ["passaro", "papagaio", "aguia", "gaivota"],
+        "es": ["pajaro", "loro", "aguila", "gaviota"],
+        "fr": ["oiseau", "perroquet", "aigle", "mouette"],
+        "de": ["vogel", "papagei", "adler", "mowe"],
+        "it": ["uccello", "pappagallo", "aquila", "gabbiano"],
+        "nl": ["vogel", "papegaai", "arend", "meeuw"],
+        "ru": ["птица", "попугай", "орел", "чайка"],
+        "zh": ["鸟", "鹦鹉", "鹰", "海鸥"],
+        "ja": ["鳥", "オウム", "鷲", "カモメ"]
+      }
+    },
+    {
+      "id": "food",
+      "label": "Food",
+      "keywords": {
+        "en": ["food", "dinner", "lunch", "barbecue", "picnic"],
+        "pt": ["comida", "jantar", "almoco", "churrasco", "piquenique"],
+        "es": ["comida", "cena", "almuerzo", "barbacoa", "picnic"],
+        "fr": ["nourriture", "diner", "dejeuner", "barbecue", "pique-nique"],
+        "de": ["essen", "abendessen", "mittagessen", "grill", "picknick"],
+        "it": ["cibo", "cena", "pranzo", "barbecue", "picnic"],
+        "nl": ["eten", "diner", "lunch", "barbecue", "picknick"],
+        "ru": ["еда", "ужин", "обед", "шашлык", "пикник"],
+        "zh": ["食物", "晚餐", "午餐", "烧烤", "野餐"],
+        "ja": ["食べ物", "夕食", "昼食", "バーベキュー", "ピクニック"]
+      }
+    },
+    {
+      "id": "sport",
+      "label": "Sport",
+      "keywords": {
+        "en": ["sport", "soccer", "football", "marathon", "race"],
+        "pt": ["esporte", "futebol", "corrida", "maratona"],
+        "es": ["deporte", "futbol", "carrera", "maraton"],
+        "fr": ["sport", "football", "course", "marathon"],
+        "de": ["sport", "fussball", "rennen", "marathon"],
+        "it": ["sport", "calcio", "corsa", "maratona"],
+        "nl": ["sport", "voetbal", "race", "marathon"],
+        "ru": ["спорт", "футбол", "забег", "марафон"],
+        "zh": ["运动", "足球", "比赛", "马拉松"],
+        "ja": ["スポーツ", "サッカー", "レース", "マラソン"]
+      }
+    },
+    {
+      "id": "garden",
+      "label": "Garden",
+      "keywords": {
+        "en": ["garden", "flower", "blossom", "rose", "park"],
+        "pt": ["jardim", "flor", "rosa", "parque"],
+        "es": ["jardin", "flor", "rosa", "parque"],
+        "fr": ["jardin", "fleur", "rose", "parc"],
+        "de": ["garten", "blume", "rose", "park"],
+        "it": ["giardino", "fiore", "rosa", "parco"],
+        "nl": ["tuin", "bloem", "roos", "park"],
+        "ru": ["сад", "цветок", "роза", "парк"],
+        "zh": ["花园", "花", "玫瑰", "公园"],
+        "ja": ["庭", "花", "バラ", "公園"]
+      }
+    }
+  ]
+}

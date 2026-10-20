@@ -1,0 +1,4 @@
+
+thread 'main' (346293) panicked at crates/app/src/main.rs:57:10:
+Failed to initialize services: No supported compositor detected (Hyprland, Niri or Mango)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

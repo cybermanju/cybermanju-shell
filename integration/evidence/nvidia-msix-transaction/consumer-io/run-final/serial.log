@@ -1,0 +1,1437 @@
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 0, apic_id: 0, flags: 1 }
+DEBUG: Found a local APIC entry in MADT: LocalApicEntry { header: EntryHeader { entry_type: 0, length: 8 }, processor_id: 1, apic_id: 1, flags: 1 }
+INFO: Initializing frame metadata for physical memory 0..80000000
+INFO: Adding free frames to the allocator: 0..8000
+INFO: Adding free frames to the allocator: 9000..9f000
+INFO: Adding free frames to the allocator: 104000..8000000
+INFO: Adding free frames to the allocator: b46f000..7ffd1000
+INFO: Initializing the kernel page table
+INFO: Creating new I/O memory allocator builder, ranges: [
+    0x80000000..0x100000000,
+    0x100000000..0x10000000000000,
+]
+INFO: xAPIC found!
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfee00000..0xfee01000 with cache policy: Uncacheable
+INFO: irq: Initializing PIC as disabled
+DEBUG: Try to reserve security-sensitive MMIO range: 0xfec00000..0xfec01000 with cache policy: Uncacheable
+INFO: irq: IOAPIC found at 0xfec00000, ID 0, version 32, interrupt base 0, interrupt count 23
+INFO: irq: IOAPIC override: ISA interrupt 0 for GSI 2
+INFO: irq: IOAPIC override: ISA interrupt 5 for GSI 5
+INFO: irq: IOAPIC override: ISA interrupt 9 for GSI 9
+INFO: irq: IOAPIC override: ISA interrupt 10 for GSI 10
+INFO: irq: IOAPIC override: ISA interrupt 11 for GSI 11
+INFO: xAPIC ID: 0, Version: 14, Max LVT: 5
+INFO: TSC frequency: 999847470 Hz
+INFO: timer: Enable APIC periodic mode
+INFO: timer: APIC timer: first 0x3b65, current 0x1811fb, init 0x3d06
+INFO: Booting 1 processors
+INFO: Booting all application processors...
+INFO: Detected ISA extensions: XSAVE | AVX | RDRAND | XAPIC | FSGSBASE
+INFO: xAPIC ID: 1, Version: 14, Max LVT: 5
+INFO: Processor 1 started. Spinning for tasks.
+INFO: All application processors started. The BSP continues to run.
+WARN: iommu: VT-d topology unavailable or unsupported: MissingDmar
+WARN: IOMMU initialization error: NoIommu
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x20,
+    end: 0x21,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa1,
+    end: 0xa2,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x21,
+    end: 0x22,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0xa0,
+    end: 0xa1,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x40,
+    end: 0x41,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x41,
+    end: 0x42,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x42,
+    end: 0x43,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x43,
+    end: 0x44,
+}
+DEBUG: Removing sensitive I/O port range: RawIoPortRange {
+    begin: 0x3f8,
+    end: 0x400,
+}
+INFO: acpi: Collected information AcpiInfo { century_register: Some(50), boot_flags: Some(IaPcBootArchFlags(2)), reset_port_and_val: Some((3321, 15)), pci_ecam_region: Some(PciEcamRegion { base_address: 2952790016, bus_start: 0, bus_end: 255 }) }
+INFO: QEMU hypervisor detected, assuming that the isa-debug-exit device exists
+DEBUG: Try to acquire PIO range: 0xf4..0xf8
+NVIDIA NVport CPU memory self-test passed (not a GPU test)
+NVIDIA RM firmware file service: 0 images acquired/released; GPU initialization not attempted
+OSTD initialized. Preparing components.
+WARN: framebuffer: Framebuffer not found
+DEBUG: Try to acquire security-insensitive MMIO range: 0xb0000000..0xc0000000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff88e0dcf0 on CPU CpuId(
+    1,
+)
+INFO: pci: initializing the PCI bus with bus numbers `0..=255`
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x29c0,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x0,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1234,
+        device_id: 0x1111,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x3,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfd000000,
+                        size: 0x1000000,
+                        prefetchable: true,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf4000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1b36,
+        device_id: 0x10,
+        revision_id: 0x2,
+        prog_if: 0x2,
+        subclass: 0x8,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x2,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf0000,
+                        size: 0x4000,
+                        prefetchable: false,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x40,
+                table_info: 0x2000,
+                pba_info: 0x3000,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1af4,
+        device_id: 0x1042,
+        revision_id: 0x1,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x3,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf5000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfe000000,
+                        size: 0x4000,
+                        prefetchable: true,
+                        address_length: Bits64,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x98,
+                msg_ctrl: 0x2,
+                table_info: 0x1,
+                pba_info: 0x801,
+            },
+        ),
+        vndr: [
+            RawCapabilityVndr {
+                cap_ptr: 0x40,
+                length: 0x10,
+            },
+            RawCapabilityVndr {
+                cap_ptr: 0x50,
+                length: 0x10,
+            },
+            RawCapabilityVndr {
+                cap_ptr: 0x60,
+                length: 0x10,
+            },
+            RawCapabilityVndr {
+                cap_ptr: 0x70,
+                length: 0x14,
+            },
+            RawCapabilityVndr {
+                cap_ptr: 0x84,
+                length: 0x14,
+            },
+        ],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x1af4,
+        device_id: 0x1001,
+        revision_id: 0x0,
+        prog_if: 0x0,
+        subclass: 0x0,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x4,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: false,
+    },
+    bar_manager: BarManager {
+        bars: [
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc000,
+                        size: 0x80,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf6000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: Some(
+            RawCapabilityMsix {
+                cap_ptr: 0x40,
+                msg_ctrl: 0x2,
+                table_info: 0x1,
+                pba_info: 0x801,
+            },
+        ),
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2918,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x1,
+        class: 0x6,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x0,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2922,
+        revision_id: 0x2,
+        prog_if: 0x1,
+        subclass: 0x6,
+        class: 0x1,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x2,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0xc0c0,
+                        size: 0x20,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            Some(
+                Memory(
+                    MemoryBar {
+                        base: 0xfebf7000,
+                        size: 0x1000,
+                        prefetchable: false,
+                        address_length: Bits32,
+                        io_memory: None,
+                    },
+                ),
+            ),
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: pci: found common device: PciCommonDevice {
+    device_id: PciDeviceId {
+        vendor_id: 0x8086,
+        device_id: 0x2930,
+        revision_id: 0x2,
+        prog_if: 0x0,
+        subclass: 0x5,
+        class: 0xc,
+    },
+    location: PciDeviceLocation {
+        bus: 0x0,
+        device: 0x1f,
+        function: 0x3,
+    },
+    header_type: PciHeaderType {
+        device_type: GeneralDevice,
+        has_multi_funcs: true,
+    },
+    bar_manager: BarManager {
+        bars: [
+            None,
+            None,
+            None,
+            None,
+            Some(
+                Io(
+                    IoBar {
+                        base: 0x700,
+                        size: 0x40,
+                        io_ports: None,
+                    },
+                ),
+            ),
+            None,
+        ],
+    },
+    capabilities: RawCapabilities {
+        msix: None,
+        vndr: [],
+    },
+    irq_quarantined: false,
+}
+DEBUG: Try to acquire PIO range: 0x70..0x71
+DEBUG: Try to acquire PIO range: 0x71..0x72
+DEBUG: pci: Register PCI driver: NvmePciDriver {
+    devices: UnsafeCell { .. },
+}
+DEBUG: Try to acquire security-insensitive MMIO range: 0xfebf0000..0xfebf4000 with cache policy: Uncacheable
+DEBUG: Performing inter-processor call to 0xffffffff88e0dcf0 on CPU CpuId(
+    1,
+)
+INFO: nvme: MSI-X enabled with 65 vectors
+INFO: nvme: Controller identified - Serial: , Model: , Firmware: , max I/O=524288 bytes (MDTS=7)
+INFO: nvme: Namespace 1: NSZE=2048, LBA size=512 bytes
+[32m[     0.746][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.746][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }[0m
+[32m[     0.747][0m [93mWARN  [0m: [39mnvidia-platform: [0m[39mNVIDIA PCI diagnostics: no unclaimed NVIDIA display controller; RM/GSP not initialized[0m
+[32m[     0.747][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.748][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }[0m
+[32m[     0.750][0m [34mINFO  [0m: [39muart: [0m[39mRegistered NS16550A as a console[0m
+[32m[     0.751][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.752][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }[0m
+[32m[     0.753][0m [92mDEBUG [0m: [39mpci: [0m[39mRegister PCI driver: VirtioPciDriver {
+    devices: UnsafeCell { .. },
+}[0m
+[32m[     0.754][0m [34mINFO  [0m: [39mvirtio: [0m[39mFound device: Block[0m
+[32m[     0.755][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire security-insensitive MMIO range: 0xfe000000..0xfe004000 with cache policy: Uncacheable[0m
+[32m[     0.757][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e0dcf0 on CPU CpuId(
+    1,
+)[0m
+[32m[     0.759][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire security-insensitive MMIO range: 0xfebf5000..0xfebf6000 with cache policy: Uncacheable[0m
+[32m[     0.761][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e0dcf0 on CPU CpuId(
+    1,
+)[0m
+[32m[     0.763][0m [34mINFO  [0m: [39mvirtio: [0m[39mFound device: Block[0m
+[32m[     0.765][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc000..0xc001[0m
+[32m[     0.766][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc001..0xc002[0m
+[32m[     0.767][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc002..0xc003[0m
+[32m[     0.768][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc003..0xc004[0m
+[32m[     0.769][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc004..0xc005[0m
+[32m[     0.770][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc005..0xc006[0m
+[32m[     0.771][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc006..0xc007[0m
+[32m[     0.772][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc007..0xc008[0m
+[32m[     0.773][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc008..0xc009[0m
+[32m[     0.774][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc009..0xc00a[0m
+[32m[     0.776][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc00a..0xc00b[0m
+[32m[     0.777][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc00b..0xc00c[0m
+[32m[     0.778][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc00c..0xc00d[0m
+[32m[     0.779][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc00d..0xc00e[0m
+[32m[     0.780][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc00e..0xc00f[0m
+[32m[     0.781][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc00f..0xc010[0m
+[32m[     0.782][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc010..0xc011[0m
+[32m[     0.783][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc011..0xc012[0m
+[32m[     0.784][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc012..0xc013[0m
+[32m[     0.785][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc013..0xc014[0m
+[32m[     0.786][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc014..0xc015[0m
+[32m[     0.788][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc015..0xc016[0m
+[32m[     0.789][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc016..0xc017[0m
+[32m[     0.790][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc017..0xc018[0m
+[32m[     0.791][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc018..0xc019[0m
+[32m[     0.792][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc019..0xc01a[0m
+[32m[     0.794][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc01a..0xc01b[0m
+[32m[     0.795][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc01b..0xc01c[0m
+[32m[     0.796][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc01c..0xc01d[0m
+[32m[     0.797][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc01d..0xc01e[0m
+[32m[     0.798][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc01e..0xc01f[0m
+[32m[     0.799][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc01f..0xc020[0m
+[32m[     0.800][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc020..0xc021[0m
+[32m[     0.801][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc021..0xc022[0m
+[32m[     0.802][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc022..0xc023[0m
+[32m[     0.803][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc023..0xc024[0m
+[32m[     0.804][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc024..0xc025[0m
+[32m[     0.806][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc025..0xc026[0m
+[32m[     0.807][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc026..0xc027[0m
+[32m[     0.808][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc027..0xc028[0m
+[32m[     0.809][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc028..0xc029[0m
+[32m[     0.810][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc029..0xc02a[0m
+[32m[     0.811][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc02a..0xc02b[0m
+[32m[     0.812][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc02b..0xc02c[0m
+[32m[     0.813][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc02c..0xc02d[0m
+[32m[     0.814][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc02d..0xc02e[0m
+[32m[     0.815][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc02e..0xc02f[0m
+[32m[     0.816][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc02f..0xc030[0m
+[32m[     0.818][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc030..0xc031[0m
+[32m[     0.819][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc031..0xc032[0m
+[32m[     0.820][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc032..0xc033[0m
+[32m[     0.821][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc033..0xc034[0m
+[32m[     0.822][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc034..0xc035[0m
+[32m[     0.824][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc035..0xc036[0m
+[32m[     0.825][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc036..0xc037[0m
+[32m[     0.826][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc037..0xc038[0m
+[32m[     0.827][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc038..0xc039[0m
+[32m[     0.828][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc039..0xc03a[0m
+[32m[     0.829][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc03a..0xc03b[0m
+[32m[     0.830][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc03b..0xc03c[0m
+[32m[     0.831][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc03c..0xc03d[0m
+[32m[     0.832][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc03d..0xc03e[0m
+[32m[     0.833][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc03e..0xc03f[0m
+[32m[     0.834][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc03f..0xc040[0m
+[32m[     0.836][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc040..0xc041[0m
+[32m[     0.837][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc041..0xc042[0m
+[32m[     0.838][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc042..0xc043[0m
+[32m[     0.839][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc043..0xc044[0m
+[32m[     0.840][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc044..0xc045[0m
+[32m[     0.842][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc045..0xc046[0m
+[32m[     0.843][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc046..0xc047[0m
+[32m[     0.844][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc047..0xc048[0m
+[32m[     0.845][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc048..0xc049[0m
+[32m[     0.846][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc049..0xc04a[0m
+[32m[     0.847][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc04a..0xc04b[0m
+[32m[     0.848][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc04b..0xc04c[0m
+[32m[     0.849][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc04c..0xc04d[0m
+[32m[     0.850][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc04d..0xc04e[0m
+[32m[     0.851][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc04e..0xc04f[0m
+[32m[     0.852][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc04f..0xc050[0m
+[32m[     0.854][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc050..0xc051[0m
+[32m[     0.855][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc051..0xc052[0m
+[32m[     0.856][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc052..0xc053[0m
+[32m[     0.857][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc053..0xc054[0m
+[32m[     0.858][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc054..0xc055[0m
+[32m[     0.860][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc055..0xc056[0m
+[32m[     0.861][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc056..0xc057[0m
+[32m[     0.862][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc057..0xc058[0m
+[32m[     0.863][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc058..0xc059[0m
+[32m[     0.864][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc059..0xc05a[0m
+[32m[     0.865][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc05a..0xc05b[0m
+[32m[     0.866][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc05b..0xc05c[0m
+[32m[     0.867][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc05c..0xc05d[0m
+[32m[     0.868][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc05d..0xc05e[0m
+[32m[     0.869][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc05e..0xc05f[0m
+[32m[     0.870][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc05f..0xc060[0m
+[32m[     0.872][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc060..0xc061[0m
+[32m[     0.873][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc061..0xc062[0m
+[32m[     0.874][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc062..0xc063[0m
+[32m[     0.875][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc063..0xc064[0m
+[32m[     0.876][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc064..0xc065[0m
+[32m[     0.878][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc065..0xc066[0m
+[32m[     0.879][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc066..0xc067[0m
+[32m[     0.880][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc067..0xc068[0m
+[32m[     0.881][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc068..0xc069[0m
+[32m[     0.882][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc069..0xc06a[0m
+[32m[     0.883][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc06a..0xc06b[0m
+[32m[     0.884][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc06b..0xc06c[0m
+[32m[     0.885][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc06c..0xc06d[0m
+[32m[     0.886][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc06d..0xc06e[0m
+[32m[     0.887][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc06e..0xc06f[0m
+[32m[     0.888][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc06f..0xc070[0m
+[32m[     0.890][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc070..0xc071[0m
+[32m[     0.891][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc071..0xc072[0m
+[32m[     0.892][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc072..0xc073[0m
+[32m[     0.893][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc073..0xc074[0m
+[32m[     0.894][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc074..0xc075[0m
+[32m[     0.895][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc075..0xc076[0m
+[32m[     0.897][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc076..0xc077[0m
+[32m[     0.898][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc077..0xc078[0m
+[32m[     0.899][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc078..0xc079[0m
+[32m[     0.900][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc079..0xc07a[0m
+[32m[     0.901][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc07a..0xc07b[0m
+[32m[     0.902][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc07b..0xc07c[0m
+[32m[     0.903][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc07c..0xc07d[0m
+[32m[     0.904][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc07d..0xc07e[0m
+[32m[     0.905][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc07e..0xc07f[0m
+[32m[     0.906][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xc07f..0xc080[0m
+[32m[     0.908][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire security-insensitive MMIO range: 0xfebf6000..0xfebf7000 with cache policy: Uncacheable[0m
+[32m[     0.909][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e0dcf0 on CPU CpuId(
+    1,
+)[0m
+[32m[     0.912][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire security-insensitive MMIO range: 0xfeb00000..0xfeb00200 with cache policy: Uncacheable[0m
+[32m[     0.914][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e0dcf0 on CPU CpuId(
+    1,
+)[0m
+[32m[     0.916][0m [92mDEBUG [0m: [39mvirtio: [0m[39mAbort MMIO detection at 0xfeb00000 because the magic number does not match[0m
+[32m[     0.918][0m [92mDEBUG [0m: [39mvirtio: [0m[39mRegister driver: VirtioMmioDriver {
+    devices: UnsafeCell { .. },
+}[0m
+[32m[     0.941][0m [92mDEBUG [0m: [39mvirtio: [0m[39mvirio_blk_config = VirtioBlockConfig { capacity: 2048, __pad1: [], size_max: 0, __pad2: [], seg_max: 254, __pad3: [], geometry: VirtioBlockGeometry { cylinders: 2, heads: 16, sectors: 63 }, __pad4: [], blk_size: 512, __pad5: [], topology: VirtioBlockTopology { physical_block_exp: 0, alignment_offset: 0, min_io_size: 0, opt_io_size: 0 }, __pad6: [], writeback: 0, __pad7: [], unused0: 0, __pad8: [], num_queues: 0, __pad9: [], max_discard_sectors: 0, __pad10: [], max_discard_seg: 0, __pad11: [], discard_sector_alignment: 0, __pad12: [], max_write_zeroes_sectors: 0, __pad13: [], max_write_zeroes_seg: 0, __pad14: [], write_zeros_may_unmap: 0, __pad15: [], unused1: [0, 0, 0], __pad16: [0, 0, 0, 0] }[0m
+[32m[     0.942][0m [93mWARN  [0m: [39mvirtio: [0m[39mMulti-Queue Block IO Queueing Mechanism is not supported yet; using the first queue[0m
+[32m[     0.943][0m [92mDEBUG [0m: [39mvirtio: [0m[39mqueue_desc start paddr: 602cb000[0m
+[32m[     0.945][0m [92mDEBUG [0m: [39mvirtio: [0m[39mqueue_driver start paddr: 602ca000[0m
+[32m[     0.946][0m [92mDEBUG [0m: [39mvirtio: [0m[39mqueue_device start paddr: 602c9000[0m
+[32m[     0.949][0m [92mDEBUG [0m: [39mvirtio: [0m[39mvirio_blk_config = VirtioBlockConfig { capacity: 2048, __pad1: [], size_max: 0, __pad2: [], seg_max: 254, __pad3: [], geometry: VirtioBlockGeometry { cylinders: 2, heads: 16, sectors: 63 }, __pad4: [], blk_size: 512, __pad5: [], topology: VirtioBlockTopology { physical_block_exp: 0, alignment_offset: 0, min_io_size: 0, opt_io_size: 0 }, __pad6: [], writeback: 0, __pad7: [], unused0: 0, __pad8: [], num_queues: 0, __pad9: [], max_discard_sectors: 0, __pad10: [], max_discard_seg: 0, __pad11: [], discard_sector_alignment: 0, __pad12: [], max_write_zeroes_sectors: 0, __pad13: [], max_write_zeroes_seg: 0, __pad14: [], write_zeros_may_unmap: 0, __pad15: [], unused1: [0, 0, 0], __pad16: [0, 0, 0, 0] }[0m
+[32m[     0.950][0m [93mWARN  [0m: [39mvirtio: [0m[39mMulti-Queue Block IO Queueing Mechanism is not supported yet; using the first queue[0m
+[32m[     0.952][0m [92mDEBUG [0m: [39mvirtio: [0m[39mqueue_desc start paddr: 602e0000[0m
+[32m[     0.953][0m [92mDEBUG [0m: [39mvirtio: [0m[39mqueue_driver start paddr: 602e1000[0m
+[32m[     0.954][0m [92mDEBUG [0m: [39mvirtio: [0m[39mqueue_device start paddr: 602e2000[0m
+[32m[     0.956][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.957][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }[0m
+[32m[     0.958][0m [34mINFO  [0m: [39mi8042: [0m[39mACPI says i8042 controller is present[0m
+[32m[     0.959][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0x60..0x61[0m
+[32m[     0.960][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0x64..0x65[0m
+[32m[     0.961][0m [34mINFO  [0m: [39mi8042: [0m[39mPS/2 keyboard device ID: 0xAB[0m
+[32m[     0.965][0m [34mINFO  [0m: [39minput: [0m[39mregistered device i8042_keyboard[0m
+[32m[     0.966][0m [34mINFO  [0m: [39mi8042: [0m[39mPS/2 mouse device ID: 0x00[0m
+[32m[     0.967][0m [34mINFO  [0m: [39mi8042: [0m[39mPS/2 mouse upgraded device ID: 0x03[0m
+[32m[     0.969][0m [34mINFO  [0m: [39minput: [0m[39mregistered device i8042_mouse[0m
+[32m[     0.970][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     0.971][0m [34mINFO  [0m: [39m[0m[39mAll components initialization in Bootstrap stage completed[0m
+[32m[     0.972][0m [92mDEBUG [0m: [39m[0m[39mTry to acquire PIO range: 0xcf9..0xcfa[0m
+[32m[     0.974][0m [34mINFO  [0m: [39m[0m[39muse randomness generated by hardware[0m
+[32m[     0.975][0m [34mINFO  [0m: [39m[0m[39mFound an input device, name: i8042_keyboard[0m
+[32m[     0.976][0m [34mINFO  [0m: [39m[0m[39mFound an input device, name: i8042_mouse[0m
+[32m[     1.617][0m [34mINFO  [0m: [39m[0m[39m[kernel] LSM module enabled: capability[0m
+[32m[     1.618][0m [34mINFO  [0m: [39m[0m[39m[kernel] LSM module enabled: yama[0m
+[32m[     1.624][0m [34mINFO  [0m: [39m[0m[39mIdle thread for CPU #0 started[0m
+Spawn the first kernel thread
+[32m[     1.636][0m [92mDEBUG [0m: [39m[0m[39mAll component: [ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }, ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }][0m
+[32m[     1.658][0m [92mDEBUG [0m: [39m[0m[39mRemain components: {"/workspace/asterinas-gpui/asterinas/kernel/comps/i8042": ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm": ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/uart": ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core": ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block": ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline": ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console": ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device": ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer": ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input": ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger": ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk": ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network": ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme": ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci": ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq": ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree": ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time": ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio": ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }}[0m
+[32m[     1.658][0m [34mINFO  [0m: [39m[0m[39mIdle thread for CPU #1 started[0m
+[32m[     1.659][0m [34mINFO  [0m: [39m[0m[39mExists components that are not initialized[0m
+[32m[     1.660][0m [92mDEBUG [0m: [39m[0m[39mcomponent infos: [ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }][0m
+[32m[     1.661][0m [34mINFO  [0m: [39m[0m[39mComponents initializing in Kthread stage...[0m
+[32m[     1.662][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }[0m
+[32m[     1.663][0m [34mINFO  [0m: [39mnvidia-platform: [0m[39mNVIDIA NVport runtime: real clock/thread/yield round trip; uptime_ns=2114537087 realtime_us=1792524376114836 nominal_tick_ns=2; RM/GSP not initialized[0m
+[32m[     1.664][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     1.665][0m [34mINFO  [0m: [39m[0m[39mAll components initialization in Kthread stage completed[0m
+[32m[     1.674][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.683][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[kernel] unpacking initramfs.cpio to rootfs ...
+[kernel] initramfs is ready
+[32m[     1.697][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.700][0m [34mINFO  [0m: [39m[0m[39mspawn the virtio-block thread[0m
+[32m[     1.705][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.706][0m [34mINFO  [0m: [39m[0m[39mspawn the virtio-block thread[0m
+[32m[     1.706][0m [34mINFO  [0m: [39m[0m[39mspawn the nvme-block thread[0m
+[32m[     1.709][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(0)..BlockId(1), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(0)..BlockId(1), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..512 }, direction: FromDevice } }] }] }[0m
+[32m[     1.715][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     1.717][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.719][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(1)..BlockId(2), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(1)..BlockId(2), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 512..1024 }, direction: FromDevice } }] }] }[0m
+[32m[     1.725][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     1.727][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(0)..BlockId(1), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(0)..BlockId(1), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..512 }, direction: FromDevice } }] }] }[0m
+[32m[     1.729][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     1.731][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(1)..BlockId(2), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(1)..BlockId(2), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 512..1024 }, direction: FromDevice } }] }] }[0m
+[32m[     1.732][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     1.734][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.736][0m [92mDEBUG [0m: [39mnvme: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(0)..BlockId(1), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(0)..BlockId(1), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..512 }, direction: FromDevice } }] }] }[0m
+[32m[     1.743][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.745][0m [92mDEBUG [0m: [39mnvme: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(1)..BlockId(2), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(1)..BlockId(2), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 512..1024 }, direction: FromDevice } }] }] }[0m
+[32m[     1.780][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.792][0m [34mINFO  [0m: [39minput: [0m[39msuccessfully connected handler class evdev to device i8042_keyboard[0m
+[32m[     1.794][0m [34mINFO  [0m: [39minput: [0m[39msuccessfully connected handler class evdev to device i8042_mouse[0m
+[32m[     1.795][0m [34mINFO  [0m: [39minput: [0m[39mregistered handler class evdev[0m
+[32m[     1.796][0m [34mINFO  [0m: [39m[0m[39mEvdev device support initialized[0m
+[32m[     1.801][0m [92mDEBUG [0m: [39m[0m[39mspawn background poll thread for "lo"[0m
+
+                                  [38;2;87;180;249m.[39m[38;2;89;185;249m.[39m[38;2;91;189;250m.[39m[38;2;93;193;250m.[39m[38;2;94;197;250m.[39m[38;2;96;201;250m.[39m
+                                [38;2;83;172;249m.[39m[38;2;85;176;249m-[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m:[39m
+                               [38;2;82;168;249m.[39m[38;2;83;172;249m=[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m:[39m
+                              [38;2;80;163;249m:[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m:[39m
+                            [38;2;76;155;248m.[39m[38;2;78;159;248m-[39m[38;2;80;163;249m+[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                           [38;2;74;151;248m.[39m[38;2;76;155;248m=[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m=[39m[38;2;87;180;249m=[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                          [38;2;73;147;248m:[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m-[39m[38;2;85;176;249m.[39m[38;2;87;180;249m=[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                        [38;2;69;138;248m.[39m[38;2;71;142;248m=[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m+[39m[38;2;82;168;249m:[39m [38;2;85;176;249m.[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m.[39m
+                       [38;2;67;134;248m.[39m[38;2;69;138;248m+[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m=[39m[38;2;80;163;249m.[39m  [38;2;85;176;249m.[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m-[39m
+                     [38;2;63;125;247m.[39m[38;2;65;130;247m-[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m=[39m[38;2;78;159;248m.[39m   [38;2;85;176;249m:[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m-[39m
+    [38;2;33;54;245m.[39m[38;2;34;58;245m:[39m[38;2;36;62;245m:[39m[38;2;38;66;245m-[39m[38;2;40;70;245m=[39m[38;2;42;75;245m=[39m[38;2;43;79;245m=[39m[38;2;45;83;246m=[39m[38;2;47;87;246m=[39m[38;2;49;92;246m=[39m[38;2;51;96;246m=[39m[38;2;53;100;246m=[39m[38;2;54;104;246m=[39m[38;2;56;108;247m=[39m[38;2;58;113;247m=[39m[38;2;60;117;247m=[39m[38;2;62;121;247m=[39m[38;2;63;125;247m+[39m[38;2;65;130;247m*[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m+[39m[38;2;76;155;248m-[39m[38;2;78;159;248m-[39m[38;2;80;163;249m-[39m[38;2;82;168;249m-[39m[38;2;83;172;249m-[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m-[39m[38;2;98;206;250m:[39m[38;2;100;210;250m:[39m[38;2;102;214;251m:[39m[38;2;103;218;251m:[39m[38;2;105;223;251m:[39m[38;2;107;227;251m:[39m[38;2;109;231;251m:[39m[38;2;111;235;251m.[39m
+        [38;2;40;70;245m.[39m[38;2;42;75;245m.[39m[38;2;43;79;245m:[39m[38;2;45;83;246m-[39m[38;2;47;87;246m*[39m[38;2;49;92;246m#[39m[38;2;51;96;246m#[39m[38;2;53;100;246m#[39m[38;2;54;104;246m#[39m[38;2;56;108;247m#[39m[38;2;58;113;247m#[39m[38;2;60;117;247m#[39m[38;2;62;121;247m#[39m[38;2;63;125;247m#[39m[38;2;65;130;247m*[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m=[39m[38;2;98;206;250m=[39m[38;2;100;210;250m=[39m[38;2;102;214;251m=[39m[38;2;103;218;251m=[39m[38;2;105;223;251m=[39m[38;2;107;227;251m:[39m[38;2;109;231;251m.[39m
+              [38;2;51;96;246m.[39m[38;2;53;100;246m:[39m[38;2;54;104;246m+[39m[38;2;56;108;247m*[39m[38;2;58;113;247m#[39m[38;2;60;117;247m#[39m[38;2;62;121;247m#[39m[38;2;63;125;247m#[39m[38;2;65;130;247m#[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m+[39m[38;2;76;155;248m+[39m[38;2;78;159;248m+[39m[38;2;80;163;249m+[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m=[39m[38;2;96;201;250m=[39m[38;2;98;206;250m=[39m[38;2;100;210;250m=[39m[38;2;102;214;251m=[39m[38;2;103;218;251m-[39m[38;2;105;223;251m.[39m[38;2;107;227;251m.[39m
+                 [38;2;56;108;247m.[39m[38;2;58;113;247m.[39m[38;2;60;117;247m-[39m[38;2;62;121;247m+[39m[38;2;63;125;247m#[39m[38;2;65;130;247m*[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m=[39m[38;2;78;159;248m.[39m[38;2;80;163;249m.[39m  [38;2;85;176;249m-[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m.[39m
+                [38;2;54;104;246m-[39m[38;2;56;108;247m+[39m[38;2;58;113;247m=[39m[38;2;60;117;247m.[39m[38;2;62;121;247m.[39m[38;2;63;125;247m.[39m[38;2;65;130;247m:[39m[38;2;67;134;248m*[39m[38;2;69;138;248m*[39m[38;2;71;142;248m*[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m=[39m[38;2;82;168;249m.[39m[38;2;83;172;249m.[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m.[39m
+              [38;2;51;96;246m.[39m[38;2;53;100;246m+[39m[38;2;54;104;246m*[39m[38;2;56;108;247m+[39m[38;2;58;113;247m+[39m[38;2;60;117;247m+[39m[38;2;62;121;247m=[39m[38;2;63;125;247m.[39m [38;2;67;134;248m.[39m[38;2;69;138;248m.[39m[38;2;71;142;248m=[39m[38;2;73;147;248m*[39m[38;2;74;151;248m*[39m[38;2;76;155;248m*[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m-[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m+[39m[38;2;94;197;250m.[39m
+            [38;2;47;87;246m.[39m[38;2;49;92;246m:[39m[38;2;51;96;246m*[39m[38;2;53;100;246m*[39m[38;2;54;104;246m*[39m[38;2;56;108;247m+[39m[38;2;58;113;247m=[39m[38;2;60;117;247m.[39m[38;2;62;121;247m.[39m     [38;2;73;147;248m.[39m[38;2;74;151;248m-[39m[38;2;76;155;248m+[39m[38;2;78;159;248m*[39m[38;2;80;163;249m*[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m=[39m[38;2;94;197;250m.[39m
+           [38;2;45;83;246m.[39m[38;2;47;87;246m-[39m[38;2;49;92;246m*[39m[38;2;51;96;246m*[39m[38;2;53;100;246m*[39m[38;2;54;104;246m+[39m[38;2;56;108;247m:[39m          [38;2;76;155;248m.[39m[38;2;78;159;248m-[39m[38;2;80;163;249m+[39m[38;2;82;168;249m+[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m=[39m
+          [38;2;43;79;245m.[39m[38;2;45;83;246m*[39m[38;2;47;87;246m#[39m[38;2;49;92;246m*[39m[38;2;51;96;246m=[39m[38;2;53;100;246m.[39m              [38;2;80;163;249m.[39m[38;2;82;168;249m=[39m[38;2;83;172;249m+[39m[38;2;85;176;249m+[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m=[39m
+        [38;2;40;70;245m.[39m[38;2;42;75;245m-[39m[38;2;43;79;245m*[39m[38;2;45;83;246m#[39m[38;2;47;87;246m+[39m[38;2;49;92;246m.[39m[38;2;51;96;246m.[39m                [38;2;82;168;249m.[39m[38;2;83;172;249m:[39m[38;2;85;176;249m=[39m[38;2;87;180;249m+[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m-[39m
+       [38;2;38;66;245m.[39m[38;2;40;70;245m=[39m[38;2;42;75;245m#[39m[38;2;43;79;245m=[39m[38;2;45;83;246m.[39m                     [38;2;85;176;249m.[39m[38;2;87;180;249m=[39m[38;2;89;185;249m+[39m[38;2;91;189;250m+[39m[38;2;93;193;250m-[39m
+      [38;2;36;62;245m:[39m[38;2;38;66;245m*[39m[38;2;40;70;245m=[39m[38;2;42;75;245m.[39m                         [38;2;89;185;249m.[39m[38;2;91;189;250m.[39m[38;2;93;193;250m.[39m
+    [38;2;33;54;245m.[39m[38;2;34;58;245m:[39m[38;2;36;62;245m-[39m[38;2;38;66;245m.[39m [38;2;42;75;245mP[39m[38;2;43;79;245mr[39m[38;2;45;83;246me[39m[38;2;47;87;246ms[39m[38;2;49;92;246me[39m[38;2;51;96;246mn[39m[38;2;53;100;246mt[39m[38;2;54;104;246me[39m[38;2;56;108;247md[39m [38;2;60;117;247mb[39m[38;2;62;121;247my[39m [38;2;65;130;247mt[39m[38;2;67;134;248mh[39m[38;2;69;138;248me[39m [38;2;73;147;248mA[39m[38;2;74;151;248ms[39m[38;2;76;155;248mt[39m[38;2;78;159;248me[39m[38;2;80;163;249mr[39m[38;2;82;168;249mi[39m[38;2;83;172;249mn[39m[38;2;85;176;249ma[39m[38;2;87;180;249ms[39m [38;2;91;189;250md[39m[38;2;93;193;250me[39m[38;2;94;197;250mv[39m[38;2;96;201;250me[39m[38;2;98;206;250ml[39m[38;2;100;210;250mo[39m[38;2;102;214;251mp[39m[38;2;103;218;251me[39m[38;2;105;223;251mr[39m[38;2;107;227;251ms[39m
+    [38;2;33;54;245m.[39m[38;2;34;58;245m.[39m [38;2;38;66;245mR[39m[38;2;40;70;245me[39m[38;2;42;75;245ml[39m[38;2;43;79;245me[39m[38;2;45;83;246ma[39m[38;2;47;87;246ms[39m[38;2;49;92;246me[39m[38;2;51;96;246md[39m [38;2;54;104;246mu[39m[38;2;56;108;247mn[39m[38;2;58;113;247md[39m[38;2;60;117;247me[39m[38;2;62;121;247mr[39m [38;2;65;130;247mM[39m[38;2;67;134;248mo[39m[38;2;69;138;248mz[39m[38;2;71;142;248mi[39m[38;2;73;147;248ml[39m[38;2;74;151;248ml[39m[38;2;76;155;248ma[39m [38;2;80;163;249mP[39m[38;2;82;168;249mu[39m[38;2;83;172;249mb[39m[38;2;85;176;249ml[39m[38;2;87;180;249mi[39m[38;2;89;185;249mc[39m [38;2;93;193;250mL[39m[38;2;94;197;250mi[39m[38;2;96;201;250mc[39m[38;2;98;206;250me[39m[38;2;100;210;250mn[39m[38;2;102;214;251ms[39m[38;2;103;218;251me[39m [38;2;107;227;251mv[39m[38;2;109;231;251m2[39m[38;2;111;235;251m.[39m[38;2;113;240;252m0[39m
+
+[kernel] running /init as the init process
+[32m[     1.821][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x3000, offset = FixedNoReplace(400000), align = 0x1000[0m
+[32m[     1.822][0m [92mDEBUG [0m: [39m[0m[39mELF segment: virt_range = 0x400000..0x40020c, file_range = 0x0..0x20c[0m
+[32m[     1.823][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedReplace(400000), align = 0x1000[0m
+[32m[     1.824][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4194304..4198400[0m
+[32m[     1.825][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4194304..4198400[0m
+[32m[     1.827][0m [92mDEBUG [0m: [39m[0m[39mELF segment: virt_range = 0x401000..0x4016ca, file_range = 0x1000..0x16ca[0m
+[32m[     1.828][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedReplace(401000), align = 0x1000[0m
+[32m[     1.830][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | EXEC | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4198400..4202496[0m
+[32m[     1.832][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | EXEC | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4198400..4202496[0m
+[32m[     1.834][0m [92mDEBUG [0m: [39m[0m[39mELF segment: virt_range = 0x402000..0x40241c, file_range = 0x2000..0x241c[0m
+[32m[     1.836][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedReplace(402000), align = 0x1000[0m
+[32m[     1.837][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4202496..4206592[0m
+[32m[     1.838][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms WRITE, self.range 4202496..4206592[0m
+[32m[     1.840][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x5000, offset = Any, align = 0x1000[0m
+[32m[     1.842][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x800000, offset = FixedNoReplace(7fffff704000), align = 0x1000[0m
+[32m[     1.843][0m [92mDEBUG [0m: [39m[0m[39margv address = 0x7ffffff03ffa[0m
+[32m[     1.848][0m [92mDEBUG [0m: [39m[0m[39mallocate free region, map_size = 0x1000, offset = FixedNoReplace(4b8000), align = 0x1000[0m
+[32m[     1.877][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.878][0m [92mDEBUG [0m: [39m[0m[39mtask entry: rip = 0x4015e0, rsp = 0x7ffffff03f30, rax = 0x0[0m
+[32m[     1.878][0m [92mDEBUG [0m: [39m[0m[39mAll component: [ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }, ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }][0m
+[32m[     1.891][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.904][0m [92mDEBUG [0m: [39m[0m[39mRemain components: {"/workspace/asterinas-gpui/asterinas/kernel/comps/i8042": ComponentInfo { name: "aster-i8042", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/i8042", priority: 4 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform": ComponentInfo { name: "aster-nvidia-platform", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/comps/uart": ComponentInfo { name: "aster-uart", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/uart", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core": ComponentInfo { name: "aster-core", path: "/workspace/asterinas-gpui/asterinas/kernel/core", priority: 3 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block": ComponentInfo { name: "aster-block", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/block", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline": ComponentInfo { name: "aster-cmdline", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console": ComponentInfo { name: "aster-console", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/console", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device": ComponentInfo { name: "aster-device", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/device", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer": ComponentInfo { name: "aster-framebuffer", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input": ComponentInfo { name: "aster-input", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/input", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger": ComponentInfo { name: "aster-logger", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk": ComponentInfo { name: "aster-mlsdisk", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network": ComponentInfo { name: "aster-network", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/network", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme": ComponentInfo { name: "aster-nvme", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme", priority: 1 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci": ComponentInfo { name: "aster-pci", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq": ComponentInfo { name: "aster-softirq", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree": ComponentInfo { name: "aster-systree", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time": ComponentInfo { name: "aster-time", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/time", priority: 0 }, "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio": ComponentInfo { name: "aster-virtio", path: "/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio", priority: 2 }}[0m
+[32m[     1.926][0m [34mINFO  [0m: [39m[0m[39mExists components that are not initialized[0m
+[32m[     1.927][0m [92mDEBUG [0m: [39m[0m[39mcomponent infos: [ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }][0m
+[32m[     1.929][0m [34mINFO  [0m: [39m[0m[39mComponents initializing in Process stage...[0m
+[32m[     1.930][0m [34mINFO  [0m: [39m[0m[39mComponent initializing: ComponentInfo { name: "aster-simpledrm", path: "/workspace/asterinas-gpui/asterinas/kernel/comps/simpledrm", priority: 4 }[0m
+[32m[     1.932][0m [93mWARN  [0m: [39msimpledrm: [0m[39mFailed to init: boot framebuffer is unavailable[0m
+[32m[     1.933][0m [34mINFO  [0m: [39m[0m[39mComponent initialize complete[0m
+[32m[     1.935][0m [34mINFO  [0m: [39m[0m[39mAll components initialization in Process stage completed[0m
+[32m[     1.939][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.953][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.955][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.957][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.959][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.961][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.964][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.966][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.968][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.971][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.973][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.975][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.977][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.979][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.983][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.985][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.987][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.989][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.991][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.994][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     1.996][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     1.999][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.000][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.003][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.005][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.007][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.009][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.012][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.015][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.017][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.019][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.021][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.023][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.026][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.028][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.031][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.034][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.036][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.038][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.041][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.044][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.046][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.050][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.052][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.055][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.057][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.060][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.062][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.064][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.066][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.069][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.071][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.074][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.076][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.078][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.080][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.083][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.085][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.087][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.089][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.092][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.095][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.097][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.098][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.101][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.103][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.106][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.108][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.111][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.113][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.116][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.118][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.120][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.122][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.125][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.126][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.129][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.131][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.134][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.137][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.139][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.141][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.143][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.145][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.147][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.149][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.152][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.154][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.156][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.159][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.161][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.164][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.167][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.169][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.171][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.174][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.176][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.179][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.181][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.185][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.192][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.194][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.196][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.199][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.202][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.204][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.206][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.208][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.210][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.213][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.215][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.217][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.219][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.222][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.224][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.227][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.229][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.232][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.233][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.236][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.238][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.240][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.242][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.244][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.246][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.249][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.251][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.254][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.257][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.259][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.261][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.263][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.266][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.268][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.270][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.272][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.280][0m [34mINFO  [0m: [39m[0m[39mVirtual terminal keyboard handler connected to device: i8042_keyboard[0m
+[32m[     2.282][0m [34mINFO  [0m: [39minput: [0m[39msuccessfully connected handler class vt_keyboard to device i8042_keyboard[0m
+[32m[     2.288][0m [34mINFO  [0m: [39minput: [0m[39mfailed to connect handler class vt_keyboard to device i8042_mouse: IncompatibleDevice[0m
+[32m[     2.290][0m [34mINFO  [0m: [39minput: [0m[39mregistered handler class vt_keyboard[0m
+[32m[     2.292][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.294][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.297][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.299][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.301][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.305][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.307][0m [92mDEBUG [0m: [39m[0m[39mhandle exception: PageFault(
+    RawPageFaultInfo {
+        error_code: WRITE | USER,
+        addr: 0x7ffffff03f28,
+    },
+)[0m
+[32m[     2.311][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | WRITE | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms READ | WRITE, self.range 140737478934528..140737487323136[0m
+[32m[     2.314][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=165][SYS_MOUNT][0m
+[32m[     2.316][0m [92mDEBUG [0m: [39m[0m[39msrc_name_addr = 0x4022c0, dst_name = "/dev", fstype = 0x4022d0, flags = (empty), data_addr = 0x0[0m
+[32m[     2.320][0m [92mDEBUG [0m: [39m[0m[39mhandle exception: PageFault(
+    RawPageFaultInfo {
+        error_code: USER,
+        addr: 0x7ffffff02ef0,
+    },
+)[0m
+[32m[     2.324][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | WRITE | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms READ, self.range 140737478934528..140737487323136[0m
+[32m[     2.327][0m [92mDEBUG [0m: [39m[0m[39mhandle exception: PageFault(
+    RawPageFaultInfo {
+        error_code: PRESENT | WRITE | USER,
+        addr: 0x7ffffff02ef0,
+    },
+)[0m
+[32m[     2.331][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | WRITE | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms READ | WRITE, self.range 140737478934528..140737487323136[0m
+[32m[     2.335][0m [92mDEBUG [0m: [39m[0m[39mhandle exception: PageFault(
+    RawPageFaultInfo {
+        error_code: USER,
+        addr: 0x7ffffff01ef0,
+    },
+)[0m
+[32m[     2.339][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | WRITE | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms READ, self.range 140737478934528..140737487323136[0m
+[32m[     2.342][0m [92mDEBUG [0m: [39m[0m[39mhandle exception: PageFault(
+    RawPageFaultInfo {
+        error_code: PRESENT | WRITE | USER,
+        addr: 0x7ffffff01ef0,
+    },
+)[0m
+[32m[     2.346][0m [92mDEBUG [0m: [39m[0m[39mself.perms READ | WRITE | MAY_READ | MAY_WRITE | MAY_EXEC | ALL_MAY_PERMS, page_fault_info.required_perms READ | WRITE, self.range 140737478934528..140737487323136[0m
+[32m[     2.350][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=2][SYS_OPEN][0m
+[32m[     2.352][0m [92mDEBUG [0m: [39m[0m[39mdirfd = -100, path = "/dev/nvme0n1", flags = 2, mode = 0[0m
+[32m[     2.356][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=0][SYS_READ][0m
+[32m[     2.358][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff01ef0, buf_len = 0x1000[0m
+[32m[     2.361][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.363][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.365][0m [92mDEBUG [0m: [39mnvme: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(0)..BlockId(8), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(0)..BlockId(8), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: FromDevice } }] }] }[0m
+[32m[     2.375][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.377][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=8][SYS_LSEEK][0m
+[32m[     2.380][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, offset = 4096, whence = 0[0m
+[32m[     2.382][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.384][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff02ef0, user_buf_len = 0x1000[0m
+[32m[     2.387][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.389][0m [92mDEBUG [0m: [39mnvme: [0m[39mHandle Request: BioRequest { type_: Write, sid_range: BlockId(8)..BlockId(16), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Write, sid_range: BlockId(8)..BlockId(16), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x62000000..0x63000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: ToDevice } }] }] }[0m
+[32m[     2.398][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.400][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.403][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.404][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.406][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=74][SYS_FSYNC][0m
+[32m[     2.408][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3[0m
+[32m[     2.410][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.412][0m [92mDEBUG [0m: [39mnvme: [0m[39mHandle Request: BioRequest { type_: Flush, sid_range: BlockId(0)..BlockId(0), num_segments: 0, bios: [SubmittedBio { metadata: BioMetadata { type: Flush, sid_range: BlockId(0)..BlockId(0), status: Submit }, sid_offset: 0, segments: [] }] }[0m
+[32m[     2.418][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.419][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=8][SYS_LSEEK][0m
+[32m[     2.421][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, offset = 4096, whence = 0[0m
+[32m[     2.423][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=0][SYS_READ][0m
+[32m[     2.425][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff01ef0, buf_len = 0x1000[0m
+[32m[     2.428][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.430][0m [92mDEBUG [0m: [39mnvme: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(8)..BlockId(16), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(8)..BlockId(16), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: FromDevice } }] }] }[0m
+[32m[     2.438][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.442][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.444][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=3][SYS_CLOSE][0m
+[32m[     2.446][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3[0m
+[32m[     2.447][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.450][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 1, user_buf_ptr = 0x7ffffff01e30, user_buf_len = 0x63[0m
+CONSUMER_IO DEVICE PASS: nvme0n1 (NVMe) verified 4096 fixture bytes + 4096-byte scratch write/read
+[32m[     2.452][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=2][SYS_OPEN][0m
+[32m[     2.454][0m [92mDEBUG [0m: [39m[0m[39mdirfd = -100, path = "/dev/vda", flags = 2, mode = 0[0m
+[32m[     2.458][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=0][SYS_READ][0m
+[32m[     2.460][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff01ef0, buf_len = 0x1000[0m
+[32m[     2.462][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.464][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(0)..BlockId(8), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(0)..BlockId(8), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: FromDevice } }] }] }[0m
+[32m[     2.473][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.473][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.476][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.479][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.481][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=8][SYS_LSEEK][0m
+[32m[     2.484][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, offset = 4096, whence = 0[0m
+[32m[     2.486][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.488][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff02ef0, user_buf_len = 0x1000[0m
+[32m[     2.491][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.492][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Write, sid_range: BlockId(8)..BlockId(16), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Write, sid_range: BlockId(8)..BlockId(16), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x62000000..0x63000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: ToDevice } }] }] }[0m
+[32m[     2.501][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.501][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.503][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.506][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.507][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.509][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=74][SYS_FSYNC][0m
+[32m[     2.511][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3[0m
+[32m[     2.513][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.515][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Flush, sid_range: BlockId(0)..BlockId(0), num_segments: 0, bios: [SubmittedBio { metadata: BioMetadata { type: Flush, sid_range: BlockId(0)..BlockId(0), status: Submit }, sid_offset: 0, segments: [] }] }[0m
+[32m[     2.520][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.521][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.524][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.525][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=8][SYS_LSEEK][0m
+[32m[     2.527][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, offset = 4096, whence = 0[0m
+[32m[     2.530][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=0][SYS_READ][0m
+[32m[     2.532][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff01ef0, buf_len = 0x1000[0m
+[32m[     2.534][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.536][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(8)..BlockId(16), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(8)..BlockId(16), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: FromDevice } }] }] }[0m
+[32m[     2.545][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.545][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.549][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.551][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=3][SYS_CLOSE][0m
+[32m[     2.553][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3[0m
+[32m[     2.555][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.557][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 1, user_buf_ptr = 0x7ffffff01e30, user_buf_len = 0x68[0m
+CONSUMER_IO DEVICE PASS: vda (VirtIO modern) verified 4096 fixture bytes + 4096-byte scratch write/read
+[32m[     2.559][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=2][SYS_OPEN][0m
+[32m[     2.561][0m [92mDEBUG [0m: [39m[0m[39mdirfd = -100, path = "/dev/vdb", flags = 2, mode = 0[0m
+[32m[     2.565][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=0][SYS_READ][0m
+[32m[     2.567][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff01ef0, buf_len = 0x1000[0m
+[32m[     2.570][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.571][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(0)..BlockId(8), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(0)..BlockId(8), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: FromDevice } }] }] }[0m
+[32m[     2.570][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.572][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.573][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.576][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.578][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=8][SYS_LSEEK][0m
+[32m[     2.581][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.583][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, offset = 4096, whence = 0[0m
+[32m[     2.586][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.588][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.590][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.592][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff02ef0, user_buf_len = 0x1000[0m
+[32m[     2.595][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.595][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.596][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Write, sid_range: BlockId(8)..BlockId(16), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Write, sid_range: BlockId(8)..BlockId(16), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x62000000..0x63000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: ToDevice } }] }] }[0m
+[32m[     2.598][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.599][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.602][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.603][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=74][SYS_FSYNC][0m
+[32m[     2.606][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3[0m
+[32m[     2.608][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Flush, sid_range: BlockId(0)..BlockId(0), num_segments: 0, bios: [SubmittedBio { metadata: BioMetadata { type: Flush, sid_range: BlockId(0)..BlockId(0), status: Submit }, sid_offset: 0, segments: [] }] }[0m
+[32m[     2.609][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.608][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.610][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.610][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.613][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.615][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.617][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.618][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=8][SYS_LSEEK][0m
+[32m[     2.621][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, offset = 4096, whence = 0[0m
+[32m[     2.623][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=0][SYS_READ][0m
+[32m[     2.625][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3, user_buf_ptr = 0x7ffffff01ef0, buf_len = 0x1000[0m
+[32m[     2.627][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    0,
+)[0m
+[32m[     2.627][0m [92mDEBUG [0m: [39m[0m[39mSave FPU context[0m
+[32m[     2.628][0m [34mINFO  [0m: [39mvirtio: [0m[39mHandle Request: BioRequest { type_: Read, sid_range: BlockId(8)..BlockId(16), num_segments: 1, bios: [SubmittedBio { metadata: BioMetadata { type: Read, sid_range: BlockId(8)..BlockId(16), status: Submit }, sid_offset: 0, segments: [BioSegment { inner: BioSegmentInner { storage: Slice { inner: Arena(DmaArena { pool: DmaArenaPool { storage: DmaStream { inner: Segment(Segment(0x61000000..0x62000000)), map_daddr: None, is_cache_coherent: false, _phantom: PhantomData<ostd::mm::dma::dma_stream::FromAndToDevice> }, manager: UnsafeCell { .. } }, page_range: 0..1 }), offset: 0..4096 }, direction: FromDevice } }] }] }[0m
+[32m[     2.629][0m [34mINFO  [0m: [39mvirtio: [0m[39mblock device handle IRQ[0m
+[32m[     2.630][0m [92mDEBUG [0m: [39m[0m[39mPerforming inter-processor call to 0xffffffff88e51970 on CPU CpuId(
+    1,
+)[0m
+[32m[     2.633][0m [92mDEBUG [0m: [39m[0m[39mLoad FPU context[0m
+[32m[     2.635][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=3][SYS_CLOSE][0m
+[32m[     2.637][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 3[0m
+[32m[     2.639][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.641][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 1, user_buf_ptr = 0x7ffffff01e30, user_buf_len = 0x68[0m
+CONSUMER_IO DEVICE PASS: vdb (VirtIO legacy) verified 4096 fixture bytes + 4096-byte scratch write/read
+[32m[     2.644][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=1][SYS_WRITE][0m
+[32m[     2.646][0m [92mDEBUG [0m: [39m[0m[39mraw_fd = 1, user_buf_ptr = 0x4021b0, user_buf_len = 0x59[0m
+ASTERINAS_CONSUMER_IO_PASS: NVMe + VirtIO modern + VirtIO legacy real block I/O verified
+[32m[     2.648][0m [34mINFO  [0m: [39m[0m[39m[pid=1][tid=1][id=169][SYS_REBOOT][0m
+[32m[     2.650][0m [92mDEBUG [0m: [39m[0m[39m[sys_reboot]: magic1 = 0xfee1dead, magic2 = 0x28121969, op = 0x4321fedc[0m

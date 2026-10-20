@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 
 use aster_pci::capability::msix::CapabilityMsixData;
-use ostd::irq::IrqLine;
+use ostd::{Error, Result, irq::IrqLine};
 
 pub(super) struct VirtioMsixManager {
     config_msix_vector: u16,
@@ -22,7 +22,8 @@ impl VirtioMsixManager {
         let mut msix_vector_list: Vec<u16> = (0..msix.table_size()).collect();
         for i in msix_vector_list.iter() {
             let irq = IrqLine::alloc().unwrap();
-            msix.set_interrupt_vector(irq, *i);
+            msix.set_interrupt_vector(irq, *i)
+                .expect("fresh MSI-X vector must be programmable");
         }
         let config_msix_vector = msix_vector_list.pop().unwrap();
         let shared_interrupt_vector = msix_vector_list.pop().unwrap();
@@ -67,5 +68,12 @@ impl VirtioMsixManager {
     /// Returns true if MSI-X is enabled.
     pub(super) fn is_enabled(&self) -> bool {
         self.msix.is_enabled()
+    }
+
+    /// Enables a vector after its real callback and device routing are installed.
+    pub(super) fn enable_vector(&mut self, vector: u16) -> Result<()> {
+        self.msix
+            .enable_vector(vector)
+            .map_err(|_| Error::InvalidArgs)
     }
 }

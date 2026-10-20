@@ -1,0 +1,37 @@
+{
+  "passed": false,
+  "qemu_exit": 65,
+  "errors": [
+    "missing verified-I/O marker: CONSUMER_IO DEVICE PASS: nvme0n1 (NVMe)",
+    "missing verified-I/O marker: CONSUMER_IO DEVICE PASS: vda (VirtIO modern)",
+    "missing verified-I/O marker: CONSUMER_IO DEVICE PASS: vdb (VirtIO legacy)",
+    "missing verified-I/O marker: ASTERINAS_CONSUMER_IO_PASS: NVMe + VirtIO modern + VirtIO legacy real block I/O verified",
+    "expected QEMU isa-debug-exit code 33 after successful poweroff, got 65",
+    "kernel panic detected in serial output",
+    "host raw disk did not preserve initial and written scratch bytes: nvme",
+    "host raw disk did not preserve initial and written scratch bytes: virtio-modern",
+    "host raw disk did not preserve initial and written scratch bytes: virtio-legacy"
+  ],
+  "scope": "Full Asterinas kernel; real block reads and writes under QEMU TCG; not GPU/firmware/performance evidence",
+  "hardware_gpu": false,
+  "gpu_firmware_loaded": false,
+  "devices": {
+    "nvme": "/dev/nvme0n1",
+    "virtio_modern": "/dev/vda",
+    "virtio_legacy": "/dev/vdb"
+  },
+  "verified": "4096 known patterned bytes at offset 0 plus 4096-byte scratch write/read at offset 4096 per device",
+  "iso_sha256": "14fc7a91f7b0d08fe025a2a722227942851c423cba3c35101f636463d26d6ec1",
+  "initramfs_sha256": "8c7bd90609e429f0d125545eff44b19121b39ac669bc0cb27a419e0660e1122e",
+  "serial_sha256": "3ac985e972676d76be1a97603b03dc0d6d02a3166595c87555603b2a73be9d40",
+  "host_raw_disk_bytes_verified": {
+    "nvme": false,
+    "virtio-modern": false,
+    "virtio-legacy": false
+  },
+  "disks_sha256_after_guest": {
+    "nvme": "c36028e418b890b6316a21a09aea15ef9356680e90398902c7db1fca1eff689d",
+    "virtio-modern": "44c55ded0eead231c9c5b7f8dd8e2b983b7ca4d43f81389a7bfcae709a25aa51",
+    "virtio-legacy": "0d4c081e29070586783b119ca3cac389db38c2867c280edeebf7dbdcb570da05"
+  }
+}

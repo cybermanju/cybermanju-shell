@@ -1,0 +1,30 @@
+[
+  {
+    "path": "target/osdk/asterinas-osdk-bin",
+    "bytes": 20946944,
+    "sha256": "d772c590781b11bbc99cb4b865b96473107677631433eb16b4b88c1d0db48220",
+    "reused": false,
+    "validation": "existence and hash only; not validated for NixOS boot"
+  },
+  {
+    "path": "target/osdk/asterinas-osdk-bin.elf",
+    "bytes": 21053264,
+    "sha256": "86b853f1d69509e68870bb5c81ae00c37db7f0e8e915ebf0803b0117d5795288",
+    "reused": false,
+    "validation": "existence and hash only; not validated for NixOS boot"
+  },
+  {
+    "path": "target/osdk/asterinas-osdk-bin.elf.compressed",
+    "bytes": 20909896,
+    "sha256": "3a20e7562fb7995545f592d9edd944efd12ae1873092cec5b07b13054b61a6f5",
+    "reused": false,
+    "validation": "existence and hash only; not validated for NixOS boot"
+  },
+  {
+    "path": "target/osdk/asterinas-osdk-bin.iso",
+    "bytes": 26185728,
+    "sha256": "9729adf48e64d966df10f467e587d4b933c8387fdcfcc5e8d0ff159fcea70b6c",
+    "reused": false,
+    "validation": "existence and hash only; not validated for NixOS boot"
+  }
+]

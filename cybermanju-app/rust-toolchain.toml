@@ -1,0 +1,12 @@
+# CyberManju OS — Rust toolchain pin (rust-toolchain.toml).
+# Role: single source of truth for the Rust toolchain + required targets.
+# Exports: channel/targets/components consumed by rustup in CI, GitLab and local dev.
+# Integrates: makes every `rustup target add` step in CI redundant (rustup
+#   auto-installs listed targets) and keeps the rust-cache env hash stable.
+# Contracts: channel is `stable` until a green run reports the exact
+#   `rustc --version`, then pin it here (dependabot has no rust-toolchain
+#   ecosystem — bump manually, ~quarterly, and let CI verify).
+[toolchain]
+channel = "stable"
+targets = ["wasm32-unknown-unknown", "aarch64-linux-android", "x86_64-linux-android"]
+components = ["rustfmt", "clippy"]

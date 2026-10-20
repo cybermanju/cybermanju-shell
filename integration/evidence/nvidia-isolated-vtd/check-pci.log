@@ -1,0 +1,64 @@
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+    Checking aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+error: implementation of an `unsafe` method
+  --> kernel/core/comps/pci/src/dma.rs:75:5
+   |
+75 | /     pub(crate) unsafe fn new(
+76 | |         owner: &'a PciMmioGuard<'_>,
+77 | |         mask: DmaMask,
+78 | |     ) -> Result<Self, DeviceDmaError> {
+...  |
+97 | |         })
+98 | |     }
+   | |_____^
+   |
+note: the lint level is defined here
+  --> kernel/core/comps/pci/src/lib.rs:56:9
+   |
+56 | #![deny(unsafe_code)]
+   |         ^^^^^^^^^^^
+
+error: usage of an `unsafe` block
+  --> kernel/core/comps/pci/src/dma.rs:93:21
+   |
+93 |         let inner = unsafe { IsolatedDmaContext::new(requester, mask)? };
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: usage of an `unsafe` block
+   --> kernel/core/comps/pci/src/lifecycle_tests.rs:266:24
+    |
+266 | ... tiny = unsafe { registers.isolated_dma_context(tiny_mask) }
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: usage of an `unsafe` block
+   --> kernel/core/comps/pci/src/lifecycle_tests.rs:280:27
+    |
+280 |             let context = unsafe { registers.isolated_dma_context(mask) }
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: usage of an `unsafe` block
+   --> kernel/core/comps/pci/src/lifecycle_tests.rs:295:21
+    |
+295 |                     unsafe { registers.isolated_dma_context(mask) },
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: implementation of an `unsafe` method
+   --> kernel/core/comps/pci/src/mmio.rs:126:5
+    |
+126 | /     pub unsafe fn isolated_dma_context(
+127 | |         &self,
+128 | |         mask: ostd::mm::dma::DmaMask,
+129 | |     ) -> Result<crate::dma::PciIsolatedDmaContext<'_>, ostd::mm::dma:...
+...   |
+132 | |         unsafe { crate::dma::PciIsolatedDmaContext::new(self, mask) }
+133 | |     }
+    | |_____^
+
+error: usage of an `unsafe` block
+   --> kernel/core/comps/pci/src/mmio.rs:132:9
+    |
+132 |         unsafe { crate::dma::PciIsolatedDmaContext::new(self, mask) }
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: could not compile `aster-pci` (lib) due to 7 previous errors
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest) --cfg ktest" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" "-p" "aster-pci" failed with status: ExitStatus(unix_wait_status(25856))

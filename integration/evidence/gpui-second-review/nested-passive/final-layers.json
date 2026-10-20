@@ -1,0 +1,14 @@
+[
+  {
+    "namespace": "bar",
+    "output": "winit",
+    "layer": "Top",
+    "keyboard_interactivity": "None"
+  },
+  {
+    "namespace": "dock",
+    "output": "winit",
+    "layer": "Top",
+    "keyboard_interactivity": "None"
+  }
+]

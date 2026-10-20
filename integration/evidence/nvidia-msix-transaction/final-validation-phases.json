@@ -1,0 +1,56 @@
+{
+  "phases": [
+    {
+      "name": "native-suites",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-native-suites.log"
+    },
+    {
+      "name": "test-counts",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-test-counts.log"
+    },
+    {
+      "name": "negative-regressions",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-negative-regressions.log"
+    },
+    {
+      "name": "consumer-io",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-consumer-io.log"
+    },
+    {
+      "name": "full-cpu-boots",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-full-cpu-boots.log"
+    },
+    {
+      "name": "host-graphics",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-host-graphics.log"
+    },
+    {
+      "name": "patch-round-trip",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-patch-round-trip.log"
+    },
+    {
+      "name": "all-patches",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-all-patches.log"
+    },
+    {
+      "name": "workflow-lint",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-workflow-lint.log"
+    },
+    {
+      "name": "diff-check",
+      "exit": 0,
+      "log": "/workspace/asterinas-gpui/evidence/nvidia-msix-transaction/final-diff-check.log"
+    }
+  ],
+  "gpu_acceptance": false,
+  "remote_actions_run": false
+}

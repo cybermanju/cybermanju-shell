@@ -1,0 +1,371 @@
+diff --git a/crates/ui/src/ui.rs b/crates/ui/src/ui.rs
+--- a/crates/ui/src/ui.rs
++++ b/crates/ui/src/ui.rs
+@@ -13,9 +13,9 @@
+ // primitive set. See the module docs.
+ pub use styles::ElevationIndex;
+ pub use theme::{
+-    ActiveTheme, Appearance, Base16Palette, Color, IconSize, Radius, Spacing, StatusColors,
+-    StatusColorsRefinement, StoredTheme, TextSize, Theme, ThemeColors, ThemeColorsRefinement,
+-    ThemeScheme, builtin_schemes,
++    ActiveTheme, Appearance, Base16Palette, Color, IconSize, LayoutDensity, Radius, Spacing,
++    StatusColors, StatusColorsRefinement, StoredTheme, TextSize, Theme, ThemeColors,
++    ThemeColorsRefinement, ThemeScheme, builtin_schemes,
+ };
+ pub use traits::*;
+ 
+diff --git a/crates/ui/src/theme/mod.rs b/crates/ui/src/theme/mod.rs
+--- a/crates/ui/src/theme/mod.rs
++++ b/crates/ui/src/theme/mod.rs
+@@ -6,6 +6,7 @@
+ mod base16;
+ mod color_string;
+ mod colors;
++mod density;
+ #[macro_use]
+ mod refineable;
+ mod refinement;
+@@ -14,6 +15,7 @@
+ 
+ pub use base16::Base16Palette;
+ pub use colors::{Color, StatusColors, ThemeColors};
++pub use density::LayoutDensity;
+ pub use refinement::{StatusColorsRefinement, ThemeColorsRefinement};
+ pub use schemes::{ThemeScheme, builtin_schemes};
+ pub use tokens::{IconSize, Radius, Spacing, TextSize};
+@@ -55,6 +57,8 @@
+     pub overrides: ThemeColorsRefinement,
+     /// Base font size.
+     pub font_size: Pixels,
++    /// Runtime profile overlay, consumed by launcher chrome only. Not persisted.
++    pub density: LayoutDensity,
+ }
+ 
+ impl Global for Theme {}
+@@ -73,6 +77,7 @@
+             palette,
+             overrides: ThemeColorsRefinement::default(),
+             font_size: Self::DEFAULT_FONT_SIZE,
++            density: LayoutDensity::default(),
+         }
+     }
+ 
+@@ -257,6 +262,20 @@
+     }
+ 
+     #[test]
++    fn profile_density_is_runtime_only_and_survives_a_palette_change() {
++        let mut theme = Theme {
++            density: LayoutDensity::Compact,
++            ..Theme::default()
++        };
++        theme.set_palette("Other", Base16Palette::default());
++        assert_eq!(theme.density, LayoutDensity::Compact);
++        let encoded = toml::to_string_pretty(&StoredTheme::from_theme(&theme)).unwrap();
++        assert!(!encoded.contains("density"));
++        let restored: StoredTheme = toml::from_str(&encoded).unwrap();
++        assert_eq!(restored.into_theme().density, LayoutDensity::Comfortable);
++    }
++
++    #[test]
+     fn font_size_is_independent_of_the_palette() {
+         let mut theme = Theme {
+             font_size: px(18.0),
+diff --git a/crates/ui/src/patterns/launcher.rs b/crates/ui/src/patterns/launcher.rs
+--- a/crates/ui/src/patterns/launcher.rs
++++ b/crates/ui/src/patterns/launcher.rs
+@@ -64,6 +64,7 @@
+ 
+ impl RenderOnce for LauncherFrame {
+     fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
++        let density = cx.theme().density;
+         let colors = cx.theme().colors();
+         let (text, muted, disabled) = (colors.text, colors.text_muted, colors.text_disabled);
+         let (background, border, badge_bg) =
+@@ -85,11 +86,11 @@
+             .child(
+                 div()
+                     .w_full()
+-                    .px(Spacing::XLarge.pixels())
+-                    .py(Spacing::Large.pixels())
++                    .px(density.spacing(Spacing::XLarge))
++                    .py(density.spacing(Spacing::Large))
+                     .flex()
+                     .items_center()
+-                    .gap(Spacing::Large.pixels())
++                    .gap(density.spacing(Spacing::Large))
+                     .child(
+                         Icon::new(self.icon)
+                             .size(IconSize::Medium)
+@@ -104,7 +105,7 @@
+                     .when_some(self.badge, |el, badge| {
+                         el.child(
+                             div()
+-                                .px(Spacing::Medium.pixels())
++                                .px(density.spacing(Spacing::Medium))
+                                 .py(px(3.))
+                                 .rounded(Radius::Small.pixels())
+                                 .bg(badge_bg)
+@@ -123,19 +124,19 @@
+                     .flex()
+                     .flex_col()
+                     .overflow_hidden()
+-                    .py(Spacing::XSmall.pixels())
++                    .py(density.spacing(Spacing::XSmall))
+                     .children(self.body),
+             )
+             .when(has_footer, |el| {
+                 el.child(hairline()).child(
+                     div()
+                         .w_full()
+-                        .px(Spacing::XLarge.pixels())
+-                        .py(Spacing::Medium.pixels())
++                        .px(density.spacing(Spacing::XLarge))
++                        .py(density.spacing(Spacing::Medium))
+                         .flex()
+                         .items_center()
+                         .justify_between()
+-                        .gap(Spacing::XLarge.pixels())
++                        .gap(density.spacing(Spacing::XLarge))
+                         .child(
+                             // Hints yield to the actions: clip rather than
+                             // push them off the edge.
+@@ -156,6 +157,7 @@
+ 
+ /// Render `(action, key)` pairs as the footer's right-hand hints - `Open ⏎ Close Esc`.
+ pub fn footer_hints(actions: Vec<(&'static str, &'static str)>, cx: &App) -> AnyElement {
++    let density = cx.theme().density;
+     let colors = cx.theme().colors();
+     let muted = colors.text_muted;
+     let key_bg = colors.element_background;
+@@ -163,7 +165,7 @@
+     div()
+         .flex()
+         .items_center()
+-        .gap(Spacing::XLarge.pixels())
++        .gap(density.spacing(Spacing::XLarge))
+         .text_size(TextSize::Small.rems())
+         .text_color(muted)
+         .children(actions.into_iter().map(|(action, key)| {
+diff --git a/crates/app/src/config/appearance.rs b/crates/app/src/config/appearance.rs
+--- a/crates/app/src/config/appearance.rs
++++ b/crates/app/src/config/appearance.rs
+@@ -230,8 +230,8 @@
+         Ok(profile)
+     }
+ 
+-    /// Project only the supported semantic color palette. Geometry, density,
+-    /// compositor policy and the media-query/system follower are NOT emulated.
++    /// Project semantic colors and launcher spacing density. Typography, bar
++    /// geometry, compositor policy and the system follower are not emulated.
+     pub fn project_theme(&self, current: &Theme) -> Result<Theme> {
+         let (bg, surface, raised, muted, text, built_in_accent) = match self.settings.theme {
+             ThemeId::OsDark => (
+@@ -273,6 +273,10 @@
+             palette,
+         );
+         theme.font_size = current.font_size;
++        theme.density = match self.settings.density {
++            Density::Compact => ui::LayoutDensity::Compact,
++            Density::Comfortable => ui::LayoutDensity::Comfortable,
++        };
+         Ok(theme)
+     }
+ 
+@@ -281,7 +285,6 @@
+             "wallpaper",
+             "shellStyle",
+             "panelDocked",
+-            "density",
+             "glass",
+             "motion",
+             "glow",
+@@ -290,8 +293,9 @@
+             retained.push("followSystem (snapshot theme only)");
+         }
+         format!(
+-            "CyberManju appearance v1: theme={} and accent token projection; retained, NOT applied: {}. Explicit live-file import requires --watch-appearance-profile; no automatic app sync or Asterinas/GPU certification.",
++            "CyberManju appearance v1: theme={} and accent token projection; density={:?} (launcher spacing only; typography/bar/compositor geometry unchanged); retained, NOT applied: {}. Explicit live-file import requires --watch-appearance-profile; no automatic app sync or Asterinas/GPU certification.",
+             self.settings.theme.name(),
++            self.settings.density,
+             retained.join(", ")
+         )
+     }
+@@ -357,6 +361,30 @@
+             global.colors().accent,
+             Base16Palette::from_hex(&["#0000ff"; 16]).unwrap().base0d
+         );
++    }
++
++    #[test]
++    fn density_projects_launcher_spacing_without_scaling_native_typography() {
++        let base = Theme {
++            font_size: gpui::px(19.0),
++            ..Theme::default()
++        };
++        let mut value = fixture();
++        value["settings"]["density"] = json!("compact");
++        let compact_profile = parse(value.clone()).unwrap();
++        let compact = compact_profile.project_theme(&base).unwrap();
++        value["settings"]["density"] = json!("comfortable");
++        let comfortable = parse(value).unwrap().project_theme(&base).unwrap();
++        assert_eq!(compact.density, ui::LayoutDensity::Compact);
++        assert_eq!(comfortable.density, ui::LayoutDensity::Comfortable);
++        assert!(
++            compact.density.spacing(ui::Spacing::Large)
++                < comfortable.density.spacing(ui::Spacing::Large)
++        );
++        assert_eq!(compact.font_size, base.font_size);
++        assert_eq!(comfortable.font_size, base.font_size);
++        assert_eq!(compact.colors().accent, comfortable.colors().accent);
++        assert!(compact_profile.report().contains("launcher spacing only"));
+     }
+ 
+     #[test]
+diff --git a/crates/app/src/config/appearance_live.rs b/crates/app/src/config/appearance_live.rs
+--- a/crates/app/src/config/appearance_live.rs
++++ b/crates/app/src/config/appearance_live.rs
+@@ -198,8 +198,10 @@
+ 
+     #[test]
+     fn native_theme_reload_preserves_imported_colors_but_updates_native_font() {
++        let mut profile = fixture();
++        profile["settings"]["density"] = json!("compact");
+         let overlay = AppearanceOverlay {
+-            profile: parsed(fixture()),
++            profile: parsed(profile),
+         };
+         let before = overlay.project(&Theme::default()).unwrap();
+         let native = Theme {
+@@ -210,6 +212,7 @@
+         assert_eq!(after.colors().accent, before.colors().accent);
+         assert_eq!(after.palette.base00, before.palette.base00);
+         assert_eq!(after.font_size, gpui::px(19.0));
++        assert_eq!(after.density, ui::LayoutDensity::Compact);
+     }
+ 
+     #[tokio::test]
+@@ -226,6 +229,7 @@
+         let replacement = dir.0.join("replacement.json");
+         let mut changed = fixture();
+         changed["settings"]["accent"] = json!("#12ab34");
++        changed["settings"]["density"] = json!("compact");
+         write(&replacement, &changed);
+         fs::rename(&replacement, &path).unwrap();
+         assert!(
+@@ -238,6 +242,7 @@
+             .replace_loaded(AppearanceProfile::load(&path), &base)
+             .unwrap();
+         assert_ne!(accepted.colors().accent, initial.colors().accent);
++        assert_eq!(accepted.density, ui::LayoutDensity::Compact);
+         fs::write(&path, b"{incomplete").unwrap();
+         assert!(
+             tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv())
+@@ -254,7 +259,12 @@
+             overlay.project(&base).unwrap().colors().accent,
+             accepted.colors().accent
+         );
++        assert_eq!(
++            overlay.project(&base).unwrap().density,
++            ui::LayoutDensity::Compact
++        );
+         changed["settings"]["accent"] = json!("#ef0012");
++        changed["settings"]["density"] = json!("comfortable");
+         write(&replacement, &changed);
+         fs::rename(&replacement, &path).unwrap();
+         assert!(
+@@ -267,6 +277,7 @@
+             .replace_loaded(AppearanceProfile::load(&path), &base)
+             .unwrap();
+         assert_ne!(recovered.colors().accent, accepted.colors().accent);
++        assert_eq!(recovered.density, ui::LayoutDensity::Comfortable);
+     }
+ 
+     #[test]
+diff --git a/docs/src/content/docs/developer/cybermanju-appearance.md b/docs/src/content/docs/developer/cybermanju-appearance.md
+--- a/docs/src/content/docs/developer/cybermanju-appearance.md
++++ b/docs/src/content/docs/developer/cybermanju-appearance.md
+@@ -36,7 +36,9 @@
+ 
+ The existing inotify watcher is reused with bounded pending notifications and trailing-edge coalescing so rapid/atomic saves do not lose the final replacement. Export or replace the same file to update it. The app still does not automatically write to that path or communicate with the shell: browser downloads, Tauri/native IPC, authenticated remote synchronization and an OS settings daemon are not provided. There is no automatic path discovery, profile write-back or preference-store migration.
+ 
+-Wallpaper, shell style, panel docking, density, glass, motion and glow are retained in the snapshot and explicitly reported as **not applied**. Live follow-system tracking is also unavailable. Geometry, theme-owned accent variants not currently selected, app keybindings/gestures/locale, and compositor workspace policy are not silently translated into invented native controls.
++Density now applies to semantic padding/gaps in the native `LauncherFrame` query, body and footer. `compact` uses the app's existing `DENSITY_SCALE.unit = 0.9`; `comfortable` uses `1.0`, which preserves the original native spacing when no profile is imported. The runtime Theme carries this choice across live profile updates and native theme reloads. It does not scale typography, icons, bespoke control hit targets, bar width, panel docking or compositor geometry, and it is not added to `theme.toml`. The validation report explicitly says **launcher spacing only**, not whole-desktop density.
++
++Wallpaper, shell style, panel docking, glass, motion and glow are retained in the snapshot and explicitly reported as **not applied**. Density outside the launcher chrome and live follow-system tracking remain unavailable. Geometry, theme-owned accent variants not currently selected, app keybindings/gestures/locale, and compositor workspace policy are not silently translated into invented native controls.
+ 
+ ## Wallpaper and bounded input
+ 
+diff --git a/crates/ui/src/theme/density.rs b/crates/ui/src/theme/density.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/ui/src/theme/density.rs
+@@ -0,0 +1,68 @@
++//! Runtime-only semantic density for explicitly opted-in native chrome.
++//! Typography, icon sizes, borders, hit targets and compositor geometry are not scaled.
++use super::Spacing;
++use gpui::{Pixels, px};
++
++#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
++pub enum LayoutDensity {
++    Compact,
++    #[default]
++    Comfortable,
++}
++
++impl LayoutDensity {
++    /// Matches CyberManju DENSITY_SCALE.unit without importing its browser CSS.
++    pub const fn spacing(self, step: Spacing) -> Pixels {
++        let scale = match self {
++            Self::Compact => 0.9,
++            Self::Comfortable => 1.0,
++        };
++        px(step.value() * scale)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn default_preserves_every_existing_native_spacing_step() {
++        for step in [
++            Spacing::None,
++            Spacing::XXSmall,
++            Spacing::XSmall,
++            Spacing::Small,
++            Spacing::Medium,
++            Spacing::Large,
++            Spacing::XLarge,
++            Spacing::XXLarge,
++            Spacing::XXXLarge,
++        ] {
++            assert_eq!(LayoutDensity::default().spacing(step), step.pixels());
++        }
++    }
++
++    #[test]
++    fn compact_is_bounded_monotonic_and_keeps_zero_spacing_zero() {
++        let steps = [
++            Spacing::None,
++            Spacing::XXSmall,
++            Spacing::XSmall,
++            Spacing::Small,
++            Spacing::Medium,
++            Spacing::Large,
++            Spacing::XLarge,
++            Spacing::XXLarge,
++            Spacing::XXXLarge,
++        ];
++        let mut previous = -1.0_f32;
++        for step in steps {
++            let actual: f32 = LayoutDensity::Compact.spacing(step).into();
++            assert!(actual.is_finite() && actual >= 0.0 && actual <= step.value());
++            assert!(actual > previous);
++            assert!((actual - step.value() * 0.9).abs() < 0.00001);
++            previous = actual;
++        }
++        assert_eq!(LayoutDensity::Compact.spacing(Spacing::None), px(0.0));
++    }
++}

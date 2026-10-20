@@ -1,0 +1,175 @@
+{
+  "completed_utc": "2026-10-20T21:38:13.489225+00:00",
+  "native_reported_passed": 315,
+  "native_explicit_skips": 3,
+  "prior_gpui_rust_passed": 205,
+  "prior_python_passed": 36,
+  "canonical_stack_count": 21,
+  "unexpected_stack_mismatches": [],
+  "whole_gpu_or_app_integration": false,
+  "physical_gpu_acceptance": false,
+  "device_nodes": {
+    "dri": [],
+    "nvidia": [],
+    "kvm": []
+  },
+  "free_workspace_bytes": 1165185024,
+  "older_manifests_are_checkpoint_snapshots": true,
+  "files": [
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/negative-old-activation.log",
+      "bytes": 54728,
+      "sha256": "42f8aca62d83c2de97bbbb47a9c37e5953dc9b8829d2c284f70f4c3e5a7d0fac"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/fixed-targeted-pci.log",
+      "bytes": 54695,
+      "sha256": "4c6899808c8c5b7e7e2b202689e87d9f8a119ed1c50d44b32d72be876a588581"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/negative-old-activation.status",
+      "bytes": 301,
+      "sha256": "f89c1c4f869b5cbae9ef0a288e566dec4078ec09b196f7282b719b437227ab49"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/disk-before.txt",
+      "bytes": 89,
+      "sha256": "68681d632ee7c4498483fc40630ee127e25aab727e3c791e3680cdcae84a1e03"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/full-matrix-run.log",
+      "bytes": 167678,
+      "sha256": "a673042ac96bd74c498f282041cc460464d9b2ccee2ed3db1a39f5dac58e0b8d"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/REPORT.md",
+      "bytes": 3792,
+      "sha256": "a5e63841a05e1b23914d23ff826e9be587fecf912aaf7b1946076b18f292e480"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/patch-repair.log",
+      "bytes": 419,
+      "sha256": "9cc8541e0bfa85d881831c2b05049b4301af2958bd3361096450574e4d75bb0a"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/stack-validation.log",
+      "bytes": 4059,
+      "sha256": "8e04785ba8ab4d20ebd0aadcae097c117ed611d356a481fe9e2bff1e79af85d7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/repair_patch.py",
+      "bytes": 2093,
+      "sha256": "ca6281ddfe48fe43cbea27f2d2d5aaba4bf5dcbb49b9426d958bd1cddad96bbf"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/validate_stack.py",
+      "bytes": 820,
+      "sha256": "1b411f742bebd5c540524f99d4279151f92912b7141b795be26a5fac9095001c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/initial-formatted-preimage.patch",
+      "bytes": 3265,
+      "sha256": "325cdf94e067943a78e436f8e7bb68f6d8ff25c4de74ee4bc99df1e1740431f5"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/patch-preimage-repair.json",
+      "bytes": 419,
+      "sha256": "9cc8541e0bfa85d881831c2b05049b4301af2958bd3361096450574e4d75bb0a"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/record-run.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/test-summary.json",
+      "bytes": 848,
+      "sha256": "4e6c26aee3a3e4cef4fe3d6b63b51167e112ec9e5c07fb67aab1e9df33f1d92b"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/record_run.py",
+      "bytes": 8252,
+      "sha256": "2243db6433fea912400aadd8641aa282ac6e126f2f8d2a966167c949a9fcd428"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/native-suites/native-nvidia-nvport-tests.log",
+      "bytes": 9192,
+      "sha256": "773774b2cf1329e594c25f676c1d3d32241202e325a9bad23cef6486eb542e8c"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/native-suites/native-nvidia-platform-tests.log",
+      "bytes": 10165,
+      "sha256": "9206138a3bf24dada41455fe632fb7d3c8412f4675fafb487b2cd5f41db8f050"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/native-suites/native-pci-tests.log",
+      "bytes": 54605,
+      "sha256": "458cf08402b05d84017215a16f6b5803a9f52df944f2f3f368cc42bc46cd949e"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/native-suites/native-pci-iommu-tests.log",
+      "bytes": 60337,
+      "sha256": "a780cf27eac13edfb99a3ccee3996df85d0b65e8725105417247dec6d8796add"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/native-suites/native-ostd-tests.log",
+      "bytes": 33379,
+      "sha256": "9281e6b9f65c85c8f1d7415d71e5fe1c6650f0138fbbb0ac9244c1a42f78c1e4"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/stack-validation/index-before.txt",
+      "bytes": 289626,
+      "sha256": "cb6a94bd04ab4156fbda5984822f2f3355c1b1ce7fed427595a912d3682951be"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/stack-validation/stack-mismatch-kernel_comps_drm_src_ioctl_gem.rs.diff",
+      "bytes": 341,
+      "sha256": "f39eb643931b05ce632b95f6c68e9e33e26d463d46d72b2b06c77e3d9612fa1e"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/native-retired-2130/stack-validation/full-stack-validation.json",
+      "bytes": 4059,
+      "sha256": "8e04785ba8ab4d20ebd0aadcae097c117ed611d356a481fe9e2bff1e79af85d7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/PR_NOTES.md",
+      "bytes": 131545,
+      "sha256": "6b6049a920489eea6f3e0ce2e0d853775e3c5d97c202b080eb9a4d9bee52afd3"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-msix-retired-activation.patch",
+      "bytes": 3774,
+      "sha256": "12843ef3d57c61872b06d1ae7967a48edc33ecf2a2f6edd29cf984de97ade3dd"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/local-prs/asterinas-nvidia-postirq-drain.patch",
+      "bytes": 6012,
+      "sha256": "a69fc5b046855acc80def80e660b35fb10a6167aa6cb5752e7c6ac24259cb09f"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/gpui-cybermanju-launcher-density.patch",
+      "bytes": 16091,
+      "sha256": "71eb7f5e396197c131e84b30b3977abaf72d898dab4d8318eaeaee494bf3cae7"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/evidence/appearance-density-2121/test-summary.json",
+      "bytes": 665,
+      "sha256": "7244b08d7ab28c80b78bbf3017a602fd091e92ea8f26326059e61ab987844fe4"
+    },
+    {
+      "path": "/workspace/asterinas-gpui/gpui-shell/crates/ui/src/theme/density.rs",
+      "bytes": 1994,
+      "sha256": "a25658a06120ee4bf92a39e3392482eb468f48264f1c973fe69e05bef612cdcb"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/docs/ASTERINAS-PERSONALIZATION-BRIDGE.md",
+      "bytes": 9819,
+      "sha256": "1992ac3d321c0569746f57f0e59fe0780e742917fa52b22c4fa644aadbf8f84b"
+    },
+    {
+      "path": "/workspace/cybermanju-os/cybermanju.github.io/worklog.md",
+      "bytes": 294846,
+      "sha256": "0a6cbd44ff3f73b74c837cb9913e1d7e301e1d81d0bbacf9b2c1421b1c906e01"
+    }
+  ]
+}

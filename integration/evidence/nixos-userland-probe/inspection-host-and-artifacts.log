@@ -1,0 +1,446 @@
+[32m/workspace/asterinas-gpui/asterinas$ [0mdate -u +%FT%TZ; df -B1 /workspace; stat -f -c 'block_size=%S available_blocks=%a total_blocks=%b' /workspace; git rev-parse HEAD; git diff --stat; git status --short --untracked-files=all | wc -l; test -e target/nixos/asterinas.img; printf 'expected_image_exists_status=%s\n' "$?"; find target -maxdepth 4 -type f \( -name '*.img' -o -name '*.qcow2' -o -name '*.iso' \) -printf '%p %s bytes\n'; nix --version; qemu-system-x86_64 --version | head -1; make --version | head -1; command -v docker || true; test -c /dev/kvm; printf 'kvm_device_exists_status=%s\n' "$?"; ls -l /dev/loop-control /dev/loop0 2>/dev/null || true; sed -n '1,240p' tools/qemu_args.sh; cat test/nixos/tests/hello/src/main.rs; cat distro/etc_nixos/configuration.nix; cat rust-toolchain.toml; ls -lh target/osdk; ls -la /workspace/asterinas-gpui/evidence/nixos-userland-probe 2>/dev/null || true; find /workspace -maxdepth 3 -name AGENTS.md -not -path '/workspace/cybermanju-os/*' -print
+2026-10-20T19:47:20Z
+Filesystem       1B-blocks        Used  Available Use% Mounted on
+/dev/root      75946782720 70248062976 5681942528  93% /
+block_size=4096 available_blocks=1387193 total_blocks=18541695
+00a4842d976db6723b8224be2e57ac8105f13ee2
+ Cargo.lock                                         |  21 [32m++
+[m Cargo.toml                                         |   5 [32m+
+[m Components.toml                                    |   1 [32m+
+[m kernel/Cargo.toml                                  |   5 [32m+
+[m kernel/comps/drm/src/ioctl/gem.rs                  |  98 [32m++++++[m[31m--
+[m kernel/comps/simpledrm/src/lib.rs                  |  57 [32m+++[m[31m--
+[m kernel/core/comps/nvme/src/device/block_device.rs  |  19 [32m+[m[31m-
+[m kernel/core/comps/nvme/src/msix.rs                 |  11 [32m+[m[31m-
+[m .../core/comps/nvme/src/transport/pci/transport.rs |   4 [32m+
+[m kernel/core/comps/pci/src/bus.rs                   |  91 [32m+++++++[m[31m-
+[m kernel/core/comps/pci/src/capability/mod.rs        |  83 [32m+++++[m[31m--
+[m kernel/core/comps/pci/src/capability/msix.rs       | 215 [32m+++++++++++++[m[31m-----
+[m kernel/core/comps/pci/src/cfg_space.rs             |  78 [32m+++++[m[31m--
+[m kernel/core/comps/pci/src/common_device.rs         |  44 [32m+++[m[31m-
+[m kernel/core/comps/pci/src/lib.rs                   |  13 [32m++
+[m .../comps/virtio/src/transport/pci/capability.rs   |   2 [32m+[m[31m-
+[m .../core/comps/virtio/src/transport/pci/device.rs  |  12 [32m+[m[31m-
+[m .../core/comps/virtio/src/transport/pci/legacy.rs  |  10 [32m+
+[m kernel/core/comps/virtio/src/transport/pci/msix.rs |  12 [32m+[m[31m-
+[m kernel/src/lib.rs                                  |  17 [32m++
+[m ostd/src/arch/x86/boot/multiboot2/mod.rs           |  32 [32m++[m[31m-
+[m .../arch/x86/iommu/dma_remapping/context_table.rs  |  35 [32m+++
+[m ostd/src/arch/x86/iommu/dma_remapping/mod.rs       |   2 [32m+
+[m ostd/src/arch/x86/iommu/fault.rs                   |  30 [32m+[m[31m--
+[m ostd/src/arch/x86/iommu/invalidate/queue.rs        |  20 [32m+[m[31m-
+[m ostd/src/arch/x86/iommu/mod.rs                     |  16 [32m+[m[31m-
+[m ostd/src/arch/x86/iommu/registers/capability.rs    |   4 [32m+[m[31m-
+[m ostd/src/arch/x86/iommu/registers/mod.rs           | 175 [32m+++++++++++[m[31m---
+[m ostd/src/arch/x86/kernel/acpi/mod.rs               |   2 [32m+
+[m ostd/src/io/io_mem/allocator.rs                    |  87 [32m++++[m[31m---
+[m ostd/src/io/io_mem/mod.rs                          | 103 [32m+++++++[m[31m--
+[m ostd/src/io/io_port/mod.rs                         |   2 [32m+
+[m ostd/src/io/mod.rs                                 |  27 [32m+++
+[m ostd/src/irq/mod.rs                                |   7 [32m+
+[m ostd/src/irq/top_half.rs                           | 251 [32m+++++++++++++++++++[m[31m--
+[m ostd/src/mm/dma/mod.rs                             |   6 [32m+
+[m ostd/src/task/atomic_mode.rs                       |  46 [32m++++
+[m 37 files changed, 1388 insertions(+), 255 deletions(-)
+99
+expected_image_exists_status=1
+target/osdk/asterinas/asterinas-osdk-bin.iso 26185728 bytes
+target/osdk/asterinas-osdk-bin.iso 26185728 bytes
+target/osdk/ostd-nvidia-nvport/ostd-nvidia-nvport-osdk-bin.iso 11638784 bytes
+target/osdk/ostd-nvidia-nvport-osdk-bin.iso 11638784 bytes
+target/osdk/ostd/ostd-osdk-bin.iso 11405312 bytes
+target/osdk/ostd-osdk-bin.iso 11405312 bytes
+target/osdk/aster-nvidia-platform/aster-nvidia-platform-osdk-bin.iso 12490752 by
+tes
+target/osdk/aster-nvidia-platform-osdk-bin.iso 12490752 bytes
+target/osdk/aster-pci/aster-pci-osdk-bin.iso 12056576 bytes
+target/osdk/aster-pci-osdk-bin.iso 12056576 bytes
+[0mnix (Nix) 2.18.1
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+GNU Make 4.3
+kvm_device_exists_status=1
+crw------- 1 root root 10, 237 Oct  9 11:39 /dev/loop-control
+brw------- 1 root root  7,   0 Oct  9 11:39 /dev/loop0
+#!/bin/bash
+# SPDX-License-Identifier: MPL-2.0
+# This script is used to generate QEMU arguments for OSDK.
+# Usage: `qemu_args.sh [scheme]`
+#  - scheme: "normal", "test", "microvm" or "iommu";
+# Other arguments are configured via environmental variables:
+#  - OVMF: "on" or "off";
+#  - OVMF_DIR: directory containing OVMF.fd, OVMF_VARS.fd and microvm/MICROVM.fd
+;
+#  - BOOT_METHOD: "vmm-direct", "grub-rescue-iso" or "grub-qcow2";
+#  - BOOT_PROTOCOL: "multiboot", "multiboot2", "pvh", "linux-legacy32", "linux-e
+fi-pe64" or "linux-efi-handover64";
+#  - NETDEV: "user", "tap" or "none" ("none" is not supported by microvm);
+#  - QEMU_DISPLAY: QEMU display backend, default is "vnc=0.0.0.0:$VNC_PORT", or 
+"none" to disable it;
+#  - VHOST: "off" or "on";
+#  - VSOCK: "off" or "on";
+#  - VIRTIOFS: "off" or "on";
+#  - VIRTIOFS_WORK_DIR: work directory used by the virtio-fs daemons;
+#  - VIRTIOFS_TAG: mount tag for virtio-fs device;
+#  - VIRTIOFS_SCRATCH: "off" or "on", whether to attach a scratch virtio-fs devi
+ce;
+#  - VIRTIOFS_SCRATCH_TAG: mount tag for the scratch virtio-fs device;
+#  - INITRAMFS: "on" or "off"; when "off", attach `rootfs.img` as an extra block
+ device.
+#  - CONSOLE: "hvc0" to enable virtio console;
+#  - SMP: number of CPUs;
+#  - MEM: amount of memory, e.g. "8G";
+#  - VNC_PORT: VNC display number, default is "42" (TCP port 5942),
+#    ignored when QEMU_DISPLAY is set;
+#  - XFSTESTS_NEEDS_BLOCK_DEVICES: "true" or "false", whether to attach
+#    xfstests images (xfstests_test.img and xfstests_scratch.img) to the VM.
+OVMF=${OVMF:-"on"}
+# Directory holding OVMF.fd, OVMF_VARS.fd and microvm/MICROVM.fd. Defaults to th
+e
+# Docker image's path; the Nix dev shell exports this to the Nix store instead.
+OVMF_DIR=${OVMF_DIR:-/root/ovmf/release}
+VHOST=${VHOST:-"off"}
+VSOCK=${VSOCK:-"off"}
+VIRTIOFS=${VIRTIOFS:-"off"}
+VIRTIOFS_SCRATCH=${VIRTIOFS_SCRATCH:-"off"}
+NETDEV=${NETDEV:-"user"}
+QEMU_DISPLAY=${QEMU_DISPLAY:-"vnc=0.0.0.0:${VNC_PORT:-42}"}
+CONSOLE=${CONSOLE:-"hvc0"}
+XFSTESTS_NEEDS_BLOCK_DEVICES=${XFSTESTS_NEEDS_BLOCK_DEVICES:-false}
+if [ "$XFSTESTS_NEEDS_BLOCK_DEVICES" != "true" ] && \
+   [ "$XFSTESTS_NEEDS_BLOCK_DEVICES" != "false" ]; then
+    echo "Invalid XFSTESTS_NEEDS_BLOCK_DEVICES=${XFSTESTS_NEEDS_BLOCK_DEVICES}" 
+1>&2
+    exit 1
+fi
+# Draw all host ports from a single `shuf` invocation,
+# so that none of them will conflict with others.
+mapfile -t RAND_PORTS < <(shuf -i 1024-65535 -n 7)
+SSH_RAND_PORT=${SSH_PORT:-${RAND_PORTS[0]}}
+NGINX_RAND_PORT=${NGINX_PORT:-${RAND_PORTS[1]}}
+REDIS_RAND_PORT=${REDIS_PORT:-${RAND_PORTS[2]}}
+IPERF_RAND_PORT=${IPERF_PORT:-${RAND_PORTS[3]}}
+LMBENCH_TCP_LAT_RAND_PORT=${LMBENCH_TCP_LAT_PORT:-${RAND_PORTS[4]}}
+LMBENCH_TCP_BW_RAND_PORT=${LMBENCH_TCP_BW_PORT:-${RAND_PORTS[5]}}
+MEMCACHED_RAND_PORT=${MEMCACHED_PORT:-${RAND_PORTS[6]}}
+# Optional QEMU arguments. Opt in them manually if needed.
+# QEMU_OPT_ARG_DUMP_PACKETS="-object filter-dump,id=filter0,netdev=net01,file=vi
+rtio-net.pcap"
+if [ "$NETDEV" = "user" ]; then
+    echo "[$1] Forwarded QEMU guest port: $SSH_RAND_PORT->22; $NGINX_RAND_PORT->
+8080 $REDIS_RAND_PORT->6379 $IPERF_RAND_PORT->5201 $LMBENCH_TCP_LAT_RAND_PORT->3
+1234 $LMBENCH_TCP_BW_RAND_PORT->31236 $MEMCACHED_RAND_PORT->11211" 1>&2
+    NETDEV_ARGS="-netdev user,id=net01,hostfwd=tcp::$SSH_RAND_PORT-:22,hostfwd=t
+cp::$NGINX_RAND_PORT-:8080,hostfwd=tcp::$REDIS_RAND_PORT-:6379,hostfwd=tcp::$IPE
+RF_RAND_PORT-:5201,hostfwd=tcp::$LMBENCH_TCP_LAT_RAND_PORT-:31234,hostfwd=tcp::$
+LMBENCH_TCP_BW_RAND_PORT-:31236,hostfwd=tcp::$MEMCACHED_RAND_PORT-:11211"
+elif [ "$NETDEV" = "tap" ]; then
+    THIS_SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+    QEMU_IFUP_SCRIPT_PATH=$THIS_SCRIPT_DIR/net/qemu-ifup.sh
+    QEMU_IFDOWN_SCRIPT_PATH=$THIS_SCRIPT_DIR/net/qemu-ifdown.sh
+    NETDEV_ARGS="-netdev tap,id=net01,script=$QEMU_IFUP_SCRIPT_PATH,downscript=$
+QEMU_IFDOWN_SCRIPT_PATH,vhost=$VHOST"
+elif [ "$NETDEV" = "none" ]; then
+    NETDEV_ARGS="-nic none"
+else
+    echo "Invalid netdev" 1>&2
+    NETDEV_ARGS="-nic none"
+fi
+VIRTIO_NET_FEATURES=",csum=off,ctrl_guest_offloads=off,ctrl_mac_addr=off,ctrl_rx
+_extra=off,ctrl_rx=off,ctrl_vlan=off,ctrl_vq=off,event_idx=off,guest_announce=of
+f,guest_csum=off,guest_ecn=off,guest_tso4=off,guest_tso6=off,guest_ufo=off,guest
+_uso4=off,guest_uso6=off,host_ecn=off,host_tso4=off,host_tso6=off,host_ufo=off,h
+ost_uso=off,indirect_desc=off,mrg_rxbuf=off,queue_reset=off"
+if [ "$CONSOLE" = "hvc0" ]; then
+    # Kernel logs are printed to all consoles. Redirect serial output to a file 
+to avoid duplicate logs.
+    CONSOLE_ARGS="-device virtconsole,chardev=mux -serial file:qemu-serial.log"
+else
+    CONSOLE_ARGS="-serial chardev:mux"
+fi
+if [ "$INITRAMFS" = "off" ]; then
+    ROOTFS_DRIVE_ARGS="-drive if=none,format=raw,id=rootfs,file=./test/initramfs
+/build/rootfs.img"
+fi
+if [ "${XFSTESTS_FS_TYPE:-}" = "virtiofs" ]; then
+    VIRTIOFS_TAG=${XFSTESTS_TEST_DEV:-aster-virtiofs}
+    VIRTIOFS_SCRATCH_TAG=${XFSTESTS_SCRATCH_DEV:-aster-virtiofs-scratch}
+else
+    VIRTIOFS_TAG=${VIRTIOFS_TAG:-"aster-virtiofs"}
+    VIRTIOFS_SCRATCH_TAG=${VIRTIOFS_SCRATCH_TAG:-"aster-virtiofs-scratch"}
+fi
+if [ "$VIRTIOFS_SCRATCH" = "on" ] && [ "$VIRTIOFS" != "on" ]; then
+    echo "VIRTIOFS_SCRATCH=on requires VIRTIOFS=on" 1>&2
+    exit 1
+fi
+if [ "$VIRTIOFS" = "on" ] && [ -z "${VIRTIOFS_WORK_DIR:-}" ]; then
+    echo "VIRTIOFS_WORK_DIR must be set when VIRTIOFS=on" 1>&2
+    exit 1
+fi
+# These paths must match the work directories passed to tools/run_virtiofsd.sh.
+VIRTIOFS_SOCKET="$VIRTIOFS_WORK_DIR/vfs.sock"
+VIRTIOFS_SCRATCH_SOCKET="$VIRTIOFS_WORK_DIR/scratch/vfs.sock"
+if [ "$1" = "riscv" ]; then
+    # NOTE: The initramfs assumes that ext2.img, exfat.img, and ltp_dev.img appe
+ar as
+    # `/dev/vda`, `/dev/vdb`, and `/dev/vdc`, respectively. RISC-V virtio-mmio
+    # block devices are discovered in reverse command-line order, so list them
+    # in the reverse of the desired device-node order.
+    # When booting without initramfs, `rootfs.img` is placed before these device
+s
+    # so that it is discovered after them as `/dev/vdd`.
+    # TODO: Once UUID-based mounting is implemented, this strict ordering will n
+o longer be required.
+    if [ "$INITRAMFS" = "off" ]; then
+        ROOTFS_RISCV_DEVICE_ARGS="-device virtio-blk-device,drive=rootfs"
+    fi
+    QEMU_ARGS="\
+        -cpu rv64,svpbmt=true,zkr=true \
+        -machine virt \
+        -m ${MEM:-8G} \
+        -smp ${SMP:-1} \
+        --no-reboot \
+        -nographic \
+        -display none \
+        -monitor chardev:mux \
+        -chardev stdio,id=mux,mux=on,signal=off,logfile=qemu.log \
+        $ROOTFS_DRIVE_ARGS \
+        -drive if=none,format=raw,id=x0,file=./test/initramfs/build/ext2.img \
+        -drive if=none,format=raw,id=x1,file=./test/initramfs/build/exfat.img \
+        -drive if=none,format=raw,id=x2,file=./test/initramfs/build/ltp_dev.img 
+\
+        $ROOTFS_RISCV_DEVICE_ARGS \
+        -device virtio-blk-device,drive=x2 \
+        -device virtio-blk-device,drive=x1 \
+        -device virtio-blk-device,drive=x0 \
+        -device virtio-keyboard-device \
+        -device virtio-serial-device \
+        $CONSOLE_ARGS \
+    "
+    echo $QEMU_ARGS
+    exit 0
+fi
+if [ "$1" = "aarch64" ]; then
+    # QEMU in KVM mode on a native aarch64 host only accepts host-compatible
+    # CPU models (e.g. `host` or `max`).
+    if [ "${ENABLE_KVM:-1}" = "1" ] && [ -e /dev/kvm ] && [ "$(uname -m)" = "aar
+ch64" ]; then
+        CPU_MODEL=host
+    else
+        CPU_MODEL=cortex-a72
+    fi
+    QEMU_ARGS="\
+        -cpu ${CPU_MODEL} \
+        -machine virt,gic-version=3 \
+        -m ${MEM:-8G} \
+        -smp ${SMP:-1} \
+        --no-reboot \
+        -nographic \
+        -display none \
+        -monitor chardev:mux \
+        -chardev stdio,id=mux,mux=on,signal=off,logfile=qemu.log \
+        -drive if=none,format=raw,id=x0,file=./test/initramfs/build/ext2.img \
+        -drive if=none,format=raw,id=x1,file=./test/initramfs/build/exfat.img \
+        -drive if=none,format=raw,id=x2,file=./test/initramfs/build/ltp_dev.img 
+\
+        -device virtio-blk-device,drive=x2 \
+        -device virtio-blk-device,drive=x1 \
+        -device virtio-blk-device,drive=x0 \
+        -device virtio-keyboard-device \
+        -device virtio-serial-device \
+        $CONSOLE_ARGS \
+    "
+    echo $QEMU_ARGS
+    exit 0
+fi
+if [ "$1" = "tdx" ]; then
+    TDX_OBJECT='{ "qom-type": "tdx-guest", "id": "tdx0", "sept-ve-disable": true
+, "quote-generation-socket": { "type": "vsock", "cid": "1", "port": "4050" } }'
+    if [ "$INITRAMFS" = "off" ]; then
+        ROOTFS_TDX_DEVICE_ARGS="-device virtio-blk-pci,bus=pcie.0,addr=0xb,drive
+=rootfs,serial=vrootfs,disable-legacy=on,disable-modern=off,queue-size=64,num-qu
+eues=1,request-merging=off,backend_defaults=off,discard=off,write-zeroes=off,eve
+nt_idx=off,indirect_desc=off,queue_reset=off"
+    fi
+    QEMU_ARGS="\
+        -m ${MEM:-8G} \
+        -smp ${SMP:-1} \
+        -vga none \
+        -nographic \
+        -monitor pty \
+        -nodefaults \
+        -bios ${OVMF_DIR}/OVMF.fd \
+        -cpu host,-kvm-steal-time,pmu=off \
+        -machine q35,kernel-irqchip=split,confidential-guest-support=tdx0 \
+        -object '$TDX_OBJECT' \
+        -drive if=none,format=raw,id=x0,file=./test/initramfs/build/ext2.img \
+        -drive if=none,format=raw,id=x1,file=./test/initramfs/build/exfat.img \
+        -drive if=none,format=raw,id=x2,file=./test/initramfs/build/ltp_dev.img 
+\
+        $ROOTFS_DRIVE_ARGS \
+        -device virtio-blk-pci,bus=pcie.0,addr=0x6,drive=x0,serial=vext2,disable
+-legacy=on,disable-modern=off,queue-size=64,num-queues=1,request-merging=off,bac
+kend_defaults=off,discard=off,write-zeroes=off,event_idx=off,indirect_desc=off,q
+ueue_reset=off \
+        -device virtio-blk-pci,bus=pcie.0,addr=0x7,drive=x1,serial=vexfat,disabl
+e-legacy=on,disable-modern=off,queue-size=64,num-queues=1,request-merging=off,ba
+ckend_defaults=off,discard=off,write-zeroes=off,event_idx=off,indirect_desc=off,
+queue_reset=off \
+        -device virtio-blk-pci,bus=pcie.0,addr=0x8,drive=x2,serial=vltpdev,disab
+le-legacy=on,disable-modern=off,queue-size=64,num-queues=1,request-merging=off,b
+ackend_defaults=off,discard=off,write-zeroes=off,event_idx=off,indirect_desc=off
+,queue_reset=off \
+        $ROOTFS_TDX_DEVICE_ARGS \
+        -device virtio-net-pci,netdev=net01,disable-legacy=on,disable-modern=off
+$VIRTIO_NET_FEATURES \
+        -device virtio-keyboard-pci,disable-legacy=on,disable-modern=off \
+        $NETDEV_ARGS \
+        $QEMU_OPT_ARG_DUMP_PACKETS \
+        -chardev stdio,id=mux,mux=on,logfile=qemu.log \
+        -device virtio-serial,romfile= \
+        $CONSOLE_ARGS \
+        -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
+        -monitor chardev:mux \
+        -d guest_errors \
+    "
+    echo $QEMU_ARGS
+    exit 0
+fi
+COMMON_QEMU_ARGS="\
+    -cpu Icelake-Server,+x2apic,+vmx \
+    -smp ${SMP:-1} \
+    -m ${MEM:-8G} \
+    --no-reboot \
+    -nographic \
+    -display $QEMU_DISPLAY \
+    -monitor chardev:mux \
+    -chardev stdio,id=mux,mux=on,signal=off,logfile=qemu.log \
+    $NETDEV_ARGS \
+    $QEMU_OPT_ARG_DUMP_PACKETS \
+    -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
+    -drive if=none,format=raw,id=x0,file=./test/initramfs/build/ext2.img \
+    -drive if=none,format=raw,id=x1,file=./test/initramfs/build/exfat.img \
+    -drive if=none,format=raw,id=x2,file=./test/initramfs/build/ltp_dev.img \
+    $ROOTFS_DRIVE_ARGS \
+"
+// SPDX-License-Identifier: MPL-2.0
+//! The test suite for hello-asterinas on Asterinas NixOS.
+use nixos_test_framework::*;
+nixos_test_main!();
+#[nixos_test]
+fn hello(nixos_shell: &mut Session) -> Result<(), Error> {
+    nixos_shell.run_cmd_and_expect("hello-asterinas", "Hello Asterinas!")?;
+    Ok(())
+}
+# Edit this configuration file to define what should be installed on
+# your system. Help is available in the configuration.nix(5) man page, on
+# https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
+# The content of this file largely mirrors or aligns with the output
+# generated by `nixos-generate-config`.
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+{
+  # Do not change these imports, which describe system-wide settings for AsterNi
+xOS.
+  imports = [ ./aster_configuration.nix ];
+  networking.hostName = "asterinas"; # Define your hostname.
+  networking.resolvconf.enable = false;
+  # The DNS server.
+  environment.etc."resolv.conf".text = ''
+    nameserver 8.8.8.8
+  '';
+  # Uncomment the three options below to enable the X11 (X.Org) desktop (XFCE).
+  # hardware.graphics.enable = true;
+  # services.xserver.enable = true;
+  # services.xserver.desktopManager.xfce.enable = true;
+  # Uncomment the following line to enable Podman.
+  # virtualisation.podman.enable = true;
+  # List packages installed in system profile.
+  # You can use https://search.nixos.org/ to find more packages (and options).
+  environment.systemPackages = with pkgs; [
+    hello-asterinas
+    gitMinimal
+  ];
+  system.nixos.distroName = "Asterinas NixOS";
+  # This option defines the first version of NixOS you have installed on this pa
+rticular machine,
+  # and is used to maintain compatibility with application data (e.g. databases)
+ created on older NixOS versions.
+  #
+  # Most users should NEVER change this value after the initial install, for any
+ reason,
+  # even if you've upgraded your system to a new NixOS release.
+  #
+  # This value does NOT affect the Nixpkgs version your packages and OS are pull
+ed from,
+  # so changing it will NOT upgrade your system - see https://nixos.org/manual/n
+ixos/stable/#sec-upgrading for how
+  # to actually do that.
+  #
+  # This value being lower than the current NixOS release does NOT mean your sys
+tem is
+  # out of date, out of support, or vulnerable.
+  #
+  # Do NOT change this value unless you have manually inspected all the changes 
+it would make to your configuration,
+  # and migrated your data accordingly.
+  #
+  # For more information, see `man configuration.nix` or https://nixos.org/manua
+l/nixos/stable/options#opt-system.stateVersion .
+  system.stateVersion = "26.05"; # Did you read the comment?
+}
+# One should also update osdk/src/commands/new/rust-toolchain.toml.template
+# when updating this
+[toolchain]
+channel = "nightly-2026-07-21"
+components = ["rust-src", "rustc-dev", "llvm-tools-preview"]
+targets = ["x86_64-unknown-none", "riscv64imac-unknown-none-elf", "loongarch64-u
+nknown-none-softfloat", "aarch64-unknown-none-softfloat"]
+total 253M
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 11:33 aster-drm
+-rw-r--r-- 2 ubuntu ubuntu  16M Oct 20 11:33 aster-drm-osdk-bin
+-rwxr-xr-x 1 ubuntu ubuntu  16M Oct 20 11:32 aster-drm-osdk-bin.elf
+-rw-r--r-- 1 ubuntu ubuntu  16M Oct 20 11:32 aster-drm-osdk-bin.elf.compressed
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 11:32 aster-drm-test-base
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 16:35 aster-nvidia-platform
+-rwxr-xr-x 1 ubuntu ubuntu 7.1M Oct 20 16:35 aster-nvidia-platform-osdk-bin.elf
+-rw-r--r-- 2 ubuntu ubuntu  12M Oct 20 16:35 aster-nvidia-platform-osdk-bin.iso
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 16:35 aster-nvidia-platform-test-base
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 16:35 aster-pci
+-rwxr-xr-x 1 ubuntu ubuntu 6.7M Oct 20 16:35 aster-pci-osdk-bin.elf
+-rw-r--r-- 2 ubuntu ubuntu  12M Oct 20 16:35 aster-pci-osdk-bin.iso
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 16:35 aster-pci-test-base
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 11:38 aster-simpledrm
+-rw-r--r-- 2 ubuntu ubuntu  17M Oct 20 11:38 aster-simpledrm-osdk-bin
+-rwxr-xr-x 1 ubuntu ubuntu  17M Oct 20 11:38 aster-simpledrm-osdk-bin.elf
+-rw-r--r-- 1 ubuntu ubuntu  17M Oct 20 11:38 aster-simpledrm-osdk-bin.elf.compre
+ssed
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 11:38 aster-simpledrm-test-base
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 16:36 asterinas
+-rw-r--r-- 1 ubuntu ubuntu  20M Oct 20 12:39 asterinas-osdk-bin
+-rwxr-xr-x 2 ubuntu ubuntu  21M Oct 20 16:36 asterinas-osdk-bin.elf
+-rw-r--r-- 1 ubuntu ubuntu  20M Oct 20 12:39 asterinas-osdk-bin.elf.compressed
+-rw-r--r-- 2 ubuntu ubuntu  25M Oct 20 16:36 asterinas-osdk-bin.iso
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 16:36 asterinas-run-base
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 12:39 bin
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 16:36 iso_root
+drwxr-xr-x 5 ubuntu ubuntu 4.0K Oct 20 11:32 linux-bzimage-setup
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 16:35 ostd
+drwxr-xr-x 2 ubuntu ubuntu 4.0K Oct 20 16:35 ostd-nvidia-nvport
+-rwxr-xr-x 1 ubuntu ubuntu 6.3M Oct 20 16:35 ostd-nvidia-nvport-osdk-bin.elf
+-rw-r--r-- 2 ubuntu ubuntu  12M Oct 20 16:35 ostd-nvidia-nvport-osdk-bin.iso
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 16:35 ostd-nvidia-nvport-test-base
+-rwxr-xr-x 1 ubuntu ubuntu 6.0M Oct 20 16:35 ostd-osdk-bin.elf
+-rw-r--r-- 2 ubuntu ubuntu  11M Oct 20 16:35 ostd-osdk-bin.iso
+drwxr-xr-x 3 ubuntu ubuntu 4.0K Oct 20 16:35 ostd-test-base
+-rw-r--r-- 1 ubuntu ubuntu  653 Oct 20 12:39 x86_64-i386_pm-none.json
+/workspace/cybermanju.github.io/AGENTS.md
+/workspace/asterinas-gpui/asterinas/AGENTS.md
+/workspace/asterinas-gpui/gpui-shell/AGENTS.md
+/workspace/asterinas-gpui/asterinas-irq-retire-local/AGENTS.md
+/workspace/cybermanju-shell/asterinas/AGENTS.md
+/workspace/cybermanju-shell/gpui-shell/AGENTS.md
+[32m/workspace/asterinas-gpui/asterinas$ [0m

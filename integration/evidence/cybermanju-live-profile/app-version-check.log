@@ -1,0 +1,27 @@
+source of truth: package.json = 0.1.1
+ok   package-lock.json                  0.1.1
+ok   src-tauri/tauri.conf.json          0.1.1
+ok   src-tauri/Cargo.toml               0.1.1
+ok   crates/web/Cargo.toml (status ep.) 0.1.1
+ok   docker/server/Cargo.toml           0.1.1
+ok   docker-compose.yml x-casaos        0.1.1
+ok   aur/PKGBUILD pkgver                0.1.1
+ok   README.md                          0.1.1
+ok   crates/agent/Cargo.toml            0.1.1
+ok   crates/compression/Cargo.toml      0.1.1
+ok   crates/crypto/Cargo.toml           0.1.1
+ok   crates/db/Cargo.toml               0.1.1
+ok   crates/disk/Cargo.toml             0.1.1
+ok   crates/erasure/Cargo.toml          0.1.1
+ok   crates/faces/Cargo.toml            0.1.1
+ok   crates/launcher/Cargo.toml         0.1.1
+ok   crates/os-wasm/Cargo.toml          0.1.1
+ok   crates/os/Cargo.toml               0.1.1
+ok   crates/scene/Cargo.toml            0.1.1
+ok   crates/search/Cargo.toml           0.1.1
+ok   crates/sync/Cargo.toml             0.1.1
+ok   crates/tests/Cargo.toml            0.1.1
+ok   crates/types/Cargo.toml            0.1.1
+ok   crates/web/Cargo.toml              0.1.1
+ok   android versionCode                1001
+all versions agree

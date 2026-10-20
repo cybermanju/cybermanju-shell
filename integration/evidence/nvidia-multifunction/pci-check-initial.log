@@ -1,0 +1,48 @@
+    Checking ostd v0.19.0 (/workspace/asterinas-gpui/asterinas/ostd)
+warning: feature `iter_advance_by` is declared but not used
+  --> ostd/src/lib.rs:14:45
+   |
+14 | #![cfg_attr(target_arch = "x86_64", feature(iter_advance_by, macro_metav...
+   |                                             ^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_features)]` (part of `#[warn(unused)]`) on by default
+
+warning: `ostd` (lib) generated 1 warning
+    Checking osdk-heap-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/heap-allocator)
+    Checking aster-pci v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/pci)
+    Checking aster-console v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/console)
+    Checking aster-fuse v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-fuse)
+    Checking aster-input v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/input)
+    Checking aster-cmdline v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/cmdline)
+    Checking ring-buffer v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/ring-buffer)
+    Checking xarray v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/xarray)
+    Checking aster-logger v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/logger)
+    Checking aster-framebuffer v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/framebuffer)
+    Checking aster-util v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-util)
+    Checking osdk-frame-allocator v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/frame-allocator)
+    Checking aster-uart v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/uart)
+    Checking osdk-test-kernel v0.19.0 (/workspace/asterinas-gpui/asterinas/osdk/deps/test-kernel)
+    Checking aster-nvidia-platform v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/comps/nvidia-platform)
+    Checking aster-softirq v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/softirq)
+    Checking device-id v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/device-id)
+    Checking aster-systree v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/systree)
+    Checking aster-time v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/time)
+    Checking dma-pool v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/dma-pool)
+    Checking aster-block v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/block)
+    Checking aster-bigtcp v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/libs/aster-bigtcp)
+    Checking aster-device v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/device)
+    Checking aster-nvme v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/nvme)
+    Checking aster-mlsdisk v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/mlsdisk)
+    Checking aster-network v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/network)
+    Checking aster-virtio v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core/comps/virtio)
+    Checking aster-core v0.1.0 (/workspace/asterinas-gpui/asterinas/kernel/core)
+error: environment variable `VDSO_LIBRARY_DIR` not defined at compile time
+   --> kernel/core/src/vdso.rs:225:28
+    |
+225 |     include_bytes!(concat!(env!("VDSO_LIBRARY_DIR"), "/vdso_x86_64.so"));
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: use `std::env::var("VDSO_LIBRARY_DIR")` to read the variable at run time
+
+error: could not compile `aster-core` (lib) due to 1 previous error
+[Error]: Command RUSTFLAGS=" --check-cfg cfg(ktest)" "cargo" "check" "-Zbuild-std=core,alloc,compiler_builtins" "-Zbuild-std-features=compiler-builtins-mem" "--target" "x86_64-unknown-none" failed with status: ExitStatus(unix_wait_status(25856))

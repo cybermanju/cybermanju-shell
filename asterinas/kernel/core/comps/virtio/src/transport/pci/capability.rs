@@ -71,7 +71,7 @@ impl VirtioPciCapabilityData {
         let memory_bar = if let Some(bar) = bar_manager.bar_mut(bar) {
             match bar.acquire() {
                 Ok(BarAccess::Memory(io_mem)) => Some(io_mem),
-                Ok(BarAccess::Io) => {
+                Ok(BarAccess::Io(_io_ports)) => {
                     warn!("I/O BAR is not supported");
                     None
                 }

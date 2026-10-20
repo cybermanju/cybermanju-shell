@@ -1,0 +1,54 @@
+# CyberManju OS — TLS sidecar override (ANALYSIS.md §3, TASKS.md P2-15).
+#
+# Adds a Caddy terminator in front of the cleartext :3456 API. The app service
+# keeps its LAN-bound publish from docker-compose.yml; Caddy is the only
+# listener on 80/443. Trust policy: Caddy is the single upstream, so the
+# app's `X-Forwarded-For` chain has exactly one hop — do NOT put another
+# proxy in front without updating the rate-limit trust notes in
+# docs/SECURITY.md §2, or every client collapses to one IP (false 429s at
+# 100 req/60s) / headers become spoofable.
+#
+# Usage:
+#   DOMAIN=vault.example.com ACME_EMAIL=you@example.com \
+#     docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+# Behind TLS also set:
+#   CYBERMANJU_OAUTH_REDIRECT_URI=https://$DOMAIN/api/sync/oauth/<provider>/callback
+services:
+  cybermanju-os:
+    # Unchanged service from docker-compose.yml joins the proxy network via
+    # the top-level networks block below; no port changes here on purpose —
+    # the LAN-bound :3456 publish stays as the plaintext backstop.
+    networks:
+      - cybermanju-lan
+      - cybermanju-proxy
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: cybermanju-caddy
+    restart: unless-stopped
+    depends_on:
+      - cybermanju-os
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-vault.example.com}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - cybermanju-proxy
+
+networks:
+  cybermanju-lan:
+  cybermanju-proxy:
+
+volumes:
+  caddy_data:
+  caddy_config:

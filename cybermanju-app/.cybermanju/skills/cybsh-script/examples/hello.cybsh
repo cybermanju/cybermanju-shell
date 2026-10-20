@@ -1,0 +1,25 @@
+# cybsh: 1
+# hello.cybsh — the smallest script that proves `run` works.
+# Usage: `run /scripts/hello.cybsh` (any volume path ending in `.cybsh`).
+# See also: tour.cybsh (the full tour).
+
+print "hello from cybsh scripts"
+
+let who: string = "manju"
+print "hi ${who}"
+
+if len(who) > 0:
+  print "name is not empty"
+elif who == "":
+  print "unreachable"
+else:
+  print "also unreachable"
+
+for i in range(3):
+  print "count " + str(i)
+
+$ echo inline shell still works
+let listing = sh("echo captured")
+print "kept: " + listing
+let answer = js: 1 + 2 * 3
+print "js says " + str(answer)
