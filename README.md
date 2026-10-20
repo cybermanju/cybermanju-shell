@@ -16,9 +16,19 @@ A private, experimental combined source snapshot of **Asterinas**, **GPUI Shell*
 | `integration/current/` | Current file hashes, source commits/status/diffs, exact exclusions, status and preparation checks. |
 | `integration/snapshot/` | Unmodified original snapshot records, retained as historical evidence. |
 
-The original commit `0832aead043cf34d06b51dbe72c732dedefe2a28` remains in Git history; its snapshot records are not rewritten. The existing remote and repository visibility are not changed. No push or remote Actions run is part of this preparation. Component `.github/` workflows stay nested as source; none is installed at root `.github/workflows/`.
+The original commit `0832aead043cf34d06b51dbe72c732dedefe2a28` remains in Git history; its snapshot records are not rewritten. The existing remote and repository visibility are not changed. Component `.github/` workflows stay nested as source; the root ISO workflow below is a later addition to the consolidation.
 
-Each component retains its own build system, toolchain and dependency lockfiles. There is no unified root Cargo workspace, bootable ISO, prebuilt runtime or automatic app-to-shell transport.
+Each component retains its own build system, toolchain and dependency lockfiles. There is no unified root Cargo workspace, integrated desktop ISO, checked-in prebuilt runtime or automatic app-to-shell transport.
+
+## Build and test the Asterinas ISO in GitHub Actions
+
+The root [Build and test ISO workflow](.github/workflows/iso.yml) runs on pushes to `main` and pull requests affecting Asterinas or the CI files, and can be started manually from the repository's Actions tab. It uses a digest-pinned upstream development container on a disposable x86_64 GitHub-hosted runner with KVM. No large image build is needed in the shared local workspace.
+
+The workflow builds the current checkout with `make iso NIXOS_TEST_SUITE=hello AUTO_INSTALL=true`, boots that ISO to install onto a disposable 16 GiB VM disk, requires the installer's successful-completion message, then boots the installed Asterinas system and runs the existing `hello-asterinas` assertion. Nonzero commands, missing success messages and timeouts fail the job. Serial output and build/test logs are retained for diagnosis.
+
+Download `asterinas-iso-<commit>` from a run for the ISO, `SHA256SUMS`, and source commit (seven-day retention). Logs are in `iso-test-logs-<commit>` (14 days). A built ISO is retained even if a later VM test fails: **only a successful job establishes that its installation and boot checks passed**. This is an automatically installing **Asterinas NixOS installer ISO**, not an integrated GPUI/CyberManju desktop image or GPU/hardware certification. Do not boot it on a real machine without understanding the installer; its unattended mode formats `/dev/vda`.
+
+The historical consolidation status and manifests below remain records of that earlier preparation, not live CI results. Check the actual Actions run for current acceptance.
 
 ## Read the status before building
 
@@ -29,7 +39,7 @@ Each component retains its own build system, toolchain and dependency lockfiles.
 - **Asterinas patch21 baseline:** prior CPU/QEMU records report 315 passed, zero failed, with three explicit VMX/VMX-EPT skips. EDU/NVMe/PCI lifecycle checks are not NVIDIA hardware acceptance.
 - **App baseline:** prior records report 125 frontend files / 1,207 tests, including 11 appearance-profile cases, plus typecheck/version/header checks. Later native-only changes did not rerun the app frontend suite. No native Tauri/GTK/WebKit or Asterinas app runtime acceptance is established.
 
-**No build, Cargo/kernel/frontend test, QEMU run or image generation was performed for this consolidation.** Preparation checks cover copying, hashes, symlink/artifact safety, whitespace and secret scanning only; they do not extend previous functional acceptance.
+**No build, Cargo/kernel/frontend test, QEMU run or image generation was performed for the original consolidation.** Its preparation checks cover copying, hashes, symlink/artifact safety, whitespace and secret scanning only; they do not extend previous functional acceptance. The later ISO workflow is evaluated separately through its remote run results.
 
 ## Verify the current source snapshot
 

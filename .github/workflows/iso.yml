@@ -1,0 +1,160 @@
+name: Build and test ISO
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'asterinas/**'
+      - '.github/workflows/iso.yml'
+      - 'tools/ci/**'
+  pull_request:
+    paths:
+      - 'asterinas/**'
+      - '.github/workflows/iso.yml'
+      - 'tools/ci/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iso-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iso:
+    name: x86_64 ISO / install / boot
+    # Do not execute untrusted fork code inside the privileged VM build image.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      # Pin the upstream kernel-dev 0.19.0-20261012 multi-architecture image.
+      BUILD_IMAGE: asterinas/kernel-dev@sha256:97d370e2260fec73f59d9ee02a128edb84141789248e4c1c4b18f05da8bf4e51
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate smoke-test gates
+        run: |
+          bash -n tools/ci/test-iso.sh
+          python3 tools/ci/test_iso_gate.py -v
+
+      - name: Prepare hosted runner disk and KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These are disposable preinstalled SDKs on this GitHub-hosted runner,
+          # not files on the user's computer. All build tools come from Docker.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          if [[ -n "${AGENT_TOOLSDIRECTORY:-}" ]]; then
+            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          fi
+          df -h .
+          free_kb=$(df -Pk . | awk 'NR==2 {print $4}')
+          (( free_kb >= 45 * 1024 * 1024 )) || {
+            echo 'At least 45 GiB free is required for the ISO/install test.' >&2
+            exit 1
+          }
+          test -c /dev/kvm || {
+            echo 'This workflow needs a GitHub-hosted x86_64 runner with KVM.' >&2
+            exit 1
+          }
+          sudo chmod a+rw /dev/kvm
+          mkdir -p artifacts
+
+      - name: Start pinned build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$BUILD_IMAGE"
+          docker run --detach --name iso-builder --privileged \
+            --volume /dev:/dev \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --workdir /work/asterinas \
+            --env ENABLE_KVM=1 --env MEM=4G --env SMP=2 \
+            --env QEMU_DISPLAY=none --env CARGO_BUILD_JOBS=2 \
+            --entrypoint /bin/bash "$BUILD_IMAGE" -c 'exec sleep infinity'
+          docker exec iso-builder bash -lc 'set -euo pipefail; test -r /dev/kvm; test -w /dev/kvm; rustc --version; nix-build --version; qemu-system-x86_64 --version'
+
+      - name: Build ISO from this checkout
+        timeout-minutes: 70
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec iso-builder bash -lc \
+            'set -euo pipefail; make iso NIXOS_TEST_SUITE=hello AUTO_INSTALL=true' \
+            2>&1 | tee artifacts/build.log
+          # Dereference the Nix-store symlink before uploading the actual ISO.
+          mapfile -t images < <(find -L asterinas/target/nixos/iso_image/iso -maxdepth 1 -type f -name '*.iso')
+          [[ ${#images[@]} -eq 1 ]] || { echo 'Expected exactly one ISO'; exit 1; }
+          docker cp -L "iso-builder:/work/asterinas/target/nixos/iso_image/iso/$(basename "${images[0]}")" artifacts/cybermanju-asterinas-x86_64.iso
+          test -s artifacts/cybermanju-asterinas-x86_64.iso
+          (cd artifacts && sha256sum cybermanju-asterinas-x86_64.iso > SHA256SUMS)
+          printf '%s\n' "$GITHUB_SHA" > artifacts/source-commit.txt
+
+      - name: Boot ISO and verify installation
+        timeout-minutes: 25
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec iso-builder bash -lc 'bash /work/tools/ci/test-iso.sh install' \
+            2>&1 | tee artifacts/install.log
+
+      - name: Boot installed Asterinas and run hello test
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec iso-builder bash -lc 'bash /work/tools/ci/test-iso.sh boot' \
+            2>&1 | tee artifacts/boot.log
+
+      - name: Publish ISO and checksum
+        # Keep a successfully built ISO even if a later VM test fails. The job
+        # result and logs (not the existence of an artifact) determine acceptance.
+        if: ${{ !cancelled() && hashFiles('artifacts/SHA256SUMS') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asterinas-iso-${{ github.sha }}
+          path: |
+            artifacts/*.iso
+            artifacts/SHA256SUMS
+            artifacts/source-commit.txt
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Collect VM diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          sudo find asterinas -maxdepth 2 -name 'qemu*.log' -type f -exec cp {} artifacts/ \; || true
+          sudo chmod -R a+rX artifacts
+          df -h . > artifacts/disk.txt
+          docker rm -f iso-builder || true
+
+      - name: Publish build and test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iso-test-logs-${{ github.sha }}
+          path: artifacts/*.log
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Record result
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo '## Asterinas x86_64 ISO'
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo "Job status: **$JOB_STATUS**"
+            echo 'Gates: source build, ISO installation success marker, installed-OS hello test.'
+            echo 'This is the Asterinas NixOS installer, not an integrated GPUI/CyberManju desktop or GPU certification.'
+            echo 'An ISO artifact alone does not mean its VM tests passed; inspect the job result and logs.'
+          } >> "$GITHUB_STEP_SUMMARY"
