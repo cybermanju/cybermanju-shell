@@ -4,6 +4,8 @@
 
 Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instalado com `hello` em QEMU x86-64/UEFI/TCG. O novo teste de staging usa uma imagem mínima OSTD distinta da ISO instaladora, BIOS/GRUB multiboot2 e TCG; não qualifica instalação, execução de módulos ou hardware físico.
 
+**Avanço gráfico posterior:** o [contrato de framebuffer e o readback MMIO em QEMU](hardware-graphics-compatibility.md) passaram em VMs mínimas; o staging bruto foi revalidado com o novo header Multiboot2. Essa prova não executa `.ko`, não resolve placement/W^X e não revalida o boot instalado desta revisão. As contagens e fixtures abaixo descrevem a rodada de integração ELF→frames, não uma nova qualificação universal.
+
 ## Matriz atual
 
 | Componente / alvo | Evidência | Limite |

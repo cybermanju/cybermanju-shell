@@ -2,12 +2,11 @@
 
 use alloc::{sync::Arc, vec::Vec};
 
-use align_ext::AlignExt;
 use ostd::{
     Error, Result,
     boot::boot_info,
     io::IoMem,
-    mm::{CachePolicy, HasSize, PAGE_SIZE, VmIo},
+    mm::{CachePolicy, PAGE_SIZE, VmIo},
     sync::Mutex,
 };
 use spin::Once;
@@ -31,6 +30,7 @@ pub struct FrameBuffer {
     width: usize,
     height: usize,
     line_size: usize,
+    byte_len: usize,
     pixel_format: PixelFormat,
     cmap: Mutex<FbCmap>,
 }
@@ -92,30 +92,34 @@ pub(crate) fn init() {
         }
     };
 
+    let Some(byte_len) = framebuffer_arg.byte_len() else {
+        ostd::error!("Invalid framebuffer geometry or pitch");
+        return;
+    };
+    // Map full pages, but only clear the declared surface, not page-tail bytes.
+    let Some(fb_size) = byte_len
+        .checked_add(PAGE_SIZE - 1)
+        .map(|v| v & !(PAGE_SIZE - 1))
+    else {
+        ostd::error!("Framebuffer page rounding overflow");
+        return;
+    };
+    let Some(fb_end) = framebuffer_arg.address.checked_add(fb_size) else {
+        ostd::error!("Framebuffer physical range overflow");
+        return;
+    };
     let framebuffer = {
-        // FIXME: There can be more than `width` pixels per framebuffer line due to alignment
-        // purposes. We need to collect this information during the boot phase.
-        let line_size = framebuffer_arg
-            .width
-            .checked_mul(pixel_format.nbytes())
-            .unwrap();
-        let fb_size = framebuffer_arg
-            .height
-            .checked_mul(line_size)
-            .unwrap()
-            // The framebuffer should cover an entire set of pages. These pages can be mapped to
-            // userspace upon request.
-            .align_up(PAGE_SIZE);
-
+        let line_size = framebuffer_arg.pitch;
         let fb_base = framebuffer_arg.address;
         // Use write-combining for framebuffer to enable faster write operations.
         // Write-combining allows the CPU to combine multiple writes into fewer bus transactions,
         // which is ideal for framebuffer access patterns (sequential writes).
-        let io_mem = IoMem::acquire_with_cache_policy(
-            fb_base..fb_base.checked_add(fb_size).unwrap(),
-            CachePolicy::WriteCombining,
-        )
-        .unwrap();
+        let Ok(io_mem) =
+            IoMem::acquire_with_cache_policy(fb_base..fb_end, CachePolicy::WriteCombining)
+        else {
+            ostd::error!("Framebuffer MMIO range is unavailable");
+            return;
+        };
 
         let default_cmap = FbCmap {
             entries: Vec::new(),
@@ -126,6 +130,7 @@ pub(crate) fn init() {
             width: framebuffer_arg.width,
             height: framebuffer_arg.height,
             line_size,
+            byte_len,
             pixel_format,
             cmap: Mutex::new(default_cmap),
         }
@@ -149,6 +154,11 @@ impl FrameBuffer {
     /// Returns the line size of the framebuffer in bytes.
     pub fn line_size(&self) -> usize {
         self.line_size
+    }
+
+    /// Declared surface bytes, including row padding, excluding mapping page tails.
+    pub fn byte_len(&self) -> usize {
+        self.byte_len
     }
 
     /// Returns a reference to the `IoMem` instance of the framebuffer.
@@ -186,8 +196,13 @@ impl FrameBuffer {
 
     /// Clears the framebuffer with default color (black).
     pub fn clear(&self) {
-        let frame = alloc::vec![0u8; self.io_mem().size()];
-        self.write_bytes_at(0, &frame).unwrap();
+        // Avoid allocating a second complete surface during boot. The validated
+        // byte length includes row padding but does not authorize page-tail I/O.
+        let zeros = [0u8; PAGE_SIZE];
+        for offset in (0..self.byte_len).step_by(PAGE_SIZE) {
+            let len = core::cmp::min(PAGE_SIZE, self.byte_len - offset);
+            self.write_bytes_at(offset, &zeros[..len]).unwrap();
+        }
     }
 
     /// Sets color map entries starting from the given index.

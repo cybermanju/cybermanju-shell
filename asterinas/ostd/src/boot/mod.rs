@@ -81,6 +81,34 @@ pub struct BootloaderFramebufferArg {
     pub height: usize,
     /// Bits per pixel of the buffer.
     pub bpp: usize,
+    /// Number of bytes between the starts of adjacent pixel rows.
+    pub pitch: usize,
+}
+
+impl BootloaderFramebufferArg {
+    /// Returns the validated framebuffer span, including per-row padding.
+    ///
+    /// The descriptor contract does not require an aligned address; consumers
+    /// that map the framebuffer must handle page alignment themselves.
+    pub fn byte_len(&self) -> Option<usize> {
+        if self.address == 0 || self.width == 0 || self.height == 0 {
+            return None;
+        }
+        self.address.checked_add(1)?;
+        if !matches!(self.bpp, 8 | 16 | 24 | 32) {
+            return None;
+        }
+        let row_bytes = self.width.checked_mul(self.bpp / 8)?;
+        if self.pitch < row_bytes {
+            return None;
+        }
+        let span = self.pitch.checked_mul(self.height)?;
+        if span == 0 {
+            return None;
+        }
+        self.address.checked_add(span)?;
+        Some(span)
+    }
 }
 
 /*************************** Boot-time information ***************************/

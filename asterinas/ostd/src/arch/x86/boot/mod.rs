@@ -76,7 +76,7 @@ trait ToEarlyBootInfo {
     fn to_early_boot_info(&self) -> EarlyBootInfo {
         let kernel_cmdline = self.kernel_commandline();
         let initramfs = self.initramfs();
-        let framebuffer_arg = self.framebuffer_arg();
+        let framebuffer_arg = self.framebuffer_arg().filter(|fb| fb.byte_len().is_some());
 
         EarlyBootInfo {
             bootloader_name: self.bootloader_name(),
@@ -99,7 +99,9 @@ fn finish_memory_regions(
 ) -> MemoryRegionArray {
     // Add the framebuffer region since some loaders do not specify it.
     if let Some(fb) = framebuffer_arg {
-        regions.push(MemoryRegion::framebuffer(&fb)).unwrap();
+        if let Some(region) = MemoryRegion::framebuffer(&fb) {
+            regions.push(region).unwrap();
+        }
     }
 
     // Add the kernel region since some loaders do not specify it.

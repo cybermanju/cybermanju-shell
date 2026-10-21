@@ -90,12 +90,12 @@ impl MemoryRegion {
     }
 
     /// Constructs a framebuffer memory region.
-    pub fn framebuffer(fb: &crate::boot::BootloaderFramebufferArg) -> Self {
-        Self {
+    pub fn framebuffer(fb: &crate::boot::BootloaderFramebufferArg) -> Option<Self> {
+        Some(Self {
             base: fb.address,
-            len: (fb.width * fb.height * fb.bpp).div_ceil(8), // round up when divide with 8 (bits/Byte)
+            len: fb.byte_len()?,
             typ: MemoryRegionType::Framebuffer,
-        }
+        })
     }
 
     /// Constructs a module memory region from a byte slice that lives in the linear mapping.

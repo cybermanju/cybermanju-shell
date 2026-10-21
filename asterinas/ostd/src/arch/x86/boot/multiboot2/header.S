@@ -38,6 +38,18 @@ info_request:
     .long  15           // ACPI (new) request
 info_request_end:
 
+    // Tag: framebuffer preference. GRUB may otherwise force text mode even
+    // when gfxpayload requests graphics. Optional, with loader-chosen geometry.
+    .align 8
+framebuffer_request:
+    .short 5
+    .short 1            // Optional; text/headless boots remain supported
+    .long  framebuffer_request_end - framebuffer_request
+    .long  0            // No preferred width
+    .long  0            // No preferred height
+    .long  32           // Prefer 32-bit pixels when graphics are available
+framebuffer_request_end:
+
     // Tag: header end
     .align 8
     .short 0            // type: tags end

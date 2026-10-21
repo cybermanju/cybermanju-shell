@@ -152,6 +152,7 @@ impl ToEarlyBootInfo for BootParams {
 
         Some(BootloaderFramebufferArg {
             address,
+            pitch: screen_info.lfb_linelength as usize,
             width: screen_info.lfb_width as usize,
             height: screen_info.lfb_height as usize,
             bpp: screen_info.lfb_depth as usize,
