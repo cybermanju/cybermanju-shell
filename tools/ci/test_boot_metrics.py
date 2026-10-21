@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import stat
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ class BootMetricsTests(unittest.TestCase):
             self.assertEqual(record["status"], "success")
             self.assertEqual(record["acceleration"], "kvm")
             self.assertGreaterEqual(record["elapsed_seconds"], 0)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
 
     def test_failure_writes_error_and_preserves_original_exception(self):
         with tempfile.TemporaryDirectory() as directory:

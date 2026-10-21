@@ -23,8 +23,42 @@ class Console:
     def __init__(self, process):
         self.process = process
         self.buffer = b""
+        self.control_state = "text"
         self.selector = selectors.DefaultSelector()
         self.selector.register(process.stdout, selectors.EVENT_READ)
+
+    def append_output(self, data):
+        # Keep raw output in the logs, but match terminal-visible text. systemd
+        # login emits OSC metadata immediately before the readiness marker.
+        # State persists across reads: an escape may be split at any byte.
+        visible = bytearray()
+        for byte in data:
+            if self.control_state == "text":
+                if byte == 0x1b:
+                    self.control_state = "escape"
+                else:
+                    visible.append(byte)
+            elif self.control_state == "escape":
+                if byte == ord("]"):
+                    self.control_state = "osc"
+                elif byte == ord("["):
+                    self.control_state = "csi"
+                else:
+                    self.control_state = "text"
+            elif self.control_state == "csi":
+                if 0x40 <= byte <= 0x7e:
+                    self.control_state = "text"
+            elif self.control_state == "osc":
+                if byte == 0x07:
+                    self.control_state = "text"
+                elif byte == 0x1b:
+                    self.control_state = "osc-escape"
+            elif self.control_state == "osc-escape":
+                if byte in (ord("\\"), 0x07):
+                    self.control_state = "text"
+                elif byte != 0x1b:
+                    self.control_state = "osc"
+        self.buffer = (self.buffer + visible)[-1024 * 1024:]
 
     def expect(self, pattern, seconds):
         deadline = time.monotonic() + seconds
@@ -43,7 +77,7 @@ class Console:
                 raise RuntimeError(f"VM exited before expected output: {pattern!r}")
             sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()
-            self.buffer = (self.buffer + data)[-1024 * 1024:]
+            self.append_output(data)
 
     def send(self, command):
         self.process.stdin.write((command + "\n").encode())

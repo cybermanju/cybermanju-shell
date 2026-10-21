@@ -20,6 +20,9 @@ def _write_metrics(artifacts_dir, phase, acceleration, status, elapsed, error):
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
     try:
+        # The VM may run in a root container on a host-mounted artifacts dir.
+        # Keep the atomically published diagnostic readable by the host runner.
+        os.fchmod(fd, 0o644)
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             json.dump(result, stream, sort_keys=True, indent=2)
             stream.write("\n")

@@ -78,6 +78,51 @@ class ConsoleTests(unittest.TestCase):
         self.assertIsNone(re.search(pattern, b"echo CYBERMANJU_LIVE_INSTALLER_READY\n", re.MULTILINE))
         self.assertIsNotNone(re.search(pattern, b"CYBERMANJU_LIVE_INSTALLER_READY\r\n", re.MULTILINE))
 
+    def test_systemd_login_osc_and_csi_at_every_read_boundary(self):
+        # OSC 3008 is the actual shape emitted by systemd login in the failed VM.
+        output = (b"login\r\n\x1b]3008;start=token;comm=login;type=session\x1b\\"
+                  b"CYBERMANJU_LIVE_INSTALLER_READY\r\n\x1b[?2004h")
+        for boundary in range(len(output) + 1):
+            with self.subTest(boundary=boundary):
+                console = Console.__new__(Console)
+                console.buffer, console.control_state = b"", "text"
+                console.append_output(output[:boundary])
+                console.append_output(output[boundary:])
+                self.assertEqual(console.buffer,
+                                 b"login\r\nCYBERMANJU_LIVE_INSTALLER_READY\r\n")
+                self.assertIsNotNone(console.expect(
+                    rb"^CYBERMANJU_LIVE_INSTALLER_READY\r?$", seconds=0))
+
+    def test_ansi_never_exposes_metadata_or_turns_echo_into_marker(self):
+        console = Console.__new__(Console)
+        console.buffer, console.control_state = b"", "text"
+        # Hidden OSC payload must not become a marker, even one with newlines.
+        output = (b"\x1b]0;\nCYBERMANJU_LIVE_INSTALLER_READY\n\x07"
+                  b"\x1b[31mecho CYBERMANJU_LIVE_INSTALLER_READY\x1b[0m\r\n")
+        for byte in output:
+            console.append_output(bytes([byte]))
+        self.assertEqual(console.buffer, b"echo CYBERMANJU_LIVE_INSTALLER_READY\r\n")
+        self.assertIsNone(re.search(rb"^CYBERMANJU_LIVE_INSTALLER_READY\r?$",
+                                   console.buffer, re.MULTILINE))
+
+    def test_expect_reads_raw_ansi_pipe_and_preserves_log(self):
+        output = (b"\x1b]3008;comm=login\x1b\\"
+                  b"CYBERMANJU_LIVE_INSTALLER_READY\r\n")
+        process = subprocess.Popen(
+            ["python3", "-c", "import os; os.write(1, " + repr(output) + ")"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        console = Console(process)
+        try:
+            with mock.patch("iso_vm.sys.stdout") as logged:
+                console.expect(rb"^CYBERMANJU_LIVE_INSTALLER_READY\r?$", seconds=2)
+            self.assertEqual(b"".join(call.args[0]
+                                     for call in logged.buffer.write.call_args_list), output)
+        finally:
+            process.stdin.close()
+            process.wait(timeout=2)
+            console.selector.close()
+            process.stdout.close()
+
 
 class LiveConsoleConfigTests(unittest.TestCase):
     def test_live_iso_selects_uart_but_preserves_legacy_auto_install(self):
