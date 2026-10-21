@@ -49,6 +49,9 @@ class IsoGateTests(unittest.TestCase):
                 '  if [[ "$SCENARIO" == settings-fail ]]; then exit 6; fi\n'
                 f'  exec {shlex.quote(sys.executable)} "$@"\n'
                 'fi\n'
+                # The real Python harness fails before success when its required
+                # normalized marker is absent; logs alone are never its result.
+                'if [[ "$1" == */iso_vm.py && "$SCENARIO" == empty ]]; then exit 1; fi\n'
                 f'exec {shlex.quote(str(root / "bin/make"))} "$@"\n'
             )
             for executable in (root / "bin").iterdir():
@@ -65,7 +68,7 @@ class IsoGateTests(unittest.TestCase):
         result = self.run_gate("install", "success")
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_zero_exit_without_completion_marker_fails(self):
+    def test_missing_completion_marker_harness_failure_is_propagated(self):
         self.assertNotEqual(self.run_gate("install", "empty").returncode, 0)
 
     def test_stale_completion_marker_cannot_pass(self):

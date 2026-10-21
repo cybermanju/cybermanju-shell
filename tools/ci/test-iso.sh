@@ -25,13 +25,11 @@ case "$phase" in
       echo "ISO $phase VM failed or timed out (exit $status)." >&2
       exit "$status"
     fi
+    # iso_vm.py validates normalized guest markers, guest checks, shutdown,
+    # and QEMU exit status. Raw log markers (including echoed text) are not
+    # evidence of success; the harness must succeed.
     if [[ "$phase" == install ]]; then
-      grep -q '^Congratulations! Asterinas NixOS has been installed successfully!' qemu.log || {
-        echo 'Installer did not report successful installation.' >&2; exit 1;
-      }
       test -s target/nixos/asterinas.img
-    else
-      grep -q '^CYBERMANJU_LIVE_INSTALLER_READY' qemu.log
     fi
     echo "PASS: full ISO $phase gate."
     ;;

@@ -2,10 +2,12 @@
 //! Structural preflight for uncompressed ELF64 little-endian x86-64 ET_REL files.
 //!
 //! Success does NOT mean Linux module compatibility or authorization to execute.
-//! Symbols, relocations, Linux ABI/versioning, signatures and executable mappings
-//! must be checked by a future loader. This crate neither loads nor executes code.
+//! Symbol resolution, relocations, Linux ABI/versioning, signatures and executable
+//! mappings remain future work. This crate neither loads nor executes code.
 #![no_std]
 #![forbid(unsafe_code)]
+
+mod symbols;
 
 const HEADER_SIZE: usize = 64;
 const SECTION_SIZE: usize = 64;
@@ -26,6 +28,12 @@ pub enum Error {
     CompressedSection,
     StringTable,
     SectionName,
+    SymbolTable,
+    SymbolName,
+    SymbolSection,
+    SymbolRange,
+    SymbolBinding,
+    UnsupportedSymbolTable,
 }
 
 /// An inspected object, not a loaded or trusted Linux module.
@@ -141,6 +149,7 @@ pub fn inspect(bytes: &[u8]) -> Result<Inspection, Error> {
             }
         }
     }
+    symbols::validate(bytes, table)?;
     Ok(Inspection { section_count })
 }
 
