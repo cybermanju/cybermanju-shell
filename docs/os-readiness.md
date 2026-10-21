@@ -4,6 +4,8 @@
 
 **Checkpoint comprovado:** o [run 39608968083](https://github.com/cybermanju/cybermanju-shell/actions/runs/39608968083), revisão `3d6dc25`, concluiu ISO live USB, instalação UEFI/EFI GRUB e **boot do Asterinas instalado com `hello` aprovado (1 passou, 0 falhou)**. `boot.log` registra `PASS: installed Asterinas booted and hello-asterinas passed (tcg)`; serial contém entrada EFI e inicialização de OSTD. Isso foi QEMU x86-64/UEFI com **TCG**, não hardware físico, GPU ou carregamento de `.ko`. Artefatos locais em `artifacts/iso-39608968083/`; uma execução bem-sucedida não demonstra estabilidade nem qualifica revisões posteriores automaticamente.
 
+**Segundo checkpoint:** o [run 39623025465](https://github.com/cybermanju/cybermanju-shell/actions/runs/39623025465), revisão `47ee9b5`, também aprovou live USB, instalação UEFI/EFI GRUB e boot instalado em QEMU/TCG. O `boot.log` registra `Test case 'hello' passed` e o mesmo marcador final de sucesso; logs locais em `artifacts/iso-39623025465/`. Não testa o novo owner de frames de staging, que por enquanto tem type-check OSTD e testes host com páginas falsas, nem executa `.ko`.
+
 Para o desenvolvimento posterior do loader, consulte a [matriz de módulos Linux](linux-module-compatibility.md): ela distingue testes estruturais ELF no host de módulos realmente carregados e mantém os limites de versão/arquitetura explícitos.
 
 ## Referência e estado observado

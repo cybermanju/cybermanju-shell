@@ -4,8 +4,12 @@ on:
   push:
     branches: [main]
     paths:
+      - 'asterinas/Cargo.toml'
+      - 'asterinas/Cargo.lock'
+      - 'asterinas/rust-toolchain.toml'
       - 'tools/ci/**'
       - 'asterinas/kernel/libs/linux-module-elf/**'
+      - 'asterinas/ostd/**'
       - 'asterinas/tools/nixos/**'
       - 'asterinas/tools/qemu_args.sh'
       - 'asterinas/distro/iso_image/**'
@@ -13,8 +17,12 @@ on:
       - '.github/workflows/**'
   pull_request:
     paths:
+      - 'asterinas/Cargo.toml'
+      - 'asterinas/Cargo.lock'
+      - 'asterinas/rust-toolchain.toml'
       - 'tools/ci/**'
       - 'asterinas/kernel/libs/linux-module-elf/**'
+      - 'asterinas/ostd/**'
       - 'asterinas/tools/nixos/**'
       - 'asterinas/tools/qemu_args.sh'
       - 'asterinas/distro/iso_image/**'
@@ -61,6 +69,37 @@ jobs:
           toolchain: '1.97.1'
       - name: ELF structural preflight and real C ET_REL fixture (no kernel boot)
         run: bash tools/ci/test_linux_module_elf.sh
+
+  module-staging:
+    # Mock pages test ownership/rollback only, never a physical allocator or MMU.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.97.1'
+      - name: Staging ownership and injected allocation/copy failure tests (host only)
+        run: bash tools/ci/test_module_staging.sh
+
+  ostd-check:
+    # Type-check the real backend, not a boot or runtime frame allocation test.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 'nightly-2026-07-21'
+          targets: x86_64-unknown-none
+          components: rust-src
+      - name: Check real OSTD x86-64 adapter with default features (no link or boot)
+        working-directory: asterinas
+        run: cargo check --locked -p ostd --target x86_64-unknown-none
 
   linux-module-kbuild:
     # A real kbuild .ko is compiled and inspected, NEVER loaded on the runner.
