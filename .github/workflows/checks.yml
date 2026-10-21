@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/ci/**'
+      - 'asterinas/kernel/libs/linux-module-elf/**'
       - 'asterinas/tools/nixos/**'
       - 'asterinas/tools/qemu_args.sh'
       - 'asterinas/distro/iso_image/**'
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'tools/ci/**'
+      - 'asterinas/kernel/libs/linux-module-elf/**'
       - 'asterinas/tools/nixos/**'
       - 'asterinas/tools/qemu_args.sh'
       - 'asterinas/distro/iso_image/**'
@@ -45,3 +47,17 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts -p 'test_frame_telemetry.py' -v
           python3 -m py_compile scripts/test_nested_presentation_boundary.py
+
+  linux-module-elf:
+    # Host-only parser checks, not evidence of a module loaded in Asterinas.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.97.1'
+      - name: ELF structural preflight and real C ET_REL fixture (no kernel boot)
+        run: bash tools/ci/test_linux_module_elf.sh

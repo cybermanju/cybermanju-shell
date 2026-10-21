@@ -2,6 +2,8 @@
 
 **Status: experimental; não é um desktop integrado nem pronto para uso diário.** Esta avaliação compara o snapshot local com o padrão prático de um desktop Linux/NixOS e com o escopo upstream do Asterinas. “Fonte presente” não equivale a comportamento validado. Nenhuma nova compilação, inicialização, teste de hardware ou medição foi feita para este relatório.
 
+Para o desenvolvimento posterior do loader, consulte a [matriz de módulos Linux](linux-module-compatibility.md): ela distingue testes estruturais ELF no host de módulos realmente carregados e mantém os limites de versão/arquitetura explícitos.
+
 ## Referência e estado observado
 
 - **Linux desktop/NixOS:** referência madura de instalação gráfica, seleção de desktop, drivers e ecossistema de aplicações. O manual oficial documenta boot por mídia, instalação guiada e rollback de perfis/gerações; compositor Wayland é uma composição de display manager, compositor e suporte às aplicações, não apenas um framebuffer. Isso é uma referência de capacidade, não promessa de que toda combinação de hardware/software funcione. [Manual NixOS](https://nixos.org/manual/nixos/stable/) · [Wiki oficial Wayland](https://wiki.nixos.org/wiki/Wayland).

@@ -62,6 +62,7 @@ members = [
     "kernel/libs/io-util",
     "kernel/libs/jhash",
     "kernel/libs/keyable-arc",
+    "kernel/libs/linux-module-elf",
     "kernel/libs/logo-ascii-art",
     "kernel/libs/ring-buffer",
     "kernel/libs/sparse-id-alloc",
