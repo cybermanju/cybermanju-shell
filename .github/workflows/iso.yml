@@ -19,7 +19,8 @@ permissions:
 
 concurrency:
   group: iso-${{ github.ref }}
-  cancel-in-progress: true
+  # Recurring pushes must not interrupt long boot/installation validations; a newer pending run may still replace a pending run.
+  cancel-in-progress: false
 
 jobs:
   iso:
