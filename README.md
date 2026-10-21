@@ -1,6 +1,6 @@
 # cybermanju-shell
 
-A private, experimental combined source snapshot of **Asterinas**, **GPUI Shell**, and the **CyberManju app**. It includes current local source changes, tests, documentation, historical patch series and compact evidence—not just the upstream commits.
+An experimental combined source snapshot of **Asterinas**, **GPUI Shell**, and the **CyberManju app**. It includes current local source changes, tests, documentation, historical patch series and compact evidence—not just the upstream commits.
 
 **This is not a fully integrated graphical operating system. GPUI has not been accepted running on Asterinas, and physical NVIDIA/AMD GPU acceleration, native RM/GSP/Vulkan, the target Wayland/Tauri runtime and Linux performance parity remain unproven.**
 
@@ -35,6 +35,37 @@ CI checks the actual ISO's El Torito/system-area metadata, EFI GRUB, boot payloa
 The ISO is copied only after VM work into `output/cybermanju-asterinas-x86_64.iso`, alongside `SHA256SUMS`, `source-commit.txt` and `validation.json`; download them from `asterinas-iso-<commit>` (seven-day retention). `iso-test-logs-<commit>` contains disk measurements, build logs, GRUB configuration and serial diagnostics (seven days). If a VM gate fails, CI still attempts to retain the built ISO **only if it remains within budget**; its validation status is false. **An artifact alone is not acceptance: all configured gates and the whole job must pass.** The published ISO is interactive and does not automatically format disks. Running the installer manually can destroy the selected disk; review `aster-nixos-install --help` first. The upstream `AUTO_INSTALL=true` option remains explicitly destructive and is not used for the published artifact.
 
 The historical consolidation status and manifests below remain records of that earlier preparation, not live CI results. Check the actual Actions run for current acceptance.
+
+## Shell CI and boot hardening
+
+The Linux **interactive installer** now uses `ttyS0,115200n8` for the CI control
+channel. The previous run [39530471851](https://github.com/cybermanju/cybermanju-shell/actions/runs/39530471851)
+built and verified the full ISO but reached Linux multi-user mode without a usable
+`hvc0` getty, so USB acceptance failed and installation/target boot were skipped.
+This change does not switch the installed Asterinas kernel away from its default
+virtio console. The legacy `AUTO_INSTALL=true` path still uses hvc0 and is not a
+newly accepted or recommended installation path.
+
+[Shell regression checks](.github/workflows/checks.yml) runs quick, unprivileged
+checks even on fork PRs, separately from the expensive privileged ISO job. These
+are Python/shell tests, **not VM boots or FPS benchmarks**. Guest commands now
+report their actual exit status with a nonce, avoiding a misleading full timeout
+when a prerequisite fails. Live boot, checks, install, EFI verification and shutdown
+write per-medium `artifacts/boot-metrics-*.json`, also exported in `validation.json`.
+Timings measure the Linux installer under the recorded QEMU acceleration, not
+Asterinas desktop latency or GPU performance. Abrupt host/container termination may
+prevent a final timing record; a missing record is not success.
+
+The frame telemetry analyzer rejects contradictory probe-deadline state rather
+than accepting an invalid FPS observation. [OS readiness and acceptance gaps](docs/os-readiness.md)
+compares the project with NixOS/Linux desktop and upstream Asterinas. Full boot,
+installation and physical presentation still require their corresponding runtime
+evidence; source and unit tests do not certify them.
+
+`integration/current/manifest.json` preserves the earlier consolidation baseline.
+Later ISO work already changed files covered by it; `verify_integration.py` reports
+those differences (including subsequent telemetry changes) and is not an acceptance
+gate for the current branch. Do not rewrite historical hashes to claim validation.
 
 ## Read the status before building
 

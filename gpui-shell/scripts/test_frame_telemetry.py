@@ -209,6 +209,20 @@ class FrameTelemetryAnalyzerTests(unittest.TestCase):
             with self.subTest(overrides=overrides), self.assertRaisesRegex(analyzer.AnalysisError, expected):
                 analyzer.analyze_text(self.log_text(telemetry=self.telemetry_record(**overrides)))
 
+    def test_probe_completion_must_match_elapsed_deadline(self) -> None:
+        active = self.telemetry_record(
+            mode="bounded_redraw_probe", probe_seconds=5, probe_finished=False, elapsed_seconds=4.99
+        )
+        self.assertEqual(analyzer.analyze_text(self.log_text(telemetry=active))["telemetry"]["observations"][0]["probe_finished"], False)
+        finished = {**active, "probe_finished": True, "elapsed_seconds": 5.0}
+        self.assertTrue(analyzer.analyze_text(self.log_text(telemetry=finished))["telemetry"]["observations"][0]["probe_finished"])
+        for overrides in (
+            {**active, "probe_finished": True},
+            {**finished, "probe_finished": False},
+        ):
+            with self.subTest(overrides=overrides), self.assertRaisesRegex(analyzer.AnalysisError, "probe_finished must match"):
+                analyzer.analyze_text(self.log_text(telemetry=overrides))
+
     def test_non_strict_software_observation_is_not_hardware_evidence(self) -> None:
         result = analyzer.analyze_text(self.log_text(classification="software_cpu"))
         self.assertTrue(result["not_hardware_performance_evidence"])

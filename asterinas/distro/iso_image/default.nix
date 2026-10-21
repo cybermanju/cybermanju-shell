@@ -36,10 +36,15 @@ let
     isoImage.storeContents = [ (builtins.storePath pkgs.path) ];
 
     # No copytoram: the compressed store stays on the ISO/USB medium.
-    # hvc0 needs the Linux virtio-console driver before the serial getty starts.
-    # Merely adding console=hvc0 does not load this module on the minimal ISO.
+    # Keep hvc0 available for the legacy auto-install path. The interactive
+    # Linux installer uses the standard UART: CI reached multi-user.target but
+    # its hvc0 getty timed out even with virtio_console loaded in the initrd.
+    # This does not change the installed Asterinas kernel's hvc0 console.
     boot.initrd.kernelModules = [ "virtio_console" ];
-    boot.kernelParams = [ "console=tty0" "console=hvc0" ];
+    boot.kernelParams = [
+      "console=tty0"
+      (if autoInstall then "console=hvc0" else "console=ttyS0,115200n8")
+    ];
     services.getty.autologinUser = pkgs.lib.mkForce "root";
     environment.systemPackages = [ installer ];
     environment.loginShellInit = ''
@@ -48,9 +53,9 @@ let
         cp -L ${installer}/etc_nixos/configuration.nix $HOME && chmod u+w $HOME/configuration.nix
       fi
 
-      if [ "$(tty)" == "/dev/hvc0" ]; then
-        echo "CYBERMANJU_LIVE_INSTALLER_READY"
-      fi
+      case "$(tty)" in
+        /dev/ttyS0|/dev/hvc0) echo "CYBERMANJU_LIVE_INSTALLER_READY" ;;
+      esac
 
       ${pkgs.lib.optionalString autoInstall ''
         if [ "$(tty)" == "/dev/hvc0" ]; then

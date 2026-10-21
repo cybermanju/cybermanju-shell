@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Drive the real ISO over hvc0; no direct kernel boot or test-only ISO.
+"""Drive the real Linux installer ISO over ttyS0; no direct kernel boot or test-only ISO.
 
 The live installer kernel is Linux. Only the subsequently installed system is
 Asterinas. Installation is online and uses the configured Nix binary caches.
@@ -16,6 +16,7 @@ import time
 import uuid
 
 from vm_settings import TIMEOUTS, settings
+from boot_metrics import timed_phase
 
 
 class Console:
@@ -31,7 +32,7 @@ class Console:
             match = re.search(pattern, self.buffer, re.MULTILINE)
             if match:
                 self.buffer = self.buffer[match.end():]
-                return
+                return match
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError(f"VM console timed out waiting for {pattern!r}")
@@ -51,15 +52,23 @@ class Console:
     def checked(self, command, seconds=120):
         # Match a complete line, never the shell's echoed command or stale logs.
         token = "CI_" + uuid.uuid4().hex
-        self.send(f"{command} && printf '\\n%s%s\\n' '{token[:10]}' '{token[10:]}'")
-        self.expect(rb"^" + token.encode() + rb"\r?$", seconds)
+        # Run in a subshell so `exit` and shell options cannot suppress reporting.
+        # A failed command should fail now, not look like a missing console later.
+        self.send(f"( {command} ); ci_status=$?; "
+                  f"printf '\\n%s%s:%s\\n' '{token[:10]}' '{token[10:]}' \"$ci_status\"")
+        match = self.expect(rb"^" + token.encode() + rb":([0-9]+)\r?$", seconds)
+        status = int(match.group(1))
+        if status:
+            raise RuntimeError(f"Guest command failed (exit {status}): {command}")
 
 
 def run(phase):
     root = Path(__file__).resolve().parents[2] / "asterinas"
+    artifacts = root.parent / "artifacts"
     selected, reason = settings()
-    print(f"QEMU acceleration: {selected['QEMU_ACCEL']} ({reason})", flush=True)
-    env = dict(os.environ, **selected, CONSOLE="hvc0", QEMU_DISPLAY="none",
+    acceleration = selected["QEMU_ACCEL"]
+    print(f"QEMU acceleration: {acceleration} ({reason})", flush=True)
+    env = dict(os.environ, **selected, CONSOLE="ttyS0", QEMU_DISPLAY="none",
                MEM="4G", SMP="2", OVMF="on", BOOT_METHOD="", ISO_BOOT_MODE="cdrom")
     if phase == "live-usb":
         env["ISO_BOOT_MODE"] = "usb"
@@ -70,46 +79,51 @@ def run(phase):
     )
     console = Console(process)
     try:
-        console.expect(rb"^CYBERMANJU_LIVE_INSTALLER_READY\r?$", TIMEOUTS["ISO_VM_BOOT_SECONDS"])
+        with timed_phase(artifacts, f"{phase}-iso-boot-readiness", acceleration):
+            console.expect(rb"^CYBERMANJU_LIVE_INSTALLER_READY\r?$", TIMEOUTS["ISO_VM_BOOT_SECONDS"])
         console.send("stty -echo; set +o emacs +o vi")
-        console.checked(
-            'test "$(uname -s)" = Linux && '
-            'command -v aster-nixos-install && command -v nix-build && '
-            'command -v nixos-install && test -s /root/configuration.nix && '
-            'test -b /dev/vda && test ! -b /dev/vda1',
-            TIMEOUTS["ISO_VM_COMMAND_SECONDS"],
-        )
+        with timed_phase(artifacts, f"{phase}-live-checks", acceleration):
+            console.checked(
+                'test "$(uname -s)" = Linux && '
+                'command -v aster-nixos-install && command -v nix-build && '
+                'command -v nixos-install && test -s /root/configuration.nix && '
+                'test -b /dev/vda && test ! -b /dev/vda1',
+                TIMEOUTS["ISO_VM_COMMAND_SECONDS"],
+            )
         if phase == "install":
             # This formats only the newly created disposable guest disk.
             # The same published ISO remains interactive on all real hardware.
-            console.send(
-                "aster-nixos-install --config /root/configuration.nix "
-                "--disk /dev/vda --force-format-disk"
-            )
-            console.expect(
-                rb"^Congratulations! Asterinas NixOS has been installed successfully!\r?$",
-                TIMEOUTS["ISO_VM_INSTALL_SECONDS"],
-            )
-            console.checked(
-                'test -b /dev/vda1 && test -b /dev/vda2 && '
-                'mkdir -p /tmp/ci-esp && mount -r /dev/vda1 /tmp/ci-esp && '
-                'test -s /tmp/ci-esp/EFI/BOOT/BOOTX64.EFI && '
-                'test -s /tmp/ci-esp/grub/grub.cfg && '
-                'grep -q asterinas /tmp/ci-esp/grub/grub.cfg && '
-                'umount /tmp/ci-esp',
-                TIMEOUTS["ISO_VM_COMMAND_SECONDS"],
-            )
-        console.checked("sync", TIMEOUTS["ISO_VM_COMMAND_SECONDS"])
-        console.send("poweroff")
-        # Drain output until EOF and require real shutdown, not just a marker.
-        try:
-            console.expect(rb"(?!)", TIMEOUTS["ISO_VM_SHUTDOWN_SECONDS"])
-        except RuntimeError:
-            pass
-        code = process.wait(timeout=TIMEOUTS["ISO_VM_PROCESS_WAIT_SECONDS"])
-        if code != 0:
-            raise RuntimeError(f"VM shutdown returned {code}")
-        print(f"PASS: {phase} using the full interactive ISO (UEFI, {selected['QEMU_ACCEL']}).", flush=True)
+            with timed_phase(artifacts, f"{phase}-install", acceleration):
+                console.send(
+                    "aster-nixos-install --config /root/configuration.nix "
+                    "--disk /dev/vda --force-format-disk"
+                )
+                console.expect(
+                    rb"^Congratulations! Asterinas NixOS has been installed successfully!\r?$",
+                    TIMEOUTS["ISO_VM_INSTALL_SECONDS"],
+                )
+            with timed_phase(artifacts, f"{phase}-verify-install", acceleration):
+                console.checked(
+                    'test -b /dev/vda1 && test -b /dev/vda2 && '
+                    'mkdir -p /tmp/ci-esp && mount -r /dev/vda1 /tmp/ci-esp && '
+                    'test -s /tmp/ci-esp/EFI/BOOT/BOOTX64.EFI && '
+                    'test -s /tmp/ci-esp/grub/grub.cfg && '
+                    'grep -q asterinas /tmp/ci-esp/grub/grub.cfg && '
+                    'umount /tmp/ci-esp',
+                    TIMEOUTS["ISO_VM_COMMAND_SECONDS"],
+                )
+        with timed_phase(artifacts, f"{phase}-shutdown", acceleration):
+            console.checked("sync", TIMEOUTS["ISO_VM_COMMAND_SECONDS"])
+            console.send("poweroff")
+            # Drain output until EOF and require real shutdown, not just a marker.
+            try:
+                console.expect(rb"(?!)", TIMEOUTS["ISO_VM_SHUTDOWN_SECONDS"])
+            except RuntimeError:
+                pass
+            code = process.wait(timeout=TIMEOUTS["ISO_VM_PROCESS_WAIT_SECONDS"])
+            if code != 0:
+                raise RuntimeError(f"VM shutdown returned {code}")
+        print(f"PASS: {phase} using the full interactive ISO (UEFI, {acceleration}).", flush=True)
     finally:
         console.selector.close()
         if process.poll() is None:
@@ -121,7 +135,6 @@ def run(phase):
                 process.wait()
         process.stdin.close()
         process.stdout.close()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

@@ -176,6 +176,8 @@ jobs:
               'source_commit': os.environ['GITHUB_SHA'], 'gates': gates,
               'accepted': all(gates.values()),
               'acceleration': acceleration,
+              'installer_timings': {path.stem: json.loads(path.read_text())
+                                    for path in Path('artifacts').glob('boot-metrics-*.json')},
               'live_environment': 'Linux NixOS full interactive Asterinas installer',
               'installed_target': 'Asterinas NixOS, base configuration with hello-asterinas and gitMinimal',
               'limits': 'Online installation; no integrated desktop, GPU, physical USB or Secure Boot certification; BIOS metadata only',

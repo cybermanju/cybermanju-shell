@@ -1,6 +1,7 @@
 """No VM runs: test console output validation and QEMU argument construction."""
 import io
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -20,6 +21,7 @@ class DriverAccelerationTests(unittest.TestCase):
                  mock.patch("vm_settings.os.access", return_value=True), \
                  mock.patch("iso_vm.subprocess.Popen") as popen, \
                  mock.patch("iso_vm.Console"), \
+                 mock.patch("iso_vm.timed_phase"), \
                  mock.patch("sys.stdout", new_callable=io.StringIO):
                 popen.return_value.wait.return_value = 0
                 popen.return_value.poll.return_value = 0
@@ -28,38 +30,62 @@ class DriverAccelerationTests(unittest.TestCase):
                 self.assertEqual(env["ENABLE_KVM"], expected)
                 self.assertEqual(env["QEMU_ACCEL"], "kvm" if present else "tcg")
                 self.assertEqual(env["ISO_BOOT_MODE"], "usb")
+                self.assertEqual(env["CONSOLE"], "ttyS0")
 
 
 class ConsoleTests(unittest.TestCase):
     def test_checked_command_uses_whole_line_and_split_nonce(self):
         console = Console.__new__(Console)
         console.send = mock.Mock()
-        console.expect = mock.Mock()
+        console.expect = mock.Mock(return_value=re.match(rb"([0-9]+)", b"0"))
         with mock.patch("iso_vm.uuid.uuid4") as token:
             token.return_value.hex = "a" * 32
             console.checked("test -s /root/configuration.nix")
         command = console.send.call_args.args[0]
-        self.assertIn("test -s /root/configuration.nix && printf", command)
+        self.assertIn("( test -s /root/configuration.nix ); ci_status=$?;", command)
         self.assertNotIn("CI_" + "a" * 32, command)
         pattern = console.expect.call_args.args[0]
-        import re
         self.assertIsNone(re.search(pattern, command.encode(), re.MULTILINE))
-        self.assertIsNotNone(re.search(pattern, b"CI_" + b"a" * 32 + b"\r\n", re.MULTILINE))
+        self.assertIsNotNone(re.search(pattern, b"CI_" + b"a" * 32 + b":0\r\n", re.MULTILINE))
+
+    def test_checked_command_reports_nonzero_exit_without_timeout(self):
+        console = Console.__new__(Console)
+        console.send = mock.Mock()
+        console.expect = mock.Mock(return_value=re.match(rb"([0-9]+)", b"7"))
+        with self.assertRaisesRegex(RuntimeError, r"Guest command failed \(exit 7\)"):
+            console.checked("false")
+
+    def test_checked_command_real_pipe_success_and_failure(self):
+        # Exercise the protocol against a real shell, not mocked expect output.
+        process = subprocess.Popen(["bash", "--noprofile", "--norc"],
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT)
+        console = Console(process)
+        try:
+            console.checked("true", seconds=2)
+            for command in ("false", "exit 9", "test -f /nonexistent-ci-file"):
+                with self.subTest(command=command), self.assertRaises(RuntimeError):
+                    console.checked(command, seconds=2)
+            console.checked("true", seconds=2)
+        finally:
+            process.stdin.close()
+            process.wait(timeout=2)
+            console.selector.close()
+            process.stdout.close()
 
     def test_console_does_not_accept_substring_or_stale_echo(self):
-        import re
         pattern = rb"^CYBERMANJU_LIVE_INSTALLER_READY\r?$"
         self.assertIsNone(re.search(pattern, b"echo CYBERMANJU_LIVE_INSTALLER_READY\n", re.MULTILINE))
         self.assertIsNotNone(re.search(pattern, b"CYBERMANJU_LIVE_INSTALLER_READY\r\n", re.MULTILINE))
 
 
 class LiveConsoleConfigTests(unittest.TestCase):
-    def test_live_iso_loads_hvc0_driver_before_getty(self):
-        import re
+    def test_live_iso_selects_uart_but_preserves_legacy_auto_install(self):
         source = (Path(__file__).resolve().parents[2]
                   / "asterinas/distro/iso_image/default.nix").read_text()
         self.assertRegex(source, r'boot\.initrd\.kernelModules\s*=\s*\[[^\]]*"virtio_console"')
-        self.assertIn('"console=hvc0"', source)
+        self.assertIn('(if autoInstall then "console=hvc0" else "console=ttyS0,115200n8")', source)
+        self.assertIn("/dev/ttyS0|/dev/hvc0)", source)
         self.assertIn('services.getty.autologinUser = pkgs.lib.mkForce "root";', source)
 
 
@@ -142,6 +168,25 @@ class RunScriptTests(unittest.TestCase):
         self.assertIn("-accel\ntcg,thread=multi", arguments)
         self.assertIn("QEMU acceleration: tcg", result.stdout)
         self.assertIn("-vmx", arguments)
+
+    def test_uart_console_routes_stdin_and_stdout_to_captured_mux(self):
+        script = Path(__file__).resolve().parents[2] / "asterinas/tools/qemu_args.sh"
+        result = subprocess.run(["bash", str(script), "nixos"],
+                                env=dict(os.environ, CONSOLE="ttyS0", NETDEV="none"),
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("-serial chardev:mux", result.stdout)
+        self.assertNotIn("-device virtconsole", result.stdout)
+
+    def test_asterinas_default_console_remains_virtio(self):
+        script = Path(__file__).resolve().parents[2] / "asterinas/tools/qemu_args.sh"
+        env = dict(os.environ, NETDEV="none")
+        env.pop("CONSOLE", None)
+        result = subprocess.run(["bash", str(script), "nixos"], env=env,
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("-device virtconsole,chardev=mux", result.stdout)
+        self.assertIn("-serial file:qemu-serial.log", result.stdout)
 
     def test_cpu_flags_follow_acceleration_without_running_qemu(self):
         script = Path(__file__).resolve().parents[2] / "asterinas/tools/qemu_args.sh"

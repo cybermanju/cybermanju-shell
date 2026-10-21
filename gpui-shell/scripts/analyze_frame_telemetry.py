@@ -105,6 +105,10 @@ def _validate_telemetry(record: dict[str, Any], line_number: int) -> dict[str, A
         raise AnalysisError(f"{prefix}: hardware_acceleration_verified must be false")
 
     elapsed = _finite_number(record.get("elapsed_seconds"), f"{prefix}.elapsed_seconds")
+    if mode == "bounded_redraw_probe" and probe_finished != (elapsed >= probe_seconds):
+        raise AnalysisError(
+            f"{prefix}: probe_finished must match whether elapsed_seconds reached probe_seconds"
+        )
     entries = _nonnegative_int(record.get("sample_entries"), f"{prefix}.sample_entries")
     intervals = _nonnegative_int(record.get("sample_intervals"), f"{prefix}.sample_intervals")
     dropped = _nonnegative_int(record.get("dropped_samples"), f"{prefix}.dropped_samples")

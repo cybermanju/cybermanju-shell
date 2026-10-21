@@ -1,0 +1,47 @@
+name: Shell regression checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ci/**'
+      - 'asterinas/tools/nixos/**'
+      - 'asterinas/tools/qemu_args.sh'
+      - 'asterinas/distro/iso_image/**'
+      - 'gpui-shell/scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'tools/ci/**'
+      - 'asterinas/tools/nixos/**'
+      - 'asterinas/tools/qemu_args.sh'
+      - 'asterinas/distro/iso_image/**'
+      - 'gpui-shell/scripts/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shell-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    # Safe for fork PRs: no secrets, containers, sudo or privileged VM build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Shell syntax and ISO regression suite (no VM)
+        run: |
+          bash -n tools/ci/*.sh asterinas/tools/nixos/run.sh asterinas/tools/nixos/build_nixos.sh asterinas/tools/qemu_args.sh
+          python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
+      - name: Frame telemetry regressions and presentation script syntax (not an FPS benchmark)
+        working-directory: gpui-shell
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_frame_telemetry.py' -v
+          python3 -m py_compile scripts/test_nested_presentation_boundary.py
