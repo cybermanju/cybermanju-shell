@@ -83,10 +83,11 @@ class DeadlineTests(unittest.TestCase):
     def test_combined_step_maxima_are_below_job_and_hosted_limits(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/iso.yml").read_text()
         limits = [int(value) for value in re.findall(r"timeout-minutes: (\d+)", workflow)]
-        self.assertEqual(limits[0], 350)
-        self.assertEqual(sum(limits[1:]), 348)
+        self.assertEqual(limits[0], 358)
+        self.assertEqual(sum(limits[1:]), 356)
         self.assertLess(sum(limits[1:]), limits[0])
         self.assertLess(limits[0], 360)
+        self.assertLess(sum(limits[1:]), 360)
 
 
 if __name__ == "__main__":

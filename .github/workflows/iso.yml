@@ -29,7 +29,7 @@ jobs:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
     # Entire build/test loop stays below the hosted 360-minute cap.
-    timeout-minutes: 350
+    timeout-minutes: 358
     env:
       # Builder host only; the ISO and installed OS remain Asterinas NixOS.
       BUILD_IMAGE: ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
@@ -49,7 +49,7 @@ jobs:
           python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 
       - name: Reclaim unused ephemeral SDKs, measure capacity and select KVM or TCG
-        timeout-minutes: 2
+        timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
