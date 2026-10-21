@@ -36,6 +36,12 @@ case ${2:-} in
         CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
         CPUS=2
         ;;
+    --tlb-global)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_tlb_global_runtime
+        VERIFY=verify_tlb_global_runtime.py
+        ;;
     *) echo 'Unknown runtime mode' >&2; exit 2 ;;
 esac
 CONFIG="$ROOT/asterinas/$CRATE_PATH/OSDK.toml"

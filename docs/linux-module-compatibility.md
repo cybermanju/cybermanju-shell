@@ -1,6 +1,8 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: a recusa do protótipo em topologia de duas CPUs passou em um ktest real de QEMU.** Três leituras válidas foram recusadas sem alterar destinos, conteúdo dos frames ou PTEs observados, e a reserva voltou ao alocador. Isso prova o bloqueio, **não suporte de mapping SMP**.
+**Avanço mais recente: corrigida a agregação TLB que podia enfraquecer pedidos de invalidação GLOBAL ao atingir 32 páginas.** O código agora preserva o pedido mais forte. Passaram testes de estado e sete leituras reais locais; **o TCG não distinguiu o controle que exclui GLOBAL**, portanto não há prova de comportamento equivalente em hardware físico ou de shootdown remoto.
+
+**Etapa anterior:** a recusa do protótipo em topologia de duas CPUs passou em um ktest real de QEMU. Três leituras válidas foram recusadas sem alterar destinos, conteúdo dos frames ou PTEs observados, e a reserva voltou ao alocador. Isso prova o bloqueio, **não suporte de mapping SMP**.
 
 **Etapa de mapping temporário:** a fixture auxiliar foi lida pela própria base virtual reservada em um mapping RW temporário real. Os **40.960 bytes / 10 páginas** coincidiram com o ELF preparado. O protótipo existe **somente em ktest x86-64 com uma CPU**: desmonta o alias e invalida o TLB local antes de devolver o controle. Um controle negativo sem INVLPG copiou bytes estrangeiros e falhou como esperado. **Não há mapping de produção/persistente, init/exit, execução de módulo, NX global ou W^X demonstrados.**
 
@@ -21,6 +23,7 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | `linux-module-elf` | **120 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
 | **`linux-module-staging`** | **1 ktest** com bytes preparados, owner conjunto, 3 casos de ciclo de vida e readback pela base real em 10 páginas temporárias | Apenas ktest de uma CPU; sem mapping persistente/produção, syscalls ou init/exit |
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 7 cenários** bruto, incluindo owner, mapping temporário, colisão e tradução stale, mais o novo ktest com ELF e **15 testes host** | Mapping experimental só em ktest de uma CPU; sem execução, SMP ou W^X |
+| **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado e 7 readbacks em uma CPU | TCG não discrimina inclusive/exclusive; sem prova remota, benchmark ou hardware físico |
 | **Recusa SMP do protótipo OSTD** | 1 ktest, topologia real reportada de 2 CPUs, 3 chamadas válidas recusadas, 3 páginas de VA sem PTEs e faixa reutilizada após Drop | Somente bloqueio; não testa acesso concorrente, shootdown remoto, W^X ou init |
 | **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Primitiva sem frames/mapping; usada pela ponte de layout, sem garantia geral de alcance de relocations |
 | VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 GiB, BIOS/GRUB multiboot2; mapping positivo em 1 CPU e recusa em 2 CPUs | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
@@ -32,6 +35,20 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | **`cybermanju_noimports_fixture.ko` auxiliar** | Mesmo Linux/arquitetura, `nm -u` vazio; preparação com zero exports; copiada para 10 frames no ktest; init FUNC 4 bytes e exit FUNC 2 bytes identificados na inspeção compacta | Flags não padrão e objtool desviado nesse objeto; init/exit nunca chamados; segurança e ABI não demonstradas |
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
+
+## Invalidação TLB: não enfraquecer pedidos ao juntar páginas
+
+O TLB guarda traduções de endereços. Depois de trocar o frame de uma página, uma tradução antiga não pode continuar entregando dados do frame anterior. No [flusher OSTD](../asterinas/ostd/src/mm/tlb.rs), os pedidos para endereços específicos incluíam páginas GLOBAL, mas ranges e filas com pelo menos 32 páginas eram promovidos para uma operação que excluía GLOBAL. Misturar essa operação ampla com pedidos específicos também podia perder a exigência mais forte.
+
+Foi acrescentado `TlbFlushOp::for_all_including_global()`, sem alterar a variante explícita `for_all()` isolada. Ranges grandes usam o novo pedido; a fila preserva a necessidade GLOBAL, inclusive antes de retornos antecipados e ao receber outra fila. O reset limpa a flag. As duas sentinelas são tratadas antes de somar contadores, evitando overflow com `u32::MAX`. O encoding continua com oito bytes no alvo testado. A gestão existente de frames/RCU não foi alterada. Isso **não cria mapping de módulos, suporte SMP ou W^X**.
+
+O [novo ktest](../asterinas/ostd/src/mm/tlb/runtime_tests.rs) passou quatro casos de encoding, oito grupos de asserções de estado e sete readbacks reais: range de 31 páginas, range de 32, 32 pedidos individuais, duas filas de 16, mistura de `for_all`/endereço nas duas ordens e flush inclusivo explícito. O helper exige uma CPU, confirma CR4.PGE e o PTE GLOBAL/supervisor sem X, aquece a tradução do frame estrangeiro e substitui seu PTE sem INVLPG. Ambos os frames ficam vivos; um guard remove o mapping e invalida antes de liberá-los. Não há execução de bytes ou ponteiros retornados.
+
+**Controle negativo final:** desativar totalmente o flush inclusivo fez a leitura retornar oito bytes `0xe1` estrangeiros em vez de `0x42`, falhando no caso do range de 32 páginas. O fonte correto foi restaurado e o teste positivo repetido. **Limite importante:** trocar o despacho inclusivo pelo flush que exclui GLOBAL também passou em QEMU/TCG, mesmo com PGE e PTE GLOBAL confirmados. Portanto, este runtime detecta ausência de flush, mas **não discrimina a variante inclusiva da exclusiva**; não prova que a falha antiga se reproduz em hardware físico. A preservação do pedido GLOBAL é conferida pelo encoding/estado e pelo caminho de código, não por uma prova discriminante do hardware.
+
+Passaram **150 testes Python e cinco ktests em VMs separadas**: TLB, staging bruto, recusa em duas CPUs, fixture preparada e framebuffer/console. Type-check normal de OSTD/ponte/framebuffer para `x86_64-unknown-none`, rustfmt, sintaxe e diff passaram. O [gate](../tools/ci/verify_tlb_global_runtime.py) exige três marcadores únicos e resumo isolado; rejeita falhas, echo e controles que alterem marcadores. O CI mantém sete jobs e acrescenta a VM ao job de runtime. Serial/JSON/hashes em `artifacts/tlb-global-runtime/`; regressões em `artifacts/module-staging-tlb-2000/`, `artifacts/module-smp-rejection-2000/`, `artifacts/prepared-tlb-2000/` e `artifacts/framebuffer-tlb-2000/`; controles em `artifacts/tlb-global-no-flush-pge-negative/`, `artifacts/tlb-global-excluding-pge-control/` e logs em `artifacts/cycle-2000/`.
+
+O flush completo inclusivo pode custar mais que o anterior: **não há benchmark de performance**. Continuam pendentes o teste discriminante fora de TCG, a coerência remota, liberação diferida de frames e a política do alias linear. Nenhum módulo, versão Linux ou arquitetura foi acrescentado à lista qualificada; não há novo boot instalado ou validação GPUI.
 
 ## Recusa explícita em topologia de duas CPUs
 
@@ -185,6 +202,7 @@ bash tools/ci/test_module_staging.sh
 bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
 bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --address-reservation
 bash tools/ci/test_module_staging_runtime.sh artifacts/module-smp-rejection-runtime --smp-rejection
+bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-global-runtime --tlb-global
 bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
 (cd asterinas && cargo check --locked -p ostd -p linux-module-staging --target x86_64-unknown-none)
 bash tools/ci/test_linux_module_elf.sh
@@ -202,11 +220,13 @@ Ainda não há despacho de `init_module` (175), `delete_module` (176) ou `finit_
 
 **Próxima etapa:** desenhar o contrato de mapping persistente e liberação diferida em SMP antes de expor uma API de produção. O protótipo acima é deliberadamente local e temporário; não pode simplesmente perder o guard de IRQ ou a recusa multi-CPU. Na API de produção, a reserva continua ligada ao layout e à preparação, mas não há frames persistentemente mapeados nela. A transição posterior para RX e dados R/RW precisa tratar o alias linear RW, não só flags do novo mapping, além de sincronização/TLB e falha de init/unload. `KVirtArea::map_frames` é interno a OSTD, não uma API pronta de loader com essas garantias; VM de processo não resolve memória do kernel. A fixture data-only atual não autoriza execução.
 
-O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) exige cuidado adicional antes de ser usado nesse caminho: `for_range` e a fila agregam 32 ou mais páginas em `for_all`, que explicitamente exclui entradas GLOBAL. Portanto, não é substituto direto do INVLPG por página usado no protótipo. Esperar shootdown remoto com IRQs desabilitadas também é vedado. São restrições de arquitetura ainda pendentes, não suporte SMP implementado.
+O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) agora preserva pedidos GLOBAL ao agregar 32 ou mais páginas, como descrito acima. Isso corrige o enfraquecimento do pedido, mas não o torna uma API de loader nem comprova shootdown remoto. Esperar IPIs de invalidação com IRQs desabilitadas continua vedado. Liberação diferida, CPUs-alvo corretos e prova discriminante do comportamento GLOBAL permanecem pendentes; não há suporte de mapping SMP implementado.
 
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
+
+O [CI da base `2077d48`, run 39687832657](https://github.com/cybermanju/cybermanju-shell/actions/runs/39687832657), **passou nos sete jobs**, incluindo a recusa de mapping em duas CPUs. A ISO dessa revisão estava pendente na consulta inicial. A nova correção TLB tem os testes locais acima; essa aprovação anterior não é sua aprovação remota.
 
 O [CI de `4f8933b`, run 39686044422](https://github.com/cybermanju/cybermanju-shell/actions/runs/39686044422), **passou nos sete jobs**, incluindo os novos casos de console e os runtimes de módulos. A ISO dessa revisão estava pendente na consulta inicial. Essa aprovação é da base anterior; a nova recusa SMP tem evidência local e aguarda seu próprio CI após publicação.
 

@@ -251,3 +251,91 @@ pub(crate) fn probe_stale_read(
     assert_unmapped(reservation);
     result
 }
+
+/// Semeia uma tradução GLOBAL antiga e verifica uma operação TLB local real.
+/// Exclusivo do harness de uma CPU; nenhum ponteiro ou frame escapa ao callback.
+pub(crate) fn probe_global_flush_for_test(flush: impl FnOnce(Range<Vaddr>)) -> [u8; 8] {
+    assert_eq!(num_cpus(), 1, "a prova local não autoriza shootdown SMP");
+    let foreign = FrameAllocOptions::new().zeroed(true).alloc_frame().unwrap();
+    let replacement = FrameAllocOptions::new().zeroed(true).alloc_frame().unwrap();
+    let old_bytes = [0xe1; 8];
+    let expected = [0x42; 8];
+    foreign.write_bytes(0, &old_bytes).unwrap();
+    replacement.write_bytes(0, &expected).unwrap();
+    let reservation = ModuleAddressReservation::new(33 * PAGE_SIZE, 33).unwrap();
+    let range = reservation.range();
+    let mut scope = ScopedMapping {
+        irq_guard: irq::disable_local(),
+        _reservation: &reservation,
+        installed: range.start..range.start,
+    };
+    // O teste exige PGE ativo; habilitá-lo usa a primitiva existente, sob IRQ guard.
+    crate::arch::mm::tlb_flush_all_including_global();
+    assert!(
+        x86_64::registers::control::Cr4::read()
+            .contains(x86_64::registers::control::Cr4Flags::PAGE_GLOBAL)
+    );
+    let table = KERNEL_PAGE_TABLE.get().unwrap();
+    let slot = range.start..range.start + PAGE_SIZE;
+    let prop = PageProperty {
+        flags: PageFlags::RW,
+        cache: CachePolicy::Writeback,
+        priv_flags: PrivilegedPageFlags::GLOBAL,
+    };
+    {
+        let mut cursor = table.cursor_mut(&scope.irq_guard, &slot).unwrap();
+        assert!(cursor.query().unwrap().1.is_none());
+        scope.installed.end = slot.end;
+        // SAFETY: faixa virtual exclusiva, frame privado retido e RAM sem X/USER.
+        unsafe {
+            cursor.map(MappedItem::Tracked(
+                Frame::from_unsized(foreign.clone()),
+                prop,
+            ));
+        }
+    }
+    {
+        let mut cursor = table.cursor(&scope.irq_guard, &slot).unwrap();
+        let Some(MappedItemRef::Tracked(actual, flags)) = cursor.query().unwrap().1 else {
+            panic!("PTE rastreado obrigatório para a prova GLOBAL");
+        };
+        assert_eq!(actual.paddr(), foreign.paddr());
+        assert!(flags.priv_flags.contains(PrivilegedPageFlags::GLOBAL));
+        assert!(!flags.priv_flags.contains(PrivilegedPageFlags::USER));
+        assert!(!flags.flags.contains(PageFlags::X));
+    }
+    tlb_flush_addr_range(&slot);
+    let mut observed = [0; 8];
+    {
+        // SAFETY: mapping legível, frame retido e IRQ local desabilitada.
+        let mut reader = unsafe { VmReader::from_kernel_space(slot.start as *const u8, 8) };
+        reader.read(&mut VmWriter::from(&mut observed[..]));
+    }
+    assert_eq!(
+        observed, old_bytes,
+        "a tradução estrangeira deve ser aquecida"
+    );
+    {
+        let mut cursor = table.cursor_mut(&scope.irq_guard, &slot).unwrap();
+        // SAFETY: troca somente o slot próprio; ambos os frames ficam vivos.
+        drop(unsafe { cursor.take_next(PAGE_SIZE) }.unwrap());
+        cursor.jump(slot.start).unwrap();
+        // SAFETY: RAM privada retida na mesma faixa reservada; sem execução.
+        unsafe {
+            cursor.map(MappedItem::Tracked(
+                Frame::from_unsized(replacement.clone()),
+                prop,
+            ));
+        }
+    }
+    // Deliberadamente sem INVLPG: somente a operação sob teste pode limpar o stale.
+    flush(range.clone());
+    {
+        // SAFETY: ambas as possíveis traduções apontam RAM válida ainda retida.
+        let mut reader = unsafe { VmReader::from_kernel_space(slot.start as *const u8, 8) };
+        reader.read(&mut VmWriter::from(&mut observed[..]));
+    }
+    drop(scope); // remove o PTE e invalida antes de liberar qualquer frame/reserva.
+    assert_unmapped(&reservation);
+    observed
+}

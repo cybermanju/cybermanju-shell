@@ -147,12 +147,13 @@ impl<'a, G: PinCurrentCpu> TlbFlusher<'a, G> {
 ///
 /// The variants of this structure are:
 ///  - Flushing all TLB entries except for the global entries;
+///  - Flushing all TLB entries including the global entries;
 ///  - Flushing the TLB entry associated with an address;
 ///  - Flushing the TLB entries for a specific range of virtual addresses;
 ///
 /// This is a `struct` instead of an `enum` because if trivially representing
-/// the three variants with an `enum`, it would be 24 bytes. To minimize the
-/// memory footprint, we encode all three variants into an 8-byte integer.
+/// these variants with an `enum`, it would be 24 bytes. To minimize the
+/// memory footprint, we encode the variants into an 8-byte integer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TlbFlushOp(Vaddr);
 
@@ -160,9 +161,14 @@ pub struct TlbFlushOp(Vaddr);
 // address can be used to store the length. A sanity check to ensure that we
 // don't allow ranged flush operations with a too long length.
 const_assert!(TlbFlushOp::FLUSH_RANGE_NPAGES_MASK | (PAGE_SIZE - 1) == PAGE_SIZE - 1);
+const_assert!(
+    (TlbFlushOp::FLUSH_ALL_INCLUDING_GLOBAL_VAL & (PAGE_SIZE - 1)) >= FLUSH_ALL_PAGES_THRESHOLD
+);
 
 impl TlbFlushOp {
     const FLUSH_ALL_VAL: Vaddr = Vaddr::MAX;
+    // The low bits identify this sentinel, distinct from valid page encodings.
+    const FLUSH_ALL_INCLUDING_GLOBAL_VAL: Vaddr = Vaddr::MAX - 1;
     const FLUSH_RANGE_NPAGES_MASK: Vaddr =
         (1 << (usize::BITS - FLUSH_ALL_PAGES_THRESHOLD.leading_zeros())) - 1;
 
@@ -172,6 +178,7 @@ impl TlbFlushOp {
 
         match self.0 {
             Self::FLUSH_ALL_VAL => mm::tlb_flush_all_excluding_global(),
+            Self::FLUSH_ALL_INCLUDING_GLOBAL_VAL => mm::tlb_flush_all_including_global(),
             addr => {
                 let start = addr & !Self::FLUSH_RANGE_NPAGES_MASK;
                 let num_pages = addr & Self::FLUSH_RANGE_NPAGES_MASK;
@@ -194,6 +201,14 @@ impl TlbFlushOp {
         TlbFlushOp(Self::FLUSH_ALL_VAL)
     }
 
+    /// Creates a full flush operation that also flushes global entries.
+    ///
+    /// This stronger operation is used when combining ranges: flushing all
+    /// entries must not weaken a request that may include global mappings.
+    pub const fn for_all_including_global() -> Self {
+        TlbFlushOp(Self::FLUSH_ALL_INCLUDING_GLOBAL_VAL)
+    }
+
     /// Creates a new TLB flush operation that flushes the TLB entry associated
     /// with the provided virtual address.
     pub const fn for_single(addr: Vaddr) -> Self {
@@ -204,7 +219,9 @@ impl TlbFlushOp {
     /// specified virtual address range.
     ///
     /// If the range is too large, the resulting [`TlbFlushOp`] will flush all
-    /// TLB entries instead.
+    /// TLB entries, including global entries. This stronger flush is needed
+    /// because the range may cover global mappings; it never enables global
+    /// mappings or changes their SMP behavior.
     ///
     /// # Panics
     ///
@@ -221,7 +238,7 @@ impl TlbFlushOp {
         assert!(range.start < range.end, "range must not be empty");
         let num_pages = (range.end - range.start) / PAGE_SIZE;
         if num_pages >= FLUSH_ALL_PAGES_THRESHOLD {
-            return TlbFlushOp::for_all();
+            return TlbFlushOp::for_all_including_global();
         }
         TlbFlushOp(range.start | (num_pages as Vaddr))
     }
@@ -232,7 +249,7 @@ impl TlbFlushOp {
     /// the return value should be less than [`FLUSH_ALL_PAGES_THRESHOLD`] and
     /// non-zero.
     fn num_pages(&self) -> u32 {
-        if self.0 == Self::FLUSH_ALL_VAL {
+        if self.0 == Self::FLUSH_ALL_VAL || self.0 == Self::FLUSH_ALL_INCLUDING_GLOBAL_VAL {
             u32::MAX
         } else {
             debug_assert!((self.0 & (PAGE_SIZE - 1)) < FLUSH_ALL_PAGES_THRESHOLD);
@@ -275,6 +292,8 @@ struct OpsStack {
     ///
     /// Otherwise, it counts the number of pages to flush in `ops`.
     num_pages_to_flush: u32,
+    /// A non-for_all request has been aggregated, so global entries must be flushed.
+    need_flush_global: bool,
     /// Keeps all the to-be-dropped frames.
     ///
     /// The elements cannot be modified after being pushed. And they must be
@@ -288,6 +307,7 @@ impl OpsStack {
             ops: [const { MaybeUninit::uninit() }; FLUSH_ALL_PAGES_THRESHOLD],
             num_ops: 0,
             num_pages_to_flush: 0,
+            need_flush_global: false,
             frame_keeper: Vec::new(),
         }
     }
@@ -310,11 +330,13 @@ impl OpsStack {
             panic_guard.forget();
         }
 
+        let op_num_pages = op.num_pages();
+        self.need_flush_global |= op != TlbFlushOp::for_all();
         if self.need_flush_all() {
             return;
         }
-        let op_num_pages = op.num_pages();
         if op == TlbFlushOp::for_all()
+            || op_num_pages == u32::MAX
             || self.num_pages_to_flush + op_num_pages >= FLUSH_ALL_PAGES_THRESHOLD as u32
         {
             self.num_pages_to_flush = u32::MAX;
@@ -330,10 +352,12 @@ impl OpsStack {
     fn push_from(&mut self, other: &OpsStack) {
         self.frame_keeper.extend(other.frame_keeper.iter().cloned());
 
+        self.need_flush_global |= other.need_flush_global;
         if self.need_flush_all() {
             return;
         }
         if other.need_flush_all()
+            || other.num_pages_to_flush == u32::MAX
             || self.num_pages_to_flush + other.num_pages_to_flush
                 >= FLUSH_ALL_PAGES_THRESHOLD as u32
         {
@@ -351,7 +375,11 @@ impl OpsStack {
 
     fn flush_all(&mut self) {
         if self.need_flush_all() {
-            crate::arch::mm::tlb_flush_all_excluding_global();
+            if self.need_flush_global {
+                crate::arch::mm::tlb_flush_all_including_global();
+            } else {
+                crate::arch::mm::tlb_flush_all_excluding_global();
+            }
         } else {
             self.ops_iter().for_each(|op| {
                 op.perform_on_current();
@@ -364,6 +392,7 @@ impl OpsStack {
     fn clear_without_flush(&mut self) {
         self.num_pages_to_flush = 0;
         self.num_ops = 0;
+        self.need_flush_global = false;
         if !self.frame_keeper.is_empty() {
             let _ = RcuDrop::new(core::mem::take(&mut self.frame_keeper));
         }
@@ -384,3 +413,7 @@ impl Drop for OpsStack {
         }
     }
 }
+
+#[cfg(all(ktest, target_arch = "x86_64"))]
+#[path = "tlb/runtime_tests.rs"]
+mod runtime_tests;
