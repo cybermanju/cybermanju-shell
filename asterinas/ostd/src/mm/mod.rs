@@ -25,6 +25,8 @@ pub mod tlb;
 pub mod vm_space;
 
 #[cfg(ktest)]
+mod module_staging_test_meta;
+#[cfg(ktest)]
 mod test;
 
 use core::fmt::Debug;

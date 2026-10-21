@@ -19,6 +19,10 @@ pub(super) trait Page {
 #[path = "storage_tests.rs"]
 mod tests;
 
+#[cfg(ktest)]
+#[path = "runtime_tests.rs"]
+mod runtime_tests;
+
 /// A borrowed input range. Empty chunks do not reserve pages.
 pub struct ModuleChunk<'a> {
     /// Page-aligned relative offset, not a virtual address or a physical pointer.

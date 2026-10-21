@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'asterinas/osdk/**'
       - 'asterinas/Cargo.toml'
       - 'asterinas/Cargo.lock'
       - 'asterinas/rust-toolchain.toml'
@@ -17,6 +18,7 @@ on:
       - '.github/workflows/**'
   pull_request:
     paths:
+      - 'asterinas/osdk/**'
       - 'asterinas/Cargo.toml'
       - 'asterinas/Cargo.lock'
       - 'asterinas/rust-toolchain.toml'
@@ -100,6 +102,38 @@ jobs:
       - name: Check real OSTD x86-64 adapter with default features (no link or boot)
         working-directory: asterinas
         run: cargo check --locked -p ostd --target x86_64-unknown-none
+
+  module-staging-runtime:
+    # Real OSTD frames in a disposable TCG VM; no .ko execution or host modules.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 'nightly-2026-07-21'
+          targets: x86_64-unknown-none
+          components: rust-src, llvm-tools
+      - name: Install tools for the minimal disposable BIOS test VM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 grub-common grub-pc-bin xorriso mtools
+      - name: Exercise real frame staging and rollback (one kernel test, five scenarios)
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
+      - name: Retain serial evidence and exact harness dependency resolution
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-staging-runtime-${{ github.sha }}
+          path: |
+            artifacts/linux-module-runtime/*.log
+            artifacts/linux-module-runtime/*.json
+            artifacts/linux-module-runtime/*.txt
+            artifacts/linux-module-runtime/harness-Cargo.*
+          retention-days: 7
+          if-no-files-found: warn
 
   linux-module-kbuild:
     # A real kbuild .ko is compiled and inspected, NEVER loaded on the runner.

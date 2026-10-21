@@ -1,17 +1,18 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Novo avanço: OSTD tem um owner de frames de staging, com validação antes de alocar e descarte transacional em falhas. O adaptador real compilou para x86-64; 15 testes host com páginas instrumentadas verificam ownership e rollback. Ainda não foi invocado em QEMU, não está ligado ao pipeline ELF e não carrega nem executa `.ko`.** A preparação anterior das duas fixtures `.ko` e do objeto C com páginas numéricas de 4 KiB continua válida. A original mantém exports sintéticos; a auxiliar usa zero exports, mas flags não padrão e bypass de objtool exclusivo desse objeto. A meta permanece uma fixture real em QEMU/Asterinas, não compatibilidade universal.
+**Novo avanço: staging executado em OSTD/QEMU com frames reais. Um teste kernel passou pelos cinco cenários de cópia/leitura, zeros, limites e descarte em falhas injetadas. O runner confirmou 1 passou, 0 falhou e 256 filtrados. Nenhum `.ko` foi fornecido a essa VM ou executado; a ligação do ELF ao staging continua pendente.** A preparação anterior das duas fixtures `.ko` e do objeto C com páginas numéricas de 4 KiB foi preservada. A original mantém exports sintéticos; a auxiliar usa zero exports, mas flags não padrão e bypass de objtool exclusivo desse objeto. A meta permanece uma fixture real em QEMU/Asterinas, não compatibilidade universal.
 
-Separadamente, um segundo CI completo, revisão `47ee9b5`, aprovou instalação e boot instalado com `hello` em QEMU x86-64/UEFI/TCG. Isso não valida o staging novo, execução de módulos ou hardware físico.
+Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instalado com `hello` em QEMU x86-64/UEFI/TCG. O novo teste de staging usa uma imagem mínima OSTD distinta da ISO instaladora, BIOS/GRUB multiboot2 e TCG; não qualifica instalação, `.ko` ou hardware físico.
 
 ## Matriz atual
 
 | Componente / alvo | Evidência | Limite |
 |---|---|---|
-| Asterinas do fork | `0.19.0`; base desta implementação `8643c76` | Boot da revisão anterior `47ee9b5`, não do staging novo |
-| Toolchain do kernel | Pin `nightly-2026-07-21`; OSTD checado com Rust `1.99.0-nightly (87e5904f5 2026-07-20)` | Type-check x86-64 com features padrão, sem link/boot; testes host usam `1.97.1` |
+| Asterinas do fork | `0.19.0`; base desta implementação `533e584` | Runtime mínimo de staging, não boot instalado desta revisão |
+| Toolchain do kernel | Pin `nightly-2026-07-21`; Rust `1.99.0-nightly (87e5904f5 2026-07-20)`; Cargo `1.99.0-nightly (3efb1f477 2026-07-17)` | Type-check normal e link/boot do harness ktest x86-64; host usa `1.97.1` |
 | `linux-module-elf` | **111 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Biblioteca de preparação offline; não integrada a syscalls ou execução |
-| **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo` compilado; **15 testes host** com mocks | Não alocado/testado em runtime OSTD; sem novo mapping, execução ou proteção W^X |
+| **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo` exercitado em QEMU; **1 ktest / 5 cenários**, além dos **15 testes host** | Sem ELF no runtime, novo mapping, execução de módulo ou proteção W^X |
+| VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 CPU e 1 GiB, BIOS/GRUB multiboot2 | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
 | Layout compacto anterior | `.ko` original: 16 seções / span 1.856 bytes; C: 6 / 320 bytes | Política antiga preservada; não garante isolamento de páginas |
 | Layout de páginas | Base alinhada, 4 KiB fixos, páginas ocupadas disjuntas; recusa WRITE+EXEC inclusive vazio | Apenas números e flags; não reserva frames nem altera tabelas de páginas |
 | Resolução + RELA | Planos compacto e paginado aceitos pelo resolvedor e pela transação completa | Exports reais, CRC/modversions e ABI não implementados |
@@ -37,6 +38,16 @@ O span não representa memória mapeada ou consumida pelo heap. O payload não i
 O adaptador usa `FrameAllocOptions::new().zeroed(true).alloc_frame()` e `VmIo` reais. Aloca o **span inteiro, inclusive gaps**, não só o payload ou intervalos ocupados; `max_pages` limita essa quantidade. Gaps e caudas começam zerados pelo contrato do alocador. A liberação descarta referências; não há scrubbing explícito. Exige heap e alocador físico já inicializados. Este módulo proíbe `unsafe` e não depende da biblioteca ELF em `kernel/`.
 
 Os [15 testes de ownership](../asterinas/ostd/src/mm/module_staging/storage_tests.rs) usam páginas falsas instrumentadas: verificam cópia entre páginas, gaps/caudas, entradas vazias, validação tardia antes de qualquer alocação, todos os pontos de falha de alocação e cópia, descarte no sucesso, inputs preservados, overflow e erros de leitura. Eles compilam o núcleo de armazenamento e o enum de erros reais de OSTD; o `PageTableError` do harness é só um tipo placeholder, não uma tabela de páginas. **Não testam alocação física, MMU, NX ou execução.**
+
+### O que o teste kernel agora demonstra
+
+O [teste nativo](../asterinas/ostd/src/mm/module_staging/runtime_tests.rs) usa o mesmo core e alocador real após inicialização de OSTD. Exercita o wrapper público `Frame<()>`: copia um payload de uma página mais 13 bytes, outro em offset de três páginas e lê o span de cinco páginas; confere zeros em gaps/caudas. Os demais cenários verificam vazio/limites, erro de alocação injetado após dois frames reais, erro de escrita injetado depois de adquirir os quatro frames e manutenção do ownership até Drop. Os erros são injetados, **não** exaustão real da RAM nem falha de MMU.
+
+Nos cenários instrumentados, frames reais carregam [`TrackedMetadata`](../asterinas/ostd/src/mm/module_staging_test_meta.rs), com contador por teste acionado quando sua metadata é descartada. Os contadores confirmam 2 ou 4 últimos handles descartados nos pontos esperados; não inspecionam a free-list nem provam reutilização física, scrubbing ou recuperação sob pressão. Esse helper só existe sob `cfg(ktest)`; a macro de metadata fica fora da fronteira `forbid(unsafe_code)` do staging. Não houve mudança da API ou lógica de produção.
+
+Há **um** `#[ktest]` agregador e **cinco cenários**, não cinco testes independentes. A ajuda de OSDK sugere substring, mas o runner implementa sufixo exato de caminho: selecionar apenas `module_staging` executou zero testes e não foi aceito como evidência. O executor agora seleciona `cybermanju_staging_runtime`, exige os cinco marcadores e `1 passed; 0 failed`, rejeitando resultados vazios, duplicados ou falhos. Entrada stdin fechada evita SIGTTIN/job-control observado na primeira tentativa local; essa tentativa interrompida também não conta como aprovação.
+
+[`test_module_staging_runtime.sh`](../tools/ci/test_module_staging_runtime.sh) compila OSDK com **`OSDK_LOCAL_DEV=1`**, essencial para usar o fork e helpers locais, não pacotes publicados. Recusa substituir uma configuração OSTD existente, remove a temporária ao sair e invalida sucesso antigo antes de tentar novamente. Guarda serial, versões, hashes e Cargo.toml/lockfile efetivamente resolvidos do harness. O lockfile desse harness é gerado pelo OSDK, não uma reprodução bit a bit do lockfile do workspace; o arquivo capturado identifica a resolução testada. O novo job `module-staging-runtime` repete a prova em TCG, separado dos testes host e do type-check.
 
 **Bloqueio de proteção identificado no código existente:** o [mapeamento linear de OSTD](../asterinas/ostd/src/mm/kspace/mod.rs) é RW e continua presente. Criar outro alias RX não bastará para W^X físico. O mapeamento do próprio código do kernel também ainda usa RWX; isso é estado preexistente, não foi alterado. Ownership de handles privados não comprova exclusividade física nem remove aliases. O staging só usa o mapping linear existente; não certifica NX e sua API de leitura não é proteção read-only de hardware.
 
@@ -82,10 +93,14 @@ Os builds locais preservados da etapa anterior usam headers Ubuntu **`6.8.0-147.
 | `.config` dos headers | `cf8454bc2e67effab87a5bff3c39042f2d8d106b6a777c4302e52f50d23b7400` |
 | `Module.symvers` | `8e7eb5798789b9610c324b3d9b13373d88c30ae17bb9e41e622efd05e0277a87` |
 
-O hash do `.ko` varia entre diretórios de build; cada amostra tem sua proveniência. Artefatos ignorados pelo Git em `artifacts/linux-module-kbuild/` e `artifacts/linux-module-noimports/`, ambos com `exit_code=0`, `loaded=false`. Logs anteriores das páginas em `artifacts/linux-module-pages/`; logs atuais em `artifacts/linux-module-ownership/`.
+O hash do `.ko` varia entre diretórios de build; cada amostra tem sua proveniência. Artefatos ignorados pelo Git em `artifacts/linux-module-kbuild/` e `artifacts/linux-module-noimports/`, ambos com `exit_code=0`, `loaded=false`. Logs anteriores em `artifacts/linux-module-pages/` e `artifacts/linux-module-ownership/`; runtime atual, resolução do harness e regressões em `artifacts/linux-module-runtime/`.
+
+No último runtime local aprovado, SHA-256 do kernel ELF: `832ba48de8f249a4da3f4056618aa5766da0c1f73e781b4ceff80a839b5fa39b`; da imagem de teste: `65d1f4b8a604542266c7a6e65d51f546ead3ba468bcf731ee3c812037f43208d`. Não são hashes de `.ko` nem da ISO instaladora; timestamps da ISO, IDs de teste gerados por macro e caminhos podem variar por build. Os cinco marcadores e o resumo constam de `runtime.log`; `result.json` identifica escopo `ostd_frame_staging_only` e `linux_modules_loaded=false`. Logs e hashes são evidência operacional de testes, não atestação contra adulteração.
 
 ```bash
 bash tools/ci/test_module_staging.sh
+(cd asterinas/osdk && OSDK_LOCAL_DEV=1 cargo build --locked -p cargo-osdk)
+bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
 (cd asterinas && cargo check --locked -p ostd --target x86_64-unknown-none)
 bash tools/ci/test_linux_module_elf.sh
 bash tools/ci/test_linux_module_kbuild.sh artifacts/linux-module-kbuild
@@ -94,19 +109,19 @@ python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 python3 -m unittest discover -s gpui-shell/scripts -p 'test_frame_telemetry.py' -v
 ```
 
-Nesta rodada passaram **15 testes host de staging, 111 testes ELF, 77 regressões CI/ISO e 19 de telemetria**, o probe C e a sintaxe dos scripts, além de `git diff --check`. Os testes anteriores de layout foram preservados. `cargo check --locked -p ostd --target x86_64-unknown-none` aprovou o backend real com as features padrão; restou um aviso preexistente de `iter_advance_by` não usado. A tentativa inicial com `--no-default-features` falhou em cinco caminhos x86 preexistentes dependentes de CVM, por isso não é a configuração validada nem a usada no novo job. Type-check não faz link, boot ou teste físico de alocação. O CI separa `module-staging` host de `ostd-check` real, e mantém os jobs ELF/kbuild. Testes finitos não são fuzzing exaustivo ou auditoria formal; conferir o resultado remoto pelo SHA publicado.
+Nesta rodada passaram **1 teste kernel / 5 cenários, 15 testes host de staging, 111 testes ELF, 84 regressões CI/ISO e 19 de telemetria**, o probe C, sintaxe dos scripts e `git diff --check`. As 7 regressões novas cobrem evidência completa, ANSI/controles, cada marcador ausente, duplicação, compilação/zero testes em vez de runtime, resumo falho e preservação de configuração com invalidação de sucesso obsoleto. Type-check normal OSTD com features padrão passou novamente; o aviso preexistente de `iter_advance_by` permanece. A configuração sem default features não foi qualificada: na etapa anterior falhou em caminhos CVM preexistentes. O runtime focado não qualifica os outros **256 testes filtrados**. Testes finitos não são fuzzing exaustivo ou auditoria formal; conferir o CI remoto pelo SHA publicado.
 
 ## O que falta para chamar init
 
 Ainda não há despacho de `init_module` (175), `delete_module` (176) ou `finit_module` (313) no caminho x86 previamente inspecionado. Acrescentar uma syscall e chamar bytes preparados não seria suficiente nem seguro. O primeiro teste executável deve ser interno e controlado em QEMU, com confiança na fixture, ABI exata, placement real e marcador serial observável, sem entrada arbitrária por syscall ou destinos fictícios.
 
-**Próxima etapa:** exercitar o adaptador de staging real em um teste OSTD/QEMU de alocação/cópia/leitura/liberação, com marcador serial, e ligar de forma checada os offsets de `PreparedModule` ao staging. Não habilitar init ainda: faltam controle de aliases/frames, mapping protegido, sincronização/TLB e contrato de falha de init/unload. A transição futura para RX e dados R/RW deve considerar o alias linear RW, não só flags do novo mapping. `KVirtArea::map_frames` é interno a OSTD e não é uma API pronta de loader com essas garantias; VM de processo não resolve memória do kernel.
+**Próxima etapa:** ligar de forma checada os offsets de `PreparedModule` ao staging e demonstrar a cópia de uma fixture `.ko` real em OSTD/QEMU, ainda sem executar init. O plano numérico não é um endereço de execução real. Faltam controle de aliases/frames, placement/mapping protegido, sincronização/TLB e contrato de falha de init/unload. A transição futura para RX e dados R/RW deve considerar o alias linear RW, não só flags do novo mapping. `KVirtArea::map_frames` é interno a OSTD e não é uma API pronta de loader com essas garantias; VM de processo não resolve memória do kernel.
 
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
 
-A base `8643c76` teve o [CI 39636467230](https://github.com/cybermanju/cybermanju-shell/actions/runs/39636467230) aprovado com ambas as fixtures e páginas isoladas. Isso não transfere aprovação ao staging novo. A consulta de branches/PRs confirmou main sincronizada, nenhuma PR aberta e branch histórica já incorporada; nenhum merge repetido foi necessário.
+A base `533e584` teve o [CI 39641696396](https://github.com/cybermanju/cybermanju-shell/actions/runs/39641696396) aprovado, incluindo o staging host e type-check real. O novo runtime local foi validado separadamente; aprovação remota dessa base não transfere aprovação ao novo job. A consulta confirmou main sincronizada, nenhuma PR aberta e branch histórica já incorporada; nenhum merge repetido foi necessário. O [CI ISO 39636467347](https://github.com/cybermanju/cybermanju-shell/actions/runs/39636467347), revisão `8643c76`, estava na instalação UEFI e foi preservado; não há conclusão nova de boot instalado nesta rodada.
 
 **Segundo run completo aprovado:** o [CI ISO 39623025465](https://github.com/cybermanju/cybermanju-shell/actions/runs/39623025465), revisão `47ee9b5`, concluiu com sucesso live USB, instalação/verificação EFI GRUB e boot instalado. O `boot.log` baixado contém `Test case 'hello' passed` e `PASS: installed Asterinas booted and hello-asterinas passed (tcg)`. Logs em `artifacts/iso-39623025465/`; não foi preciso baixar a ISO inteira. É outra revisão anterior, QEMU x86-64/UEFI/TCG, não prova do staging ou de `.ko`.
 
