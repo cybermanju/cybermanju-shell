@@ -121,10 +121,8 @@ jobs:
           targets: x86_64-unknown-none
           components: rust-src, llvm-tools
       - name: Install tools for the minimal disposable BIOS test VM
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 grub-common grub-pc-bin xorriso mtools linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod
-      - name: Exercise real frame staging and rollback (one kernel test, five scenarios)
+        run: sudo bash tools/ci/install_runtime_tools.sh module-staging
+      - name: Exercise real frame staging and rollback (one kernel test, seven scenarios)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
       - name: Verify OSTD virtual-address reservation only (one kernel test, four scenarios; no payload mappings)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --address-reservation
@@ -173,9 +171,7 @@ jobs:
         with:
           toolchain: '1.97.1'
       - name: Install fixed Linux headers and inspection tools (no kernel image)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod
+        run: sudo bash tools/ci/install_runtime_tools.sh kbuild
       - name: Build and structurally inspect Linux 6.8.0-147-generic fixture
         run: bash tools/ci/test_linux_module_kbuild.sh artifacts/linux-module-kbuild
       - name: Prepare test-only no-import kbuild fixture with zero exports (never execute)
@@ -211,9 +207,7 @@ jobs:
           targets: x86_64-unknown-none
           components: rust-src, llvm-tools
       - name: Install tools for disposable framebuffer VMs
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 grub-common grub-pc-bin xorriso mtools
+        run: sudo bash tools/ci/install_runtime_tools.sh framebuffer
       - name: Test padded metadata, Multiboot2 conversion and overflow rejection (no GPU I/O)
         run: bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-contract --kind contract
       - name: Read back pixels through the boot framebuffer and real VGA MMIO in QEMU
