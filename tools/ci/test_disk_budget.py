@@ -82,7 +82,7 @@ class DiskBudgetTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertIn("allocated_delta_bytes=450", output.getvalue())
-        self.assertIn("does NOT fit standard 14GB", errors.getvalue())
+        self.assertIn("does NOT fit the configured runner capacity", errors.getvalue())
 
     def test_check_fails_when_physical_available_is_below_reserve(self):
         state = {
@@ -95,7 +95,7 @@ class DiskBudgetTests(unittest.TestCase):
             result = disk_budget.check_state(state)
 
         self.assertEqual(result, 1)
-        self.assertIn("does NOT fit standard 14GB", errors.getvalue())
+        self.assertIn("does NOT fit the configured runner capacity", errors.getvalue())
 
     def test_run_propagates_child_failure(self):
         state = {
@@ -147,7 +147,7 @@ class DiskBudgetTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         signal_group.assert_called_once_with(child, disk_budget.signal.SIGTERM)
-        self.assertIn("does NOT fit standard 14GB", errors.getvalue())
+        self.assertIn("does NOT fit the configured runner capacity", errors.getvalue())
 
     def test_usage_reports_delta_and_budget_after_reserve(self):
         state = {
@@ -170,6 +170,48 @@ class DiskBudgetTests(unittest.TestCase):
                 )
                 snapshot = disk_budget.usage(state)
             self.assertEqual(snapshot["allocated_delta_bytes"], 500)
+
+    def test_capacity_mode_uses_free_space_plus_checkout_and_keeps_reserve(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(disk_budget, "available_bytes", return_value=30_000_000_000):
+                state = disk_budget.create_state(
+                    os.path.join(directory, "state.json"), directory, directory,
+                    limit_bytes=None, reserve_bytes=1_073_741_824, initial_bytes=500,
+                )
+                snapshot = disk_budget.usage(state)
+            self.assertEqual(state["budget_mode"], "measured-runner-capacity")
+            self.assertEqual(state["limit_bytes"], 30_000_000_500)
+            self.assertEqual(snapshot["allocated_delta_bytes"], 500)
+            self.assertEqual(snapshot["budget_bytes"] - snapshot["allocated_delta_bytes"],
+                             30_000_000_000 - 1_073_741_824)
+            with mock.patch.object(disk_budget, "available_bytes", return_value=1_073_741_823):
+                self.assertIsNotNone(disk_budget.violation(disk_budget.usage(state)))
+
+    def test_capacity_mode_uses_smaller_filesystem_measurement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(disk_budget, "available_bytes", side_effect=[9000, 8500]):
+                state = disk_budget.create_state(
+                    os.path.join(directory, "state.json"), directory, directory,
+                    limit_bytes=None, reserve_bytes=1000, initial_bytes=500,
+                )
+            self.assertEqual(state["limit_bytes"], 9000)
+
+    def test_capacity_mode_refuses_insufficient_physical_reserve(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(disk_budget, "available_bytes", return_value=999):
+                with self.assertRaisesRegex(ValueError, "below the required reserve"):
+                    disk_budget.create_state(
+                        os.path.join(directory, "state.json"), directory, directory,
+                        limit_bytes=None, reserve_bytes=1000, initial_bytes=5000,
+                    )
+
+    def test_capacity_cli_flag_is_opt_in_and_excludes_fixed_limit(self):
+        parser = disk_budget.build_parser()
+        args = ["init", "state.json", "--path", "/workspace", "--docker-root", "/docker"]
+        self.assertEqual(parser.parse_args(args).limit_bytes, disk_budget.STANDARD_LIMIT_BYTES)
+        self.assertIsNone(parser.parse_args(args + ["--limit-from-available-space"]).limit_bytes)
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parser.parse_args(args + ["--limit-from-available-space", "--limit-bytes", "12345"])
 
     def test_filesystem_change_is_rejected(self):
         state = {"workspace_path": "/workspace", "workspace_st_dev": 1,

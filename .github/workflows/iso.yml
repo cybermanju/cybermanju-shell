@@ -32,8 +32,7 @@ jobs:
     env:
       # Builder host only; the ISO and installed OS remain Asterinas NixOS.
       BUILD_IMAGE: ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
-      # Decimal 14 GB, deliberately not 14 GiB. Reserve includes upload headroom.
-      ISO_DISK_LIMIT_BYTES: '14000000000'
+      # Workload allowance is measured after narrowly scoped ephemeral cleanup.
       ISO_DISK_RESERVE_BYTES: '1073741824'
     steps:
       - uses: actions/checkout@v4
@@ -44,23 +43,25 @@ jobs:
       - name: Lightweight static regression tests
         timeout-minutes: 2
         run: |
-          bash -n tools/ci/test-iso.sh tools/ci/verify-iso.sh tools/ci/setup-iso-builder.sh
+          bash -n tools/ci/test-iso.sh tools/ci/verify-iso.sh tools/ci/setup-iso-builder.sh tools/ci/prepare-iso-runner.sh
           bash -n asterinas/tools/nixos/run.sh asterinas/tools/nixos/build_nixos.sh asterinas/tools/qemu_args.sh
           python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 
-      - name: Establish disk budget and select KVM or TCG (no SDK deletion)
+      - name: Reclaim unused ephemeral SDKs, measure capacity and select KVM or TCG
         timeout-minutes: 2
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts output
+          sudo --preserve-env=GITHUB_ACTIONS,RUNNER_ENVIRONMENT,RUNNER_OS,GITHUB_WORKSPACE \
+            bash tools/ci/prepare-iso-runner.sh 2>&1 | tee artifacts/runner-preparation.log
           docker_root=$(docker info --format '{{.DockerRootDir}}')
           checkout_bytes=$(du -s -B1 "$GITHUB_WORKSPACE" | cut -f1)
           # Include Docker's compressed layers and writable layer, not just /work.
           sudo python3 tools/ci/disk_budget.py init artifacts/disk-budget.json \
             --path "$GITHUB_WORKSPACE" --docker-root "$docker_root" \
             --initial-bytes "$checkout_bytes" \
-            --limit-bytes "$ISO_DISK_LIMIT_BYTES" \
+            --limit-from-available-space \
             --reserve-bytes "$ISO_DISK_RESERVE_BYTES"
           # Missing/inaccessible /dev/kvm is normal: select explicit software TCG.
           vm_exports=$(python3 tools/ci/vm_settings.py shell --record artifacts/acceleration.json)
@@ -226,7 +227,8 @@ jobs:
             echo 'KVM only when the device is available and accessible; otherwise explicit TCG software emulation.'
             echo 'TCG-sized step budgets: build 75m, live USB 35m, install 100m, installed boot 60m; job 350m (<360m hosted maximum).'
             echo 'Only a successful job establishes fit and all configured VM gates.'
-            echo '14 GB total incremental disk budget, including Docker; no SDK deletion or larger-runner fallback.'
+            echo 'Standard hosted runner; only unused host .NET, Android and Haskell SDK directories reclaimed. No local/self-hosted cleanup or larger-runner fallback.'
+            echo 'Measured post-cleanup free bytes plus initial checkout bytes set the soft cap, including Docker; 1 GiB stays reserved.'
             echo 'Sparse guest capacity is not host disk consumption. Budget polling is not a hard filesystem quota.'
             echo 'Gates: <=4 GiB full ISO; BIOS/UEFI hybrid metadata; EFI GRUB; UEFI USB live Linux installer; UEFI CD install; installed GRUB; installed Asterinas hello test.'
             echo 'BIOS execution, physical USB hardware, offline installation, Secure Boot and an integrated GPUI/CyberManju desktop are NOT certified.'

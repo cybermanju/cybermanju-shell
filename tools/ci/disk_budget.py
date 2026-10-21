@@ -35,17 +35,17 @@ def create_state(
     state_path: str,
     workspace_path: str,
     docker_root: str,
-    limit_bytes: int = STANDARD_LIMIT_BYTES,
+    limit_bytes: int | None = STANDARD_LIMIT_BYTES,
     reserve_bytes: int = DEFAULT_RESERVE_BYTES,
     initial_bytes: int = 0,
 ) -> dict[str, Any]:
-    if limit_bytes <= 0:
+    if limit_bytes is not None and limit_bytes <= 0:
         raise ValueError("--limit-bytes must be greater than zero")
     if initial_bytes < 0:
         raise ValueError("--initial-bytes cannot be negative")
     if reserve_bytes < 0:
         raise ValueError("--reserve-bytes cannot be negative")
-    if reserve_bytes >= limit_bytes:
+    if limit_bytes is not None and reserve_bytes >= limit_bytes:
         raise ValueError("--reserve-bytes must be smaller than --limit-bytes")
 
     workspace_stat = os.stat(workspace_path)
@@ -64,6 +64,14 @@ def create_state(
             f"reserve ({reserve_bytes} bytes)"
         )
 
+    capacity_mode = limit_bytes is None
+    if capacity_mode:
+        # Checkout was allocated before initialization. Include it on both sides
+        # so available build growth is exactly measured free space minus reserve.
+        limit_bytes = min(workspace_baseline, docker_baseline) + initial_bytes
+        if reserve_bytes >= limit_bytes:
+            raise ValueError("measured capacity must exceed the required reserve")
+
     state: dict[str, Any] = {
         "workspace_path": os.path.abspath(workspace_path),
         "docker_root": os.path.abspath(docker_root),
@@ -75,6 +83,7 @@ def create_state(
         "baseline_available_bytes": workspace_baseline + initial_bytes,
         "limit_bytes": limit_bytes,
         "reserve_bytes": reserve_bytes,
+        "budget_mode": "measured-runner-capacity" if capacity_mode else "fixed-limit",
     }
     destination = Path(state_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -150,8 +159,8 @@ def report_snapshot(snapshot: dict[str, int]) -> None:
 
 def budget_error(reason: str, snapshot: dict[str, int]) -> None:
     print(
-        "::error::Disk budget exceeded: this workload does NOT fit standard "
-        f"14GB ({reason}); {format_usage(snapshot)}",
+        "::error::Disk budget exceeded: this workload does NOT fit the configured "
+        f"runner capacity ({reason}); {format_usage(snapshot)}",
         file=sys.stderr,
         flush=True,
     )
@@ -260,7 +269,11 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("state", help="state JSON path")
     init_parser.add_argument("--path", required=True, help="workspace path")
     init_parser.add_argument("--docker-root", required=True, help="Docker data root path")
-    init_parser.add_argument("--limit-bytes", type=int, default=STANDARD_LIMIT_BYTES)
+    limit_group = init_parser.add_mutually_exclusive_group()
+    limit_group.add_argument("--limit-bytes", type=int, default=STANDARD_LIMIT_BYTES)
+    limit_group.add_argument("--limit-from-available-space", dest="limit_bytes",
+                             action="store_const", const=None,
+                             help="use post-cleanup free bytes plus initial checkout bytes")
     init_parser.add_argument("--reserve-bytes", type=int, default=DEFAULT_RESERVE_BYTES)
     init_parser.add_argument("--initial-bytes", type=int, default=0,
                              help="already allocated checkout bytes to include in budget")
