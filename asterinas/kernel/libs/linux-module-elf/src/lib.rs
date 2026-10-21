@@ -2,13 +2,19 @@
 //! Structural preflight for uncompressed ELF64 little-endian x86-64 ET_REL files.
 //!
 //! Success does NOT mean Linux module compatibility or authorization to execute.
-//! Symbol resolution, applying relocations, Linux ABI/versioning, signatures and
-//! executable mappings remain future work. This crate neither loads nor executes code.
+//! Offline relocation arithmetic uses explicit symbol values and returns heap data.
+//! Kernel symbol resolution, Linux ABI/versioning, signatures and executable
+//! mappings remain future work. This crate neither loads nor executes code.
 #![no_std]
 #![forbid(unsafe_code)]
 
+extern crate alloc;
+
+mod apply;
 mod relocations;
 mod symbols;
+
+pub use apply::relocate_section;
 
 const HEADER_SIZE: usize = 64;
 const SECTION_SIZE: usize = 64;
@@ -41,6 +47,10 @@ pub enum Error {
     RelocationSymbol,
     RelocationRange,
     UnsupportedRelocation,
+    MissingSymbol,
+    RelocationOverflow,
+    RelocationOverlap,
+    ResourceLimit,
 }
 
 /// An inspected object, not a loaded or trusted Linux module.

@@ -127,6 +127,203 @@ mod tests {
         bytes
     }
 
+    fn apply(kind: u32, symbol: u64, addend: i64, base: u64) -> Result<Vec<u8>, Error> {
+        let mut bytes = fixture();
+        put64(&mut bytes, ENTRIES, 0);
+        put64(&mut bytes, ENTRIES + 8, (1_u64 << 32) | u64::from(kind));
+        put64(&mut bytes, ENTRIES + 16, addend as u64);
+        crate::relocate_section(&bytes, 4, base, &[None, Some(symbol)], 16)
+    }
+
+    #[test]
+    fn applies_all_formulas_with_explicit_numeric_addresses() {
+        for (kind, expected, width) in [
+            (1, 0x1ffc_u64, 8),
+            (2, 0xffc, 4),
+            (4, 0xffc, 4),
+            (10, 0x1ffc, 4),
+            (11, 0x1ffc, 4),
+            (24, 0xffc, 8),
+        ] {
+            let result = apply(kind, 0x2000, -4, 0x1000).unwrap();
+            assert_eq!(&result[..width], &expected.to_le_bytes()[..width]);
+            assert!(result[width..].iter().all(|&b| b == 0));
+        }
+    }
+
+    #[test]
+    fn pc_relative_place_includes_entry_offset() {
+        let bytes = fixture();
+        let before = bytes.clone();
+        let result = crate::relocate_section(&bytes, 4, 0x1000, &[None, Some(0x1000)], 16).unwrap();
+        assert_eq!(&result[12..], &(-16_i32).to_le_bytes());
+        assert_eq!(bytes, before);
+    }
+
+    #[test]
+    fn signed_and_unsigned_boundaries_are_not_truncated() {
+        for (kind, symbol, addend, base) in [
+            (1, u64::MAX, 1, 0),
+            (1, 0, -1, 0),
+            (10, u32::MAX as u64 + 1, 0, 0),
+            (10, 0, -1, 0),
+            (11, i32::MAX as u64 + 1, 0, 0),
+            (11, 0, i32::MIN as i64 - 1, 0),
+            (2, i32::MAX as u64 + 1, 0, 0),
+            (4, 0, 0, i32::MAX as u64 + 2),
+            (24, u64::MAX, 0, 0),
+            (24, 0, -1, i64::MAX as u64 + 1),
+        ] {
+            assert_eq!(
+                apply(kind, symbol, addend, base),
+                Err(Error::RelocationOverflow)
+            );
+        }
+        assert!(apply(1, u64::MAX, 0, 0).is_ok());
+        assert!(apply(10, u32::MAX as u64, 0, 0).is_ok());
+        assert!(apply(11, 0, i32::MIN as i64, 0).is_ok());
+        assert!(apply(2, i32::MAX as u64, 0, 0).is_ok());
+        assert!(apply(24, 0, i64::MIN, 0).is_ok());
+    }
+
+    #[test]
+    fn missing_symbols_fail_without_modifying_input() {
+        let bytes = fixture();
+        let before = bytes.clone();
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, None], 16),
+            Err(Error::MissingSymbol)
+        );
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[], 16),
+            Err(Error::RelocationSymbol)
+        );
+        assert_eq!(bytes, before);
+    }
+
+    #[test]
+    fn none_needs_no_symbol_and_preserves_target_data() {
+        let mut bytes = fixture();
+        bytes[384] = 0xaa;
+        put64(&mut bytes, ENTRIES + 8, 0);
+        let result = crate::relocate_section(&bytes, 4, 0, &[None, None], 16).unwrap();
+        assert_eq!(&result, &bytes[384..400]);
+    }
+
+    #[test]
+    fn enforces_entry_cap_and_extreme_none_offset_without_allocating_target() {
+        let mut bytes = fixture();
+        bytes.resize(ENTRIES + 65_537 * 24, 0);
+        bytes[ENTRIES..].fill(0); // NONE entries, no symbol resolution or writes
+        put64(&mut bytes, RELA + 32, 65_536 * 24);
+        assert!(crate::relocate_section(&bytes, 4, 0, &[None, None], 16).is_ok());
+        put64(&mut bytes, RELA + 32, 65_537 * 24);
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, None], 16),
+            Err(Error::ResourceLimit)
+        );
+        put64(&mut bytes, RELA + 32, 24);
+        put64(&mut bytes, ENTRIES, u64::MAX);
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, None], 16),
+            Err(Error::RelocationRange)
+        );
+        put64(&mut bytes, ENTRIES, 0);
+        put32(&mut bytes, TEXT + 4, 8);
+        put64(&mut bytes, TEXT + 32, u64::MAX);
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, None], 16),
+            Err(Error::ResourceLimit)
+        );
+    }
+
+    #[test]
+    fn weak_absolute_and_common_symbols_require_explicit_values() {
+        for shndx in [0, 0xfff1, 0xfff2] {
+            let mut bytes = fixture();
+            bytes[SYMBOLS + 24 + 4] = 0x20; // STB_WEAK
+            put16(&mut bytes, SYMBOLS + 24 + 6, shndx);
+            assert_eq!(
+                crate::relocate_section(&bytes, 4, 0, &[None, None], 16),
+                Err(Error::MissingSymbol)
+            );
+            let result = crate::relocate_section(&bytes, 4, 0, &[None, Some(20)], 16).unwrap();
+            assert_eq!(&result[12..], &4_i32.to_le_bytes());
+        }
+    }
+
+    #[test]
+    fn nobits_output_is_zero_initialized_before_patching() {
+        let mut bytes = fixture();
+        put32(&mut bytes, TEXT + 4, 8);
+        put64(&mut bytes, TEXT + 24, u64::MAX);
+        let result = crate::relocate_section(&bytes, 4, 0, &[None, Some(20)], 16).unwrap();
+        assert_eq!(&result[12..], &4_i32.to_le_bytes());
+        assert_eq!(&result[..12], &[0; 12]);
+    }
+
+    #[test]
+    fn rejects_bad_application_target_index_size_and_address() {
+        let bytes = fixture();
+        for index in [0, 1, 5, u16::MAX] {
+            assert_eq!(
+                crate::relocate_section(&bytes, index, 0, &[None, Some(0)], 16),
+                Err(Error::RelocationTable)
+            );
+        }
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, Some(0)], 15),
+            Err(Error::ResourceLimit)
+        );
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, u64::MAX - 15, &[None, Some(0)], 16),
+            Err(Error::RelocationOverflow)
+        );
+        let mut bytes = bytes;
+        put32(&mut bytes, TEXT + 4, 7); // SHT_NOTE: valid container, unsupported target
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, Some(0)], 16),
+            Err(Error::RelocationTarget)
+        );
+    }
+
+    #[test]
+    fn rejects_overlapping_patches_but_accepts_adjacent_unsorted_patches() {
+        let mut bytes = fixture();
+        bytes.extend_from_within(ENTRIES..ENTRIES + 24);
+        put64(&mut bytes, RELA + 32, 48);
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, Some(20)], 16),
+            Err(Error::RelocationOverlap)
+        );
+        put64(&mut bytes, ENTRIES + 24, 8);
+        let result = crate::relocate_section(&bytes, 4, 0, &[None, Some(20)], 16).unwrap();
+        assert_eq!(&result[8..12], &8_i32.to_le_bytes());
+        assert_eq!(&result[12..], &4_i32.to_le_bytes());
+        put64(&mut bytes, ENTRIES + 24 + 16, i64::MIN as u64);
+        assert_eq!(
+            crate::relocate_section(&bytes, 4, 0, &[None, Some(20)], 16),
+            Err(Error::RelocationOverflow)
+        );
+    }
+
+    #[test]
+    fn application_mutations_and_truncations_do_not_panic() {
+        let original = fixture();
+        for end in 0..original.len() {
+            assert!(
+                crate::relocate_section(&original[..end], 4, 0, &[None, Some(20)], 16).is_err()
+            );
+        }
+        for index in 0..original.len() {
+            for value in [0, 1, 0x7f, 0xff] {
+                let mut bytes = original.clone();
+                bytes[index] = value;
+                let _ = crate::relocate_section(&bytes, 4, 0, &[None, Some(20)], 16);
+            }
+        }
+    }
+
     #[test]
     fn accepts_pc32_at_boundary_without_resolving_or_writing() {
         assert!(inspect(&fixture()).is_ok());
