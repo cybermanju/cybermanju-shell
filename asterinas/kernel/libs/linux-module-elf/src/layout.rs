@@ -4,8 +4,9 @@
 //! Page planning only prevents numeric overlap of occupied 4 KiB pages. Section
 //! flags describe intended R/RW/RX use; they do not establish permissions or W^X.
 
-use super::{Error, SECTION_SIZE, inspect, u32_at, u64_at};
 use alloc::vec::Vec;
+
+use super::{Error, SECTION_SIZE, inspect, u32_at, u64_at};
 
 const SHF_ALLOC: u64 = 0x2;
 const SHF_WRITE: u64 = 0x1;
@@ -200,10 +201,46 @@ pub fn plan_page_layout(
     Ok(plan)
 }
 
+/// Return a conservative upper bound on the span needed by a page layout,
+/// independent of the eventual 4 KiB-aligned base address. This validates the
+/// ELF through [`plan_page_layout`] first, then charges each section's maximum
+/// alignment gap (`max(4096, sh_addralign) - 4096`) and rounded nonempty size.
+/// The bound may exceed spans actually needed; it is metadata-only and does
+/// not guarantee relocation success, mapping feasibility, or special alignment
+/// behavior. Returns zero when there are no ALLOC sections.
+pub fn page_layout_span_bound(
+    bytes: &[u8],
+    max_span: u64,
+    max_sections: usize,
+) -> Result<u64, Error> {
+    let plan = plan_page_layout(bytes, 0, u64::MAX, max_sections)?;
+    let mut bound = 0u64;
+    for item in plan.placements() {
+        let alignment = core::cmp::max(item.alignment, PAGE_SIZE);
+        let max_gap = alignment
+            .checked_sub(PAGE_SIZE)
+            .ok_or(Error::LayoutOverflow)?;
+        bound = bound.checked_add(max_gap).ok_or(Error::LayoutOverflow)?;
+        if item.size != 0 {
+            let rounded = item
+                .size
+                .checked_add(PAGE_SIZE - 1)
+                .ok_or(Error::LayoutOverflow)?
+                & !(PAGE_SIZE - 1);
+            bound = bound.checked_add(rounded).ok_or(Error::LayoutOverflow)?;
+        }
+    }
+    if bound > max_span {
+        return Err(Error::ResourceLimit);
+    }
+    Ok(bound)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{vec, vec::Vec};
+
+    use super::*;
 
     fn put16(b: &mut [u8], o: usize, v: u16) {
         b[o..o + 2].copy_from_slice(&v.to_le_bytes());

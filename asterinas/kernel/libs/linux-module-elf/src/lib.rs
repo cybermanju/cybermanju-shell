@@ -22,6 +22,8 @@ mod symbols;
 #[cfg(test)]
 mod image_tests;
 #[cfg(test)]
+mod page_layout_bound_tests;
+#[cfg(test)]
 mod page_layout_tests;
 #[cfg(test)]
 mod staging_tests;
@@ -30,7 +32,7 @@ mod target_tests;
 
 pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
-pub use layout::{Layout, SectionPlacement, plan_layout, plan_page_layout};
+pub use layout::{Layout, SectionPlacement, page_layout_span_bound, plan_layout, plan_page_layout};
 pub use resolve::{Export, SymbolResolver};
 pub use staging::{StagingChunk, StagingPlan};
 
@@ -201,8 +203,9 @@ extern crate std;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{vec, vec::Vec};
+
+    use super::*;
 
     fn put16(bytes: &mut [u8], at: usize, value: u16) {
         bytes[at..at + 2].copy_from_slice(&value.to_le_bytes());

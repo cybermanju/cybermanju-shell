@@ -5,7 +5,7 @@ use alloc::{vec, vec::Vec};
 use linux_module_elf::{Error as ElfError, SymbolResolver, plan_layout, plan_page_layout};
 use ostd::{mm::PAGE_SIZE, prelude::*};
 
-use super::{Error, stage_prepared};
+use super::{Error, ReservedModuleLayout, stage_prepared};
 
 // Only expanded for the selected kernel test; normal builds need no fixture.
 const FIXTURE: &[u8] = include_bytes!(env!("CYBERMANJU_STAGING_FIXTURE"));
@@ -58,7 +58,7 @@ fn cybermanju_prepared_module_runtime() {
         );
     }
     println!(
-        "CYBERMANJU_PREPARED_RUNTIME:roundtrip:PASS sections={} span={} payload={} relocations={} pages={}",
+        "\nCYBERMANJU_PREPARED_RUNTIME:roundtrip:PASS sections={} span={} payload={} relocations={} pages={}",
         sections,
         span,
         prepared.payload_bytes(),
@@ -86,6 +86,75 @@ fn cybermanju_prepared_module_runtime() {
         Err(Error::Plan(ElfError::PageAlignment))
     ));
     println!("CYBERMANJU_PREPARED_RUNTIME:rejected_budgets_and_mismatched_layout:PASS");
+
+    // Replan at a real owned base, not by shifting the old numeric plan.
+    let envelope =
+        linux_module_elf::page_layout_span_bound(FIXTURE, MAX_SPAN, MAX_SECTIONS).unwrap() as usize;
+    assert!(envelope > 0 && envelope.is_multiple_of(PAGE_SIZE));
+    for budget in [0, envelope / PAGE_SIZE - 1, usize::MAX] {
+        assert!(matches!(
+            ReservedModuleLayout::new(FIXTURE, budget, MAX_SECTIONS),
+            Err(Error::Plan(ElfError::ResourceLimit))
+        ));
+    }
+    assert!(matches!(
+        ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, 0),
+        Err(Error::Plan(ElfError::ResourceLimit))
+    ));
+    let owned =
+        ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
+    let actual_layout = owned.layout();
+    let base = owned.range().start as u64;
+    assert_eq!(actual_layout.base(), base);
+    assert_eq!(owned.range().len(), envelope);
+    assert!(base >= 0xffff_8000_0000_0000);
+    assert!(actual_layout.span() > 0 && actual_layout.span() <= envelope as u64);
+    for section in actual_layout.placements() {
+        assert!(section.address >= base);
+        assert!(section.address.checked_add(section.size).unwrap() <= owned.range().end as u64);
+    }
+    let real_resolver = SymbolResolver::new(FIXTURE, actual_layout, &[]).unwrap();
+    let real_prepared = real_resolver
+        .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
+        .unwrap();
+    assert!(
+        real_prepared
+            .sections()
+            .iter()
+            .zip(prepared.sections())
+            .any(|(real, numeric)| real.bytes() != numeric.bytes()),
+        "this fixture's absolute relocations must change bytes at the reserved base"
+    );
+    let actual_span = actual_layout.span() as usize;
+    let actual_pages = actual_span / PAGE_SIZE;
+    let mut real_expected = vec![0; actual_span];
+    for section in real_prepared.sections() {
+        let start = (section.placement().address - base) as usize;
+        real_expected[start..start + section.bytes().len()].copy_from_slice(section.bytes());
+    }
+    let real_staged = stage_prepared(
+        &real_prepared,
+        actual_layout,
+        actual_pages,
+        real_prepared.sections().len(),
+    )
+    .unwrap();
+    let mut real_actual = vec![0xff; actual_span];
+    real_staged.read_bytes(0, &mut real_actual).unwrap();
+    assert_eq!(
+        real_actual, real_expected,
+        "reserved-base prepared bytes must roundtrip"
+    );
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:reserved_layout:PASS base={:#x} reserved={} span={} sections={} payload={} relocations={} pages={}",
+        base,
+        envelope,
+        actual_span,
+        real_prepared.sections().len(),
+        real_prepared.payload_bytes(),
+        real_prepared.relocation_entries(),
+        actual_pages
+    );
     // No pointer conversion, function pointer, call to an ELF symbol or mapping.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
 }

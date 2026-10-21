@@ -1,6 +1,6 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: OSTD agora reserva endereços virtuais reais para um futuro placement de módulos.** Um ktest x86-64 em QEMU aprovou quatro cenários: validação, exclusividade com o alocador existente, consulta de páginas sem mapping e reutilização depois de Drop. **A reserva não recebeu frames, bytes de ELF ou relocations e não executou código.** As fixtures abaixo continuam preparadas em bases numéricas, sem associação a essa reserva.
+**Avanço mais recente: a fixture auxiliar foi replanejada e preparada na base virtual real reservada, com seus bytes copiados para frames e lidos de volta.** O ktest aprovou a base `0xffffdffffff70000`, reserva e span de **40.960 bytes**, **13 seções, 1.721 bytes de payload, 6 relocations e 10 páginas**. Os bytes das relocations absolutas mudaram em relação à base sintética. **Os frames continuam separados do endereço reservado: não houve mapping, init/exit, W^X ou execução de módulo.**
 
 **Etapa anterior:** uma fixture `.ko` real foi preparada dentro de OSTD/QEMU e suas seções copiadas para frames reais. A ponte conferiu **13 seções, 40.960 bytes de span, 1.721 bytes de payload, 6 entradas RELA e 10 páginas**, com leitura de todo o span idêntica ao esperado. Um ktest passou, zero falhou; conferiu também budgets insuficientes, layout divergente e política compacta recusados. **Init/exit não foram chamados e os endereços das relocations continuam numéricos, não placement real para execução.** É uma fixture auxiliar Linux `6.8.0-147-generic` x86-64 sem imports, com flags não padrão e bypass de objtool exclusivo do objeto; não é um driver qualificado ou compatibilidade universal.
 
@@ -14,10 +14,10 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 |---|---|---|
 | Asterinas do fork | `0.19.0`; reserva desenvolvida a partir de `fb5b9d0` | Runtimes mínimos, não boot instalado desta revisão |
 | Toolchain do kernel | Pin `nightly-2026-07-21`; Rust `1.99.0-nightly (87e5904f5 2026-07-20)`; Cargo `1.99.0-nightly (3efb1f477 2026-07-17)` | Type-check normal e link/boot do harness ktest x86-64; host usa `1.97.1` |
-| `linux-module-elf` | **115 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
-| **`linux-module-staging`** | Ponte segura ELF→offsets→OSTD; **1 ktest** com a fixture real e leitura de todo o span | Só dados; não está ligada ao caminho de syscalls ou ao boot normal do kernel principal |
+| `linux-module-elf` | **120 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
+| **`linux-module-staging`** | **1 ktest** com preparação e readback nas bases sintética e real reservada; owner `ReservedModuleLayout` mantém a reserva durante a prova | Frames não mapeados na reserva; sem syscalls, init/exit ou boot normal do kernel principal |
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 5 cenários** bruto preservado, mais o novo ktest com ELF e **15 testes host** | Sem novo mapping, execução de módulo ou proteção W^X |
-| **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Endereços reais sem frames/mapping; não integrada ao ELF, sem garantia de alcance de relocations |
+| **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Primitiva sem frames/mapping; usada pela ponte de layout, sem garantia geral de alcance de relocations |
 | VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 CPU e 1 GiB, BIOS/GRUB multiboot2 | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
 | Framebuffer, avanço posterior | x86-64, VGA virtual 1280×800×32; readback e **6 verificações de limites** no mesmo ktest; controle negativo falhou antes da correção | Superfície curta sintética sobre MMIO real; não executa `.ko`, não prova GPUI/scanout; [detalhes e estado da ISO](hardware-graphics-compatibility.md) |
 | Layout compacto anterior | `.ko` original: 16 seções / span 1.856 bytes; C: 6 / 320 bytes | Política antiga preservada; não garante isolamento de páginas |
@@ -28,7 +28,7 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
-## Reserva virtual real, ainda sem ligar ao ELF
+## Reserva virtual real: primitiva OSTD
 
 [`ModuleAddressReservation`](../asterinas/ostd/src/mm/module_address.rs) usa um owner interno de faixa no mesmo alocador VMALLOC de `KVirtArea`, com IRQ local desabilitada durante alocação/liberação. Não é Clone e não oferece mapping ou ponteiro executável. Drop só devolve a faixa: não percorre tabelas de páginas. Exige span não vazio, múltiplo de 4 KiB e orçamento explícito de páginas **virtuais**, não de RAM. Falta de espaço contíguo retorna `NoMemory`; o bookkeeping `BTreeMap` existente não oferece recuperação de OOM de heap.
 
@@ -36,9 +36,17 @@ O [teste nativo](../asterinas/ostd/src/mm/module_address/runtime_tests.rs) aprov
 
 Pool observado: `0xffffc00000000000..0xffffe00000000000`; primeira reserva: `0xffffdffffff78000..0xffffdffffff7a000`. São medições desta VM, não endereços fixos da API. Serial, JSON, manifests e hashes estão em `artifacts/module-address-runtime/`. O gate exige quatro marcadores completos únicos e um único resumo `1 passed; 0 failed`; rejeita serial parcial, misturado, contraditório ou com panic.
 
-Nesta mudança passaram **3 ktests em VMs separadas** (reserva, regressão de staging bruto e framebuffer), **117 testes Python, 115 testes ELF e 15 testes host de staging**, além de type-check de OSTD/ponte/framebuffer. Não foi acrescentado nenhum módulo ou versão Linux ao conjunto testado.
+Na etapa anterior da reserva passaram **3 ktests em VMs separadas** (reserva, regressão de staging bruto e framebuffer), **117 testes Python, 115 testes ELF e 15 testes host de staging**, além de type-check de OSTD/ponte/framebuffer. Não foi acrescentado nenhum módulo ou versão Linux ao conjunto testado.
 
-**Rebase continua pendente:** o layout deve ser recalculado na base real; `sh_addralign` acima de 4 KiB pode mudar gaps e span. Uma reserva-envelope conservadora ou outra estratégia de planejamento será necessária antes de ligar as APIs. VMALLOC alto não cabe automaticamente em `R_X86_64_32`/`32S`; PC32/PLT32 também podem falhar para exports distantes e não há trampolines. A reserva não muda o resolvedor, o alias linear RW ou as permissões atuais.
+## Da reserva ao layout e aos bytes preparados
+
+[`page_layout_span_bound`](../asterinas/kernel/libs/linux-module-elf/src/layout.rs) calcula um envelope conservador antes de conhecer a base. Para cada seção, cobra o pior gap entre endereços alinhados a página (`max(4096, sh_addralign) - 4096`) e o tamanho não vazio arredondado. Vazios também podem cobrar alinhamento. A soma é checked, respeita orçamento e pode recusar casos que caberiam em uma fase mais favorável. Cinco testes host novos cobrem fases de alinhamento, budgets, validação preservada e overflow; não são medições de hardware.
+
+[`ReservedModuleLayout`](../asterinas/kernel/libs/linux-module-staging/src/reserved.rs) mantém juntos a reserva OSTD e o layout **recalculado** em sua base. Não desloca cegamente um plano baixo. Rejeita orçamento vazio/irrepresentável e span zero; falha de replanejamento devolve a reserva via Drop. Layout clonado é apenas metadata e não retém o owner. O envelope pode conter espaço não usado pelo layout, e o budget virtual não limita todo o heap.
+
+O ktest preparado manteve a prova baixa e acrescentou preparação real com exports vazios, comparação dos bytes que mudaram pelas relocations e leitura de todo o staging contra o novo preparado, incluindo gaps e caudas. A reserva ficou viva durante a operação. A fixture tem seis relocations ALLOC `R_X86_64_64`; isso **não qualifica imports, 32/32S, trampolines ou ABI Linux**. Serial/hashes/fixture em `artifacts/prepared-module-reserved-runtime/`; regressões e relocations em `artifacts/cycle-1730/`. Um ktest passou, zero falhou; também passaram **120 testes ELF, 119 testes Python, 15 testes host de staging** e type-check de OSTD/ponte/framebuffer.
+
+VMALLOC alto não cabe automaticamente em `R_X86_64_32`/`32S`; PC32/PLT32 podem falhar para exports distantes. A preparação continua fail-closed e não cria trampolines. A nova ponte não muda permissões, TLB ou o alias linear RW. Não há novo módulo, versão Linux ou arquitetura qualificada.
 
 ## Preparação real das fixtures na política paginada
 
@@ -58,7 +66,7 @@ Na etapa de planejamento, span é só um número, não memória reservada. No no
 
 O [ktest da ponte](../asterinas/kernel/libs/linux-module-staging/src/runtime_tests.rs) embute a fixture criada pelo kbuild, resolve com exports vazios e prepara RELA **dentro da VM**. Recalcula offsets independentemente do array da ponte, compara todos os 40.960 bytes (payload, zeros e gaps), confere entrada preparada imutável e leitura fora do span recusada. Depois verifica rejeição de budgets insuficientes, layout em outra base e layout compacto. Um teste passou, zero falhou, zero filtrado na crate da ponte; as outras crates do runner foram explicitamente puladas, não qualificadas.
 
-Os endereços foram planejados na base numérica `0x10000000`: **não são os endereços dos frames nem um endereço executável do kernel**. Bytes relocados são apenas dados lidos de volta. Não houve criação de ponteiro de função, chamada a símbolo ELF, registro de módulo, syscall ou novo mapping. A fixture original com imports continua usando apenas exports sintéticos na preparação host, não foi transferida para o teste kernel desta rodada.
+Na prova baixa anterior, os endereços foram planejados na base numérica `0x10000000`. A prova adicional agora usa a base real reservada descrita acima: **nenhuma das duas é endereço dos frames ou autorização de execução**. Bytes relocados são apenas dados lidos de volta. Não houve criação de ponteiro de função, chamada a símbolo ELF, registro de módulo, syscall ou novo mapping. A fixture original com imports continua usando apenas exports sintéticos na preparação host, não foi transferida para o teste kernel desta rodada.
 
 ## Staging em OSTD: ownership sem execução
 
@@ -146,13 +154,13 @@ Na rodada anterior de integração ELF→frames passaram **2 ktests em VMs separ
 
 Ainda não há despacho de `init_module` (175), `delete_module` (176) ou `finit_module` (313) no caminho x86 previamente inspecionado. Acrescentar uma syscall e chamar bytes preparados não seria suficiente nem seguro. O primeiro teste executável deve ser interno e controlado em QEMU, com confiança na fixture, ABI exata, placement real e marcador serial observável, sem entrada arbitrária por syscall ou destinos fictícios.
 
-**Próxima etapa:** ligar reserva e layout com replanejamento/orçamento na base real e rejeição honesta de relocations fora de alcance. Depois, validar mappings inicialmente não executáveis antes de chamar init. A transição posterior para RX e dados R/RW precisa tratar o alias linear RW, não só flags do novo mapping, além de sincronização/TLB e falha de init/unload. `KVirtArea::map_frames` é interno a OSTD, não uma API pronta de loader com essas garantias; VM de processo não resolve memória do kernel. A fixture data-only atual não autoriza execução.
+**Próxima etapa:** desenhar ownership conjunto de reserva e frames e validar mappings inicialmente não executáveis. A reserva já está ligada ao layout e à preparação de dados desta fixture, mas os frames ainda não ocupam esses endereços. A transição posterior para RX e dados R/RW precisa tratar o alias linear RW, não só flags do novo mapping, além de sincronização/TLB e falha de init/unload. `KVirtArea::map_frames` é interno a OSTD, não uma API pronta de loader com essas garantias; VM de processo não resolve memória do kernel. A fixture data-only atual não autoriza execução.
 
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
 
-Na referência `fb5b9d0`, o [CI de regressões 39658860905](https://github.com/cybermanju/cybermanju-shell/actions/runs/39658860905) passou. O [CI de ISO 39658861099](https://github.com/cybermanju/cybermanju-shell/actions/runs/39658861099) superou a preparação do runner, build, verificação da ISO e live USB; na consulta desta rodada ainda executava a instalação UEFI, com boot instalado pendente. Não foi cancelado nem conta como aceite completo. A nova reserva foi validada localmente e adicionada ao job existente; isso não transfere aprovação remota à nova revisão.
+Na referência `fb5b9d0`, o [CI de regressões 39658860905](https://github.com/cybermanju/cybermanju-shell/actions/runs/39658860905) passou. O [CI de ISO 39658861099](https://github.com/cybermanju/cybermanju-shell/actions/runs/39658861099) superou preparação, build, metadados e live USB, mas **falhou na espera de sucesso da instalação UEFI após 3.600 segundos em TCG**. O console ainda mostrava cópia de paths Nix; boot instalado foi pulado. Diagnósticos baixados em `artifacts/iso-diagnosis-1730/`; não é prova de falha do kernel instalado nem motivo para afrouxar o marcador de sucesso. Não foi cancelado nem conta como aceite completo. A referência `540a0b8` teve o [CI de regressões 39666735817](https://github.com/cybermanju/cybermanju-shell/actions/runs/39666735817) aprovado, incluindo a reserva; seu [run ISO 39666736082](https://github.com/cybermanju/cybermanju-shell/actions/runs/39666736082) segue em progresso na consulta. A nova ligação ELF→reserva foi validada localmente; não transfere aprovação remota à nova revisão.
 
 A base `6b7b043` teve o [CI 39647158355](https://github.com/cybermanju/cybermanju-shell/actions/runs/39647158355) aprovado nos seis jobs, incluindo o runtime bruto. A nova cópia de ELF em frames foi testada localmente e acrescentada ao mesmo job, sem transferir automaticamente a aprovação anterior. A consulta confirmou main sincronizada, nenhuma PR aberta e branch histórica incorporada. O [CI ISO 39636467347](https://github.com/cybermanju/cybermanju-shell/actions/runs/39636467347), revisão `8643c76`, continuava na instalação UEFI; foi preservado. O run ISO de `6b7b043` estava pendente, sem nova evidência de boot instalado nesta rodada.
 

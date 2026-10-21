@@ -16,6 +16,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                 [
                     "CYBERMANJU_PREPARED_RUNTIME:roundtrip:PASS sections=13 span=40960 payload=1721 relocations=6 pages=10",
                     "CYBERMANJU_PREPARED_RUNTIME:rejected_budgets_and_mismatched_layout:PASS",
+                    "CYBERMANJU_PREPARED_RUNTIME:reserved_layout:PASS base=0xffffc00000000000 reserved=40960 span=40960 sections=13 payload=1721 relocations=6 pages=10",
                     "CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
@@ -27,10 +28,14 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         result = verify(self.evidence())
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["runtime_tests"], 1)
-        self.assertEqual(result["scope"], "prepared_module_frame_staging_only")
+        self.assertEqual(result["scope"], "prepared_module_reserved_base_staging_only")
         self.assertTrue(result["fixture_staged"])
         self.assertFalse(result["linux_modules_executed"])
         self.assertFalse(result["init_called"])
+        self.assertFalse(result["pages_mapped"])
+        self.assertFalse(result["wx_verified"])
+        self.assertTrue(result["reservation_held_during_staging"])
+        self.assertEqual(result["reserved_layout"]["base"], "0xffffc00000000000")
         self.assertNotIn("linux_modules_loaded", result)
         for field in ("sections", "span", "payload", "relocations", "pages"):
             self.assertIsInstance(result[field], int)
@@ -63,6 +68,37 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         for text in examples:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 verify(text)
+
+    def test_reserved_range_budget_and_fixture_consistency(self):
+        text = self.evidence()
+        marker = next(line for line in text.splitlines() if "reserved_layout:" in line)
+        changes = [
+            ("base=0xffffc00000000000", "base=0x10000000"),
+            ("base=0xffffc00000000000", "base=0x10000000000000000"),
+            ("base=0xffffc00000000000", "base=0xffffffffffff0000"),
+            ("base=0xffffc00000000000", "base=0xffffc00000000001"),
+            ("reserved=40960", "reserved=40959"),
+            ("reserved=40960", "reserved=36864"),
+            ("reserved=40960", f"reserved={4*1024*1024+4096}"),
+            ("sections=13", "sections=12"),
+            ("payload=1721", "payload=1720"),
+            ("relocations=6", "relocations=5"),
+        ]
+        for old, new in changes:
+            with self.subTest(new=new), self.assertRaises(ValueError):
+                verify(text.replace(marker, marker.replace(old, new)))
+
+    def test_echoed_markers_mixed_logs_and_panic_cannot_qualify(self):
+        text = self.evidence()
+        marker = text.splitlines()[0]
+        cases = [text.replace(marker, "echo " + marker),
+                 text + "CYBERMANJU_MODULE_ADDRESS:validation:PASS cases=6\n",
+                 text + "[caught panic] Panicked at module.rs:42\n",
+                 text + "assertion failed: prepared bytes\n",
+                 text + "prefix test result: ok. 1 passed; 0 failed; 0 filtered out.\n"]
+        for bad in cases:
+            with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
+                verify(bad)
 
     def test_multiple_runner_summaries_are_rejected(self):
         for summary in (

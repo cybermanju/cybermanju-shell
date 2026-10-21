@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Data-only transfer of a prepared ELF image to private OSTD frame handles.
+//! Data-only staging and owned virtual-address planning, never execution.
 //!
-//! Planned symbol addresses remain numeric placeholders, NOT the locations of
-//! these frames. This API must never be used as authorization to call init/exit.
+//! Ordinary layouts may use synthetic addresses. ReservedModuleLayout instead
+//! holds real but unmapped addresses, NOT the locations of staging frames.
+//! This API must never be used as authorization to call init/exit.
 //! It creates no executable mappings, removes no aliases and certifies no ABI.
 #![no_std]
 #![forbid(unsafe_code)]
@@ -17,6 +18,11 @@ use ostd::mm::{
     module_staging::{ModuleChunk, ModuleStaging},
 };
 
+#[cfg(target_arch = "x86_64")]
+mod reserved;
+#[cfg(target_arch = "x86_64")]
+pub use reserved::ReservedModuleLayout;
+
 /// A failed transfer never returns a partially staged owner.
 #[derive(Debug)]
 pub enum Error {
@@ -28,6 +34,8 @@ pub enum Error {
     Resources,
     /// The initialized OSTD allocator or frame copy returned an error.
     Frames(ostd::Error),
+    /// The shared VMALLOC allocator could not reserve the virtual range.
+    AddressSpace(ostd::Error),
 }
 
 /// Copy all prepared sections, including NOTE/NOBITS data, to private frames.
@@ -63,5 +71,5 @@ pub fn stage_prepared(
     ModuleStaging::new(plan.span(), &chunks, max_pages, max_chunks).map_err(Error::Frames)
 }
 
-#[cfg(ktest)]
+#[cfg(all(ktest, target_arch = "x86_64"))]
 mod runtime_tests;
