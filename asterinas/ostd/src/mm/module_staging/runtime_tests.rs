@@ -281,3 +281,82 @@ fn cybermanju_staging_runtime() {
     #[cfg(target_arch = "x86_64")]
     scoped_rw_mapping();
 }
+
+/// Verifica o bloqueio de topologia; não qualifica execução concorrente ou shootdown.
+#[cfg(target_arch = "x86_64")]
+#[ktest]
+fn cybermanju_module_mapping_smp_rejection() {
+    use crate::mm::{kspace::KERNEL_PAGE_TABLE, module_address::ModuleAddressReservation};
+
+    assert_eq!(
+        crate::cpu::num_cpus(),
+        2,
+        "este teste exige a VM de duas CPUs"
+    );
+    println!("\nCYBERMANJU_MODULE_SMP_REJECTION:topology:PASS cpus=2");
+    let payload = [0x11, 0x22, 0x33, 0x44];
+    let staged = ModuleStaging::new(
+        2 * PAGE_SIZE,
+        &[ModuleChunk {
+            offset: 0,
+            bytes: &payload,
+        }],
+        2,
+        1,
+    )
+    .unwrap();
+    let reservation = ModuleAddressReservation::new(3 * PAGE_SIZE, 3).unwrap();
+    let range = reservation.range();
+    let mut joint = staged.with_reservation(reservation).unwrap();
+    let assert_unmapped = || {
+        let guard = crate::irq::disable_local();
+        let mut cursor = KERNEL_PAGE_TABLE
+            .get()
+            .unwrap()
+            .cursor(&guard, &range)
+            .unwrap();
+        for address in range.clone().step_by(PAGE_SIZE) {
+            cursor.jump(address).unwrap();
+            assert!(
+                cursor.query().unwrap().1.is_none(),
+                "recusa não pode deixar PTEs"
+            );
+        }
+    };
+    let mut before = vec![0; joint.span()];
+    joint.read_bytes(0, &mut before).unwrap();
+    assert_eq!(&before[..payload.len()], &payload);
+    assert_unmapped();
+    // Todos os pedidos são válidos em uma CPU, inclusive a leitura vazia no fim.
+    for offset in [0, PAGE_SIZE - 4] {
+        let mut output = [0x5a; 8];
+        assert_eq!(
+            joint.read_mapped_for_test(offset, &mut output),
+            Err(Error::AccessDenied)
+        );
+        assert_eq!(output, [0x5a; 8], "recusa não pode alterar o destino");
+        assert_unmapped();
+    }
+    assert_eq!(
+        joint.read_mapped_for_test(joint.span(), &mut []),
+        Err(Error::AccessDenied)
+    );
+    assert_unmapped();
+    let mut after = vec![0xff; joint.span()];
+    joint.read_bytes(0, &mut after).unwrap();
+    assert_eq!(
+        after, before,
+        "frames originais continuam legíveis e intactos"
+    );
+    println!("CYBERMANJU_MODULE_SMP_REJECTION:denied:PASS cases=3");
+    drop(joint);
+    let reused = ModuleAddressReservation::new(3 * PAGE_SIZE, 3).unwrap();
+    assert_eq!(
+        reused.range(),
+        range,
+        "Drop deve devolver a reserva recusada"
+    );
+    assert_unmapped();
+    drop(reused);
+    println!("CYBERMANJU_MODULE_SMP_REJECTION:owner_released:PASS pages=3");
+}

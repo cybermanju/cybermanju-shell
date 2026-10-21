@@ -6,6 +6,8 @@ OUT=${1:-"$ROOT/artifacts/linux-module-runtime"}
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 printf '{"status":"not_verified","linux_modules_executed":false}\n' > "$OUT/result.json"
+CONFIG_TEMPLATE="$ROOT/tools/ci/module-staging-runtime.OSDK.toml"
+CPUS=1
 case ${2:-} in
     '')
         CRATE=ostd
@@ -25,6 +27,14 @@ case ${2:-} in
         CRATE_PATH=ostd
         FILTER=cybermanju_module_address_runtime
         VERIFY=verify_module_address_runtime.py
+        ;;
+    --smp-rejection)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_module_mapping_smp_rejection
+        VERIFY=verify_module_smp_rejection_runtime.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
+        CPUS=2
         ;;
     *) echo 'Unknown runtime mode' >&2; exit 2 ;;
 esac
@@ -48,8 +58,8 @@ mkdir -p "$OUT/bin"
 ln -sf "$LLVM" "$OUT/bin/rust-objcopy"
 export PATH="$OUT/bin:$PATH"
 # noclobber also closes the race while building OSDK after the initial check.
-(set -o noclobber; cat "$ROOT/tools/ci/module-staging-runtime.OSDK.toml" > "$CONFIG") || exit 2
-trap 'if cmp -s "$CONFIG" "$ROOT/tools/ci/module-staging-runtime.OSDK.toml"; then rm -f "$CONFIG"; else echo "Changed configuration preserved: $CONFIG" >&2; fi' EXIT
+(set -o noclobber; cat "$CONFIG_TEMPLATE" > "$CONFIG") || exit 2
+trap 'if cmp -s "$CONFIG" "$CONFIG_TEMPLATE"; then rm -f "$CONFIG"; else echo "Changed configuration preserved: $CONFIG" >&2; fi' EXIT
 set +e
 (cd "$ROOT/asterinas/$CRATE_PATH" && timeout --signal=TERM --kill-after=15s 600 "$OSDK" osdk test "$FILTER" --target-arch x86_64 </dev/null) 2>&1 | tee "$OUT/runtime.log"
 statuses=("${PIPESTATUS[@]}")
@@ -62,7 +72,7 @@ cp "$ROOT/asterinas/target/osdk/$CRATE-test-base/Cargo.lock" "$OUT/harness-Cargo
 {
     (cd "$ROOT/asterinas" && rustc --version && cargo --version)
     qemu-system-x86_64 --version | head -1
-    echo 'x86_64; q35; TCG; 1 CPU; 1 GiB; BIOS/GRUB multiboot2; OSDK_LOCAL_DEV=1'
+    echo "x86_64; q35; TCG; $CPUS CPU(s); 1 GiB; BIOS/GRUB multiboot2; OSDK_LOCAL_DEV=1"
     sha256sum "$ROOT/asterinas/target/osdk/$CRATE-osdk-bin.elf" "$ROOT/asterinas/target/osdk/$CRATE/$CRATE-osdk-bin.iso"
     if [[ -n ${CYBERMANJU_STAGING_FIXTURE:-} ]]; then sha256sum "$CYBERMANJU_STAGING_FIXTURE"; fi
 } > "$OUT/provenance.txt"

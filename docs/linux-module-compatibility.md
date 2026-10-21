@@ -1,6 +1,8 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: a fixture auxiliar foi lida pela própria base virtual reservada em um mapping RW temporário real.** Os **40.960 bytes / 10 páginas** coincidiram com o ELF preparado. O protótipo existe **somente em ktest x86-64 com uma CPU**: desmonta o alias e invalida o TLB local antes de devolver o controle. Um controle negativo sem INVLPG copiou bytes estrangeiros e falhou como esperado. **Não há mapping de produção/persistente, init/exit, execução de módulo, NX global ou W^X demonstrados.**
+**Avanço mais recente: a recusa do protótipo em topologia de duas CPUs passou em um ktest real de QEMU.** Três leituras válidas foram recusadas sem alterar destinos, conteúdo dos frames ou PTEs observados, e a reserva voltou ao alocador. Isso prova o bloqueio, **não suporte de mapping SMP**.
+
+**Etapa de mapping temporário:** a fixture auxiliar foi lida pela própria base virtual reservada em um mapping RW temporário real. Os **40.960 bytes / 10 páginas** coincidiram com o ELF preparado. O protótipo existe **somente em ktest x86-64 com uma CPU**: desmonta o alias e invalida o TLB local antes de devolver o controle. Um controle negativo sem INVLPG copiou bytes estrangeiros e falhou como esperado. **Não há mapping de produção/persistente, init/exit, execução de módulo, NX global ou W^X demonstrados.**
 
 **Etapa anterior:** uma fixture `.ko` real foi preparada dentro de OSTD/QEMU e suas seções copiadas para frames reais. A ponte conferiu **13 seções, 40.960 bytes de span, 1.721 bytes de payload, 6 entradas RELA e 10 páginas**, com leitura de todo o span idêntica ao esperado. Um ktest passou, zero falhou; conferiu também budgets insuficientes, layout divergente e política compacta recusados. **Init/exit não foram chamados e os endereços das relocations continuam numéricos, não placement real para execução.** É uma fixture auxiliar Linux `6.8.0-147-generic` x86-64 sem imports, com flags não padrão e bypass de objtool exclusivo do objeto; não é um driver qualificado ou compatibilidade universal.
 
@@ -19,8 +21,9 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | `linux-module-elf` | **120 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
 | **`linux-module-staging`** | **1 ktest** com bytes preparados, owner conjunto, 3 casos de ciclo de vida e readback pela base real em 10 páginas temporárias | Apenas ktest de uma CPU; sem mapping persistente/produção, syscalls ou init/exit |
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 7 cenários** bruto, incluindo owner, mapping temporário, colisão e tradução stale, mais o novo ktest com ELF e **15 testes host** | Mapping experimental só em ktest de uma CPU; sem execução, SMP ou W^X |
+| **Recusa SMP do protótipo OSTD** | 1 ktest, topologia real reportada de 2 CPUs, 3 chamadas válidas recusadas, 3 páginas de VA sem PTEs e faixa reutilizada após Drop | Somente bloqueio; não testa acesso concorrente, shootdown remoto, W^X ou init |
 | **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Primitiva sem frames/mapping; usada pela ponte de layout, sem garantia geral de alcance de relocations |
-| VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 CPU e 1 GiB, BIOS/GRUB multiboot2 | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
+| VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 GiB, BIOS/GRUB multiboot2; mapping positivo em 1 CPU e recusa em 2 CPUs | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
 | Framebuffer, avanço posterior | x86-64, VGA virtual 1280×800×32; readback e **6 verificações de limites** no mesmo ktest; controle negativo falhou antes da correção | Superfície curta sintética sobre MMIO real; não executa `.ko`, não prova GPUI/scanout; [detalhes e estado da ISO](hardware-graphics-compatibility.md) |
 | Layout compacto anterior | `.ko` original: 16 seções / span 1.856 bytes; C: 6 / 320 bytes | Política antiga preservada; não garante isolamento de páginas |
 | Layout de páginas | Base alinhada, 4 KiB fixos, páginas ocupadas disjuntas; recusa WRITE+EXEC inclusive vazio | Apenas números e flags; não reserva frames nem altera tabelas de páginas |
@@ -30,9 +33,21 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
+## Recusa explícita em topologia de duas CPUs
+
+O [novo ktest](../asterinas/ostd/src/mm/module_staging/runtime_tests.rs) exige `num_cpus() == 2`, cria dois frames com payload conhecido e reserva três páginas virtuais. Tenta leitura inicial, leitura cruzando a fronteira de página e leitura vazia no fim do span: os três pedidos são válidos para o protótipo de uma CPU, mas devem retornar `AccessDenied` nesta topologia. Os dois buffers de destino permanecem intactos; o conteúdo integral dos frames permanece igual. Consultas às tabelas reais verificam a ausência de PTEs nas três páginas antes/depois das recusas. Após Drop, a mesma faixa volta a ser reservada.
+
+A [configuração dedicada](../tools/ci/module-mapping-smp-rejection.OSDK.toml) usa q35/TCG e `-smp 2`. O teste passou com uma única conclusão `1 passed; 0 failed`. **Não há acesso de módulo em paralelo entre CPUs, mapping persistente, PTE executável, shootdown remoto ou chamada de init.** Nenhum mapping ou API de produção foi introduzido; o adaptador continua restrito a ktest x86-64 e uma CPU para leituras mapeadas positivas.
+
+**Controle negativo sem instalar mappings:** um bypass temporário que aceitava a leitura vazia antes de checar a topologia fez o ktest falhar (`Ok(())` em vez de `Err(AccessDenied)`). O backend original foi restaurado e a VM positiva repetida. Serial/JSON/hashes/manifests em `artifacts/module-smp-rejection-runtime/`; negativo em `artifacts/module-smp-empty-bypass-negative/`; logs em `artifacts/cycle-1930/`.
+
+O [gate](../tools/ci/verify_module_smp_rejection_runtime.py) exige três marcadores completos únicos e um resumo isolado de um teste aprovado. Recusa CPU divergente, marcadores ausentes/estranhos/ecoados, panic/FAIL e resumos contraditórios. O JSON registra `pages_mapped=false`, `init_called=false`, `smp_mapping_supported=false` e `production_mapping_available=false`. O preflight também preserva arquivos/symlinks próprios e invalida sucesso antigo. Stubs de preflight não são evidência de VM.
+
+Passaram **3 ktests em VMs separadas**: recusa em duas CPUs, regressão bruta em uma CPU com sete cenários e reserva com quatro cenários. Passaram **140 testes Python**, rustfmt, sintaxe dos scripts e diff. O CI continua com sete jobs; a nova VM é um passo obrigatório no job de runtime de módulos, com logs retidos. Não houve nova fixture `.ko`, versão Linux ou arquitetura qualificada.
+
 ## Primeira leitura pela base real: protótipo de uma CPU
 
-O [backend OSTD](../asterinas/ostd/src/mm/kspace/module_staging_map.rs) só é compilado em `ktest` x86-64; `read_mapped_for_test(&mut self, ...)` **não existe na API de produção**. Também recusa topologias com mais de uma CPU. Essa recusa está no código; não foi executado um novo teste SMP. Não se tentou contornar o problema de shootdown remoto mantendo IRQs desabilitadas.
+O [backend OSTD](../asterinas/ostd/src/mm/kspace/module_staging_map.rs) só é compilado em `ktest` x86-64; `read_mapped_for_test(&mut self, ...)` **não existe na API de produção**. Também recusa topologias com mais de uma CPU. A recusa foi executada no novo teste de duas CPUs descrito acima; não é prova de mapping ou coerência de TLB em SMP. Não se tentou contornar o problema de shootdown remoto mantendo IRQs desabilitadas.
 
 A chamada verifica limites/overflow e um teto de **1.024 páginas**, tanto de frames quanto de envelope. Mantém IRQs locais desabilitadas; confere a faixa vazia sob lock das tabelas, instala frames rastreados WB/RW/supervisor **sem o flag X** e invalida cada VA localmente, inclusive entradas GLOBAL. Lê pelo VA real, não pelo alias linear; o guard RAII remove só seu prefixo instalado e invalida novamente antes de liberar o CPU. O owner original conserva os frames e a reserva. Nenhum ponteiro, callback ou capacidade de execução é retornado. Alocações internas de tabelas/heap ainda podem panicar: isso não oferece OOM recuperável geral.
 
@@ -169,6 +184,7 @@ bash tools/ci/test_module_staging.sh
 (cd asterinas/osdk && OSDK_LOCAL_DEV=1 cargo build --locked -p cargo-osdk)
 bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
 bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --address-reservation
+bash tools/ci/test_module_staging_runtime.sh artifacts/module-smp-rejection-runtime --smp-rejection
 bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
 (cd asterinas && cargo check --locked -p ostd -p linux-module-staging --target x86_64-unknown-none)
 bash tools/ci/test_linux_module_elf.sh
@@ -192,11 +208,13 @@ Execução nativa arbitrária em ring 0 não pode virar API segura só porque o 
 
 ## Evidência de CI e boot
 
+O [CI de `4f8933b`, run 39686044422](https://github.com/cybermanju/cybermanju-shell/actions/runs/39686044422), **passou nos sete jobs**, incluindo os novos casos de console e os runtimes de módulos. A ISO dessa revisão estava pendente na consulta inicial. Essa aprovação é da base anterior; a nova recusa SMP tem evidência local e aguarda seu próprio CI após publicação.
+
 O [CI de `9142a04`, run 39684369567](https://github.com/cybermanju/cybermanju-shell/actions/runs/39684369567), **passou nos sete jobs**, incluindo framebuffer e runtimes de módulos. Sua ISO estava pendente na consulta desta rodada. A correção de console posterior foi validada localmente; CI anterior não a qualifica automaticamente.
 
-**Estado confirmado nesta rodada:** no [CI de `ec4b7f2`, run 39681738837](https://github.com/cybermanju/cybermanju-shell/actions/runs/39681738837), passaram os seis jobs de ELF, kbuild, staging host, type-check, regressões e runtime de módulos. O job gráfico falhou **antes de executar qualquer VM**, no `apt-get update`: o repositório Microsoft não relacionado ao teste devolveu HTTP 403. Não foi falha de compilação ou readback. Os artefatos nativos remotos foram baixados em `artifacts/ci-ec4b7f2/`: incluem reserva, os sete cenários brutos e o readback preparado temporário de uma CPU, com `init_called=false`.
+**Estado histórico confirmado na rodada de infraestrutura:** no [CI de `ec4b7f2`, run 39681738837](https://github.com/cybermanju/cybermanju-shell/actions/runs/39681738837), passaram os seis jobs de ELF, kbuild, staging host, type-check, regressões e runtime de módulos. O job gráfico falhou **antes de executar qualquer VM**, no `apt-get update`: o repositório Microsoft não relacionado ao teste devolveu HTTP 403. Não foi falha de compilação ou readback. Os artefatos nativos remotos foram baixados em `artifacts/ci-ec4b7f2/`: incluem reserva, os sete cenários brutos e o readback preparado temporário de uma CPU, com `init_called=false`.
 
-A correção desta rodada troca somente o setup dos três jobs que instalam ferramentas pelo [helper APT isolado](../tools/ci/install_runtime_tools.sh). Usa índices/cache temporários, fontes Ubuntu oficiais, keyring Ubuntu explícito e erro estrito no update, sem modificar as fontes globais, aceitar pacotes sem assinatura ou pular VMs. Mantém os sete jobs, versões/pins, budgets e gates. As sete regressões novas cobrem os três perfis, falhas de update/install, cleanup, fonte Microsoft preexistente preservada, input inválido e `os-release` tratado como dados.
+A correção da rodada de infraestrutura trocou somente o setup dos três jobs que instalam ferramentas pelo [helper APT isolado](../tools/ci/install_runtime_tools.sh). Usa índices/cache temporários, fontes Ubuntu oficiais, keyring Ubuntu explícito e erro estrito no update, sem modificar as fontes globais, aceitar pacotes sem assinatura ou pular VMs. Mantém os sete jobs, versões/pins, budgets e gates. As sete regressões novas cobrem os três perfis, falhas de update/install, cleanup, fonte Microsoft preexistente preservada, input inválido e `os-release` tratado como dados.
 
 Passaram **130 testes Python e os 2 ktests gráficos** (contrato e MMIO), com os seis limites de escrita preservados. O APT real atualizou somente índices Ubuntu assinados e resolveu em **simulação** o perfil completo `module-staging`, inclusive headers `6.8.0-147.147`, GCC 13 e kmod; não instalou pacotes. Log em `artifacts/cycle-1900/apt-module-staging-simulation.log`. Essa verificação não substitui a próxima execução hospedada do CI e não é teste de instalação da ISO. Código do loader e a lista de módulos qualificados não mudaram.
 

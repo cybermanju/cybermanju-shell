@@ -1,0 +1,10 @@
+# Minimal disposable OSTD test VM for explicit SMP rejection, not SMP support.
+[boot]
+method = "grub-rescue-iso"
+
+[grub]
+boot_protocol = "multiboot2"
+
+[qemu]
+args = "-accel tcg -machine q35 -cpu max -m 1G -smp 2 -display none -serial stdio -monitor none --no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04"
+with_monitor = false
