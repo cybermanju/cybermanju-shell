@@ -17,6 +17,11 @@ class RuntimeEvidenceTests(unittest.TestCase):
         result = verify(self.evidence())
         self.assertEqual(result["runtime_tests"], 1)
         self.assertFalse(result["linux_modules_loaded"])
+        self.assertTrue(result["scoped_mapping_readback_verified"])
+        self.assertFalse(result["mapping_persists_after_read"])
+        self.assertFalse(result["init_called"])
+        self.assertEqual(result["mapping_scope"], "ktest_single_cpu_only")
+        self.assertFalse(result["production_mapping_available"])
 
     def test_serial_ansi_and_control_prefixes(self):
         result = verify("\x03\x1b[32m" + self.evidence().replace("ok.", "\x1b[32mok\x1b[0m."))

@@ -19,6 +19,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:reserved_layout:PASS base=0xffffc00000000000 reserved=40960 span=40960 sections=13 payload=1721 relocations=6 pages=10",
                     "CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS",
                     "CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3",
+                    "CYBERMANJU_PREPARED_RUNTIME:scoped_rw_mapping:PASS pages=10",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -29,13 +30,20 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         result = verify(self.evidence())
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["runtime_tests"], 1)
-        self.assertEqual(result["scope"], "prepared_module_reserved_owner_staging_only")
+        self.assertEqual(result["scope"], "prepared_module_scoped_rw_readback_only")
         self.assertTrue(result["joint_owner_lifecycle_verified"])
         self.assertEqual(result["owner_lifecycle_cases"], 3)
         self.assertTrue(result["fixture_staged"])
         self.assertFalse(result["linux_modules_executed"])
         self.assertFalse(result["init_called"])
-        self.assertFalse(result["pages_mapped"])
+        self.assertTrue(result["pages_mapped"])
+        self.assertFalse(result["mapping_persists_after_read"])
+        self.assertTrue(result["scoped_mapping_readback_verified"])
+        self.assertFalse(result["new_alias_execute_flag"])
+        self.assertFalse(result["global_nx_verified"])
+        self.assertEqual(result["tlb_scope"], "current_cpu_scoped")
+        self.assertEqual(result["mapping_scope"], "ktest_single_cpu_only")
+        self.assertFalse(result["production_mapping_available"])
         self.assertFalse(result["wx_verified"])
         self.assertTrue(result["reservation_held_during_staging"])
         self.assertEqual(result["reserved_layout"]["base"], "0xffffc00000000000")
@@ -123,6 +131,18 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         for text in bad:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 verify(text)
+
+    def test_scoped_mapping_page_count_is_strict_and_matches_reservation(self):
+        base = self.evidence()
+        cases = [
+            base.replace("scoped_rw_mapping:PASS pages=10", "scoped_rw_mapping:PASS pages=0"),
+            base.replace("scoped_rw_mapping:PASS pages=10", "scoped_rw_mapping:PASS pages=1025"),
+            base.replace("scoped_rw_mapping:PASS pages=10", "scoped_rw_mapping:PASS pages=11"),
+            base.replace("scoped_rw_mapping:PASS pages=10", "scoped_rw_mapping:PASS pages=nope"),
+        ]
+        for bad in cases:
+            with self.subTest(bad=bad.splitlines()[5]), self.assertRaises(ValueError):
+                verify(bad)
 
     def test_invalid_or_budget_exceeding_counts_are_rejected(self):
         examples = (

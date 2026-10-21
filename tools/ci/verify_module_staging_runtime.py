@@ -12,6 +12,7 @@ TESTS = (
     "copy_failure_drops_every_frame_acquired_before_copy",
     "metadata_drop_counter_stays_zero_while_owned_then_counts_all_frames",
     "reserved_owner_lifecycle",
+    "scoped_rw_mapping",
 )
 
 
@@ -33,7 +34,11 @@ def verify(text: str) -> dict:
     if re.search(r"\b(?:panic|panicked)\b|assertion\b[^\n]*failed\b|runner failed\b|test result:\s*FAILED|\b[1-9]\d* failed;", text, re.I):
         raise ValueError("Runner reported failures or panic")
     return {"status": "passed", "runtime_tests": 1, "scenarios": len(TESTS), "failed": 0,
-            "scope": "ostd_frame_staging_only", "linux_modules_loaded": False}
+            "scope": "ostd_scoped_rw_readback_only", "linux_modules_loaded": False,
+            "scoped_mapping_readback_verified": True,
+            "mapping_persists_after_read": False, "init_called": False,
+            "mapping_scope": "ktest_single_cpu_only",
+            "production_mapping_available": False}
 
 
 def main() -> None:

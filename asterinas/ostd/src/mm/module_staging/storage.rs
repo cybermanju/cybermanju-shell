@@ -3,8 +3,9 @@
 //! Generic owned page storage for module staging. This core only depends on
 //! `alloc` and `Error`, so it can also be compiled in a host test harness.
 
-use crate::error::Error;
 use alloc::vec::Vec;
+
+use crate::error::Error;
 
 /// A page-like storage backend used by [`StagedPages`].
 /// The trusted internal allocator must return owned, zero-filled pages of SIZE.
@@ -114,6 +115,11 @@ impl<P: Page> StagedPages<P> {
     }
     pub(super) fn page_count(&self) -> usize {
         self.pages.len()
+    }
+
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(super) fn iter(&self) -> core::slice::Iter<'_, P> {
+        self.pages.iter()
     }
 
     pub(super) fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), Error> {

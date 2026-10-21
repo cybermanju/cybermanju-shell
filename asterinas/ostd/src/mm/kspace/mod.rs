@@ -37,6 +37,8 @@
 #![cfg_attr(target_arch = "loongarch64", expect(unused_imports))]
 
 pub(crate) mod kvirt_area;
+#[cfg(all(ktest, target_arch = "x86_64"))]
+pub(crate) mod module_staging_map;
 
 use core::ops::Range;
 

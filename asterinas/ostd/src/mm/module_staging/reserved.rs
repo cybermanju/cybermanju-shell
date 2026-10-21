@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Coupled lifetime only, not a virtual mapping or permission transition.
+//! Coupled lifetime in production; temporary single-CPU mapping probes in ktest.
 
 use core::ops::Range;
 
@@ -13,7 +13,8 @@ use crate::{
 /// Holds private staging frames and a virtual reservation in one non-Clone owner.
 ///
 /// Staged bytes use the existing linear alias, NOT `reserved_range()`. There is
-/// no mapping, pointer, permission guarantee, scrubbing, or separate handle API.
+/// no production mapping, pointer, permission guarantee, scrubbing, or separate
+/// handle API. The ktest-only read probe maps temporarily and removes its alias.
 /// The declaration order drops frame handles before releasing the address range.
 pub struct ReservedModuleStaging {
     staging: ModuleStaging,
@@ -62,5 +63,30 @@ impl ReservedModuleStaging {
     /// Same bounds/error semantics as ModuleStaging; no read-only MMU promise.
     pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), Error> {
         self.staging.read_bytes(offset, out)
+    }
+
+    /// Single-CPU ktest prototype: temporarily map RW/supervisor/non-X, copy via
+    /// VA, unmap and locally invalidate TLB before returning. No pointer escapes.
+    /// Refuses SMP and reservations above 1024 pages. Mapping/page-table heap
+    /// failures can still panic. This is NOT a production or physical NX API.
+    #[cfg(ktest)]
+    pub fn read_mapped_for_test(&mut self, offset: usize, out: &mut [u8]) -> Result<(), Error> {
+        crate::mm::kspace::module_staging_map::read_scoped(
+            &self.reservation,
+            self.staging.span(),
+            self.staging.pages.iter().map(|page| page.0.clone()),
+            offset,
+            out,
+        )
+    }
+
+    #[cfg(ktest)]
+    pub(crate) fn probe_stale_read_for_test(&mut self, out: &mut [u8]) -> Result<(), Error> {
+        crate::mm::kspace::module_staging_map::probe_stale_read(
+            &self.reservation,
+            self.staging.span(),
+            self.staging.pages.iter().map(|page| page.0.clone()),
+            out,
+        )
     }
 }

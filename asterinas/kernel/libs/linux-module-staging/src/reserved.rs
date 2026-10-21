@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Reserved address planning and coupled data-only staging, never mapping.
+//! Reserved planning and data-only staging; temporary mapping probes are ktest-only.
 
 use core::ops::Range;
 
@@ -122,5 +122,16 @@ impl ReservedPreparedModule {
     /// Reads the private frames; errors retain ModuleStaging's buffer semantics.
     pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
         self.storage.read_bytes(offset, out)
+    }
+
+    /// Temporary real-VA readback in the single-CPU ktest harness only.
+    /// There is no persistent mapping or execution capability after this call.
+    #[cfg(ktest)]
+    pub fn read_mapped_for_test(
+        &mut self,
+        offset: usize,
+        out: &mut [u8],
+    ) -> Result<(), ostd::Error> {
+        self.storage.read_mapped_for_test(offset, out)
     }
 }

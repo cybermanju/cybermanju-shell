@@ -134,7 +134,7 @@ fn cybermanju_prepared_module_runtime() {
     }
     drop(real_resolver);
     let reserved_range = owned.range();
-    let real_staged = owned
+    let mut real_staged = owned
         .stage(&real_prepared, actual_pages, real_prepared.sections().len())
         .unwrap();
     assert_eq!(real_staged.reserved_range(), reserved_range);
@@ -155,6 +155,18 @@ fn cybermanju_prepared_module_runtime() {
     let other = ostd::mm::module_address::ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
     assert!(other.range().end <= reserved_range.start || reserved_range.end <= other.range().start);
     drop(other);
+    let mut mapped_actual = vec![0xff; actual_span];
+    real_staged
+        .read_mapped_for_test(0, &mut mapped_actual)
+        .unwrap();
+    assert_eq!(
+        mapped_actual, real_expected,
+        "real VA must read the same prepared bytes"
+    );
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:scoped_rw_mapping:PASS pages={}",
+        actual_pages
+    );
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:reserved_layout:PASS base={:#x} reserved={} span={} sections={} payload={} relocations={} pages={}",
         base,

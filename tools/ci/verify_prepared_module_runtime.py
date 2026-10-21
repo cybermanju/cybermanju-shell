@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Verify prepared bytes at a reserved base, not module mapping or execution."""
+"""Verify single-CPU ktest scoped RW readback, never persistent mapping or execution."""
 import json
 from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
@@ -31,9 +31,11 @@ def verify(text: str) -> dict:
         raise ValueError("Unexpected or contradictory runtime marker")
     simple = {PREFIX + name + ":PASS" for name in (SCENARIOS[1], SCENARIOS[3])}
     owner_lifecycle = PREFIX + "reserved_owner_lifecycle:PASS cases=3"
+    scoped = re.compile(re.escape(PREFIX + "scoped_rw_mapping:PASS pages=") + r"([1-9]\d{0,3})")
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group()}:
+    scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group()}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -47,6 +49,9 @@ def verify(text: str) -> dict:
             and base % 4096 == 0 and envelope % 4096 == 0
             and 0 < actual_span <= envelope <= 4 * 1024 * 1024):
         raise ValueError("Invalid reserved canonical range or envelope")
+    scoped_pages = int(scoped_matches[0].group(1))
+    if scoped_pages > 1024 or scoped_pages != actual_pages:
+        raise ValueError("Scoped mapping pages do not match the reserved layout")
     if (actual_sections, actual_payload, actual_relocations) != (sections, payload, relocations):
         raise ValueError("Reserved layout does not describe the same fixture contents")
     summaries = [line for line in lines if "test result:" in line.lower()]
@@ -56,10 +61,16 @@ def verify(text: str) -> dict:
         raise ValueError("Runner reported failure or panic")
     return {
         "status": "passed", "runtime_tests": 1,
-        "scope": "prepared_module_reserved_owner_staging_only",
+        "scope": "prepared_module_scoped_rw_readback_only",
         "joint_owner_lifecycle_verified": True, "owner_lifecycle_cases": 3,
         "fixture_staged": True, "linux_modules_executed": False, "init_called": False,
-        "pages_mapped": False, "wx_verified": False,
+        "pages_mapped": True, "wx_verified": False,
+        "mapping_persists_after_read": False,
+        "scoped_mapping_readback_verified": True,
+        "new_alias_execute_flag": False, "global_nx_verified": False,
+        "tlb_scope": "current_cpu_scoped",
+        "mapping_scope": "ktest_single_cpu_only",
+        "production_mapping_available": False,
         "reservation_held_during_staging": True,
         "sections": sections, "span": span, "payload": payload,
         "relocations": relocations, "pages": pages,
@@ -76,7 +87,7 @@ def main() -> None:
     path = Path(sys.argv[1])
     result = verify(path.read_text(errors="replace"))
     path.with_name("result.json").write_text(json.dumps(result, indent=2) + "\n")
-    print("Verified prepared-module bytes at reserved base; no mappings or module execution.")
+    print("Verified scoped temporary RW mapping readback; mapping removed before return; no module execution.")
 
 
 if __name__ == "__main__":

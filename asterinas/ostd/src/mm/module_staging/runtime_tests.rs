@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Real-frame integration tests for staging. These tests require initialized
-//! OSTD allocation facilities; they do not create mappings or execute bytes.
+//! OSTD allocation facilities. A single-CPU scoped mapping probe is ktest-only;
+//! no test executes module bytes or creates persistent mappings.
 #![forbid(unsafe_code)]
 
 use alloc::vec;
@@ -202,6 +203,70 @@ fn reserved_owner_lifecycle() {
     println!("CYBERMANJU_STAGING_RUNTIME:reserved_owner_lifecycle:PASS");
 }
 
+#[cfg(target_arch = "x86_64")]
+fn scoped_rw_mapping() {
+    use crate::mm::module_address::ModuleAddressReservation;
+    let first: Vec<u8> = (0..PAGE_SIZE + 13).map(|i| (i % 251) as u8).collect();
+    let tail = [0x51, 0x82, 0xa3, 0xb4];
+    let chunks = [
+        ModuleChunk {
+            offset: 0,
+            bytes: &first,
+        },
+        ModuleChunk {
+            offset: 2 * PAGE_SIZE,
+            bytes: &tail,
+        },
+    ];
+    let staged = ModuleStaging::new(3 * PAGE_SIZE, &chunks, 3, 2).unwrap();
+    let reservation = ModuleAddressReservation::new(4 * PAGE_SIZE, 4).unwrap();
+    let range = reservation.range();
+    let mut joint = staged.with_reservation(reservation).unwrap();
+    let mut expected = vec![0xff; joint.span()];
+    joint.read_bytes(0, &mut expected).unwrap();
+    let mut actual = vec![0xff; joint.span()];
+    joint.read_mapped_for_test(0, &mut actual).unwrap();
+    assert_eq!(actual, expected);
+    let mut cross = vec![0xff; PAGE_SIZE + 7];
+    joint
+        .read_mapped_for_test(PAGE_SIZE - 3, &mut cross)
+        .unwrap();
+    assert_eq!(&cross, &expected[PAGE_SIZE - 3..2 * PAGE_SIZE + 4]);
+    let mut byte = [0xa5];
+    assert_eq!(
+        joint.read_mapped_for_test(joint.span(), &mut byte),
+        Err(Error::InvalidArgs)
+    );
+    assert_eq!(
+        joint.read_mapped_for_test(usize::MAX, &mut byte),
+        Err(Error::Overflow)
+    );
+    assert_eq!(byte, [0xa5]);
+    joint.read_mapped_for_test(joint.span(), &mut []).unwrap();
+    let mut stale = [0; 8];
+    joint.probe_stale_read_for_test(&mut stale).unwrap();
+    assert_eq!(
+        &stale,
+        &expected[..8],
+        "stale GLOBAL translation must not supply foreign bytes"
+    );
+    drop(joint);
+    let reused = ModuleAddressReservation::new(4 * PAGE_SIZE, 4).unwrap();
+    assert_eq!(reused.range(), range);
+    drop(reused);
+    let oversized = ModuleAddressReservation::new(1025 * PAGE_SIZE, 1025).unwrap();
+    let mut bounded = ModuleStaging::new(PAGE_SIZE, &[], 1, 0)
+        .unwrap()
+        .with_reservation(oversized)
+        .unwrap();
+    assert_eq!(
+        bounded.read_mapped_for_test(0, &mut byte),
+        Err(Error::InvalidArgs)
+    );
+    assert_eq!(byte, [0xa5]);
+    println!("CYBERMANJU_STAGING_RUNTIME:scoped_rw_mapping:PASS");
+}
+
 // The runner currently selects exact path suffixes, despite the CLI help saying
 // substring. Keep one uniquely named entry and require every scenario marker.
 #[ktest]
@@ -213,4 +278,6 @@ fn cybermanju_staging_runtime() {
     metadata_drop_counter_stays_zero_while_owned_then_counts_all_frames();
     #[cfg(target_arch = "x86_64")]
     reserved_owner_lifecycle();
+    #[cfg(target_arch = "x86_64")]
+    scoped_rw_mapping();
 }
