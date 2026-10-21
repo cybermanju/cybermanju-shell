@@ -118,14 +118,17 @@ pub(super) fn relocate_target(
     max_bytes: usize,
     max_entries: usize,
 ) -> Result<Vec<u8>, Error> {
-    let inspected = inspect(bytes)?;
-    if target_index == 0 || target_index >= inspected.section_count {
+    // This private helper is reached only through SymbolResolver, which has
+    // already validated and immutably borrows this exact ELF and layout. Do not
+    // revalidate every symbol/relocation globally for each prepared section.
+    let section_count = crate::u16_at(bytes, 60);
+    if target_index == 0 || target_index >= section_count {
         return Err(Error::RelocationTarget);
     }
     let table = file_range(
         bytes,
         u64_at(bytes, 40),
-        u64::from(inspected.section_count) * SECTION_SIZE as u64,
+        u64::from(section_count) * SECTION_SIZE as u64,
     )?;
     let section = |index: usize| &table[index * SECTION_SIZE..(index + 1) * SECTION_SIZE];
     let target = section(usize::from(target_index));
@@ -152,7 +155,7 @@ pub(super) fn relocate_target(
     // Count first, across every matching table (including NONE entries), before
     // allocating patches or target payload. Inspect validates links and ranges.
     let mut total = 0usize;
-    for index in 1..usize::from(inspected.section_count) {
+    for index in 1..usize::from(section_count) {
         let rela = section(index);
         if u32_at(rela, 4) == 4 && u32_at(rela, 44) == u32::from(target_index) {
             let count = usize::try_from(u64_at(rela, 32) / 24).map_err(|_| Error::ResourceLimit)?;
@@ -166,7 +169,7 @@ pub(super) fn relocate_target(
     patches
         .try_reserve_exact(total)
         .map_err(|_| Error::ResourceLimit)?;
-    for index in 1..usize::from(inspected.section_count) {
+    for index in 1..usize::from(section_count) {
         let rela = section(index);
         if u32_at(rela, 4) != 4 || u32_at(rela, 44) != u32::from(target_index) {
             continue;

@@ -101,6 +101,31 @@ impl<'a> SymbolResolver<'a> {
         )
     }
 
+    /// Prepare ALL planned ALLOC sections, returning complete data or an error.
+    /// `max_bytes` caps summed payload (including NOTE and NOBITS), not padding
+    /// or allocator overhead. Layout span is bounded separately by plan_layout.
+    /// `max_entries` counts all ALLOC-target RELA entries, including NONE, with
+    /// a hard aggregate ceiling of 65,536. `max_sections` includes empty sections.
+    /// NOTE is copied verbatim; any RELA targeting NOTE is rejected. Non-ALLOC
+    /// tables are not applied. All budgets are checked before payload allocation.
+    /// On failure private copies are dropped; input and earlier results remain
+    /// unchanged. No mapping, execution, trust, W^X or Linux ABI is established.
+    pub fn prepare_module(
+        &self,
+        max_bytes: usize,
+        max_entries: usize,
+        max_sections: usize,
+    ) -> Result<crate::PreparedModule, Error> {
+        crate::image::prepare_module(
+            self.bytes,
+            self.layout,
+            self,
+            max_bytes,
+            max_entries,
+            max_sections,
+        )
+    }
+
     pub fn resolve(&self, symtab_index: u16, symbol_index: u32) -> Result<u64, Error> {
         let section_offset = usize::from(symtab_index)
             .checked_mul(SECTION_SIZE)

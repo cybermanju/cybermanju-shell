@@ -12,15 +12,19 @@
 extern crate alloc;
 
 mod apply;
+mod image;
 mod layout;
 mod relocations;
 mod resolve;
 mod symbols;
 
 #[cfg(test)]
+mod image_tests;
+#[cfg(test)]
 mod target_tests;
 
 pub use apply::relocate_section;
+pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, plan_layout};
 pub use resolve::{Export, SymbolResolver};
 

@@ -183,10 +183,20 @@ fn main() {
     );
     let mut atomic_targets = 0;
     let mut atomic_writes = 0;
+    let mut expected_sections = Vec::new();
+    let mut total_entries = 0usize;
+    let mut total_payload = 0usize;
     for placement in layout.placements() {
         let target = section(usize::from(placement.section_index));
         let kind = u32_at(target, 4);
+        total_payload += placement.size as usize;
         if !matches!(kind, 1 | 8) {
+            assert_eq!(kind, 7, "only opaque NOTE besides PROGBITS/NOBITS");
+            let start = u64_at(target, 24) as usize;
+            expected_sections.push((
+                *placement,
+                bytes[start..start + placement.size as usize].to_vec(),
+            ));
             continue;
         } // NOTE remains opaque metadata.
         let size = placement.size as usize;
@@ -235,6 +245,8 @@ fn main() {
             output, expected,
             "full target bytes, including untouched ranges"
         );
+        expected_sections.push((*placement, expected));
+        total_entries += entries_count;
         if entries_count > 0 {
             assert_eq!(
                 resolver.relocate_target(placement.section_index, size, entries_count - 1),
@@ -258,6 +270,36 @@ fn main() {
     assert!(atomic_targets > 0 && atomic_writes == planned_writes);
     println!(
         "Atomic target RELA passed: {atomic_writes} writes across {atomic_targets} PROGBITS/NOBITS copies; full-byte oracle and budgets checked; exports SYNTHETIC; NOT executed"
+    );
+    let image = resolver
+        .prepare_module(total_payload, total_entries, expected_sections.len())
+        .expect("prepare every ALLOC section as one data-only transaction");
+    assert_eq!(image.payload_bytes(), total_payload);
+    assert_eq!(image.relocation_entries(), total_entries);
+    assert_eq!(image.sections().len(), expected_sections.len());
+    for (actual, (placement, expected)) in image.sections().iter().zip(&expected_sections) {
+        assert_eq!(actual.placement(), placement);
+        assert_eq!(actual.bytes(), expected);
+    }
+    assert_eq!(
+        resolver.prepare_module(total_payload - 1, total_entries, expected_sections.len()),
+        Err(linux_module_elf::Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver.prepare_module(total_payload, total_entries - 1, expected_sections.len()),
+        Err(linux_module_elf::Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver.prepare_module(total_payload, total_entries, expected_sections.len() - 1),
+        Err(linux_module_elf::Error::ResourceLimit)
+    );
+    assert_eq!(
+        without_exports.prepare_module(total_payload, total_entries, expected_sections.len()),
+        Err(linux_module_elf::Error::MissingSymbol)
+    );
+    println!(
+        "Whole-module data transaction passed: {} ALLOC sections (opaque NOTE included), {total_payload} payload bytes, {total_entries} RELA entries; full-byte oracle, aggregate budgets and missing exports checked; NOT mapped, loaded or executed",
+        image.sections().len()
     );
     // Deliberately synthetic addresses, NOT kernel exports or callable pointers.
     let base = |index: usize| 0x10_0000_u64 + index as u64 * 0x1_0000;
