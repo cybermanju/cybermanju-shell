@@ -79,11 +79,21 @@ jobs:
           sudo apt-get install -y --no-install-recommends linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod
       - name: Build and structurally inspect Linux 6.8.0-147-generic fixture
         run: bash tools/ci/test_linux_module_kbuild.sh artifacts/linux-module-kbuild
+      - name: Prepare test-only no-import kbuild fixture with zero exports (never execute)
+        run: bash tools/ci/test_linux_module_noimports.sh artifacts/linux-module-noimports
       - name: Retain module and provenance without claiming native execution
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: linux-module-kbuild-${{ github.sha }}
           path: artifacts/linux-module-kbuild/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Retain no-import fixture and its nonstandard test configuration
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-module-noimports-${{ github.sha }}
+          path: artifacts/linux-module-noimports/
           retention-days: 7
           if-no-files-found: warn
