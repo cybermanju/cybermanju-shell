@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Real boot framebuffer MMIO in a disposable VGA/TCG VM, not GPU acceleration.
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 
 use ostd::{Error, boot::boot_info, mm::VmIo, prelude::*, sync::Mutex};
 
@@ -116,4 +116,60 @@ fn cybermanju_framebuffer_runtime() {
         "rejected writes must not modify even an in-range prefix"
     );
     println!("CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24");
+
+    // Exercise the public console paths on a non-page-sized logical surface.
+    // The original console allocated by the larger mapping and panicked here.
+    const CONSOLE_BYTES: usize = 36 * 16;
+    let console_fb = framebuffer::FrameBuffer {
+        io_mem: fb.io_mem().clone(),
+        width: 8,
+        height: 16,
+        line_size: 36,
+        byte_len: CONSOLE_BYTES,
+        pixel_format: PixelFormat::BgrReserved,
+        cmap: Mutex::new(framebuffer::FbCmap {
+            entries: Vec::new(),
+        }),
+    };
+    let mut saved = [0; CONSOLE_BYTES + 8];
+    fb.io_mem().read_bytes(0, &mut saved).unwrap();
+    let mut console = crate::console::FramebufferConsole::new(Arc::new(console_fb));
+    for returning_from_graphics in [false, true] {
+        if returning_from_graphics {
+            console.set_mode(crate::mode::ConsoleMode::Graphics);
+        }
+        fb.io_mem()
+            .write_bytes(0, &[0x6d; CONSOLE_BYTES + 8])
+            .unwrap();
+        if returning_from_graphics {
+            console.set_mode(crate::mode::ConsoleMode::Text);
+        } else {
+            console.activate();
+        }
+        let mut observed = [0; CONSOLE_BYTES + 8];
+        fb.io_mem().read_bytes(0, &mut observed).unwrap();
+        assert_eq!(
+            &observed[..CONSOLE_BYTES],
+            &[0; CONSOLE_BYTES],
+            "flush must cover the surface"
+        );
+        assert_eq!(
+            &observed[CONSOLE_BYTES..],
+            &[0x6d; 8],
+            "flush must preserve the tail"
+        );
+    }
+    fb.io_mem()
+        .write_bytes(0, &[0x6d; CONSOLE_BYTES + 8])
+        .unwrap();
+    console.send(b"\n\n"); // A segunda linha força scroll com a fonte básica 8x8.
+    let mut observed = [0; CONSOLE_BYTES + 8];
+    fb.io_mem().read_bytes(0, &mut observed).unwrap();
+    assert_eq!(&observed[..CONSOLE_BYTES], &[0; CONSOLE_BYTES]);
+    assert_eq!(&observed[CONSOLE_BYTES..], &[0x6d; 8]);
+    fb.io_mem().write_bytes(0, &saved).unwrap();
+    println!(
+        "CYBERMANJU_FRAMEBUFFER:console_flush:PASS cases=3 bytes={} guard_bytes=8",
+        CONSOLE_BYTES
+    );
 }

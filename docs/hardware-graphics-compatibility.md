@@ -1,6 +1,18 @@
 # Gráficos e hardware: o que já foi provado
 
-**O framebuffer de boot passou por escrita e leitura de pixels em QEMU; agora as APIs de escrita também recusam ultrapassar a superfície lógica.** A medição real continua em **1280 × 800, 32 bpp, pitch de 5.120 bytes e superfície de 4.096.000 bytes**. Isso não demonstra GPUI nativo, aceleração gráfica ou imagem apresentada em monitor físico.
+**O console agora dimensiona seu buffer e seu scroll pelo span lógico da superfície, corrigindo dois panics reproduzidos em QEMU.** O framebuffer mantém as escritas limitadas ao span e a prova de readback. A medição real continua em **1280 × 800, 32 bpp, pitch de 5.120 bytes e superfície de 4.096.000 bytes**. Isso não demonstra GPUI nativo, aceleração gráfica ou imagem apresentada em monitor físico.
+
+## Console: usar o tamanho da superfície, não da página
+
+O [console](../asterinas/kernel/core/comps/framebuffer/src/console.rs) dimensionava seu espelho de pixels pelo tamanho do mapping MMIO arredondado, embora `FrameBuffer::write_bytes_at` valide o span lógico. Quando esses tamanhos diferem, ativar o console ou voltar do modo gráfico tenta um flush grande demais. O scroll também usava a capacidade MMIO ao calcular onde zerar o buffer.
+
+A correção aloca pelo `byte_len()` da superfície e calcula a cauda do scroll pelo próprio buffer. Não altera `IoMem`, o mapping físico ou mmap do dispositivo.
+
+**Dois controles negativos em QEMU:** o teste inicial, com superfície sintética de 24 bytes sobre MMIO real maior, fez o console antigo panicar ao ativar (`InvalidArgs`). Mantendo a alocação corrigida e recolocando somente a conta antiga do scroll, o teste final falhou com índice `4095712` fora de um buffer de 576 bytes. Os fontes corretos foram restaurados antes da validação positiva.
+
+O teste final usa uma superfície **sintética 8×16, pitch 36, span 576 bytes**, com quatro bytes de padding por linha, sobre a abertura VGA real. Exercita as APIs públicas de **ativação, volta Graphics→Text e scroll por duas quebras de linha**. Em cada caminho, lê de volta todos os 576 bytes e confirma que oito bytes sentinela posteriores continuam intactos; restaura os bytes originais ao terminar. Não testa desenho de glifos, toda a máquina ANSI ou novas resoluções reais.
+
+Passaram **2 ktests em VMs separadas** (contrato e hardware/console), **131 regressões Python**, type-check normal de OSTD/ponte/framebuffer, rustfmt e sintaxe/diff. O gate de hardware agora exige também o marcador único `console_flush:PASS cases=3 bytes=576 guard_bytes=8`; logs antigos sem essa prova não aprovam esta revisão. Os seis limites de escrita anteriores continuam obrigatórios. Serial, JSON e hashes em `artifacts/framebuffer-console-fixed/` e `artifacts/framebuffer-contract-1916/`; negativos em `artifacts/framebuffer-console-before/`, `artifacts/framebuffer-scroll-before/` e `artifacts/cycle-1916/`.
 
 ## Limites de escrita com prova antes e depois
 
@@ -28,7 +40,7 @@ O [header Multiboot2](../asterinas/ostd/src/arch/x86/boot/multiboot2/header.S) s
 | Contrato de boot | 1 ktest aprovado: padding sintético, span da região, overflow e conversão de tags Multiboot2 | Sem I/O de GPU |
 | Framebuffer VGA | 1 ktest aprovado: clear amostrado, escrita/leitura/restauração de dois pixels na primeira e última linha, mais seis verificações de limites | Readback de MMIO; limites extras usam superfície sintética, não scanout |
 | Adaptadores de produção | `cargo check --locked -p ostd -p linux-module-staging -p aster-framebuffer --target x86_64-unknown-none` aprovado | Type-check, não boot do kernel completo |
-| Regressões locais desta mudança | 109 testes Python, 115 testes ELF e 15 testes host de staging aprovados | Não executam init/exit de `.ko` |
+| Regressões históricas da etapa de limites | 109 testes Python, 115 testes ELF e 15 testes host de staging aprovados | Não executam init/exit de `.ko` |
 | CI anterior `4133000` | [Sete jobs de regressão aprovados](https://github.com/cybermanju/cybermanju-shell/actions/runs/39656869405), incluindo framebuffer e staging real | Evidência daquela revisão, não aprovação automática desta mudança |
 
 As VMs são imagens mínimas OSTD, **não a ISO instaladora nem a instalação UEFI completa**. Nenhum módulo, versão Linux ou arquitetura adicional foi qualificado nesta mudança; a [matriz de módulos](linux-module-compatibility.md) mantém as fixtures e suas restrições.
@@ -42,11 +54,13 @@ bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-hardware --kind 
 
 O [runner](../tools/ci/test_framebuffer_runtime.sh) recusa configurações preexistentes, invalida sucesso antigo, limita a VM a 600 segundos e reconstrói só o bundle descartável. Os diretórios guardam serial, JSON verificado, GRUB extraído da imagem, manifests/lockfile, versões e hashes. O [verificador](../tools/ci/verify_framebuffer_runtime.py) agora exige também o marcador único dos seis limites; serial antigo sem essa prova não aprova a nova versão. Panics contraditórios também são recusados.
 
-## Infraestrutura gráfica: falha antes da VM
+## Infraestrutura gráfica: correção confirmada no CI
 
 O [CI de `ec4b7f2`, run 39681738837](https://github.com/cybermanju/cybermanju-shell/actions/runs/39681738837), aprovou seis dos sete jobs, mas o gráfico parou ao atualizar APT: `packages.microsoft.com` retornou HTTP 403. As etapas de contrato e MMIO foram puladas; isso não é uma regressão gráfica demonstrada. O log bruto está em `artifacts/cycle-1900/ci-failed.log`. Não se deve aprovar o gate ignorando o erro ou dispensando assinaturas.
 
-O novo [helper de instalação](../tools/ci/install_runtime_tools.sh) usa fontes temporárias somente Ubuntu, assinadas pelo keyring Ubuntu, e preserva fontes globais e falhas estritas. Os três jobs com APT usam os mesmos perfis/pacotes fixados de antes. A simulação real do perfil completo de staging resolveu todos os pacotes sem instalá-los; o novo CI ainda precisa confirmar o setup no runner hospedado. Passaram **130 regressões Python** e novamente os **2 ktests gráficos**, sem mudar seus gates. Evidência em `artifacts/framebuffer-contract-1900/`, `artifacts/framebuffer-hardware-1900/` e `artifacts/cycle-1900/`. Não houve nova qualificação GPUI, DRM ou hardware físico.
+O [CI posterior de `9142a04`, run 39684369567](https://github.com/cybermanju/cybermanju-shell/actions/runs/39684369567), **passou nos sete jobs**, inclusive as duas VMs gráficas. Isso confirma a correção de setup naquela revisão, não aprova automaticamente o novo código de console.
+
+O novo [helper de instalação](../tools/ci/install_runtime_tools.sh) usa fontes temporárias somente Ubuntu, assinadas pelo keyring Ubuntu, e preserva fontes globais e falhas estritas. Os três jobs com APT usam os mesmos perfis/pacotes fixados de antes. A simulação real do perfil completo de staging resolveu todos os pacotes sem instalá-los; o run hospedado citado acima confirmou o setup. Passaram **130 regressões Python** e novamente os **2 ktests gráficos**, sem mudar seus gates. Evidência em `artifacts/framebuffer-contract-1900/`, `artifacts/framebuffer-hardware-1900/` e `artifacts/cycle-1900/`. Não houve nova qualificação GPUI, DRM ou hardware físico.
 
 ## Pipeline da ISO: bloqueio identificado
 

@@ -9,6 +9,7 @@ BOOT = re.compile(r"CYBERMANJU_FRAMEBUFFER:boot:PASS width=(\d+) height=(\d+) bp
 IO = re.compile(r"CYBERMANJU_FRAMEBUFFER:io_readback:PASS rows=(\d+) row_bytes=(\d+)")
 CONTRACT = "CYBERMANJU_FRAMEBUFFER_CONTRACT:PASS"
 BOUNDS = "CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24"
+CONSOLE = "CYBERMANJU_FRAMEBUFFER:console_flush:PASS cases=3 bytes=576 guard_bytes=8"
 SUMMARY = re.compile(r"test result:\s*ok\.\s*(\d+) passed;\s*(\d+) failed;(?:\s*\d+ filtered out\.)?", re.I)
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
@@ -26,16 +27,17 @@ def verify(text, kind):
     boots = [m for line in lines if (m := BOOT.fullmatch(line.strip()))]
     ios = [m for line in lines if (m := IO.fullmatch(line.strip()))]
     bounds_count = sum(line.strip() == BOUNDS for line in lines)
+    console_count = sum(line.strip() == CONSOLE for line in lines)
     known_marker_lines = [line for line in lines if "CYBERMANJU_FRAMEBUFFER" in line]
-    if any(not (line.strip() in (CONTRACT, BOUNDS) or BOOT.fullmatch(line.strip()) or IO.fullmatch(line.strip())) for line in known_marker_lines):
+    if any(not (line.strip() in (CONTRACT, BOUNDS, CONSOLE) or BOOT.fullmatch(line.strip()) or IO.fullmatch(line.strip())) for line in known_marker_lines):
         raise ValueError("unknown or malformed framebuffer marker")
     if kind == "contract":
-        if contract_count != 1 or boots or ios or bounds_count:
+        if contract_count != 1 or boots or ios or bounds_count or console_count:
             raise ValueError("expected exactly one contract marker and no hardware markers")
         scope = "framebuffer_boot_metadata_contract"
     elif kind == "hardware":
-        if contract_count or len(boots) != 1 or len(ios) != 1 or bounds_count != 1:
-            raise ValueError("expected exactly one boot, io_readback and surface_bounds marker")
+        if contract_count or len(boots) != 1 or len(ios) != 1 or bounds_count != 1 or console_count != 1:
+            raise ValueError("expected exactly one boot, io_readback, surface_bounds and console_flush marker")
         w, h, bpp, pitch, nbytes = map(int, boots[0].groups())
         rows, rowbytes = map(int, ios[0].groups())
         umax = 2**64 - 1
@@ -51,6 +53,7 @@ def verify(text, kind):
     if kind == "hardware":
         result["framebuffer"] = {"width": w, "height": h, "bpp": bpp, "pitch": pitch, "bytes": nbytes, "rows": rows, "row_bytes": rowbytes}
         result["surface_bounds"] = {"cases": 6, "bytes": 24, "synthetic_subsurface": True}
+        result["console_flush"] = {"cases": 3, "bytes": 576, "guard_bytes": 8, "synthetic_subsurface": True}
     return result
 
 def main():

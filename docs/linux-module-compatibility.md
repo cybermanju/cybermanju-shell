@@ -8,6 +8,8 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 
 **Avanço gráfico posterior:** o [contrato de framebuffer e o readback MMIO em QEMU](hardware-graphics-compatibility.md) passaram em VMs mínimas; o staging bruto foi revalidado com o novo header Multiboot2. Essa prova não executa `.ko`, não resolve placement/W^X e não revalida o boot instalado desta revisão. As contagens e fixtures abaixo descrevem a rodada de integração ELF→frames, não uma nova qualificação universal.
 
+**Integração gráfica mais recente:** o [console de framebuffer](hardware-graphics-compatibility.md) foi corrigido para não confundir span lógico com capacidade MMIO. Dois controles negativos reproduziram panics de ativação e scroll; os três caminhos públicos testados passaram após a correção, com bytes de guarda intactos. Passaram 2 ktests gráficos, 131 regressões e type-check. Isso não muda o loader, ABI ou a lista de módulos/versões/arquiteturas qualificadas.
+
 ## Matriz atual
 
 | Componente / alvo | Evidência | Limite |
@@ -189,6 +191,8 @@ O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) exige cuidado adicional antes
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
+
+O [CI de `9142a04`, run 39684369567](https://github.com/cybermanju/cybermanju-shell/actions/runs/39684369567), **passou nos sete jobs**, incluindo framebuffer e runtimes de módulos. Sua ISO estava pendente na consulta desta rodada. A correção de console posterior foi validada localmente; CI anterior não a qualifica automaticamente.
 
 **Estado confirmado nesta rodada:** no [CI de `ec4b7f2`, run 39681738837](https://github.com/cybermanju/cybermanju-shell/actions/runs/39681738837), passaram os seis jobs de ELF, kbuild, staging host, type-check, regressões e runtime de módulos. O job gráfico falhou **antes de executar qualquer VM**, no `apt-get update`: o repositório Microsoft não relacionado ao teste devolveu HTTP 403. Não foi falha de compilação ou readback. Os artefatos nativos remotos foram baixados em `artifacts/ci-ec4b7f2/`: incluem reserva, os sete cenários brutos e o readback preparado temporário de uma CPU, com `init_called=false`.
 

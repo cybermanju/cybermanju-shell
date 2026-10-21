@@ -6,6 +6,8 @@ CONTRACT = "CYBERMANJU_FRAMEBUFFER_CONTRACT:PASS"
 BOOT = "CYBERMANJU_FRAMEBUFFER:boot:PASS width=1024 height=768 bpp=32 pitch=4096 bytes=3145728"
 IO = "CYBERMANJU_FRAMEBUFFER:io_readback:PASS rows=2 row_bytes=8"
 BOUNDS = "CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24"
+CONSOLE = "CYBERMANJU_FRAMEBUFFER:console_flush:PASS cases=3 bytes=576 guard_bytes=8"
+HARDWARE = (BOOT, IO, BOUNDS, CONSOLE)
 
 
 def log(*evidence):
@@ -19,29 +21,29 @@ class RuntimeVerifierTests(unittest.TestCase):
         for key in ("hardware_acceleration_verified", "gpui_native_verified", "physical_scanout_verified"):
             self.assertFalse(result[key])
         self.assertNotIn("surface_bounds", result)
+        self.assertNotIn("console_flush", result)
 
     def test_valid_hardware_exports_measurements(self):
-        result = verify(log(BOOT, IO, BOUNDS), "hardware")
+        result = verify(log(*HARDWARE), "hardware")
         self.assertEqual(result["framebuffer"], {"width": 1024, "height": 768, "bpp": 32, "pitch": 4096, "bytes": 3145728, "rows": 2, "row_bytes": 8})
         self.assertEqual(result["surface_bounds"], {"cases": 6, "bytes": 24, "synthetic_subsurface": True})
+        self.assertEqual(result["console_flush"], {"cases": 3, "bytes": 576, "guard_bytes": 8, "synthetic_subsurface": True})
         self.assertTrue(all(v is False for k, v in result.items() if k.endswith("_verified")))
 
     def test_missing_contradictory_duplicate_and_unknown_markers(self):
-        invalid = (
+        invalid = [
             ((), "contract"), ((CONTRACT, CONTRACT), "contract"),
-            ((CONTRACT, BOOT, IO, BOUNDS), "contract"), ((CONTRACT, BOUNDS), "contract"),
-            ((BOOT,), "hardware"), ((BOOT, IO), "hardware"),
-            ((BOOT, BOUNDS), "hardware"), ((IO, BOUNDS), "hardware"),
-            ((BOOT, IO, BOUNDS, CONTRACT), "hardware"),
-            ((BOOT, BOOT, IO, BOUNDS), "hardware"),
-            ((BOOT, IO, IO, BOUNDS), "hardware"),
-            ((BOOT, IO, BOUNDS, BOUNDS), "hardware"),
-            ((BOOT, IO, BOUNDS, "CYBERMANJU_FRAMEBUFFER:other:PASS"), "hardware"),
-        )
+            ((CONTRACT, *HARDWARE), "contract"), ((CONTRACT, BOUNDS), "contract"),
+            ((CONTRACT, CONSOLE), "contract"),
+            ((*HARDWARE, CONTRACT), "hardware"),
+            ((*HARDWARE, "CYBERMANJU_FRAMEBUFFER:other:PASS"), "hardware"),
+        ]
+        for marker in HARDWARE:
+            invalid.append((tuple(m for m in HARDWARE if m != marker), "hardware"))
+            invalid.append(((*HARDWARE, marker), "hardware"))
         for evidence, kind in invalid:
-            with self.subTest(evidence=evidence):
-                with self.assertRaises(ValueError):
-                    verify(log(*evidence), kind)
+            with self.subTest(evidence=evidence, kind=kind), self.assertRaises(ValueError):
+                verify(log(*evidence), kind)
 
     def test_echo_partial_and_unrecognized_log_lines_rejected(self):
         for text in (log("$ echo " + CONTRACT), log("prefix " + CONTRACT), log(CONTRACT + " trailing")):
@@ -49,15 +51,27 @@ class RuntimeVerifierTests(unittest.TestCase):
                 verify(text, "contract")
         for marker in ("prefix " + BOUNDS, BOUNDS + " trailing", BOUNDS.replace("cases=6", "cases=5"), BOUNDS.replace("bytes=24", "bytes=25")):
             with self.subTest(marker=marker), self.assertRaises(ValueError):
-                verify(log(BOOT, IO, marker), "hardware")
+                verify(log(BOOT, IO, marker, CONSOLE), "hardware")
         with self.assertRaises(ValueError):
-            verify(log(BOOT.replace("width=1024", "width=1024 extra"), IO, BOUNDS), "hardware")
+            verify(log(BOOT.replace("width=1024", "width=1024 extra"), IO, BOUNDS, CONSOLE), "hardware")
+
+    def test_console_marker_is_complete_and_exact(self):
+        invalid = (
+            "prefix " + CONSOLE, "$ echo " + CONSOLE, CONSOLE + " trailing",
+            CONSOLE.replace("cases=3", "cases=2"),
+            CONSOLE.replace("bytes=576", "bytes=4096"),
+            CONSOLE.replace("guard_bytes=8", "guard_bytes=0"),
+        )
+        for marker in invalid:
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                verify(log(BOOT, IO, BOUNDS, marker), "hardware")
 
     def test_exactly_one_success_summary_and_failure_rejection(self):
         invalid = (SUMMARY, "test result: FAILED. 0 passed; 1 failed;", "runner failed: 0 failures", "FAILED assertion panic", "test result: ok. 1 passed; 1 failed; 0 filtered out.", "[caught panic] Panicked at source.rs:5", "Panicked at source.rs:5", "assertion failed: logical span")
         for failure in invalid:
-            with self.subTest(failure=failure), self.assertRaises(ValueError):
-                verify(log(CONTRACT, failure), "contract")
+            for kind, evidence in (("contract", (CONTRACT,)), ("hardware", HARDWARE)):
+                with self.subTest(failure=failure, kind=kind), self.assertRaises(ValueError):
+                    verify(log(*evidence, failure), kind)
 
     def test_overflow_zero_geometry_rowbytes_and_pitch_mismatch(self):
         invalid_boots = (
@@ -70,9 +84,9 @@ class RuntimeVerifierTests(unittest.TestCase):
         )
         for boot in invalid_boots:
             with self.subTest(boot=boot), self.assertRaises(ValueError):
-                verify(log(boot, IO, BOUNDS), "hardware")
+                verify(log(boot, IO, BOUNDS, CONSOLE), "hardware")
         with self.assertRaises(ValueError):
-            verify(log(BOOT, IO.replace("row_bytes=8", "row_bytes=7"), BOUNDS), "hardware")
+            verify(log(BOOT, IO.replace("row_bytes=8", "row_bytes=7"), BOUNDS, CONSOLE), "hardware")
 
 
 if __name__ == "__main__":
