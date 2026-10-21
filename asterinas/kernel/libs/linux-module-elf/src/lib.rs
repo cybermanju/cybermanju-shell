@@ -17,6 +17,9 @@ mod relocations;
 mod resolve;
 mod symbols;
 
+#[cfg(test)]
+mod target_tests;
+
 pub use apply::relocate_section;
 pub use layout::{Layout, SectionPlacement, plan_layout};
 pub use resolve::{Export, SymbolResolver};

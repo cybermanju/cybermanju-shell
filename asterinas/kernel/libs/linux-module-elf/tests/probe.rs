@@ -181,6 +181,84 @@ fn main() {
     println!(
         "Planned symbol resolution + RELA passed: {planned_writes} writes in {planned_sections} ALLOC section copies; {absent_exports} missing-export rejections; exports SYNTHETIC; NOT loaded or executed"
     );
+    let mut atomic_targets = 0;
+    let mut atomic_writes = 0;
+    for placement in layout.placements() {
+        let target = section(usize::from(placement.section_index));
+        let kind = u32_at(target, 4);
+        if !matches!(kind, 1 | 8) {
+            continue;
+        } // NOTE remains opaque metadata.
+        let size = placement.size as usize;
+        let mut expected = vec![0; size];
+        if kind == 1 {
+            let start = u64_at(target, 24) as usize;
+            expected.copy_from_slice(&bytes[start..start + size]);
+        }
+        let mut entries_count = 0;
+        let mut requires_export = false;
+        for index in 1..usize::from(result.section_count) {
+            let rela = section(index);
+            if u32_at(rela, 4) != 4 || u32_at(rela, 44) != u32::from(placement.section_index) {
+                continue;
+            }
+            let symtab_index = u32_at(rela, 40) as u16;
+            let symtab = section(usize::from(symtab_index));
+            let symbols_start = u64_at(symtab, 24) as usize;
+            let start = u64_at(rela, 24) as usize;
+            let end = start + u64_at(rela, 32) as usize;
+            for entry in bytes[start..end].chunks_exact(24) {
+                entries_count += 1;
+                let info = u64_at(entry, 8);
+                let kind = info as u32;
+                if kind == 0 {
+                    continue;
+                }
+                let symbol_index = (info >> 32) as u32;
+                let symbol_at = symbols_start + symbol_index as usize * 24;
+                requires_export |= u16_at(&bytes[symbol_at..symbol_at + 24], 6) == 0;
+                let value = resolver.resolve(symtab_index, symbol_index).unwrap();
+                let offset = u64_at(entry, 0) as usize;
+                let mut encoded = i128::from(value) + i128::from(u64_at(entry, 16) as i64);
+                if matches!(kind, 2 | 4 | 24) {
+                    encoded -= i128::from(placement.address) + offset as i128;
+                }
+                let width = if matches!(kind, 1 | 24) { 8 } else { 4 };
+                expected[offset..offset + width].copy_from_slice(&encoded.to_le_bytes()[..width]);
+                atomic_writes += 1;
+            }
+        }
+        let output = resolver
+            .relocate_target(placement.section_index, 16 * 1024 * 1024, 65_536)
+            .expect("atomically relocate all tables of a planned target into data");
+        assert_eq!(
+            output, expected,
+            "full target bytes, including untouched ranges"
+        );
+        if entries_count > 0 {
+            assert_eq!(
+                resolver.relocate_target(placement.section_index, size, entries_count - 1),
+                Err(linux_module_elf::Error::ResourceLimit)
+            );
+        }
+        if size > 0 {
+            assert_eq!(
+                resolver.relocate_target(placement.section_index, size - 1, 65_536),
+                Err(linux_module_elf::Error::ResourceLimit)
+            );
+        }
+        if requires_export {
+            assert_eq!(
+                without_exports.relocate_target(placement.section_index, size, 65_536),
+                Err(linux_module_elf::Error::MissingSymbol)
+            );
+        }
+        atomic_targets += 1;
+    }
+    assert!(atomic_targets > 0 && atomic_writes == planned_writes);
+    println!(
+        "Atomic target RELA passed: {atomic_writes} writes across {atomic_targets} PROGBITS/NOBITS copies; full-byte oracle and budgets checked; exports SYNTHETIC; NOT executed"
+    );
     // Deliberately synthetic addresses, NOT kernel exports or callable pointers.
     let base = |index: usize| 0x10_0000_u64 + index as u64 * 0x1_0000;
     let mut applied_sections = 0;

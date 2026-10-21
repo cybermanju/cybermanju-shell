@@ -81,6 +81,26 @@ impl<'a> SymbolResolver<'a> {
         })
     }
 
+    /// Apply every RELA targeting one planned section to a fresh data-only copy.
+    /// The budget counts all entries across all tables, including NONE entries.
+    /// Cross-table overlapping writes fail; no partial result or ELF mutation is
+    /// exposed. This neither maps memory nor executes module code.
+    pub fn relocate_target(
+        &self,
+        target_index: u16,
+        max_bytes: usize,
+        max_entries: usize,
+    ) -> Result<Vec<u8>, Error> {
+        crate::apply::relocate_target(
+            self.bytes,
+            self.layout,
+            self,
+            target_index,
+            max_bytes,
+            max_entries,
+        )
+    }
+
     pub fn resolve(&self, symtab_index: u16, symbol_index: u32) -> Result<u64, Error> {
         let section_offset = usize::from(symtab_index)
             .checked_mul(SECTION_SIZE)
