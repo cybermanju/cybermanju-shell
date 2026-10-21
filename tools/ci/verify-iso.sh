@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Inspect the real ISO without extracting its entire (large) Nix store.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'printf "ISO verification failed at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$root/asterinas"
 mapfile -t images < <(find -L target/nixos/iso_image/iso -maxdepth 1 -type f -name '*.iso')
@@ -31,6 +32,12 @@ cleanup() {
 trap cleanup EXIT
 mkdir "$work/iso"
 mount -o loop,ro "$iso" "$work/iso"
+find "$work/iso" -maxdepth 3 -type f ! -name nix-store.squashfs \
+    -printf '%P %s bytes\n' | sort | tee "$report/iso-boot-files.log"
+if [[ -f "$work/iso/EFI/BOOT/grub.cfg" ]]; then
+    cp "$work/iso/EFI/BOOT/grub.cfg" "$report/iso-grub.cfg"
+    cat "$report/iso-grub.cfg"
+fi
 test -s "$work/iso/EFI/BOOT/BOOTX64.EFI"
 test -s "$work/iso/EFI/BOOT/grub.cfg"
 test -s "$work/iso/boot/efi.img"
@@ -43,7 +50,6 @@ grep -Eq '^[[:space:]]*initrd /boot/' "$work/iso/EFI/BOOT/grub.cfg"
 while read -r path; do test -s "$work/iso$path"; done < <(
     awk '$1 == "linux" || $1 == "initrd" { print $2 }' "$work/iso/EFI/BOOT/grub.cfg" | sort -u
 )
-cp "$work/iso/EFI/BOOT/grub.cfg" "$report/iso-grub.cfg"
 test -s "$work/iso/nix-store.squashfs"
 # Listing alone reads metadata; no full squashfs extraction or second ISO copy.
 # squashfsTools is already a build dependency of this exact pinned ISO module.
