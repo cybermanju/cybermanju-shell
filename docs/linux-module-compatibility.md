@@ -1,6 +1,8 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: corrigida a agregação TLB que podia enfraquecer pedidos de invalidação GLOBAL ao atingir 32 páginas.** O código agora preserva o pedido mais forte. Passaram testes de estado e sete leituras reais locais; **o TCG não distinguiu o controle que exclui GLOBAL**, portanto não há prova de comportamento equivalente em hardware físico ou de shootdown remoto.
+**Avanço mais recente: o flush GLOBAL x86 agora preserva PGE e o estado de IRQ de entrada.** Um ktest reproduziu o efeito colateral anterior: PGE desabilitado voltava habilitado. Depois da correção passaram os dois estados de PGE e três contextos de verificação de IRQ, além das regressões de módulos e framebuffer. **Isso não habilita execução de módulos ou mapping SMP.**
+
+**Etapa anterior:** corrigida a agregação TLB que podia enfraquecer pedidos de invalidação GLOBAL ao atingir 32 páginas. O código agora preserva o pedido mais forte. Passaram testes de estado e sete leituras reais locais; **o TCG não distinguiu o controle que exclui GLOBAL**, portanto não há prova de comportamento equivalente em hardware físico ou de shootdown remoto.
 
 **Etapa anterior:** a recusa do protótipo em topologia de duas CPUs passou em um ktest real de QEMU. Três leituras válidas foram recusadas sem alterar destinos, conteúdo dos frames ou PTEs observados, e a reserva voltou ao alocador. Isso prova o bloqueio, **não suporte de mapping SMP**.
 
@@ -23,7 +25,7 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | `linux-module-elf` | **120 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
 | **`linux-module-staging`** | **1 ktest** com bytes preparados, owner conjunto, 3 casos de ciclo de vida e readback pela base real em 10 páginas temporárias | Apenas ktest de uma CPU; sem mapping persistente/produção, syscalls ou init/exit |
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 7 cenários** bruto, incluindo owner, mapping temporário, colisão e tradução stale, mais o novo ktest com ELF e **15 testes host** | Mapping experimental só em ktest de uma CPU; sem execução, SMP ou W^X |
-| **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado e 7 readbacks em uma CPU | TCG não discrimina inclusive/exclusive; sem prova remota, benchmark ou hardware físico |
+| **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado, 7 readbacks, 2 estados PGE e 3 contextos IRQ em uma CPU | TCG não discrimina inclusive/exclusive; sem prova remota, benchmark ou hardware físico |
 | **Recusa SMP do protótipo OSTD** | 1 ktest, topologia real reportada de 2 CPUs, 3 chamadas válidas recusadas, 3 páginas de VA sem PTEs e faixa reutilizada após Drop | Somente bloqueio; não testa acesso concorrente, shootdown remoto, W^X ou init |
 | **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Primitiva sem frames/mapping; usada pela ponte de layout, sem garantia geral de alcance de relocations |
 | VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 GiB, BIOS/GRUB multiboot2; mapping positivo em 1 CPU e recusa em 2 CPUs | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
@@ -36,7 +38,19 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
-## Invalidação TLB: não enfraquecer pedidos ao juntar páginas
+## Flush GLOBAL sem alterar a configuração da CPU
+
+A [primitiva x86](../asterinas/ostd/src/arch/x86/mm/mod.rs) existente terminava sempre com CR4.PGE habilitado. Esse bit controla o uso de traduções globais no cache de endereços; limpar o cache não deve habilitar uma configuração que estava desabilitada. O [novo teste](../asterinas/ostd/src/arch/x86/mm/tlb_test.rs) executado antes da correção falhou: CR4 ganhou `PAGE_GLOBAL` quando o estado esperado não o continha. Serial e resultado não aprovado em `artifacts/tlb-pge-before/` e `artifacts/cycle-2030/pge-before.log`.
+
+A rotina agora guarda o PGE original, desabilita IRQs locais mascaráveis durante as duas transições, inverte PGE e o restaura. O guard devolve o estado de IRQ anterior, inclusive em chamadas aninhadas. A interrupção NMI não é mascarada: **não há prova específica de NMI/reentrância ou concorrência entre CPUs**. Nenhuma permissão de página, alias linear ou mapping executável é introduzido.
+
+O ktest compara o valor **bruto de CR4** antes/depois e exige IRQ habilitada na entrada normal. Depois verifica PGE desabilitado e habilitado sob guard IRQ aninhado: CR4 deve permanecer igual e IRQ continuar desabilitada nos dois casos. O helper de readback agora habilita PGE **explicitamente só no teste**, com guard que restaura o bit anterior antes de restaurar IRQ; não depende mais de um efeito colateral do flush.
+
+Passaram **151 testes Python e cinco ktests** em VMs separadas: estado de CPU/TLB com os sete readbacks anteriores, staging bruto, recusa em duas CPUs, fixture preparada e framebuffer/console. O gate obrigatório atual exige **quatro marcadores completos únicos**, incluindo `cpu_state:PASS pge_cases=2 irq_checks=3`, e acrescenta `pge_state_cases=2` e `irq_state_checks=3` ao JSON; as alegações de execução e suporte SMP continuam falsas. Type-check bare-metal de OSTD/ponte/framebuffer, rustfmt, sintaxe e diff passaram. Evidências em `artifacts/tlb-global-cpu-state/`, `artifacts/staging-pge-2030/`, `artifacts/smp-pge-2030/`, `artifacts/prepared-pge-2030/`, `artifacts/framebuffer-pge-2030/` e logs em `artifacts/cycle-2030/`.
+
+Essa prova de preservação de registrador é discriminante para o bug reproduzido. Ela **não resolve a limitação anterior do TCG para distinguir invalidação inclusiva/exclusiva GLOBAL**, não valida hardware físico ou boot instalado e não acrescenta módulo/versão Linux/arquitetura à lista qualificada. Continuam pendentes coerência remota, liberação diferida, política W^X/alias e init controlado.
+
+## Invalidação TLB: não enfraquecer pedidos ao juntar páginas (etapa anterior)
 
 O TLB guarda traduções de endereços. Depois de trocar o frame de uma página, uma tradução antiga não pode continuar entregando dados do frame anterior. No [flusher OSTD](../asterinas/ostd/src/mm/tlb.rs), os pedidos para endereços específicos incluíam páginas GLOBAL, mas ranges e filas com pelo menos 32 páginas eram promovidos para uma operação que excluía GLOBAL. Misturar essa operação ampla com pedidos específicos também podia perder a exigência mais forte.
 
@@ -46,7 +60,7 @@ O [novo ktest](../asterinas/ostd/src/mm/tlb/runtime_tests.rs) passou quatro caso
 
 **Controle negativo final:** desativar totalmente o flush inclusivo fez a leitura retornar oito bytes `0xe1` estrangeiros em vez de `0x42`, falhando no caso do range de 32 páginas. O fonte correto foi restaurado e o teste positivo repetido. **Limite importante:** trocar o despacho inclusivo pelo flush que exclui GLOBAL também passou em QEMU/TCG, mesmo com PGE e PTE GLOBAL confirmados. Portanto, este runtime detecta ausência de flush, mas **não discrimina a variante inclusiva da exclusiva**; não prova que a falha antiga se reproduz em hardware físico. A preservação do pedido GLOBAL é conferida pelo encoding/estado e pelo caminho de código, não por uma prova discriminante do hardware.
 
-Passaram **150 testes Python e cinco ktests em VMs separadas**: TLB, staging bruto, recusa em duas CPUs, fixture preparada e framebuffer/console. Type-check normal de OSTD/ponte/framebuffer para `x86_64-unknown-none`, rustfmt, sintaxe e diff passaram. O [gate](../tools/ci/verify_tlb_global_runtime.py) exige três marcadores únicos e resumo isolado; rejeita falhas, echo e controles que alterem marcadores. O CI mantém sete jobs e acrescenta a VM ao job de runtime. Serial/JSON/hashes em `artifacts/tlb-global-runtime/`; regressões em `artifacts/module-staging-tlb-2000/`, `artifacts/module-smp-rejection-2000/`, `artifacts/prepared-tlb-2000/` e `artifacts/framebuffer-tlb-2000/`; controles em `artifacts/tlb-global-no-flush-pge-negative/`, `artifacts/tlb-global-excluding-pge-control/` e logs em `artifacts/cycle-2000/`.
+Passaram **150 testes Python e cinco ktests em VMs separadas**: TLB, staging bruto, recusa em duas CPUs, fixture preparada e framebuffer/console. Type-check normal de OSTD/ponte/framebuffer para `x86_64-unknown-none`, rustfmt, sintaxe e diff passaram. O [gate](../tools/ci/verify_tlb_global_runtime.py) dessa etapa exigia três marcadores únicos e resumo isolado; rejeita falhas, echo e controles que alterem marcadores. O CI mantém sete jobs e acrescenta a VM ao job de runtime. Serial/JSON/hashes em `artifacts/tlb-global-runtime/`; regressões em `artifacts/module-staging-tlb-2000/`, `artifacts/module-smp-rejection-2000/`, `artifacts/prepared-tlb-2000/` e `artifacts/framebuffer-tlb-2000/`; controles em `artifacts/tlb-global-no-flush-pge-negative/`, `artifacts/tlb-global-excluding-pge-control/` e logs em `artifacts/cycle-2000/`.
 
 O flush completo inclusivo pode custar mais que o anterior: **não há benchmark de performance**. Continuam pendentes o teste discriminante fora de TCG, a coerência remota, liberação diferida de frames e a política do alias linear. Nenhum módulo, versão Linux ou arquitetura foi acrescentado à lista qualificada; não há novo boot instalado ou validação GPUI.
 
@@ -225,6 +239,8 @@ O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) agora preserva pedidos GLOBAL
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
+
+O [CI da base `d997972`, run 39692176406](https://github.com/cybermanju/cybermanju-shell/actions/runs/39692176406), **passou nos sete jobs**, incluindo o novo teste TLB e framebuffer. Sua ISO estava pendente na consulta inicial. A preservação de PGE/IRQ é uma revisão posterior validada localmente; a aprovação anterior não a qualifica automaticamente.
 
 O [CI da base `2077d48`, run 39687832657](https://github.com/cybermanju/cybermanju-shell/actions/runs/39687832657), **passou nos sete jobs**, incluindo a recusa de mapping em duas CPUs. A ISO dessa revisão estava pendente na consulta inicial. A nova correção TLB tem os testes locais acima; essa aprovação anterior não é sua aprovação remota.
 

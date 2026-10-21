@@ -16,6 +16,7 @@ class TlbGlobalRuntimeEvidenceTests(unittest.TestCase):
         self.assertEqual(verify(self.evidence()), {
             "status": "passed", "scope": "local_global_tlb_invalidation_only", "cpus": 1,
             "encoding_cases": 4, "aggregation_cases": 8, "stale_readback_cases": 7,
+            "pge_state_cases": 2, "irq_state_checks": 3,
             "remote_shootdown_verified": False, "linux_modules_executed": False,
             "init_called": False, "smp_mapping_supported": False,
         })
@@ -32,6 +33,16 @@ class TlbGlobalRuntimeEvidenceTests(unittest.TestCase):
                 with self.subTest(marker=marker, text=text[-100:]), self.assertRaises(ValueError):
                     verify(text)
 
+    def test_cpu_state_marker_missing_duplicate_or_corrupt_is_rejected(self):
+        marker = "CYBERMANJU_TLB_GLOBAL:cpu_state:PASS pge_cases=2 irq_checks=3"
+        line = marker + "\n"
+        for bad in (self.evidence().replace(line, ""), self.evidence() + line,
+                    self.evidence().replace(line, "echo " + line),
+                    self.evidence().replace("pge_cases=2", "pge_cases=1"),
+                    self.evidence().replace("irq_checks=3", "irq_checks=4")):
+            with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
+                verify(bad)
+
     def test_cpu_two_is_rejected(self):
         with self.assertRaises(ValueError):
             verify(self.evidence().replace("cases=7 cpus=1", "cases=7 cpus=2"))
@@ -39,7 +50,8 @@ class TlbGlobalRuntimeEvidenceTests(unittest.TestCase):
     def test_wrong_case_counts_or_extra_fields_are_rejected(self):
         for bad in (self.evidence().replace("cases=4", "cases=5"),
                     self.evidence().replace("cases=8", "cases=9"),
-                    self.evidence().replace("cases=7 cpus=1", "cases=7 cpus=1 extra=yes")):
+                    self.evidence().replace("cases=7 cpus=1", "cases=7 cpus=1 extra=yes"),
+                    self.evidence().replace("pge_cases=2 irq_checks=3", "pge_cases=2 irq_checks=3 extra=yes")):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 verify(bad)
 

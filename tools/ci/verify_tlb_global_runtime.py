@@ -9,6 +9,7 @@ MARKERS = (
     "CYBERMANJU_TLB_GLOBAL:encoding:PASS cases=4",
     "CYBERMANJU_TLB_GLOBAL:aggregation:PASS cases=8",
     "CYBERMANJU_TLB_GLOBAL:stale_readback:PASS cases=7 cpus=1",
+    "CYBERMANJU_TLB_GLOBAL:cpu_state:PASS pge_cases=2 irq_checks=3",
 )
 SUMMARY = re.compile(r"test result: ok\. 1 passed; 0 failed; \d+ filtered out\.")
 
@@ -35,6 +36,8 @@ def verify(text: str) -> dict:
         "encoding_cases": 4,
         "aggregation_cases": 8,
         "stale_readback_cases": 7,
+        "pge_state_cases": 2,
+        "irq_state_checks": 3,
         "remote_shootdown_verified": False,
         "linux_modules_executed": False,
         "init_called": False,

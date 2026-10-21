@@ -269,8 +269,8 @@ pub(crate) fn probe_global_flush_for_test(flush: impl FnOnce(Range<Vaddr>)) -> [
         _reservation: &reservation,
         installed: range.start..range.start,
     };
-    // O teste exige PGE ativo; habilitá-lo usa a primitiva existente, sob IRQ guard.
-    crate::arch::mm::tlb_flush_all_including_global();
+    // PGE é uma pré-condição explícita do teste, não um efeito colateral do flush.
+    let _pge = crate::arch::mm::tlb_test::TestPgeGuard::new(true);
     assert!(
         x86_64::registers::control::Cr4::read()
             .contains(x86_64::registers::control::Cr4Flags::PAGE_GLOBAL)

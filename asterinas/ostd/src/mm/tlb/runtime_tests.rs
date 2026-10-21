@@ -11,6 +11,8 @@ use crate::{
 #[ktest]
 fn cybermanju_tlb_global_runtime() {
     assert_eq!(crate::cpu::num_cpus(), 1);
+    crate::arch::mm::tlb_test::assert_flush_preserves_cpu_state();
+    println!("\nCYBERMANJU_TLB_GLOBAL:cpu_state:PASS pge_cases=2 irq_checks=3");
     let base = PAGE_SIZE * 16;
     // Quatro casos de representação/contrato, incluindo o limite de 32 páginas.
     assert_eq!(
@@ -29,7 +31,7 @@ fn cybermanju_tlb_global_runtime() {
         TlbFlushOp::for_range(base..base + 31 * PAGE_SIZE).num_pages(),
         31
     );
-    println!("\nCYBERMANJU_TLB_GLOBAL:encoding:PASS cases=4");
+    println!("CYBERMANJU_TLB_GLOBAL:encoding:PASS cases=4");
 
     let mut stack = OpsStack::new();
     assert!(stack.is_empty());

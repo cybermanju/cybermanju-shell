@@ -98,17 +98,28 @@ pub(crate) fn tlb_flush_all_excluding_global() {
 }
 
 /// Flushes all TLB entries, including the global-page entries.
+/// Preserves the original PGE and IRQ state on this CPU.
 pub(crate) fn tlb_flush_all_including_global() {
-    // SAFETY: Updates to CR4 here only change the global-page bit. The side effect
-    // is only to invalidate the TLB, which doesn't affect the memory safety.
+    // Keep both CR4 transitions on this CPU without a maskable interrupt between them.
+    let _irq_guard = crate::irq::disable_local();
+    let original_pge = x86_64::registers::control::Cr4::read()
+        .contains(x86_64::registers::control::Cr4Flags::PAGE_GLOBAL);
+    // SAFETY: Only PGE is toggled, invalidating translations. No mappings change;
+    // both the original PGE bit and IRQ state are restored before returning.
     unsafe {
-        // To invalidate all entries, including global-page
-        // entries, disable global-page extensions (CR4.PGE=0).
+        // A PGE transition invalidates entries, including GLOBAL. Toggle twice
+        // instead of unconditionally enabling a feature that was disabled.
         x86_64::registers::control::Cr4::update(|cr4| {
-            *cr4 -= x86_64::registers::control::Cr4Flags::PAGE_GLOBAL;
+            cr4.set(
+                x86_64::registers::control::Cr4Flags::PAGE_GLOBAL,
+                !original_pge,
+            );
         });
         x86_64::registers::control::Cr4::update(|cr4| {
-            *cr4 |= x86_64::registers::control::Cr4Flags::PAGE_GLOBAL;
+            cr4.set(
+                x86_64::registers::control::Cr4Flags::PAGE_GLOBAL,
+                original_pge,
+            );
         });
     }
 }
@@ -321,3 +332,6 @@ pub(super) fn enable_essential_features() {
         });
     }
 }
+
+#[cfg(ktest)]
+pub(crate) mod tlb_test;
