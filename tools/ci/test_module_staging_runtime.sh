@@ -20,6 +20,12 @@ case ${2:-} in
         VERIFY=verify_prepared_module_runtime.py
         [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
         ;;
+    --address-reservation)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_module_address_runtime
+        VERIFY=verify_module_address_runtime.py
+        ;;
     *) echo 'Unknown runtime mode' >&2; exit 2 ;;
 esac
 CONFIG="$ROOT/asterinas/$CRATE_PATH/OSDK.toml"

@@ -46,10 +46,10 @@ O [runner](../tools/ci/test_framebuffer_runtime.sh) recusa configurações preex
 
 A [execução de ISO em `4133000`](https://github.com/cybermanju/cybermanju-shell/actions/runs/39656869402) falhou **antes do build**, no timeout de dois minutos para remover SDKs efêmeros e medir capacidade. O log chegou a mostrar cerca de 102 GiB disponíveis; não foi evidência de falta de disco nem falha de boot do kernel.
 
-O passo passa a ter dez minutos. Para preservar a invariável já testada de que a soma dos limites individuais cabe no job, o limite global passa a 358 minutos: soma de 356, ambos abaixo do cap hospedado de 360. Reserva de 1 GiB e gates de instalação/boot permanecem. Testes estáticos validam esses limites; só uma nova execução remota pode comprovar que o bloqueio foi superado.
+O passo passa a ter dez minutos. Para preservar a invariável já testada de que a soma dos limites individuais cabe no job, o limite global passa a 358 minutos: soma de 356, ambos abaixo do cap hospedado de 360. Reserva de 1 GiB e gates de instalação/boot permanecem. Testes estáticos validam esses limites. A [execução posterior em `fb5b9d0`](https://github.com/cybermanju/cybermanju-shell/actions/runs/39658861099) já superou preparação, build, verificação da ISO e live USB; ainda executava instalação UEFI nesta consulta, com boot instalado pendente. Isso comprova o desbloqueio inicial, não aceite completo da ISO.
 
 ## O que ainda falta
 
 O consumidor ainda recusa endereço físico não alinhado a página. Os formatos de cor são inferidos por bpp; máscaras e ordem de canais não são preservadas. Linux boot, Multiboot v1, 8/16/24 bpp e GPU física não receberam nova qualificação em runtime.
 
-No caminho gráfico faltam formato completo de cor, mapeamento com offset de página, apresentação DRM/input e integração GPUI↔kernel de ponta a ponta. No loader faltam placement virtual real, proteção considerando o alias linear e chamada controlada de init. Readback de bytes não comprova cores, sincronização de apresentação ou FPS.
+No caminho gráfico faltam formato completo de cor, mapeamento com offset de página, apresentação DRM/input e integração GPUI↔kernel de ponta a ponta. No loader há agora [reserva virtual real testada](linux-module-compatibility.md), ainda sem ligação ao ELF; faltam replanejamento na base real, mapping, proteção considerando o alias linear e chamada controlada de init. Readback de bytes não comprova cores, sincronização de apresentação ou FPS.

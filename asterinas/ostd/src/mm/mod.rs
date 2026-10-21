@@ -18,6 +18,8 @@ pub mod heap;
 pub mod io;
 pub(crate) mod kspace;
 pub(crate) mod mem_obj;
+#[cfg(target_arch = "x86_64")]
+pub mod module_address;
 pub mod module_staging;
 pub(crate) mod page_prop;
 pub(crate) mod page_table;

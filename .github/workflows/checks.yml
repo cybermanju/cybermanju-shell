@@ -126,6 +126,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends qemu-system-x86 grub-common grub-pc-bin xorriso mtools linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod
       - name: Exercise real frame staging and rollback (one kernel test, five scenarios)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
+      - name: Verify OSTD virtual-address reservation only (one kernel test, four scenarios; no payload mappings)
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --address-reservation
       - name: Prepare real no-import .ko inside QEMU and verify all staged bytes (never call init)
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
       - name: Retain serial evidence and exact harness dependency resolution
@@ -138,6 +140,10 @@ jobs:
             artifacts/linux-module-runtime/*.json
             artifacts/linux-module-runtime/*.txt
             artifacts/linux-module-runtime/harness-Cargo.*
+            artifacts/module-address-runtime/*.log
+            artifacts/module-address-runtime/*.json
+            artifacts/module-address-runtime/*.txt
+            artifacts/module-address-runtime/harness-Cargo.*
           retention-days: 7
           if-no-files-found: warn
 

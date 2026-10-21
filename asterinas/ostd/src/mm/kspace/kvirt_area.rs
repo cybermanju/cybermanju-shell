@@ -56,6 +56,40 @@ pub(crate) struct KVirtArea {
     range: Range<Vaddr>,
 }
 
+/// A range held in the same allocator as `KVirtArea`, with no mapping API.
+/// Unlike `KVirtArea`, dropping it never walks or modifies page tables.
+#[cfg(target_arch = "x86_64")]
+#[derive(Debug)]
+pub(crate) struct KVirtReservation {
+    range: Range<Vaddr>,
+}
+
+#[cfg(target_arch = "x86_64")]
+impl KVirtReservation {
+    pub(crate) fn new(size: usize) -> Result<Self, crate::Error> {
+        if size == 0 || !size.is_multiple_of(PAGE_SIZE) {
+            return Err(crate::Error::InvalidArgs);
+        }
+        let irq_guard = irq::disable_local();
+        let range = kvirt_area_allocator(&irq_guard)
+            .alloc(size)
+            .map_err(|_| crate::Error::NoMemory)?;
+        Ok(Self { range })
+    }
+
+    pub(crate) fn range(&self) -> Range<Vaddr> {
+        self.range.clone()
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl Drop for KVirtReservation {
+    fn drop(&mut self) {
+        let irq_guard = irq::disable_local();
+        kvirt_area_allocator(&irq_guard).free(self.range.clone());
+    }
+}
+
 impl HasSize for KVirtArea {
     fn size(&self) -> usize {
         self.range.len()
