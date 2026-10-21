@@ -21,6 +21,52 @@ fn main() {
     );
     let table = u64_at(&bytes, 40) as usize;
     let section = |index: usize| &bytes[table + index * 64..table + (index + 1) * 64];
+    let layout = linux_module_elf::plan_layout(&bytes, 0x20_0000, 16 * 1024 * 1024, 256)
+        .expect("plan a numeric-only layout of SHF_ALLOC sections");
+    let mut cursor = u128::from(layout.base());
+    let mut placements = layout.placements().iter();
+    for index in 1..usize::from(result.section_count) {
+        let header = section(index);
+        let flags = u64_at(header, 8);
+        if flags & 2 == 0 {
+            continue;
+        }
+        let placement = placements.next().expect("every allocated section planned");
+        let alignment = u64_at(header, 48).max(1);
+        // Independent arithmetic oracle: division in u128, not the planner's
+        // checked u64 bit-mask implementation. Addresses are never pointers.
+        cursor = cursor.div_ceil(u128::from(alignment)) * u128::from(alignment);
+        assert_eq!(placement.section_index as usize, index);
+        assert_eq!(u128::from(placement.address), cursor);
+        assert_eq!(placement.alignment, alignment);
+        assert_eq!(placement.size, u64_at(header, 32));
+        assert_eq!(placement.flags, flags);
+        cursor += u128::from(placement.size);
+    }
+    assert!(placements.next().is_none());
+    assert!(!layout.placements().is_empty());
+    assert_eq!(
+        cursor - u128::from(layout.base()),
+        u128::from(layout.span())
+    );
+    assert_eq!(
+        linux_module_elf::plan_layout(&bytes, layout.base(), layout.span() - 1, 256),
+        Err(linux_module_elf::Error::ResourceLimit)
+    );
+    assert_eq!(
+        linux_module_elf::plan_layout(
+            &bytes,
+            layout.base(),
+            layout.span(),
+            layout.placements().len() - 1
+        ),
+        Err(linux_module_elf::Error::ResourceLimit)
+    );
+    println!(
+        "Offline SHF_ALLOC layout passed: {} sections, {} bytes span; numeric addresses only; NOT mapped or executed",
+        layout.placements().len(),
+        layout.span()
+    );
     // Deliberately synthetic addresses, NOT kernel exports or callable pointers.
     let base = |index: usize| 0x10_0000_u64 + index as u64 * 0x1_0000;
     let mut applied_sections = 0;

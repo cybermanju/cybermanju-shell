@@ -11,10 +11,12 @@
 extern crate alloc;
 
 mod apply;
+mod layout;
 mod relocations;
 mod symbols;
 
 pub use apply::relocate_section;
+pub use layout::{Layout, SectionPlacement, plan_layout};
 
 const HEADER_SIZE: usize = 64;
 const SECTION_SIZE: usize = 64;
@@ -51,6 +53,8 @@ pub enum Error {
     RelocationOverflow,
     RelocationOverlap,
     ResourceLimit,
+    LayoutOverflow,
+    UnsupportedSection,
 }
 
 /// An inspected object, not a loaded or trusted Linux module.
