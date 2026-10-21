@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Real boot framebuffer MMIO in a disposable VGA/TCG VM, not GPU acceleration.
-use ostd::{boot::boot_info, mm::VmIo, prelude::*};
+use alloc::vec::Vec;
+
+use ostd::{Error, boot::boot_info, mm::VmIo, prelude::*, sync::Mutex};
 
 use crate::{
     framebuffer,
@@ -69,4 +71,49 @@ fn cybermanju_framebuffer_runtime() {
     // A readback from the device aperture does not measure monitor scanout,
     // presentation feedback, color correctness, Vulkan, GPUI or physical FPS.
     println!("CYBERMANJU_FRAMEBUFFER:io_readback:PASS rows=2 row_bytes=8");
+
+    // A synthetic short surface over real MMIO deliberately leaves accessible
+    // bytes beyond its declared span. Testing only the page-aligned real mode
+    // would let IoMem's own limit hide a missing FrameBuffer-level guard.
+    let short = framebuffer::FrameBuffer {
+        io_mem: fb.io_mem().clone(),
+        width: 2,
+        height: 2,
+        line_size: 12,
+        byte_len: 24,
+        pixel_format: PixelFormat::BgrReserved,
+        cmap: Mutex::new(framebuffer::FbCmap {
+            entries: Vec::new(),
+        }),
+    };
+    let mut before = [0; 16];
+    fb.io_mem().read_bytes(16, &mut before).unwrap();
+    assert!(matches!(
+        short.write_bytes_at(23, &[0xa1, 0xb2]),
+        Err(Error::InvalidArgs)
+    ));
+    assert!(matches!(
+        short.write_bytes_at(24, &[0xc3]),
+        Err(Error::InvalidArgs)
+    ));
+    assert!(matches!(
+        short.write_pixel_at(short.calc_offset(0, 2), short.render_pixel(first)),
+        Err(Error::InvalidArgs)
+    ));
+    assert!(matches!(
+        short.write_bytes_at(usize::MAX, &[0xd4]),
+        Err(Error::InvalidArgs)
+    ));
+    assert!(matches!(
+        short.write_bytes_at(25, &[]),
+        Err(Error::InvalidArgs)
+    ));
+    short.write_bytes_at(24, &[]).unwrap();
+    let mut after = [0; 16];
+    fb.io_mem().read_bytes(16, &mut after).unwrap();
+    assert_eq!(
+        after, before,
+        "rejected writes must not modify even an in-range prefix"
+    );
+    println!("CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24");
 }

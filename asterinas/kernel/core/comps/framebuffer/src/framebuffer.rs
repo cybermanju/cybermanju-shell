@@ -13,6 +13,10 @@ use spin::Once;
 
 use crate::pixel::{Pixel, PixelFormat, RenderedPixel};
 
+#[cfg(ktest)]
+#[path = "runtime_tests.rs"]
+mod runtime_tests;
+
 /// Maximum number of colormap entries (standard 8-bit palette)
 pub const MAX_CMAP_SIZE: usize = 256;
 
@@ -186,11 +190,21 @@ impl FrameBuffer {
 
     /// Writes a pixel at the specified position.
     pub fn write_pixel_at(&self, offset: PixelOffset, pixel: RenderedPixel) -> Result<()> {
-        self.io_mem.write_bytes(offset.as_usize(), pixel.as_slice())
+        self.write_bytes_at(offset.as_usize(), pixel.as_slice())
     }
 
-    /// Writes raw bytes at the specified offset.
+    /// Writes raw bytes within the declared surface, including row padding.
+    ///
+    /// Rejects overflow and out-of-surface writes before any I/O, even when the
+    /// page-rounded MMIO mapping contains accessible bytes after the surface.
+    /// An empty write is accepted at the exact end, but not beyond it.
     pub fn write_bytes_at(&self, offset: usize, bytes: &[u8]) -> Result<()> {
+        if offset
+            .checked_add(bytes.len())
+            .is_none_or(|end| end > self.byte_len)
+        {
+            return Err(Error::InvalidArgs);
+        }
         self.io_mem.write_bytes(offset, bytes)
     }
 

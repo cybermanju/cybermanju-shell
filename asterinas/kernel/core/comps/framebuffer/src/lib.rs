@@ -20,9 +20,6 @@ pub mod framebuffer;
 pub mod mode;
 pub mod pixel;
 
-#[cfg(ktest)]
-mod runtime_tests;
-
 use component::{ComponentInitError, init_component};
 
 #[init_component]
