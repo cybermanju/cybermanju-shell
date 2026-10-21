@@ -84,7 +84,7 @@ class DeadlineTests(unittest.TestCase):
         workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/iso.yml").read_text()
         limits = [int(value) for value in re.findall(r"timeout-minutes: (\d+)", workflow)]
         self.assertEqual(limits[0], 350)
-        self.assertEqual(sum(limits[1:]), 333)
+        self.assertEqual(sum(limits[1:]), 348)
         self.assertLess(sum(limits[1:]), limits[0])
         self.assertLess(limits[0], 360)
 

@@ -27,10 +27,11 @@ jobs:
     # Never run untrusted fork code inside the privileged build environment.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-24.04
-    # 333 minutes of step maxima plus 17 minutes margin, below the hosted 360-minute cap.
+    # Entire build/test loop stays below the hosted 360-minute cap.
     timeout-minutes: 350
     env:
-      BUILD_IMAGE: asterinas/kernel-dev@sha256:97d370e2260fec73f59d9ee02a128edb84141789248e4c1c4b18f05da8bf4e51
+      # Builder host only; the ISO and installed OS remain Asterinas NixOS.
+      BUILD_IMAGE: ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
       # Decimal 14 GB, deliberately not 14 GiB. Reserve includes upload headroom.
       ISO_DISK_LIMIT_BYTES: '14000000000'
       ISO_DISK_RESERVE_BYTES: '1073741824'
@@ -43,7 +44,7 @@ jobs:
       - name: Lightweight static regression tests
         timeout-minutes: 2
         run: |
-          bash -n tools/ci/test-iso.sh tools/ci/verify-iso.sh
+          bash -n tools/ci/test-iso.sh tools/ci/verify-iso.sh tools/ci/setup-iso-builder.sh
           bash -n asterinas/tools/nixos/run.sh asterinas/tools/nixos/build_nixos.sh asterinas/tools/qemu_args.sh
           python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 
@@ -68,8 +69,8 @@ jobs:
           printf 'QEMU acceleration: %s\n' "$QEMU_ACCEL" | tee artifacts/acceleration.log
           df -h . | tee artifacts/disk-start.log
 
-      - name: Pull and start pinned builder within budget
-        timeout-minutes: 15
+      - name: Prepare lean pinned builder within budget
+        timeout-minutes: 30
         shell: bash
         run: |
           set -euo pipefail
@@ -80,14 +81,18 @@ jobs:
             --platform linux/amd64 --volume /dev:/dev \
             --volume "$GITHUB_WORKSPACE:/work" --workdir /work/asterinas \
             --env ENABLE_KVM="$ENABLE_KVM" --env QEMU_ACCEL="$QEMU_ACCEL" \
+            --env ISO_CI_BUILDER=1 --env NIX_REMOTE=local \
+            --env PATH=/root/.cargo/bin:/opt/iso-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            --env VDSO_LIBRARY_DIR=/opt/linux_vdso \
             --env MEM=4G --env SMP=2 \
             --env QEMU_DISPLAY=none --env CARGO_BUILD_JOBS=2 \
             --env CARGO_INCREMENTAL=0 --env CARGO_PROFILE_DEV_DEBUG=0 \
             --env CARGO_PROFILE_RELEASE_DEBUG=0 \
             --env NIX_CONFIG=$'max-jobs = 1\ncores = 2' \
             --entrypoint /bin/bash "$BUILD_IMAGE" -c 'exec sleep infinity'
-          docker exec iso-builder bash -lc \
-            'set -euo pipefail; printf "Builder QEMU acceleration: %s (ENABLE_KVM=%s)\n" "$QEMU_ACCEL" "$ENABLE_KVM"; rustc --version; nix-build --version; qemu-system-x86_64 --version; command -v xorriso'
+          python3 tools/ci/disk_budget.py run artifacts/disk-budget.json -- \
+            docker exec iso-builder bash /work/tools/ci/setup-iso-builder.sh \
+            2>&1 | tee artifacts/setup-builder.log
           docker image inspect "$BUILD_IMAGE" --format 'Image unpacked bytes: {{.Size}}' \
             | tee artifacts/image-size.log
           python3 tools/ci/disk_budget.py check artifacts/disk-budget.json
