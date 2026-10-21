@@ -83,10 +83,19 @@
       </button>
     </label>
 
+    <HomeWorkspaceStudio
+      ref="workspaceStudio"
+      v-if="!query"
+      :apps="workspaceApps"
+      :initial-ids="orderedApps.map(app => app.panel)"
+      @open="open($event as PanelType)"
+      @customize="customizeWorkspaceApp"
+    />
+
     <!-- iOS springboard pager (cf. iOS4Android PageView + IconGrid):
       8 icons per page (2 rows × 4), horizontal snap scroll with dots. -->
     <div
-      v-if="filtered.length"
+      v-if="query && filtered.length"
       ref="pagerRef"
       class="mla-pages"
       role="group"
@@ -135,7 +144,7 @@
     </p>
 
     <!-- iOS page dots (cf. iOS4Android DotsIndicator): 7.5px dots, white vs dim. -->
-    <div v-if="pages.length > 1" class="mla-dots" aria-hidden="true">
+    <div v-if="query && pages.length > 1" class="mla-dots" aria-hidden="true">
       <button
         v-for="(_, dotIndex) in pages"
         :key="dotIndex"
@@ -244,6 +253,7 @@
 
 <script setup lang="ts">
 import AppIcon from '@/components/AppIcon.vue'
+import HomeWorkspaceStudio from '@/components/HomeWorkspaceStudio.vue'
 import AppDrawer from '@/components/AppDrawer.vue'
 import MessagesHub from '@/components/MessagesHub.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -271,6 +281,7 @@ const msgHub = useMessages()
 // computed would re-run it on every recompute.
 const sys = useNotifications()
 const sysUnread = computed(() => sys.unreadCount.value)
+const workspaceStudio = ref<{ removeApp: (id: string) => void; reorderApp: (id: string, direction: -1 | 1) => void } | null>(null)
 const query = ref('')
 const dateStr = ref('')
 const greeting = ref('')
@@ -436,6 +447,15 @@ const orderedApps = computed<LauncherApp[]>(() => {
   })
   return rows.map((r) => r.app)
 })
+
+const workspaceApps = computed(() => apps.value.map(app => ({
+  id: app.panel, label: homeName(app), icon: app.icon,
+  image: homeTile(app).kind === 'image' ? homeTile(app).src : undefined,
+})))
+function customizeWorkspaceApp(id: string) {
+  const app = apps.value.find(app => app.panel === id)
+  if (app) openHomeCustom(app)
+}
 
 /** Display name honoring the rename override. */
 function homeName(app: LauncherApp): string {
@@ -634,6 +654,7 @@ function moveHomeCustom(dir: -1 | 1) {
   if (!app) return
   launcher.pinToEnd(homeKey(app))
   launcher.move(homeKey(app), dir)
+  workspaceStudio.value?.reorderApp(app.panel, dir)
   homeMsg.value = dir < 0 ? 'Moved earlier.' : 'Moved later.'
 }
 
@@ -641,7 +662,8 @@ function hideHomeCustom() {
   const app = customHome.value
   if (!app) return
   launcher.hide(homeKey(app), true)
-  store.notifySuccess(`${homeName(app)} hidden — Reset home brings it back`)
+  workspaceStudio.value?.removeApp(app.panel)
+  store.notifySuccess(`${homeName(app)} hidden — use + to add it again`)
   customHome.value = null
 }
 
