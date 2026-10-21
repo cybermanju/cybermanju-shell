@@ -2,10 +2,10 @@
 fn main() {
     let path = std::env::args().nth(1).expect("expected ELF object path");
     let bytes = std::fs::read(path).expect("read fixture");
-    let result = linux_module_elf::inspect(&bytes).expect("inspect real C ET_REL fixture");
+    let result = linux_module_elf::inspect(&bytes).expect("inspect ELF ET_REL structure");
     assert!(result.section_count > 2);
     println!(
-        "C ET_REL structural inspection passed: {} sections; NOT loaded or ABI-validated",
+        "ELF ET_REL structural inspection passed: {} sections; NOT loaded or ABI-validated",
         result.section_count
     );
 }

@@ -1,59 +1,77 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Nenhum módulo Linux `.ko` foi demonstrado carregando neste kernel.** A biblioteca Rust faz pré-validação estrutural de ELF, símbolos e um subconjunto de relocations x86-64. Não resolve símbolos, não aplica relocations e não executa código de módulo.
+**Um módulo Linux real foi compilado via kbuild e passou pela inspeção estrutural Rust. Nenhum `.ko` foi carregado ou executado, nem no host nem no Asterinas.** Essa distinção é essencial: ainda faltam resolução de símbolos, aplicação de relocations, ABI do kernel e integração do loader.
 
 ## Matriz atual
 
 | Componente / alvo | Versão ou formato | Evidência mais recente | Limite |
 |---|---|---|---|
-| Fonte Asterinas do fork | `0.19.0`, conforme `asterinas/VERSION` | Fonte local e `main` remota conferidas na base `9d13c04` | Kernel completo não recompilado nem inicializado nesta rodada |
+| Fonte Asterinas do fork | `0.19.0`, conforme `asterinas/VERSION` | Fonte local e `main` remota conferidas na base `3d6dc25` | Kernel Asterinas completo não recompilado nem inicializado localmente nesta rodada |
 | Toolchain do kernel | `nightly-2026-07-21`, conforme `rust-toolchain.toml` | Pin do repositório | Testes no host não substituem build com esse nightly |
-| Pré-validador `linux-module-elf` | ELF64 little-endian, ET_REL, x86-64 | **40 testes Rust** aprovados no host Linux x86-64, `rustc 1.97.1`; build `no_std`, sem dependências e sem `unsafe` aprovado | Biblioteca ainda não integrada a syscalls, boot ou loader executável |
-| Símbolos | `SHT_SYMTAB`, entradas ELF64 de 24 bytes | Nomes, string table, partição local/global, índices e limites de símbolos validados | `SHT_DYNSYM` e índices estendidos rejeitados; símbolos indefinidos, absolutos e common não são resolvidos |
-| Relocations | `SHT_RELA`, entradas de 24 bytes | `sh_link`, `sh_info`, índices de símbolos, tipo e intervalo do destino validados com testes negativos | Somente os tipos listados abaixo; nenhuma fórmula calculada, escrita em memória ou execução |
-| Objeto C real de teste | GCC 13.3.0, ELF ET_REL x86-64 com 14 seções | Compilação, `readelf` e inspeção com símbolos e RELA aprovados | Objeto C comum, **não** `.ko` de Linux kbuild; não prova ABI Linux ou módulo executável |
-| ARM64 / RISC-V / LoongArch | Nenhuma versão de módulo qualificada | Arquitetura diferente rejeitada pelo pré-validador; exemplo sintético ARM64 | Nenhuma execução de módulo nessas arquiteturas |
-| Módulos Linux reais | Nenhum nome/versão aprovado | Nenhuma evidência de `.ko` carregado | Kernel/configuração Linux alvo, `Module.symvers`, `vermagic` e assinaturas ainda sem qualificação |
+| Pré-validador `linux-module-elf` | ELF64 little-endian, ET_REL, x86-64 | **40 testes Rust** e build `no_std`, sem dependências ou `unsafe`, aprovados com `rustc 1.97.1` | Biblioteca ainda não integrada a syscalls, boot ou loader executável |
+| Símbolos / relocations | `SHT_SYMTAB` e subconjunto `SHT_RELA` x86-64 | Referências, tamanhos e intervalos conferidos | Sem resolução, fórmulas de relocation, escrita em memória ou execução |
+| Objeto C de teste | GCC 13.3.0, ELF ET_REL com 14 seções | Compilação e inspeção aprovadas novamente | Não é um módulo kbuild |
+| **Módulo Linux real** | **`cybermanju_fixture.ko` versão `0.1.0`; Linux `6.8.0-147-generic`, x86-64** | **kbuild/MODPOST/link aprovados; inspeção Rust das 44 seções, símbolos e RELA aprovada** | **Somente compilado/inspecionado. Nunca carregado; compatibilidade de execução não comprovada** |
+| Outros módulos / versões Linux | Nenhum qualificado | Nenhuma evidência de carregamento, inclusive do módulo mínimo | Não extrapolar essa inspeção para drivers de GPU, outras configurações ou versões Linux |
+| ARM64 / RISC-V / LoongArch | Nenhum módulo qualificado | Pré-validador limitado a x86-64; exemplo sintético ARM64 rejeitado | Nenhum build ou execução de `.ko` nessas arquiteturas |
 | Ponte NVIDIA NVport | Fonte NVIDIA `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` documentado localmente | Sem nova execução NVport nesta rodada | Ponte C/Rust por fontes, não carregamento de `nvidia.ko`; RM completo, GSP e GPU real não validados aqui |
-| CI de regressão na base `9d13c04` | [Run 39605334934](https://github.com/cybermanju/cybermanju-shell/actions/runs/39605334934) | Jobs de regressão e ELF aprovados | Cobre os 26 testes Rust anteriores, não automaticamente os novos 40 |
-| ISO / instalação / boot instalado | [Run 39605334894](https://github.com/cybermanju/cybermanju-shell/actions/runs/39605334894), base `9d13c04` | Run consultado: em andamento no gate live USB | Instalação e boot instalado ainda pendentes nessa consulta; boot do instalador Linux não é boot Asterinas |
+| CI de regressão na base `3d6dc25` | [Run 39608968060](https://github.com/cybermanju/cybermanju-shell/actions/runs/39608968060) | Regressões e 40 testes ELF aprovados | Ainda não cobre automaticamente o novo job kbuild |
+| ISO live USB Linux | [Run 39608968083](https://github.com/cybermanju/cybermanju-shell/actions/runs/39608968083), base `3d6dc25` | Gate live USB passou; run avançou à instalação por UEFI CD | Isso valida o instalador Linux, não o boot do Asterinas instalado |
+| Instalação / boot instalado | Mesmo run | Instalação em andamento na consulta desta rodada | Instalação concluída e boot instalado ainda não comprovados nessa consulta |
 
-## Melhoria desta rodada
+## Primeiro módulo real: exatamente o que foi testado
 
-O novo [`relocations.rs`](../asterinas/kernel/libs/linux-module-elf/src/relocations.rs) roda depois da validação das seções e símbolos. Confere tamanho/divisibilidade da tabela RELA, `sh_link` para uma symtab validada, `sh_info` para seção de destino não nula, índice de símbolo em `r_info` e `r_offset + largura` sem overflow dentro do tamanho da seção. `.bss`/`SHT_NOBITS` usa tamanho em memória, não bytes no arquivo. Tabelas vazias continuam exigindo referências válidas.
+O código mínimo em [`tests/kbuild`](../asterinas/kernel/libs/linux-module-elf/tests/kbuild/cybermanju_fixture.c) define init que retorna zero, exit vazio e metadados de módulo. Foi compilado pelo **Linux kbuild real**, não pela simples troca de extensão de um objeto C. O executor [`test_linux_module_kbuild.sh`](../tools/ci/test_linux_module_kbuild.sh) não contém comandos de carregamento: só build, `readelf`, `modinfo`, `nm` e inspeção Rust.
 
-A lista de tipos reconhecidos é deliberadamente pequena:
+A configuração testada foi:
 
-| Tipo x86-64 | Largura conferida | O que foi provado |
-|---|---:|---|
-| `R_X86_64_NONE` (0) | 0 bytes | Política conservadora exige offset até o fim da seção, mesmo sem escrita |
-| `R_X86_64_64` (1), `R_X86_64_PC64` (24) | 8 bytes | Campo cabe no destino; não há cálculo da relocação |
-| `R_X86_64_PC32` (2), `R_X86_64_PLT32` (4), `R_X86_64_32` (10), `R_X86_64_32S` (11) | 4 bytes | Campo cabe no destino; não há resolução de símbolo, cálculo ou checagem de overflow do resultado da fórmula |
+- Headers Ubuntu `linux-headers-6.8.0-147-generic` e comuns `6.8.0-147`, ambos pacote **`6.8.0-147.147`**.
+- Compilador **`x86_64-linux-gnu-gcc-13`, Ubuntu `13.3.0-6ubuntu2~24.04.1`**, e inspetor Rust **`1.97.1`**.
+- `vermagic`: **`6.8.0-147-generic SMP preempt mod_unload modversions`**.
+- Relocations encontradas: **`R_X86_64_32`, `R_X86_64_64`, `R_X86_64_PC32`, `R_X86_64_PLT32`**; todas passaram pelos checks estruturais existentes. Nenhuma foi aplicada.
+- Símbolos ainda indefinidos: **`__fentry__` e `__x86_return_thunk`**. A inspeção não fornece essas funções nem valida os CRCs/contratos de modversions.
+- **BTF não gerado**, pois não havia `vmlinux` correspondente. Assinatura/confiança e execução continuam sem validação.
 
-Tipos fora dessa lista e tabelas `SHT_REL`/`SHT_RELR` são rejeitados. Reconhecer largura **não significa implementar ou suportar a relocação num módulo executável**. Addends negativos/extremos são lidos como parte do contêiner, mas não avaliados. O teste de imutabilidade confirma que a inspeção não altera a entrada.
+Hashes SHA-256 da amostra local preservada:
 
-Foram adicionados **14 testes Rust**: limites exatos, overflow, símbolo/links/destinos inválidos, entradas parciais, tabelas vazias, tipos não implementados, `.bss`, imutabilidade, truncamentos e mutações. São testes finitos, não fuzzing exaustivo ou auditoria formal. Sobreposições de regiões/escritas, semântica completa de símbolos/seções, ABI Linux, assinaturas e execução seguem fora do escopo. Um resultado positivo **nunca** autoriza mapear ou chamar código.
+| Artefato | SHA-256 |
+|---|---|
+| `cybermanju_fixture.ko` | `8f068b7b74977b6f3477e5becbaba91b6eeb6cea5112171eba94faf1d632458c` |
+| Fonte C do fixture | `ae0db544d38a724cdac33d74b0d54716628dd23d87bc613dae2f072dd72e3da7` |
+| `.config` dos headers | `cf8454bc2e67effab87a5bff3c39042f2d8d106b6a777c4302e52f50d23b7400` |
+| `Module.symvers` dos headers | `8e7eb5798789b9610c324b3d9b13373d88c30ae17bb9e41e622efd05e0277a87` |
 
-## CI longo sem reinícios a cada push
+O `.ko`, logs e metadados completos estão em `artifacts/linux-module-kbuild/`, ignorados pelo Git. `status.txt` registra `exit_code=0` e `loaded=false`; um rerun que falhe grava seu erro para não herdar sucesso de um `provenance.txt` antigo. O build não promete binário idêntico entre diretórios temporários ou toolchains: cada amostra deve ser identificada pelo próprio hash.
 
-A política de concorrência da ISO passou para `cancel-in-progress: false`, mantendo o grupo por branch/ref. Assim, novas alterações não devem interromper um run ativo antes da instalação e do boot. O GitHub ainda pode substituir uma execução **pendente** pela pendente mais recente; isso não transforma jobs cancelados ou resultados de outra revisão em aprovação.
+## Limites do pré-validador
 
-O run anterior `39600721252` havia produzido métricas de readiness/live-checks/shutdown bem-sucedidas, mas falhou no `grep` shell sobre marcador com metadados OSC. Essa checagem duplicada foi removida em `9d13c04`, preservando os checks reais do harness Python. A validação completa dessa correção continua dependendo do resultado do run de ISO acima.
+Reconhece apenas ELF64 little-endian ET_REL x86-64, sem compressão ou numeração estendida. Valida cabeçalho, seções, nomes, symtab/strtab, índices e limites. A RELA aceita larguras dos tipos `NONE` (0 bytes), `64`/`PC64` (8 bytes), `PC32`/`PLT32`/`32`/`32S` (4 bytes); outros tipos e `SHT_REL`/`SHT_RELR` são rejeitados. `NONE` tem política conservadora de offset até o fim da seção. `.bss` usa tamanho em memória.
+
+Reconhecer essas larguras **não implementa as fórmulas nem a compatibilidade ABI**. Addends não são calculados; sobreposições, permissões executáveis, semântica completa de símbolos/seções, assinaturas e ciclo de vida não estão qualificados. Testes finitos de truncamento/mutação não equivalem a fuzzing exaustivo ou auditoria formal. Um resultado positivo nunca autoriza chamar código.
+
+## CI e bloqueios de boot
+
+O run anterior [39605334894](https://github.com/cybermanju/cybermanju-shell/actions/runs/39605334894), base `9d13c04`, falhou aguardando readiness por 1.200 segundos: o serial registra timeout de `/dev/ttyS0` e falha da dependência do serial-getty. Não chegou a live-checks ou shutdown; não foi repetição do falso negativo de `grep` do run mais antigo. Os logs não isolam por que o dispositivo não apareceu. O run seguinte avançou além do live USB, mas isso ainda não prova estabilidade do console nem instalação/boot completo.
+
+A concorrência da ISO permanece `cancel-in-progress: false`: o run ativo não deve ser interrompido por pushes periódicos; uma execução pendente ainda pode ser substituída pela mais recente. Resultados são vinculados ao commit testado, sem herdar aprovação entre revisões.
 
 ## Testes reproduzíveis
 
-Na raiz do repositório:
+Na raiz, com os headers fixados, GCC 13 e kmod instalados:
 
 ```bash
 bash tools/ci/test_linux_module_elf.sh
+bash tools/ci/test_linux_module_kbuild.sh artifacts/linux-module-kbuild
 python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 python3 -m unittest discover -s gpui-shell/scripts -p 'test_frame_telemetry.py' -v
 ```
 
-Resultados locais desta rodada: **40 testes Rust**, inspeção do objeto C real, **72 regressões CI/ISO** e **19 regressões de telemetria** aprovados. Incluem duas regressões da política de concorrência, sem remover os testes existentes. `bash -n tools/ci/*.sh` e `git diff --check` também passaram. Logs locais em `artifacts/linux-module-relocations/`, ignorados pelo Git. Nenhuma nova evidência local de boot, instalação ou GPU.
+Resultados locais: **40 testes Rust**, inspeção do objeto C e do **`.ko` real**, **76 regressões CI/ISO** e **19 regressões de telemetria** aprovados. Quatro novas regressões conferem rejeição de headers ausentes, arquitetura diferente, UTS_RELEASE incorreto e `Module.symvers` ausente, sem simular um build aprovado. O script usa `include/generated/utsrelease.h`, pois o alvo `make kernelrelease` dos headers Ubuntu pode indicar a versão-fonte e não a ABI empacotada. `bash -n tools/ci/*.sh` e `git diff --check` passaram.
+
+Foi adicionado um job de CI próprio para instalar os headers fixados, compilar/inspecionar o módulo e preservar os artefatos. Seu resultado remoto precisa ser conferido no novo commit.
 
 ## Próxima pequena etapa
 
-Fixar versão/configuração de Linux e construir um `.ko` mínimo real via kbuild; submetê-lo primeiro à inspeção, registrando hash, toolchain, `vermagic` e tipos de relocations encontrados. Isso será evidência de **inspeção de módulo real**, não de carregamento. Depois implementar, em memória não executável, uma etapa de planejamento/aplicação de relocations com testes de overflow e símbolos não resolvidos antes de integrar ao kernel.
+Planejar/aplicar uma relocation x86-64 em **buffer não executável**, com símbolos e endereços fornecidos explicitamente e testes de overflow, símbolo ausente e escrita fora dos limites. Depois conectar esse planejamento ao `.ko` real, mantendo separados inspeção, resolução, aplicação e execução. Nenhuma função do módulo deve ser chamada nessa etapa.
 
-Antes da execução serão necessários política de confiança/assinatura, privilégio, W^X, ciclo de vida e rollback. Módulos Linux executam operações arbitrárias em ring 0: a fronteira de confiança precisa ficar explícita em OSTD, sem introduzir `unsafe` no kernel seguro. Aprovar um módulo mínimo não aprova todos os drivers ou versões do Linux.
+Antes da execução serão necessários confiança/assinatura, privilégio, W^X, ABI/modversions e ciclo de vida/rollback. Módulos Linux executam operações arbitrárias em ring 0: a fronteira de confiança precisa ficar explícita em OSTD, sem introduzir `unsafe` no kernel seguro. Aprovar um módulo mínimo não aprova todos os drivers ou versões do Linux.
