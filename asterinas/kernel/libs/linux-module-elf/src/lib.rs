@@ -3,7 +3,8 @@
 //!
 //! Success does NOT mean Linux module compatibility or authorization to execute.
 //! Offline relocation arithmetic uses explicit symbol values and returns heap data.
-//! Kernel symbol resolution, Linux ABI/versioning, signatures and executable
+//! Numeric resolution uses checked layouts and explicitly named exports.
+//! Actual kernel exports, Linux ABI/versioning, signatures and executable
 //! mappings remain future work. This crate neither loads nor executes code.
 #![no_std]
 #![forbid(unsafe_code)]
@@ -13,15 +14,17 @@ extern crate alloc;
 mod apply;
 mod layout;
 mod relocations;
+mod resolve;
 mod symbols;
 
 pub use apply::relocate_section;
 pub use layout::{Layout, SectionPlacement, plan_layout};
+pub use resolve::{Export, SymbolResolver};
 
 const HEADER_SIZE: usize = 64;
 const SECTION_SIZE: usize = 64;
 
-/// A structural error; unsupported encodings fail closed.
+/// A structural or offline-operation error; unsupported inputs fail closed.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Error {
     Truncated,
@@ -55,6 +58,9 @@ pub enum Error {
     ResourceLimit,
     LayoutOverflow,
     UnsupportedSection,
+    LayoutMismatch,
+    UnsupportedSymbol,
+    DuplicateExport,
 }
 
 /// An inspected object, not a loaded or trusted Linux module.

@@ -1,74 +1,68 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Um módulo Linux real teve o layout numérico de suas 16 seções alocáveis validado, ocupando span de 1.856 bytes. A aplicação offline anterior também passou novamente: 2.909 relocations em 14 cópias de seções, com endereços sintéticos. Nenhum `.ko` foi carregado ou executado.** O novo plano ainda não alimenta a resolução de símbolos ou a aplicação conjunta: as etapas continuam separadas, sem ABI do kernel ou loader integrado.
+**O módulo Linux mínimo já passa por plano de seções, resolução numérica de símbolos e aplicação de 13 relocations em 9 cópias de seções alocáveis. Os exports fornecidos são valores sintéticos de teste, não funções reais. Nenhum `.ko` foi carregado ou executado.** A instalação via UEFI CD e verificação do EFI GRUB passaram no CI; o boot instalado do Asterinas ainda está em teste.
 
 ## Matriz atual
 
 | Componente / alvo | Versão ou formato | Evidência mais recente | Limite |
 |---|---|---|---|
-| Fonte Asterinas do fork | `0.19.0`, conforme `asterinas/VERSION` | Fonte local e `main` remota conferidas na base `33a480c` | Kernel Asterinas completo não recompilado nem inicializado localmente nesta rodada |
-| Toolchain do kernel | `nightly-2026-07-21`, conforme `rust-toolchain.toml` | Pin do repositório | Testes no host não substituem build com esse nightly |
-| Pré-validador `linux-module-elf` | ELF64 little-endian, ET_REL, x86-64 | **60 testes Rust** e build `no_std`, sem dependências externas ou `unsafe`, aprovados com `rustc 1.97.1`; etapas offline usam `alloc` | Biblioteca ainda não integrada a syscalls, boot ou loader executável |
-| Plano de seções alocáveis | PROGBITS, NOTE e NOBITS com `SHF_ALLOC`, sem TLS | `.ko` real: **16 seções, span 1.856 bytes**; objeto C: **6 seções, span 320 bytes**; orçamento e alinhamento conferidos | Vetor de metadados; nenhuma reserva de payload ou mapeamento nos endereços planejados |
-| Símbolos / relocations | `SHT_SYMTAB` e subconjunto `SHT_RELA` x86-64 | Fórmulas aplicadas a cópias de dados; overflow, símbolo ausente e sobreposição rejeitados | Valores de símbolos explícitos/sintéticos, sem resolução de exports reais ou execução |
-| Objeto C de teste | GCC 13.3.0, ELF ET_REL com 14 seções | Compilação e inspeção aprovadas novamente | Não é um módulo kbuild |
-| **Módulo Linux real** | **`cybermanju_fixture.ko` versão `0.1.0`; Linux `6.8.0-147-generic`, x86-64** | **kbuild/MODPOST/link, inspeção das 44 seções e 2.909 escritas RELA em 14 cópias de dados aprovados** | **Endereços sintéticos. Nunca carregado; compatibilidade de execução não comprovada** |
-| Outros módulos / versões Linux | Nenhum qualificado | Nenhuma evidência de carregamento, inclusive do módulo mínimo | Não extrapolar essa inspeção para drivers de GPU, outras configurações ou versões Linux |
-| ARM64 / RISC-V / LoongArch | Nenhum módulo qualificado | Pré-validador limitado a x86-64; exemplo sintético ARM64 rejeitado | Nenhum build ou execução de `.ko` nessas arquiteturas |
-| Ponte NVIDIA NVport | Fonte NVIDIA `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` documentado localmente | Sem nova execução NVport nesta rodada | Ponte C/Rust por fontes, não carregamento de `nvidia.ko`; RM completo, GSP e GPU real não validados aqui |
-| CI de regressão na base `33a480c` | [Run 39614968699](https://github.com/cybermanju/cybermanju-shell/actions/runs/39614968699) | Jobs `regression`, `linux-module-elf` e `linux-module-kbuild` aprovados, incluindo os 51 testes Rust anteriores | Evidência da base; não substitui o CI dos 60 testes e do novo planner |
-| ISO live USB Linux | [Run 39608968083](https://github.com/cybermanju/cybermanju-shell/actions/runs/39608968083), base `3d6dc25` | Gate live USB passou; run avançou à instalação por UEFI CD | Isso valida o instalador Linux, não o boot do Asterinas instalado |
-| Instalação / boot instalado | Mesmo run | Instalação em andamento na consulta desta rodada | Instalação concluída e boot instalado ainda não comprovados nessa consulta |
+| Fonte Asterinas do fork | `0.19.0`, conforme `asterinas/VERSION` | Fonte local e `main` conferidas na base `aac15c4` | Kernel completo não recompilado/bootado localmente nesta rodada |
+| Toolchain do kernel | `nightly-2026-07-21`, pin do repositório | Pin preservado | Testes no host não substituem build com esse nightly |
+| Biblioteca `linux-module-elf` | ELF64 little-endian ET_REL, x86-64 | **71 testes Rust**, `rustc 1.97.1`, `no_std`, sem dependências externas ou `unsafe`; etapas offline usam `alloc` | Não integrada a syscalls ou loader executável |
+| Plano de seções alocáveis | PROGBITS, NOTE e NOBITS com `SHF_ALLOC`, sem TLS | `.ko`: **16 seções / span 1.856 bytes**; objeto C: **6 / 320 bytes** | Metadados e endereços numéricos, sem mapear/reservar memória do módulo |
+| Resolução + RELA usando o plano | Símbolos definidos, ABS e exports explicitamente fornecidos | `.ko`: **13 escritas em 9 cópias ALLOC**, com **3 rejeições de export ausente**; C: **4 escritas em 2 cópias**, com 1 rejeição | Exports e base sintéticos; sem funções reais do kernel ou validação de ABI |
+| Aplicação RELA anterior, independente | Inclui seções debug e endereços sintéticos separados | `.ko`: **2.909 escritas em 14 cópias**; C: **4 em 2**; regressão preservada | Esses 2.909 casos não são aplicação do novo layout nem prova de execução |
+| **Módulo Linux real** | **`cybermanju_fixture.ko` `0.1.0`, Linux `6.8.0-147-generic`, x86-64** | **kbuild/MODPOST/link, inspeção de 44 seções e testes offline acima aprovados** | **Nunca carregado; nenhum contrato de execução Linux/Asterinas comprovado** |
+| Outros módulos/versões Linux | Nenhum qualificado | Nenhuma evidência de carregamento, inclusive do módulo mínimo | Não extrapolar para GPU, outras configurações ou versões Linux |
+| ARM64 / RISC-V / LoongArch | Nenhum módulo qualificado | Pré-validador limitado a x86-64; exemplo sintético ARM64 rejeitado | Nenhum build/execução de `.ko` nessas arquiteturas |
+| NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` documentado localmente | Sem nova execução NVport nesta rodada | Ponte C/Rust por fontes, não `nvidia.ko`; RM completo, GSP e GPU real não validados aqui |
+| CI da base `aac15c4` | [Run 39617951122](https://github.com/cybermanju/cybermanju-shell/actions/runs/39617951122) | Jobs de regressão, ELF e kbuild aprovados, incluindo 60 testes Rust anteriores | Não transfere aprovação automaticamente para os novos 71 testes |
+| ISO live USB, QEMU/UEFI | [Run 39608968083](https://github.com/cybermanju/cybermanju-shell/actions/runs/39608968083), base `3d6dc25` | Gate live USB concluído com sucesso | Boot do instalador Linux, não do Asterinas instalado; não é teste em hardware USB físico |
+| Instalação via UEFI CD / EFI GRUB | Mesmo run | Gate **concluído com sucesso** nesta consulta | Não prova que o kernel instalado chega ao userspace |
+| Boot Asterinas instalado / hello userspace | Mesmo run | Etapa em andamento na consulta desta rodada | Ainda sem conclusão; nenhuma declaração de boot instalado aprovado |
 
-## Primeiro módulo real: exatamente o que foi testado
+## O que mudou na resolução
 
-O código mínimo em [`tests/kbuild`](../asterinas/kernel/libs/linux-module-elf/tests/kbuild/cybermanju_fixture.c) define init que retorna zero, exit vazio e metadados de módulo. Foi compilado pelo **Linux kbuild real**, não pela simples troca de extensão de um objeto C. O executor [`test_linux_module_kbuild.sh`](../tools/ci/test_linux_module_kbuild.sh) não contém comandos de carregamento: só build, `readelf`, `modinfo`, `nm` e inspeção Rust.
+A API [`SymbolResolver`](../asterinas/kernel/libs/linux-module-elf/src/resolve.rs) valida o ELF e recalcula o plano recebido antes de resolver símbolos pedidos pelo chamador. A igualdade do plano é **estrutural**, não uma identidade criptográfica do arquivo. Os bytes e o plano são emprestados imutavelmente durante o uso.
 
-A configuração testada foi:
+Símbolos definidos usam o endereço da seção planejada mais `st_value`, com adição verificada. ABS usa seu valor absoluto. Símbolos em seções não planejadas são rejeitados, sem override por export. COMMON não recebe alocação automática e é recusado.
 
-- Headers Ubuntu `linux-headers-6.8.0-147-generic` e comuns `6.8.0-147`, ambos pacote **`6.8.0-147.147`**.
-- Compilador **`x86_64-linux-gnu-gcc-13`, Ubuntu `13.3.0-6ubuntu2~24.04.1`**, e inspetor Rust **`1.97.1`**.
-- `vermagic`: **`6.8.0-147-generic SMP preempt mod_unload modversions`**.
-- Relocations encontradas: **`R_X86_64_32`, `R_X86_64_64`, `R_X86_64_PC32`, `R_X86_64_PLT32`**; todas passaram pelos checks estruturais e foram aplicadas em cópias de dados com endereços sintéticos. O probe confere cada campo escrito e preservação do ELF original; dois testes adicionais no próprio `.ko` rejeitam símbolos externos sem valor fornecido.
-- Símbolos ainda indefinidos: **`__fentry__` e `__x86_return_thunk`**. A inspeção não fornece essas funções nem valida os CRCs/contratos de modversions.
-- **BTF não gerado**, pois não havia `vmlinux` correspondente. Assinatura/confiança e execução continuam sem validação.
+Undefined global/weak exige um nome exato numa lista de `Export { name, value }` fornecida explicitamente. Weak ausente também é erro, não zero implícito; zero explicitamente fornecido é aceito. Undefined local, visibilidade/bits `st_other` não padrão, símbolo nulo e tipos não admitidos são recusados. A lista aceita apenas bindings local/global/weak e tipos NOTYPE/OBJECT/FUNC/SECTION; TLS, IFUNC e FILE não são resolvidos por esta API.
 
-Hashes SHA-256 da amostra local preservada:
+Os exports são copiados com reserva falível, ordenados e buscados por nome em bytes, sem exigir UTF-8. Há teto de **4.096 exports**; nomes vazios/com NUL e nomes duplicados são rejeitados, mesmo com valores iguais. Isso não implementa descoberta de exports do kernel, política GPL, CRC/modversions ou prova de ABI.
 
-| Artefato | SHA-256 |
+O probe usa valores de teste fixos para `unresolved_kernel_symbol`, `__fentry__` e `__x86_return_thunk`. Confere a resolução e cada campo RELA escrito contra um cálculo independente, verifica rejeição sem exports e preserva o ELF original. **Esses números não apontam para implementações dessas funções.** Seções debug/não ALLOC ficam fora do teste integrado; seu teste offline anterior permanece separado. Cada chamada ainda processa uma tabela RELA, sem qualificação de múltiplas tabelas sobre o mesmo alvo.
+
+## A amostra real e sua procedência
+
+O [fixture C](../asterinas/kernel/libs/linux-module-elf/tests/kbuild/cybermanju_fixture.c) tem init que retorna zero, exit vazio e metadados. Foi produzido por Linux kbuild real, não por renomear um objeto C. O [executor](../tools/ci/test_linux_module_kbuild.sh) faz build, `readelf`, `modinfo`, `nm` e testes Rust; não usa comandos de carregamento.
+
+A configuração testada é Linux **`6.8.0-147-generic` x86-64**, headers comuns/genéricos Ubuntu **`6.8.0-147.147`**, compilador **`x86_64-linux-gnu-gcc-13` `13.3.0-6ubuntu2~24.04.1`**, inspetor Rust **`1.97.1`**. `vermagic`: **`6.8.0-147-generic SMP preempt mod_unload modversions`**. Os tipos encontrados são `R_X86_64_32`, `R_X86_64_64`, `R_X86_64_PC32` e `R_X86_64_PLT32`.
+
+`__fentry__` e `__x86_return_thunk` continuam indefinidos no ELF: o teste apenas fornece valores numéricos para eles. **BTF não foi gerado**, por falta de `vmlinux` correspondente. Assinatura/confiança, CRCs e execução não foram qualificados.
+
+| Artefato local | SHA-256 |
 |---|---|
-| `cybermanju_fixture.ko` | `8e117c781383bf7922936e6c07c6276ad19b3543b69f712674bea144e71f1a67` |
-| Fonte C do fixture | `ae0db544d38a724cdac33d74b0d54716628dd23d87bc613dae2f072dd72e3da7` |
+| `cybermanju_fixture.ko` | `fbbf9fa15c912268fe61fa039f5a67f17c4e5766fad629f8a2bfb53433e43217` |
+| Fonte C | `ae0db544d38a724cdac33d74b0d54716628dd23d87bc613dae2f072dd72e3da7` |
 | `.config` dos headers | `cf8454bc2e67effab87a5bff3c39042f2d8d106b6a777c4302e52f50d23b7400` |
-| `Module.symvers` dos headers | `8e7eb5798789b9610c324b3d9b13373d88c30ae17bb9e41e622efd05e0277a87` |
+| `Module.symvers` | `8e7eb5798789b9610c324b3d9b13373d88c30ae17bb9e41e622efd05e0277a87` |
 
-O `.ko`, logs e metadados completos estão em `artifacts/linux-module-kbuild/`, ignorados pelo Git. `status.txt` registra `exit_code=0` e `loaded=false`; um rerun que falhe grava seu erro para não herdar sucesso de um `provenance.txt` antigo. O build não promete binário idêntico entre diretórios temporários ou toolchains: cada amostra deve ser identificada pelo próprio hash.
+O `.ko`, metadados, `inspection.txt`, `provenance.txt` e `status.txt` ficam em `artifacts/linux-module-kbuild/`, ignorados pelo Git. O status desta execução é `exit_code=0`, `loaded=false`; falhas de rerun não devem herdar um provenance antigo. O build não promete binário idêntico entre diretórios/toolchains: cada amostra é identificada pelo próprio hash. Os logs desta rodada estão em `artifacts/linux-module-resolver/`.
 
-## Novo plano offline de seções
+## Limites que permanecem
 
-A API [`plan_layout`](../asterinas/kernel/libs/linux-module-elf/src/layout.rs) recebe ELF, base numérica, teto de span e teto de seções. Planeja apenas `SHF_ALLOC`, na ordem dos índices, respeitando alinhamentos; alinhamento zero vira um. O span inclui padding inicial e entre seções. Endereços, alinhamento e fim usam operações verificadas, com erro em overflow. Limites do chamador e falhas ao reservar metadados retornam `ResourceLimit`.
+O planner usa índices, alinhamentos, padding, limites de bytes/contagem e overflow verificados; NOTE é dado opaco, TLS é recusado. Não cria mapeamentos nem aplica permissões. `inspect` permanece estrutural e não verifica a ABI Linux, autenticidade ou semântica completa de símbolos/seções.
 
-NOBITS/`.bss` usa tamanho em memória sem ler seu payload. Seções vazias podem compartilhar endereço. NOTE é dado opaco, não metadado confiável. Tipos alocáveis fora de PROGBITS/NOTE/NOBITS e seções TLS são recusados. Flags são registradas, mas não viram permissões ou mapeamentos; o plano não aplica W^X, não reserva memória de módulo e não resolve símbolos.
+`relocate_section` aplica `S + A` ou `S + A - P` em `i128` e exige representação exata em `u64`, `i64`, `u32` ou `i32`. Retorna uma nova cópia de dados de PROGBITS/NOBITS, sem solicitar permissão executável, sem transformar números em ponteiros e sem modificar o ELF. Recusa escritas sobrepostas na tabela, símbolo sem valor e excesso de orçamento/65.536 entradas. RELA reconhece `NONE`, `64`, `PC64`, `PC32`, `PLT32`, `32` e `32S`; REL/RELR e outros tipos são recusados. PLT32 usa o destino direto fornecido, sem construir PLT.
 
-O probe confere o resultado com uma conta independente em `u128` usando divisão para alinhamento, verifica todos os índices/flags/tamanhos e exige falha com orçamento de bytes ou contagem insuficiente. No `.ko` real foram planejadas 16 seções, span 1.856 bytes, com base sintética `0x200000`. A aplicação RELA existente continua um teste separado com seus endereços sintéticos anteriores; não foi apresentada como aplicação desse layout conjunto.
+Ainda faltam aplicação conjunta atômica de múltiplas tabelas, exports reais, ABI/modversions, confiança/assinatura, privilégio, W^X, ciclo de vida e rollback. Módulos executam operações arbitrárias em ring 0: a fronteira de confiança terá de ficar explícita em OSTD, sem introduzir `unsafe` no kernel seguro. Aprovar este fixture não aprova outros drivers ou versões Linux. Testes finitos de truncamento/mutação não equivalem a fuzzing exaustivo ou auditoria formal.
 
-## Limites do pré-validador
+## CI, boot e reprodução
 
-Reconhece apenas ELF64 little-endian ET_REL x86-64, sem compressão ou numeração estendida. Valida cabeçalho, seções, nomes, symtab/strtab, índices e limites. A RELA aceita larguras dos tipos `NONE` (0 bytes), `64`/`PC64` (8 bytes), `PC32`/`PLT32`/`32`/`32S` (4 bytes); outros tipos e `SHT_REL`/`SHT_RELR` são rejeitados. `NONE` tem política conservadora de offset até o fim da seção. `.bss` usa tamanho em memória.
+O run antigo [39605334894](https://github.com/cybermanju/cybermanju-shell/actions/runs/39605334894) falhou na prontidão serial: timeout de `/dev/ttyS0` e ausência do marcador, antes de live-checks/shutdown. A causa da ausência do dispositivo não foi isolada. O run seguinte passou live USB e instalação, mas seu boot Asterinas ainda não terminou nesta consulta. Não confundir esses resultados nem declarar estabilidade a partir de um único sucesso.
 
-`inspect` continua somente estrutural. A API separada `relocate_section` calcula `S + A` ou `S + A - P` em `i128`, exige representação exata em `u64`, `i64`, `u32` ou `i32` e retorna um novo `Vec<u8>`. Não cria mapeamentos executáveis nem transforma endereços numéricos em ponteiros. O alvo deve ser PROGBITS ou NOBITS; NOBITS começa zerado. O chamador limita seu tamanho; há teto de 65.536 entradas por seção RELA e falhas de alocação retornam erro. Escritas sobrepostas dentro dessa seção RELA são rejeitadas antes de copiar o alvo; falhas não expõem resultado parcial nem alteram o ELF.
-
-Cada símbolo referenciado, inclusive weak/undefined/common, exige valor explícito; `NONE` não exige resolução. Para `PLT32`, o valor é o destino direto fornecido, sem construir PLT. Não há resolução automática nem política real de exports/COMMON. A operação cobre uma seção RELA por chamada: combinações de várias tabelas sobre o mesmo alvo e aplicação conjunta usando o plano ainda não estão qualificadas. Permissões executáveis, semântica completa de símbolos/seções, ABI, assinaturas e ciclo de vida continuam pendentes. Testes finitos de truncamento/mutação não equivalem a fuzzing exaustivo ou auditoria formal. Um resultado positivo nunca autoriza chamar código.
-
-## CI e bloqueios de boot
-
-O run anterior [39605334894](https://github.com/cybermanju/cybermanju-shell/actions/runs/39605334894), base `9d13c04`, falhou aguardando readiness por 1.200 segundos: o serial registra timeout de `/dev/ttyS0` e falha da dependência do serial-getty. Não chegou a live-checks ou shutdown; não foi repetição do falso negativo de `grep` do run mais antigo. Os logs não isolam por que o dispositivo não apareceu. O run seguinte avançou além do live USB, mas isso ainda não prova estabilidade do console nem instalação/boot completo.
-
-A concorrência da ISO permanece `cancel-in-progress: false`: o run ativo não deve ser interrompido por pushes periódicos; uma execução pendente ainda pode ser substituída pela mais recente. Resultados são vinculados ao commit testado, sem herdar aprovação entre revisões.
-
-## Testes reproduzíveis
-
-Na raiz, com os headers fixados, GCC 13 e kmod instalados:
+A ISO mantém `cancel-in-progress: false`: pushes periódicos não devem interromper o run ativo, embora a pendente mais recente possa substituir outra pendente. Nenhum agendamento foi criado/alterado nesta rodada.
 
 ```bash
 bash tools/ci/test_linux_module_elf.sh
@@ -77,12 +71,8 @@ python3 -m unittest discover -s tools/ci -p 'test_*.py' -v
 python3 -m unittest discover -s gpui-shell/scripts -p 'test_frame_telemetry.py' -v
 ```
 
-Resultados locais: **60 testes Rust**, novo layout do objeto C (**6 seções / 320 bytes**) e do `.ko` (**16 seções / 1.856 bytes**), aplicação offline preservada (**4 escritas em 2 seções C; 2.909 em 14 seções do `.ko`**), **76 regressões CI/ISO** e **19 regressões de telemetria** aprovados. Os nove testes Rust novos cobrem alinhamento/padding inicial, orçamento, overflow, NOBITS, seções vazias/não alocáveis, tipos/TLS recusados e mutações/truncamentos sem panic. Os testes anteriores de fórmulas, símbolos ausentes e sobreposição foram preservados. O probe rejeita COMMON com diagnóstico explícito: não fornece alocador COMMON. Logs desta rodada em `artifacts/linux-module-layout/`. `bash -n tools/ci/*.sh` e `git diff --check` passaram.
-
-Os jobs ELF/kbuild existentes executam o probe ampliado; seu novo resultado remoto deve ser conferido por commit. A ISO pendente de `b241e98` foi substituída pela pendente mais recente quando houve outro push; a execução ativa da base `3d6dc25` continuou preservada. Nenhum agendamento foi criado ou alterado nesta rodada.
+Resultados locais: **71 testes Rust**, as duas fixtures com resolução/aplicação offline acima, **76 regressões CI/ISO** e **19 de telemetria** aprovados. Onze testes novos cobrem definidos/ABS, exports global/weak/zero, ausentes, COMMON, planos incorretos, seções não alocadas, tipos/bindings/visibilidade, duplicatas/NUL, limites de exports, truncamentos/mutações no construtor e chamadas de resolução sem panic. `bash -n tools/ci/*.sh` e `git diff --check` passaram. Os jobs ELF/kbuild existentes executam o probe ampliado; seu novo CI deve ser conferido pelo commit publicado.
 
 ## Próxima pequena etapa
 
-Resolver símbolos definidos com base nas seções planejadas e símbolos ABS pelo valor absoluto, preservando falha para exports ausentes, símbolos em seções não planejadas e COMMON sem alocador. Validar essa resolução e sua aplicação offline antes de integrar qualquer loader ao kernel. Nenhuma função do módulo deve ser chamada nessa etapa.
-
-Antes da execução serão necessários confiança/assinatura, privilégio, W^X, ABI/modversions e ciclo de vida/rollback. Módulos Linux executam operações arbitrárias em ring 0: a fronteira de confiança precisa ficar explícita em OSTD, sem introduzir `unsafe` no kernel seguro. Aprovar um módulo mínimo não aprova todos os drivers ou versões do Linux.
+Aplicar todas as RELA de um alvo numa única operação de dados, detectando sobreposição também **entre tabelas**, impondo orçamento agregado e retornando somente resultado completo ou erro. Depois validar o conjunto de seções do módulo como uma unidade. Não chamar qualquer função do `.ko` antes de projetar e testar as fronteiras de execução e confiança.

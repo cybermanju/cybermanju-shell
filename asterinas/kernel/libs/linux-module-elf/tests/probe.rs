@@ -67,6 +67,120 @@ fn main() {
         layout.placements().len(),
         layout.span()
     );
+    // Test-only export values, NOT functions, real kernel exports or pointers.
+    let exports = [
+        linux_module_elf::Export {
+            name: b"unresolved_kernel_symbol",
+            value: 0x80_0000,
+        },
+        linux_module_elf::Export {
+            name: b"__fentry__",
+            value: 0x80_0100,
+        },
+        linux_module_elf::Export {
+            name: b"__x86_return_thunk",
+            value: 0x80_0200,
+        },
+    ];
+    let resolver = linux_module_elf::SymbolResolver::new(&bytes, &layout, &exports)
+        .expect("construct numeric resolver with explicit synthetic exports");
+    let without_exports = linux_module_elf::SymbolResolver::new(&bytes, &layout, &[])
+        .expect("construct resolver without any external exports");
+    let mut planned_sections = 0;
+    let mut planned_writes = 0;
+    let mut absent_exports = 0;
+    for index in 1..usize::from(result.section_count) {
+        let rela = section(index);
+        if u32_at(rela, 4) != 4 {
+            continue;
+        }
+        let target = u32_at(rela, 44) as u16;
+        let Some(placement) = layout
+            .placements()
+            .iter()
+            .find(|p| p.section_index == target)
+        else {
+            continue; // Debug/non-ALLOC relocations are outside this joint test.
+        };
+        let symtab_index = u32_at(rela, 40) as u16;
+        let symtab = section(usize::from(symtab_index));
+        let symbols_start = u64_at(symtab, 24) as usize;
+        let mut values = vec![None; u64_at(symtab, 32) as usize / 24];
+        let entries_start = u64_at(rela, 24) as usize;
+        let entries_size = u64_at(rela, 32) as usize;
+        let entries = &bytes[entries_start..entries_start + entries_size];
+        for entry in entries.chunks_exact(24) {
+            let info = u64_at(entry, 8);
+            if info as u32 == 0 {
+                continue;
+            }
+            let symbol_index = (info >> 32) as u32;
+            let symbol = &bytes[symbols_start + symbol_index as usize * 24
+                ..symbols_start + (symbol_index as usize + 1) * 24];
+            let shndx = u16_at(symbol, 6);
+            let expected = if shndx == 0 {
+                assert_eq!(
+                    without_exports.resolve(symtab_index, symbol_index),
+                    Err(linux_module_elf::Error::MissingSymbol)
+                );
+                absent_exports += 1;
+                let strings = section(u32_at(symtab, 40) as usize);
+                let start = u64_at(strings, 24) as usize + u32_at(symbol, 0) as usize;
+                let end = start + bytes[start..].iter().position(|&b| b == 0).unwrap();
+                exports
+                    .iter()
+                    .find(|e| e.name == &bytes[start..end])
+                    .expect("known fixture export")
+                    .value
+            } else if shndx == 0xfff1 {
+                u64_at(symbol, 8)
+            } else {
+                let defined_in = layout
+                    .placements()
+                    .iter()
+                    .find(|p| p.section_index == shndx)
+                    .expect("referenced symbol is in a planned section");
+                defined_in.address.checked_add(u64_at(symbol, 8)).unwrap()
+            };
+            let value = resolver
+                .resolve(symtab_index, symbol_index)
+                .expect("resolve requested fixture symbol");
+            assert_eq!(value, expected);
+            values[symbol_index as usize] = Some(value);
+        }
+        let output = linux_module_elf::relocate_section(
+            &bytes,
+            index as u16,
+            placement.address,
+            &values,
+            16 * 1024 * 1024,
+        )
+        .expect("apply resolved numeric values to a non-executable section copy");
+        for entry in entries.chunks_exact(24) {
+            let info = u64_at(entry, 8);
+            let kind = info as u32;
+            if kind == 0 {
+                continue;
+            }
+            let offset = u64_at(entry, 0) as usize;
+            let mut expected = i128::from(values[(info >> 32) as usize].unwrap())
+                + i128::from(u64_at(entry, 16) as i64);
+            if matches!(kind, 2 | 4 | 24) {
+                expected -= i128::from(placement.address) + offset as i128;
+            }
+            let width = if matches!(kind, 1 | 24) { 8 } else { 4 };
+            assert_eq!(
+                &output[offset..offset + width],
+                &expected.to_le_bytes()[..width]
+            );
+            planned_writes += 1;
+        }
+        planned_sections += 1;
+    }
+    assert!(planned_writes > 0 && planned_sections > 0 && absent_exports > 0);
+    println!(
+        "Planned symbol resolution + RELA passed: {planned_writes} writes in {planned_sections} ALLOC section copies; {absent_exports} missing-export rejections; exports SYNTHETIC; NOT loaded or executed"
+    );
     // Deliberately synthetic addresses, NOT kernel exports or callable pointers.
     let base = |index: usize| 0x10_0000_u64 + index as u64 * 0x1_0000;
     let mut applied_sections = 0;
