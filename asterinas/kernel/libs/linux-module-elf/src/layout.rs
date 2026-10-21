@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Checked layout planning for allocatable ELF sections. This records metadata only;
 //! it does not allocate section contents, map addresses, or execute module code.
+//! Page planning only prevents numeric overlap of occupied 4 KiB pages. Section
+//! flags describe intended R/RW/RX use; they do not establish permissions or W^X.
 
 use super::{Error, SECTION_SIZE, inspect, u32_at, u64_at};
 use alloc::vec::Vec;
 
 const SHF_ALLOC: u64 = 0x2;
+const SHF_WRITE: u64 = 0x1;
+const SHF_EXECINSTR: u64 = 0x4;
 const SHF_TLS: u64 = 0x400;
 const SHT_PROGBITS: u32 = 1;
 const SHT_NOTE: u32 = 7;
 const SHT_NOBITS: u32 = 8;
+const PAGE_SIZE: u64 = 4096;
 
 /// One allocatable section's planned numeric address range.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -27,6 +32,7 @@ pub struct Layout {
     base: u64,
     span: u64,
     placements: Vec<SectionPlacement>,
+    page_policy: bool,
 }
 
 impl Layout {
@@ -38,6 +44,19 @@ impl Layout {
     }
     pub fn placements(&self) -> &[SectionPlacement] {
         &self.placements
+    }
+    /// Page size for fixed-page plans; compact plans have no page policy.
+    pub fn page_size(&self) -> Option<u64> {
+        self.page_policy.then_some(PAGE_SIZE)
+    }
+
+    /// Revalidate the ELF against this layout's exact policy and resource bounds.
+    pub(crate) fn replan(&self, bytes: &[u8]) -> Result<Layout, Error> {
+        if self.page_policy {
+            plan_page_layout(bytes, self.base, self.span, self.placements.len())
+        } else {
+            plan_layout(bytes, self.base, self.span, self.placements.len())
+        }
     }
 }
 
@@ -56,7 +75,6 @@ pub fn plan_layout(
     placements
         .try_reserve(capacity)
         .map_err(|_| Error::ResourceLimit)?;
-
     let mut cursor = base;
     for index in 1..inspection.section_count {
         let offset = table_offset
@@ -78,7 +96,6 @@ pub fn plan_layout(
         if flags & SHF_ALLOC == 0 {
             continue;
         }
-
         let kind = u32_at(section, 4);
         if flags & SHF_TLS != 0 || !matches!(kind, SHT_PROGBITS | SHT_NOTE | SHT_NOBITS) {
             return Err(Error::UnsupportedSection);
@@ -90,7 +107,6 @@ pub fn plan_layout(
             0 => 1,
             value => value,
         };
-        // inspect() already established that nonzero section alignments are powers of two.
         let address = cursor
             .checked_add(alignment - 1)
             .ok_or(Error::LayoutOverflow)?
@@ -121,7 +137,67 @@ pub fn plan_layout(
         base,
         span,
         placements,
+        page_policy: false,
     })
+}
+
+/// Plan a metadata-only layout using fixed 4 KiB x86-64 pages. This reserves
+/// complete pages numerically for nonempty sections; it does not map pages,
+/// enforce real permissions/W^X, execute code, or establish ownership.
+/// Base must be page-aligned. Each section starts at max(4096, sh_addralign);
+/// inter-section padding and the rounded tail count against max_span. Empty
+/// sections reserve no pages and may share addresses, but alignment gaps count.
+/// WRITE+EXEC is rejected even for empty ALLOC sections. Other sections imply
+/// intended R/RW/RX by their flags, not actual page permissions. This is not a
+/// validator for canonical kernel addresses, physical frames or the x86 MMU.
+pub fn plan_page_layout(
+    bytes: &[u8],
+    base: u64,
+    max_span: u64,
+    max_sections: usize,
+) -> Result<Layout, Error> {
+    if base % PAGE_SIZE != 0 {
+        return Err(Error::PageAlignment);
+    }
+    // Reuse compact planning for structural/type/count validation, without letting
+    // compact byte-span accounting incorrectly constrain page-rounded layouts.
+    let mut plan = plan_layout(bytes, base, u64::MAX, max_sections)?;
+    let mut cursor = base;
+    for item in &mut plan.placements {
+        if item.flags & (SHF_WRITE | SHF_EXECINSTR) == (SHF_WRITE | SHF_EXECINSTR) {
+            return Err(Error::WritableExecutableSection);
+        }
+        let alignment = core::cmp::max(item.alignment, PAGE_SIZE);
+        let address = cursor
+            .checked_add(alignment - 1)
+            .ok_or(Error::LayoutOverflow)?
+            & !(alignment - 1);
+        let end = address
+            .checked_add(item.size)
+            .ok_or(Error::LayoutOverflow)?;
+        let reserved_end = if item.size == 0 {
+            address
+        } else {
+            end.checked_add(PAGE_SIZE - 1)
+                .ok_or(Error::LayoutOverflow)?
+                & !(PAGE_SIZE - 1)
+        };
+        let span = reserved_end
+            .checked_sub(base)
+            .ok_or(Error::LayoutOverflow)?;
+        if span > max_span {
+            return Err(Error::ResourceLimit);
+        }
+        item.address = address;
+        cursor = reserved_end;
+    }
+    let span = cursor.checked_sub(base).ok_or(Error::LayoutOverflow)?;
+    if span > max_span {
+        return Err(Error::ResourceLimit);
+    }
+    plan.span = span;
+    plan.page_policy = true;
+    Ok(plan)
 }
 
 #[cfg(test)]

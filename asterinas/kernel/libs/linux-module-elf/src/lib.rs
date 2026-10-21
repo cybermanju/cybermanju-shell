@@ -21,11 +21,13 @@ mod symbols;
 #[cfg(test)]
 mod image_tests;
 #[cfg(test)]
+mod page_layout_tests;
+#[cfg(test)]
 mod target_tests;
 
 pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
-pub use layout::{Layout, SectionPlacement, plan_layout};
+pub use layout::{Layout, SectionPlacement, plan_layout, plan_page_layout};
 pub use resolve::{Export, SymbolResolver};
 
 const HEADER_SIZE: usize = 64;
@@ -68,6 +70,8 @@ pub enum Error {
     LayoutMismatch,
     UnsupportedSymbol,
     DuplicateExport,
+    PageAlignment,
+    WritableExecutableSection,
 }
 
 /// An inspected object, not a loaded or trusted Linux module.

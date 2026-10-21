@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Test-only inspection and preparation. NEVER calls init or exit.
 use linux_module_elf::{Error, SymbolResolver, inspect, plan_layout};
+mod page_probe;
+
 fn u16_at(b: &[u8], o: usize) -> u16 {
     u16::from_le_bytes(b[o..o + 2].try_into().unwrap())
 }
@@ -15,6 +17,7 @@ fn main() {
     let bytes = std::fs::read(path).expect("read fixture");
     let original = bytes.clone();
     let inspected = inspect(&bytes).expect("real ELF64 x86-64 ET_REL preflight");
+    page_probe::check(&bytes, &[]);
     let headers = u64_at(&bytes, 40) as usize;
     let section = |i: usize| &bytes[headers + i * 64..headers + (i + 1) * 64];
     let layout = plan_layout(&bytes, 0x200000, 16 * 1024 * 1024, 1024).expect("bounded layout");

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
+mod page_probe;
+
 fn u16_at(bytes: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
 }
@@ -82,6 +84,7 @@ fn main() {
             value: 0x80_0200,
         },
     ];
+    page_probe::check(&bytes, &exports);
     let resolver = linux_module_elf::SymbolResolver::new(&bytes, &layout, &exports)
         .expect("construct numeric resolver with explicit synthetic exports");
     let without_exports = linux_module_elf::SymbolResolver::new(&bytes, &layout, &[])

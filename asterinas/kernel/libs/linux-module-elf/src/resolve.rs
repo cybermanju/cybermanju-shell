@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Numeric symbol resolution only. This makes no ABI, CRC, GPL, or W^X claim.
-use super::{
-    Error, Layout, SECTION_SIZE, file_range, inspect, plan_layout, u16_at, u32_at, u64_at,
-};
+use super::{Error, Layout, SECTION_SIZE, file_range, inspect, u16_at, u32_at, u64_at};
 use alloc::vec::Vec;
 
 const SYMBOL_SIZE: usize = 24;
@@ -32,13 +30,7 @@ impl<'a> SymbolResolver<'a> {
     /// Missing weak exports are errors rather than implicit zero resolutions.
     pub fn new(bytes: &'a [u8], layout: &'a Layout, exports: &[Export<'a>]) -> Result<Self, Error> {
         let inspection = inspect(bytes)?;
-        let planned = plan_layout(
-            bytes,
-            layout.base(),
-            layout.span(),
-            layout.placements().len(),
-        )
-        .map_err(|_| Error::LayoutMismatch)?;
+        let planned = layout.replan(bytes).map_err(|_| Error::LayoutMismatch)?;
         if planned != *layout || usize::from(inspection.section_count) * SECTION_SIZE > bytes.len()
         {
             return Err(Error::LayoutMismatch);
@@ -220,6 +212,7 @@ impl<'a> SymbolResolver<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layout::plan_layout;
     use std::{vec, vec::Vec};
 
     // Compact ELF fixture: null, allocatable data, string table, symbol table.
