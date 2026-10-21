@@ -1218,6 +1218,14 @@ name = "linux-module-elf"
 version = "0.1.0"
 
 [[package]]
+name = "linux-module-staging"
+version = "0.1.0"
+dependencies = [
+ "linux-module-elf",
+ "ostd",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"

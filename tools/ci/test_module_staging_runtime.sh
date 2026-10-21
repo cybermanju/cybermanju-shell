@@ -1,46 +1,63 @@
 #!/usr/bin/env bash
-# Real OSTD frames in a disposable BIOS/TCG test VM. Never loads a Linux module.
+# Real OSTD frames in a disposable BIOS/TCG VM. Never executes module entries.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 OUT=${1:-"$ROOT/artifacts/linux-module-runtime"}
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
-printf '{"status":"not_verified","linux_modules_loaded":false}\n' > "$OUT/result.json"
-CONFIG="$ROOT/asterinas/ostd/OSDK.toml"
-if [[ -e "$CONFIG" ]]; then
-    echo "Refusing to overwrite an existing OSTD/OSDK.toml" >&2
+printf '{"status":"not_verified","linux_modules_executed":false}\n' > "$OUT/result.json"
+case ${2:-} in
+    '')
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_staging_runtime
+        VERIFY=verify_module_staging_runtime.py
+        ;;
+    --prepared-module)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_prepared_module_runtime
+        VERIFY=verify_prepared_module_runtime.py
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
+    *) echo 'Unknown runtime mode' >&2; exit 2 ;;
+esac
+CONFIG="$ROOT/asterinas/$CRATE_PATH/OSDK.toml"
+if [[ -e "$CONFIG" || -L "$CONFIG" ]]; then
+    echo 'Refusing to overwrite an existing OSDK.toml' >&2
     exit 2
 fi
 for tool in cargo rustc qemu-system-x86_64 grub-mkrescue xorriso timeout python3; do
     command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 2; }
 done
-# The compile-time flag is essential: otherwise OSDK can select published OSTD
-# and runner dependencies instead of the changed local fork.
+# The compile-time flag selects the changed fork and local runner dependencies.
 (cd "$ROOT/asterinas/osdk" && CARGO_TARGET_DIR="$ROOT/asterinas/osdk/target" OSDK_LOCAL_DEV=1 cargo build --locked -p cargo-osdk) > "$OUT/osdk-build.log" 2>&1
 OSDK="$ROOT/asterinas/osdk/target/debug/cargo-osdk"
 export CARGO_TARGET_DIR="$ROOT/asterinas/target"
 SYSROOT=$(cd "$ROOT/asterinas" && rustc --print sysroot)
 HOST=$(cd "$ROOT/asterinas" && rustc -vV | sed -n 's/^host: //p')
 LLVM="$SYSROOT/lib/rustlib/$HOST/bin/llvm-objcopy"
-[[ -x "$LLVM" ]] || { echo "Missing nightly llvm-tools component" >&2; exit 2; }
+[[ -x "$LLVM" ]] || { echo 'Missing nightly llvm-tools component' >&2; exit 2; }
 mkdir -p "$OUT/bin"
 ln -sf "$LLVM" "$OUT/bin/rust-objcopy"
 export PATH="$OUT/bin:$PATH"
-cp "$ROOT/tools/ci/module-staging-runtime.OSDK.toml" "$CONFIG"
-trap 'rm -f "$CONFIG"' EXIT
+# noclobber also closes the race while building OSDK after the initial check.
+(set -o noclobber; cat "$ROOT/tools/ci/module-staging-runtime.OSDK.toml" > "$CONFIG") || exit 2
+trap 'if cmp -s "$CONFIG" "$ROOT/tools/ci/module-staging-runtime.OSDK.toml"; then rm -f "$CONFIG"; else echo "Changed configuration preserved: $CONFIG" >&2; fi' EXIT
 set +e
-(cd "$ROOT/asterinas/ostd" && timeout --signal=TERM --kill-after=15s 600 "$OSDK" osdk test cybermanju_staging_runtime --target-arch x86_64 </dev/null) 2>&1 | tee "$OUT/runtime.log"
+(cd "$ROOT/asterinas/$CRATE_PATH" && timeout --signal=TERM --kill-after=15s 600 "$OSDK" osdk test "$FILTER" --target-arch x86_64 </dev/null) 2>&1 | tee "$OUT/runtime.log"
 statuses=("${PIPESTATUS[@]}")
 set -e
 status=${statuses[0]}
 if [[ "$status" -eq 0 ]]; then status=${statuses[1]}; fi
 [[ "$status" -eq 0 ]] || { echo "OSDK runtime failed with exit $status" >&2; exit "$status"; }
-cp "$ROOT/asterinas/target/osdk/ostd-test-base/Cargo.toml" "$OUT/harness-Cargo.toml"
-cp "$ROOT/asterinas/target/osdk/ostd-test-base/Cargo.lock" "$OUT/harness-Cargo.lock"
+cp "$ROOT/asterinas/target/osdk/$CRATE-test-base/Cargo.toml" "$OUT/harness-Cargo.toml"
+cp "$ROOT/asterinas/target/osdk/$CRATE-test-base/Cargo.lock" "$OUT/harness-Cargo.lock"
 {
     (cd "$ROOT/asterinas" && rustc --version && cargo --version)
     qemu-system-x86_64 --version | head -1
     echo 'x86_64; q35; TCG; 1 CPU; 1 GiB; BIOS/GRUB multiboot2; OSDK_LOCAL_DEV=1'
-    sha256sum "$ROOT/asterinas/target/osdk/ostd-osdk-bin.elf" "$ROOT/asterinas/target/osdk/ostd/ostd-osdk-bin.iso"
+    sha256sum "$ROOT/asterinas/target/osdk/$CRATE-osdk-bin.elf" "$ROOT/asterinas/target/osdk/$CRATE/$CRATE-osdk-bin.iso"
+    if [[ -n ${CYBERMANJU_STAGING_FIXTURE:-} ]]; then sha256sum "$CYBERMANJU_STAGING_FIXTURE"; fi
 } > "$OUT/provenance.txt"
-python3 "$ROOT/tools/ci/verify_module_staging_runtime.py" "$OUT/runtime.log"
+python3 "$ROOT/tools/ci/$VERIFY" "$OUT/runtime.log"

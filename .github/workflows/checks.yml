@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'asterinas/kernel/libs/linux-module-staging/**'
       - 'asterinas/osdk/**'
       - 'asterinas/Cargo.toml'
       - 'asterinas/Cargo.lock'
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/**'
   pull_request:
     paths:
+      - 'asterinas/kernel/libs/linux-module-staging/**'
       - 'asterinas/osdk/**'
       - 'asterinas/Cargo.toml'
       - 'asterinas/Cargo.lock'
@@ -101,7 +103,7 @@ jobs:
           components: rust-src
       - name: Check real OSTD x86-64 adapter with default features (no link or boot)
         working-directory: asterinas
-        run: cargo check --locked -p ostd --target x86_64-unknown-none
+        run: cargo check --locked -p ostd -p linux-module-staging --target x86_64-unknown-none
 
   module-staging-runtime:
     # Real OSTD frames in a disposable TCG VM; no .ko execution or host modules.
@@ -119,9 +121,11 @@ jobs:
       - name: Install tools for the minimal disposable BIOS test VM
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 grub-common grub-pc-bin xorriso mtools
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 grub-common grub-pc-bin xorriso mtools linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod
       - name: Exercise real frame staging and rollback (one kernel test, five scenarios)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
+      - name: Prepare real no-import .ko inside QEMU and verify all staged bytes (never call init)
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -132,6 +136,20 @@ jobs:
             artifacts/linux-module-runtime/*.json
             artifacts/linux-module-runtime/*.txt
             artifacts/linux-module-runtime/harness-Cargo.*
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Retain prepared-module data-only runtime and fixture provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-module-runtime-${{ github.sha }}
+          path: |
+            artifacts/prepared-module-runtime/*.log
+            artifacts/prepared-module-runtime/*.json
+            artifacts/prepared-module-runtime/*.txt
+            artifacts/prepared-module-runtime/harness-Cargo.*
+            artifacts/prepared-module-runtime/fixture/
           retention-days: 7
           if-no-files-found: warn
 

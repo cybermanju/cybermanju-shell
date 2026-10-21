@@ -16,6 +16,7 @@ mod image;
 mod layout;
 mod relocations;
 mod resolve;
+mod staging;
 mod symbols;
 
 #[cfg(test)]
@@ -23,12 +24,15 @@ mod image_tests;
 #[cfg(test)]
 mod page_layout_tests;
 #[cfg(test)]
+mod staging_tests;
+#[cfg(test)]
 mod target_tests;
 
 pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, plan_layout, plan_page_layout};
 pub use resolve::{Export, SymbolResolver};
+pub use staging::{StagingChunk, StagingPlan};
 
 const HEADER_SIZE: usize = 64;
 const SECTION_SIZE: usize = 64;

@@ -8,6 +8,8 @@
 
 **Staging de memória, prova separada:** uma imagem mínima OSTD local agora executou **1 teste kernel com 5 cenários** de frames reais em QEMU 8.2.2/q35/TCG, BIOS/GRUB multiboot2, 1 CPU e 1 GiB. Cópia/leitura/zeros, limites e descarte em falhas injetadas passaram; metadata Drop confirma o encerramento dos handles instrumentados, não mede reutilização da free-list. O runner registra 1 passou, 0 falhou, 256 filtrados. Isso não é boot da ISO instaladora, execução de `.ko`, proteção W^X ou hardware físico. Serial, hashes e resolução do harness em `artifacts/linux-module-runtime/`.
 
+**Ponte ELF→frames validada separadamente:** outro ktest na mesma configuração QEMU preparou a fixture auxiliar `.ko` Linux `6.8.0-147-generic` x86-64 com zero exports e copiou **13 seções, payload de 1.721 bytes e 6 RELA para um span de 40.960 bytes / 10 frames**. Leitura completa, zeros/gaps, budgets e layouts divergentes foram conferidos: 1 passou, 0 falhou. A fixture usa flags não padrão e bypass de objtool exclusivo desse objeto. **Init/exit nunca foram chamados**; os endereços permanecem números, sem placement/mapping executável, integração a syscalls ou garantia de ABI/NX/W^X. Artefatos em `artifacts/prepared-module-runtime/`.
+
 Para o desenvolvimento posterior do loader, consulte a [matriz de módulos Linux](linux-module-compatibility.md): ela distingue testes estruturais ELF no host de módulos realmente carregados e mantém os limites de versão/arquitetura explícitos.
 
 ## Referência e estado observado
