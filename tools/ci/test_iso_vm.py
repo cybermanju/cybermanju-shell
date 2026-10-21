@@ -53,6 +53,16 @@ class ConsoleTests(unittest.TestCase):
         self.assertIsNotNone(re.search(pattern, b"CYBERMANJU_LIVE_INSTALLER_READY\r\n", re.MULTILINE))
 
 
+class LiveConsoleConfigTests(unittest.TestCase):
+    def test_live_iso_loads_hvc0_driver_before_getty(self):
+        import re
+        source = (Path(__file__).resolve().parents[2]
+                  / "asterinas/distro/iso_image/default.nix").read_text()
+        self.assertRegex(source, r'boot\.initrd\.kernelModules\s*=\s*\[[^\]]*"virtio_console"')
+        self.assertIn('"console=hvc0"', source)
+        self.assertIn('services.getty.autologinUser = pkgs.lib.mkForce "root";', source)
+
+
 class RunScriptTests(unittest.TestCase):
     def run_script(self, mode, *, kvm_available=None):
         with tempfile.TemporaryDirectory() as directory:

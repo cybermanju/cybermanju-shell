@@ -36,6 +36,9 @@ let
     isoImage.storeContents = [ (builtins.storePath pkgs.path) ];
 
     # No copytoram: the compressed store stays on the ISO/USB medium.
+    # hvc0 needs the Linux virtio-console driver before the serial getty starts.
+    # Merely adding console=hvc0 does not load this module on the minimal ISO.
+    boot.initrd.kernelModules = [ "virtio_console" ];
     boot.kernelParams = [ "console=tty0" "console=hvc0" ];
     services.getty.autologinUser = pkgs.lib.mkForce "root";
     environment.systemPackages = [ installer ];
