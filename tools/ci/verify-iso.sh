@@ -47,7 +47,15 @@ grep -q 'Installer' "$work/iso/EFI/BOOT/grub.cfg"
 grep -Eq '^[[:space:]]*linux /boot/' "$work/iso/EFI/BOOT/grub.cfg"
 grep -Eq '^[[:space:]]*initrd /boot/' "$work/iso/EFI/BOOT/grub.cfg"
 # Validate every referenced GRUB boot payload, not merely filenames in a listing.
-while read -r path; do test -s "$work/iso$path"; done < <(
+while read -r path; do
+    # GRUB also emits device-qualified paths, e.g. ($root)/boot/memtest.bin.
+    # Resolve only the literal current-root prefix, never evaluate GRUB input.
+    path=${path#'($root)'}
+    if [[ $path != /* ]] || ! test -s "$work/iso$path"; then
+        printf 'Missing GRUB boot payload: %s\n' "$path" >&2
+        exit 1
+    fi
+done < <(
     awk '$1 == "linux" || $1 == "initrd" { print $2 }' "$work/iso/EFI/BOOT/grub.cfg" | sort -u
 )
 test -s "$work/iso/nix-store.squashfs"
