@@ -31,6 +31,13 @@ class RuntimeEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify(self.evidence() + f"CYBERMANJU_STAGING_RUNTIME:{TESTS[0]}:PASS")
 
+    def test_prefixed_marker_is_rejected(self):
+        with self.assertRaises(ValueError):
+            verify(self.evidence().replace(
+                f"CYBERMANJU_STAGING_RUNTIME:{TESTS[-1]}:PASS",
+                f"prefix CYBERMANJU_STAGING_RUNTIME:{TESTS[-1]}:PASS",
+            ))
+
     def test_compilation_or_empty_filter_is_not_runtime_success(self):
         for text in ["Finished dev profile", self.evidence().replace("1 passed", "0 passed"), self.evidence().replace("test result: ok.", "test result: FAILED.")]:
             with self.subTest(text=text), self.assertRaises(ValueError):
@@ -39,6 +46,21 @@ class RuntimeEvidenceTests(unittest.TestCase):
     def test_other_runner_failures_are_rejected(self):
         with self.assertRaises(ValueError):
             verify(self.evidence() + "test result: FAILED. 1 passed; 1 failed; 0 filtered out.")
+
+    def test_extra_mixed_or_contradictory_markers_and_panic_rejected(self):
+        for extra in ["CYBERMANJU_STAGING_RUNTIME:unknown:PASS\n",
+                      "CYBERMANJU_STAGING_RUNTIME:reserved_owner_lifecycle:FAIL\n",
+                      "CYBERMANJU_MODULE_ADDRESS:validation:PASS cases=6\n",
+                      "panic: frame ownership lost\n", "assertion failed: reservation overlap\n"]:
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                verify(self.evidence() + extra)
+
+    def test_only_one_standalone_runner_summary_is_accepted(self):
+        valid = self.evidence()
+        summary = valid.splitlines()[-1]
+        for bad in [valid + summary + "\n", valid.replace(summary, "echo " + summary)]:
+            with self.subTest(bad=bad[-100:]), self.assertRaises(ValueError):
+                verify(bad)
 
     def test_existing_config_is_preserved_and_stale_success_invalidated(self):
         with tempfile.TemporaryDirectory() as directory:

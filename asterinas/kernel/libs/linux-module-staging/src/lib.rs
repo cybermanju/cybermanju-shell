@@ -21,7 +21,7 @@ use ostd::mm::{
 #[cfg(target_arch = "x86_64")]
 mod reserved;
 #[cfg(target_arch = "x86_64")]
-pub use reserved::ReservedModuleLayout;
+pub use reserved::{ReservedModuleLayout, ReservedPreparedModule};
 
 /// A failed transfer never returns a partially staged owner.
 #[derive(Debug)]

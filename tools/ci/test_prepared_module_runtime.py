@@ -18,6 +18,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:rejected_budgets_and_mismatched_layout:PASS",
                     "CYBERMANJU_PREPARED_RUNTIME:reserved_layout:PASS base=0xffffc00000000000 reserved=40960 span=40960 sections=13 payload=1721 relocations=6 pages=10",
                     "CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS",
+                    "CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -28,7 +29,9 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         result = verify(self.evidence())
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["runtime_tests"], 1)
-        self.assertEqual(result["scope"], "prepared_module_reserved_base_staging_only")
+        self.assertEqual(result["scope"], "prepared_module_reserved_owner_staging_only")
+        self.assertTrue(result["joint_owner_lifecycle_verified"])
+        self.assertEqual(result["owner_lifecycle_cases"], 3)
         self.assertTrue(result["fixture_staged"])
         self.assertFalse(result["linux_modules_executed"])
         self.assertFalse(result["init_called"])
@@ -64,6 +67,8 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
             self.evidence() + "CYBERMANJU_PREPARED_RUNTIME:unknown:PASS\n",
             self.evidence().replace("no_init_or_exit_called:PASS", "no_init_or_exit_called:PASS_EXTRA"),
             self.evidence().replace("pages=10", "pages=10 unexpected"),
+            self.evidence().replace("reserved_owner_lifecycle:PASS cases=3", "reserved_owner_lifecycle:PASS cases=2"),
+            self.evidence().replace("reserved_owner_lifecycle:PASS cases=3", "prefix CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3"),
         )
         for text in examples:
             with self.subTest(text=text), self.assertRaises(ValueError):

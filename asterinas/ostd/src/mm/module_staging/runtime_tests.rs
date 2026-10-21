@@ -3,15 +3,18 @@
 //! OSTD allocation facilities; they do not create mappings or execute bytes.
 #![forbid(unsafe_code)]
 
-use super::super::{ModuleChunk, ModuleStaging};
-use super::{Page, StagedPages};
+use alloc::vec;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+use super::{
+    super::{ModuleChunk, ModuleStaging},
+    Page, StagedPages,
+};
 use crate::{
     Error,
     mm::{Frame, FrameAllocOptions, PAGE_SIZE, VmIo, module_staging_test_meta::TrackedMetadata},
     prelude::*,
 };
-use alloc::vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
 
 struct TrackedPage(Frame<TrackedMetadata>);
 
@@ -66,7 +69,7 @@ fn real_wrapper_roundtrip_zero_gaps_tail_and_drop() {
                 .all(|b| *b == 0)
         );
     }
-    println!("CYBERMANJU_STAGING_RUNTIME:real_wrapper_roundtrip_zero_gaps_tail_and_drop:PASS");
+    println!("\nCYBERMANJU_STAGING_RUNTIME:real_wrapper_roundtrip_zero_gaps_tail_and_drop:PASS");
 }
 
 fn empty_and_invalid_budget() {
@@ -151,6 +154,54 @@ fn metadata_drop_counter_stays_zero_while_owned_then_counts_all_frames() {
     );
 }
 
+#[cfg(target_arch = "x86_64")]
+fn reserved_owner_lifecycle() {
+    use crate::mm::module_address::ModuleAddressReservation;
+    let payload = [0xa1, 0xb2, 0xc3];
+    let staged = ModuleStaging::new(
+        PAGE_SIZE,
+        &[ModuleChunk {
+            offset: 0,
+            bytes: &payload,
+        }],
+        1,
+        1,
+    )
+    .unwrap();
+    let reservation = ModuleAddressReservation::new(2 * PAGE_SIZE, 2).unwrap();
+    let range = reservation.range();
+    let joint = staged.with_reservation(reservation).unwrap();
+    assert_eq!(joint.reserved_range(), range);
+    assert_eq!((joint.span(), joint.page_count()), (PAGE_SIZE, 1));
+    let mut actual = [0xff; 8];
+    joint.read_bytes(0, &mut actual).unwrap();
+    assert_eq!(&actual[..payload.len()], &payload);
+    assert!(actual[payload.len()..].iter().all(|byte| *byte == 0));
+    let mut byte = [0xff];
+    assert!(joint.read_bytes(PAGE_SIZE, &mut byte).is_err());
+    assert_eq!(byte, [0xff]);
+    let other = ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
+    assert!(other.range().end <= range.start || range.end <= other.range().start);
+    drop(other);
+    drop(joint);
+    let reused = ModuleAddressReservation::new(2 * PAGE_SIZE, 2).unwrap();
+    assert_eq!(reused.range(), range);
+    drop(reused);
+    for span in [0, 2 * PAGE_SIZE] {
+        let reservation = ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
+        let failed_range = reservation.range();
+        let staged = ModuleStaging::new(span, &[], span / PAGE_SIZE, 0).unwrap();
+        assert!(matches!(
+            staged.with_reservation(reservation),
+            Err(Error::InvalidArgs)
+        ));
+        let probe = ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
+        assert_eq!(probe.range(), failed_range);
+        drop(probe);
+    }
+    println!("CYBERMANJU_STAGING_RUNTIME:reserved_owner_lifecycle:PASS");
+}
+
 // The runner currently selects exact path suffixes, despite the CLI help saying
 // substring. Keep one uniquely named entry and require every scenario marker.
 #[ktest]
@@ -160,4 +211,6 @@ fn cybermanju_staging_runtime() {
     allocation_failure_drops_all_acquired_real_frames();
     copy_failure_drops_every_frame_acquired_before_copy();
     metadata_drop_counter_stays_zero_while_owned_then_counts_all_frames();
+    #[cfg(target_arch = "x86_64")]
+    reserved_owner_lifecycle();
 }

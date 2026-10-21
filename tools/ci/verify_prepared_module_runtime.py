@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
@@ -30,9 +30,10 @@ def verify(text: str) -> dict:
     if len(markers) != len(SCENARIOS):
         raise ValueError("Unexpected or contradictory runtime marker")
     simple = {PREFIX + name + ":PASS" for name in (SCENARIOS[1], SCENARIOS[3])}
+    owner_lifecycle = PREFIX + "reserved_owner_lifecycle:PASS cases=3"
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or set(markers) != simple | {rounds[0].group(), reserved[0].group()}:
+    if len(rounds) != 1 or len(reserved) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group()}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -55,7 +56,8 @@ def verify(text: str) -> dict:
         raise ValueError("Runner reported failure or panic")
     return {
         "status": "passed", "runtime_tests": 1,
-        "scope": "prepared_module_reserved_base_staging_only",
+        "scope": "prepared_module_reserved_owner_staging_only",
+        "joint_owner_lifecycle_verified": True, "owner_lifecycle_cases": 3,
         "fixture_staged": True, "linux_modules_executed": False, "init_called": False,
         "pages_mapped": False, "wx_verified": False,
         "reservation_held_during_staging": True,

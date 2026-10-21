@@ -132,19 +132,29 @@ fn cybermanju_prepared_module_runtime() {
         let start = (section.placement().address - base) as usize;
         real_expected[start..start + section.bytes().len()].copy_from_slice(section.bytes());
     }
-    let real_staged = stage_prepared(
-        &real_prepared,
-        actual_layout,
-        actual_pages,
-        real_prepared.sections().len(),
-    )
-    .unwrap();
+    drop(real_resolver);
+    let reserved_range = owned.range();
+    let real_staged = owned
+        .stage(&real_prepared, actual_pages, real_prepared.sections().len())
+        .unwrap();
+    assert_eq!(real_staged.reserved_range(), reserved_range);
+    assert_eq!(real_staged.layout().base(), base);
+    assert_eq!(
+        (real_staged.span(), real_staged.page_count()),
+        (actual_span, actual_pages)
+    );
     let mut real_actual = vec![0xff; actual_span];
     real_staged.read_bytes(0, &mut real_actual).unwrap();
     assert_eq!(
         real_actual, real_expected,
         "reserved-base prepared bytes must roundtrip"
     );
+    let mut byte = [0xff];
+    assert!(real_staged.read_bytes(actual_span, &mut byte).is_err());
+    assert_eq!(byte, [0xff]);
+    let other = ostd::mm::module_address::ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
+    assert!(other.range().end <= reserved_range.start || reserved_range.end <= other.range().start);
+    drop(other);
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:reserved_layout:PASS base={:#x} reserved={} span={} sections={} payload={} relocations={} pages={}",
         base,
@@ -155,6 +165,37 @@ fn cybermanju_prepared_module_runtime() {
         real_prepared.relocation_entries(),
         actual_pages
     );
+    drop(real_staged);
+    let reused =
+        ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
+    assert_eq!(reused.range(), reserved_range);
+    drop(reused);
+    for bad_layout in [false, true] {
+        let failed_owner =
+            ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        let failed_range = failed_owner.range();
+        if bad_layout {
+            assert!(matches!(
+                failed_owner.stage(&prepared, actual_pages, sections),
+                Err(Error::Plan(ElfError::LayoutMismatch))
+            ));
+        } else {
+            assert!(matches!(
+                failed_owner.stage(&real_prepared, 0, sections),
+                Err(Error::Plan(ElfError::ResourceLimit))
+            ));
+        }
+        let probe = ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+            .unwrap();
+        assert_eq!(
+            probe.range(),
+            failed_range,
+            "error must return the consumed reservation"
+        );
+        drop(probe);
+    }
+    println!("CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3");
     // No pointer conversion, function pointer, call to an ELF symbol or mapping.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
 }

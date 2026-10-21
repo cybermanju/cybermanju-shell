@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Address ownership and metadata only: no mapping or executable memory.
+//! Reserved address planning and coupled data-only staging, never mapping.
 
 use core::ops::Range;
 
-use linux_module_elf::{Layout, page_layout_span_bound, plan_page_layout};
-use ostd::mm::{PAGE_SIZE, Vaddr, module_address::ModuleAddressReservation};
+use linux_module_elf::{Layout, PreparedModule, page_layout_span_bound, plan_page_layout};
+use ostd::mm::{
+    PAGE_SIZE, Vaddr, module_address::ModuleAddressReservation,
+    module_staging::ReservedModuleStaging,
+};
 
-use super::Error;
+use super::{Error, stage_prepared};
 
 /// Holds a real VMALLOC reservation together with a layout replanned at its base.
 ///
@@ -63,5 +66,61 @@ impl ReservedModuleLayout {
     /// Entire owned virtual range, including conservative unused envelope space.
     pub fn range(&self) -> Range<Vaddr> {
         self.reservation.range()
+    }
+
+    /// Copy prepared bytes and consume the reservation into one coupled owner.
+    ///
+    /// Structural matching is not authentication of the input ELF. Any returned
+    /// error drops this layout/reservation and any acquired frame handles. Heap
+    /// OOM in existing allocator bookkeeping is outside this Result guarantee.
+    /// This creates no mapping and does not make the prepared bytes executable.
+    pub fn stage(
+        self,
+        module: &PreparedModule,
+        max_pages: usize,
+        max_chunks: usize,
+    ) -> Result<ReservedPreparedModule, Error> {
+        let staged = stage_prepared(module, &self.layout, max_pages, max_chunks)?;
+        let storage = staged
+            .with_reservation(self.reservation)
+            .map_err(Error::Frames)?;
+        Ok(ReservedPreparedModule {
+            layout: self.layout,
+            storage,
+        })
+    }
+}
+
+/// Data-only prepared storage with the virtual reservation kept alive by OSTD.
+/// No Clone, into_parts, mutable handle, pointer or execution API is provided.
+pub struct ReservedPreparedModule {
+    layout: Layout,
+    storage: ReservedModuleStaging,
+}
+
+impl ReservedPreparedModule {
+    /// Metadata only; cloning it does not retain ownership of the reservation.
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+
+    /// Entire reserved envelope, not a mapping to physical frames.
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.storage.reserved_range()
+    }
+
+    /// Actual staged span, excluding unused envelope slack.
+    pub fn span(&self) -> usize {
+        self.storage.span()
+    }
+
+    /// Staging pages, not the potentially larger virtual reservation.
+    pub fn page_count(&self) -> usize {
+        self.storage.page_count()
+    }
+
+    /// Reads the private frames; errors retain ModuleStaging's buffer semantics.
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.storage.read_bytes(offset, out)
     }
 }

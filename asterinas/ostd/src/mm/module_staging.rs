@@ -10,14 +10,19 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(target_arch = "x86_64")]
+mod reserved;
 mod storage;
+
+#[cfg(target_arch = "x86_64")]
+pub use reserved::ReservedModuleStaging;
+pub use storage::ModuleChunk;
+use storage::{Page, StagedPages};
 
 use crate::{
     Error,
     mm::{Frame, FrameAllocOptions, VmIo},
 };
-pub use storage::ModuleChunk;
-use storage::{Page, StagedPages};
 
 struct OstdPage(Frame<()>);
 
