@@ -293,3 +293,94 @@ fn cybermanju_framebuffer_runtime() {
         CONSOLE_BYTES
     );
 }
+
+// This must run in its own VM: no global framebuffer mapping may already own
+// the aperture. The descriptor is synthetic, the MMIO acquisition is real.
+#[ktest]
+fn cybermanju_framebuffer_offset_init_runtime() {
+    use ostd::{io::IoMem, mm::CachePolicy};
+
+    assert!(framebuffer::FRAMEBUFFER.get().is_none());
+    let boot = boot_info()
+        .framebuffer_arg
+        .expect("real boot MMIO required");
+    assert_eq!(boot.bpp, 32);
+    assert_eq!(boot.address % PAGE_SIZE, 0, "fixed QEMU mode only");
+    assert!(boot.byte_len().unwrap() >= 2 * PAGE_SIZE);
+    const OFFSET: usize = PAGE_SIZE - 3;
+    const SPAN: usize = 24;
+    const GUARD: usize = 8;
+    let mut descriptor = boot;
+    descriptor.address = boot.address.checked_add(OFFSET).unwrap();
+    descriptor.width = 2;
+    descriptor.height = 2;
+    descriptor.pitch = 12;
+    let (cover, offset) = framebuffer::mmio_cover(descriptor.address, SPAN).unwrap();
+    assert_eq!(offset, OFFSET);
+    assert_eq!(cover.len(), 2 * PAGE_SIZE);
+
+    // Seed guards, then release the entire mapping/reservation before invoking
+    // the actual production constructor. Do not retain any sliced owner here.
+    let seed = IoMem::acquire_with_cache_policy(cover.clone(), CachePolicy::WriteCombining)
+        .expect("initial isolated MMIO acquisition");
+    let mut saved = [0; SPAN + 2 * GUARD];
+    seed.read_bytes(OFFSET - GUARD, &mut saved).unwrap();
+    seed.write_bytes(OFFSET - GUARD, &[0x6d; SPAN + 2 * GUARD])
+        .unwrap();
+    drop(seed);
+
+    let fb = framebuffer::framebuffer_from_boot_arg(descriptor)
+        .expect("production constructor must acquire an unaligned descriptor's page cover");
+    assert_eq!(fb.io_mem().paddr(), descriptor.address);
+    assert_eq!(fb.io_mem().size(), 2 * PAGE_SIZE - OFFSET);
+    assert_eq!(fb.io_mem().cache_policy(), CachePolicy::WriteCombining);
+    assert_eq!(
+        (fb.width(), fb.height(), fb.line_size(), fb.byte_len()),
+        (2, 2, 12, SPAN)
+    );
+    let view = fb.surface_io_mem();
+    assert_eq!(view.paddr(), descriptor.address);
+    assert_eq!(view.size(), SPAN);
+    println!("CYBERMANJU_FB_OFFSET_INIT:acquire:PASS offset=4093 bytes=24 pages=2");
+
+    fb.clear();
+    let mut observed = [0x9a; SPAN];
+    view.read_bytes(0, &mut observed).unwrap();
+    assert_eq!(observed, [0; SPAN]);
+    let pixel = Pixel {
+        red: 0x12,
+        green: 0x34,
+        blue: 0x56,
+    };
+    fb.write_pixel_at(fb.calc_offset(0, 0), fb.render_pixel(pixel))
+        .unwrap();
+    let mut crossing = [0; 4];
+    view.read_bytes(0, &mut crossing).unwrap();
+    assert_eq!(crossing, [0x56, 0x34, 0x12, 0]);
+
+    // A bounded slice is still an owner: dropping only FrameBuffer cannot free
+    // the reservation or unmap bytes that this view can still access.
+    drop(fb);
+    assert!(IoMem::acquire_with_cache_policy(cover.clone(), CachePolicy::WriteCombining).is_err());
+    let mut after_drop = [0; 4];
+    view.read_bytes(0, &mut after_drop).unwrap();
+    assert_eq!(after_drop, crossing);
+    drop(view);
+
+    let restored = IoMem::acquire_with_cache_policy(cover, CachePolicy::WriteCombining)
+        .expect("last owner dropped: physical reservation must become reusable");
+    let mut guards = [0; SPAN + 2 * GUARD];
+    restored.read_bytes(OFFSET - GUARD, &mut guards).unwrap();
+    assert_eq!(&guards[..GUARD], &[0x6d; GUARD]);
+    assert_eq!(&guards[GUARD + SPAN..], &[0x6d; GUARD]);
+    println!("CYBERMANJU_FB_OFFSET_INIT:io:PASS guard_bytes=8 crossing_bytes=4");
+    restored.write_bytes(OFFSET - GUARD, &saved).unwrap();
+    restored.read_bytes(OFFSET - GUARD, &mut guards).unwrap();
+    assert_eq!(guards, saved);
+    drop(restored);
+    assert!(framebuffer::FRAMEBUFFER.get().is_none());
+    println!("CYBERMANJU_FB_OFFSET_INIT:lifetime:PASS release_reacquire=true restored=true");
+    println!(
+        "CYBERMANJU_FB_OFFSET_INIT:scope:PASS synthetic_descriptor=true firmware_unaligned=false userspace=false"
+    );
+}

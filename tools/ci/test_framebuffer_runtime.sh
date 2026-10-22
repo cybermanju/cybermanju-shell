@@ -2,17 +2,18 @@
 # Disposable OSTD metadata / boot framebuffer tests, not the installer ISO.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-OUT=${1:?usage: test_framebuffer_runtime.sh OUT --kind contract|hardware|fbdev}
+OUT=${1:?usage: test_framebuffer_runtime.sh OUT --kind contract|hardware|fbdev|offset-init}
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 printf '{"status":"not_verified"}\n' > "$OUT/result.json"
-[[ $# == 3 && $2 == --kind ]] || { echo 'expected OUT --kind contract|hardware|fbdev' >&2; exit 2; }
+[[ $# == 3 && $2 == --kind ]] || { echo 'expected OUT --kind contract|hardware|fbdev|offset-init' >&2; exit 2; }
 KIND=$3
 case "$KIND" in
     contract) CRATE=ostd; PATHCRATE=ostd; FILTER=cybermanju_framebuffer_boot_contract; CFG="$ROOT/tools/ci/framebuffer-contract.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_framebuffer_runtime.py" ;;
     hardware) CRATE=aster-framebuffer; PATHCRATE=kernel/core/comps/framebuffer; FILTER=cybermanju_framebuffer_runtime; CFG="$ROOT/tools/ci/framebuffer-runtime.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_framebuffer_runtime.py" ;;
     fbdev) CRATE=aster-core; PATHCRATE=kernel/core; FILTER=cybermanju_fbdev_fileops_runtime; CFG="$ROOT/tools/ci/fbdev-runtime.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_fbdev_runtime.py" ;;
-    *) echo 'expected --kind contract|hardware|fbdev' >&2; exit 2 ;;
+    offset-init) CRATE=aster-framebuffer; PATHCRATE=kernel/core/comps/framebuffer; FILTER=cybermanju_framebuffer_offset_init_runtime; CFG="$ROOT/tools/ci/framebuffer-runtime.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_framebuffer_offset_init.py" ;;
+    *) echo 'expected --kind contract|hardware|fbdev|offset-init' >&2; exit 2 ;;
 esac
 CONFIG="$ROOT/asterinas/$PATHCRATE/OSDK.toml"
 if [[ -e "$CONFIG" || -L "$CONFIG" ]]; then
@@ -68,7 +69,7 @@ fi
 {
     (cd "$ROOT/asterinas" && rustc --version && cargo --version)
     qemu-system-x86_64 --version | head -1
-    printf 'kind=%s; x86_64; q35; TCG; 1 CPU; 1 GiB; BIOS/GRUB multiboot2; OSDK_LOCAL_DEV=1\n' "$KIND"
+    printf 'kind=%s; x86_64; q35; TCG; 1 CPU; 1 GiB; BIOS/GRUB multiboot2; OSDK_LOCAL_DEV=1; timeout=600s\n' "$KIND"
     sha256sum "$ROOT/asterinas/target/osdk/$CRATE-osdk-bin.elf" "$ISO" "$OUT/grub.cfg" "$OUT/harness-Cargo.toml" "$OUT/harness-Cargo.lock"
     sha256sum "$CFG" "$ROOT/tools/ci/test_framebuffer_runtime.sh" "$VERIFY"
     if [[ "$KIND" == fbdev ]]; then

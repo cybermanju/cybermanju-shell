@@ -55,6 +55,10 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
+## Aquisição de framebuffer: não amplia a matriz de módulos
+
+A nova prova isolada chama o construtor de produção do framebuffer com descritor sintético deslocado e aquisição MMIO real; valida ownership de views, exclusividade da reserva e readquisição após o último drop. A [matriz gráfica](hardware-graphics-compatibility.md#aquisição-real-o-último-proprietário-mantém-a-reserva) registra os limites. Isso não exercita carregamento de `.ko`, exports Linux, relocations novas, init/exit de módulo ou SMP; versões, arquiteturas e módulos qualificados nesta matriz continuam os mesmos.
+
 ## Hardware: origem de framebuffer não é compatibilidade de módulo
 
 O ciclo acrescenta cobertura MMIO alinhada com view deslocada da superfície e recusa de mmap de fbdev para origem física desalinhada. A prova usa uma subsuperfície sintética sobre MMIO VGA real em QEMU, não um driver `.ko`, nova GPU ou endereço desalinhado entregue pelo firmware. A [matriz gráfica](hardware-graphics-compatibility.md#origem-física-páginas-alinhadas-bytes-na-posição-correta) delimita as evidências. O loader, as fixtures, versões Linux e arquiteturas qualificadas nesta matriz não mudaram; nenhuma chamada de init/exit ou resolução de exports reais foi acrescentada.

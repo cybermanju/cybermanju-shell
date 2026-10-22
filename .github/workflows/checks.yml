@@ -236,6 +236,8 @@ jobs:
         run: bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-contract --kind contract
       - name: Read back pixels through the boot framebuffer and real VGA MMIO in QEMU
         run: bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-hardware --kind hardware
+      - name: Verify offset framebuffer initialization and real MMIO reacquisition
+        run: bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-offset-init --kind offset-init
       - name: Prepare pinned kernel VDSO library for direct fbdev fileops
         run: bash tools/ci/prepare_kernel_vdso.sh artifacts/kernel-vdso
       - name: Exercise direct fbdev fileops in the runtime kernel
@@ -256,6 +258,11 @@ jobs:
             artifacts/framebuffer-hardware/*.txt
             artifacts/framebuffer-hardware/grub.cfg
             artifacts/framebuffer-hardware/harness-Cargo.*
+            artifacts/framebuffer-offset-init/*.log
+            artifacts/framebuffer-offset-init/*.json
+            artifacts/framebuffer-offset-init/*.txt
+            artifacts/framebuffer-offset-init/grub.cfg
+            artifacts/framebuffer-offset-init/harness-Cargo.*
             artifacts/fbdev-runtime/*.log
             artifacts/fbdev-runtime/*.json
             artifacts/fbdev-runtime/*.txt

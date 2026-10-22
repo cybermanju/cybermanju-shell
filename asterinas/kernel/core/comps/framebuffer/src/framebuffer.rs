@@ -5,7 +5,7 @@ use core::ops::Range;
 
 use ostd::{
     Error, Result,
-    boot::boot_info,
+    boot::{BootloaderFramebufferArg, boot_info},
     io::IoMem,
     mm::{CachePolicy, HasPaddr, HasSize, PAGE_SIZE, VmIo},
     sync::Mutex,
@@ -71,9 +71,20 @@ pub(crate) fn init() {
         return;
     };
 
+    let Some(framebuffer) = framebuffer_from_boot_arg(framebuffer_arg) else {
+        return;
+    };
+
+    framebuffer.clear();
+    FRAMEBUFFER.call_once(|| Arc::new(framebuffer));
+}
+
+// Real acquisition path shared by boot initialization and the isolated descriptor ktest.
+// Clearing/publishing are intentionally left to the caller.
+fn framebuffer_from_boot_arg(framebuffer_arg: BootloaderFramebufferArg) -> Option<FrameBuffer> {
     if framebuffer_arg.address == 0 {
         ostd::error!("Framebuffer address is zero");
-        return;
+        return None;
     }
 
     // FIXME: There are several pixel formats that have the same BPP. We lost the information
@@ -88,18 +99,18 @@ pub(crate) fn init() {
                 "Unsupported framebuffer pixel format: {} bpp",
                 framebuffer_arg.bpp
             );
-            return;
+            return None;
         }
     };
 
     let Some(byte_len) = framebuffer_arg.byte_len() else {
         ostd::error!("Invalid framebuffer geometry or pitch");
-        return;
+        return None;
     };
     // Reserve/map the entire aligned cover, retaining the logical physical origin.
     let Some((cover, _)) = mmio_cover(framebuffer_arg.address, byte_len) else {
         ostd::error!("Framebuffer page cover overflow");
-        return;
+        return None;
     };
     let framebuffer = {
         let line_size = framebuffer_arg.pitch;
@@ -109,12 +120,12 @@ pub(crate) fn init() {
         let Ok(io_mem) = IoMem::acquire_with_cache_policy(cover, CachePolicy::WriteCombining)
         else {
             ostd::error!("Framebuffer MMIO range is unavailable");
-            return;
+            return None;
         };
 
         let Ok(io_mem) = slice_surface_mapping(&io_mem, framebuffer_arg.address, byte_len) else {
             ostd::error!("Framebuffer MMIO cover does not match its surface");
-            return;
+            return None;
         };
 
         let default_cmap = FbCmap {
@@ -132,8 +143,7 @@ pub(crate) fn init() {
         }
     };
 
-    framebuffer.clear();
-    FRAMEBUFFER.call_once(|| Arc::new(framebuffer));
+    Some(framebuffer)
 }
 
 // Zero, arithmetic overflow and an unrepresentable page end fail before acquisition.
