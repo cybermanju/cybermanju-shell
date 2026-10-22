@@ -60,8 +60,64 @@ impl NearTextModuleLayout {
 
         let reservation = NearTextAddressReservation::new_at(base, span, max_pages)
             .map_err(Error::AddressSpace)?;
-        let layout =
-            plan_page_layout(bytes, base as u64, bound, max_sections).map_err(Error::Plan)?;
+        Self::new_with_reservation(
+            bytes,
+            exports,
+            reservation,
+            bound,
+            max_sections,
+            max_entries,
+        )
+    }
+
+    /// Reserve and preflight a fixed base in the separate signed-32 pool.
+    ///
+    /// The contract and limits are identical to [`Self::new_at`], with no
+    /// search or fallback to the legacy near-text pool.
+    #[cfg(target_arch = "x86_64")]
+    pub fn new_signed32_at(
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        base: Vaddr,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+    ) -> Result<Self, Error> {
+        if PAGE_SIZE != 4096 {
+            return Err(Error::UnsupportedPageSize);
+        }
+        let max_span = max_pages
+            .checked_mul(PAGE_SIZE)
+            .ok_or(Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        let bound =
+            page_layout_span_bound(bytes, max_span as u64, max_sections).map_err(Error::Plan)?;
+        let span = usize::try_from(bound)
+            .map_err(|_| Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        if span == 0 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+        let reservation = NearTextAddressReservation::new_signed32_at(base, span, max_pages)
+            .map_err(Error::AddressSpace)?;
+        Self::new_with_reservation(
+            bytes,
+            exports,
+            reservation,
+            bound,
+            max_sections,
+            max_entries,
+        )
+    }
+
+    fn new_with_reservation(
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        reservation: NearTextAddressReservation,
+        bound: u64,
+        max_sections: usize,
+        max_entries: usize,
+    ) -> Result<Self, Error> {
+        let layout = plan_page_layout(bytes, reservation.range().start as u64, bound, max_sections)
+            .map_err(Error::Plan)?;
         if layout.span() == 0 {
             return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
         }

@@ -20,6 +20,9 @@ use crate::{
 
 static NEAR_TEXT_ALLOCATOR: RangeAllocator =
     RangeAllocator::new(crate::mm::kspace::MODULE_NEAR_TEXT_VADDR_RANGE);
+#[cfg(target_arch = "x86_64")]
+static SIGNED32_ALLOCATOR: RangeAllocator =
+    RangeAllocator::new(crate::mm::kspace::MODULE_SIGNED32_VADDR_RANGE);
 
 const MAX_CLAIM_PAGES: usize = 1024;
 
@@ -31,6 +34,14 @@ const MAX_CLAIM_PAGES: usize = 1024;
 #[derive(Debug)]
 pub struct NearTextAddressReservation {
     range: Range<Vaddr>,
+    backend: ReservationBackend,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ReservationBackend {
+    NearText,
+    #[cfg(target_arch = "x86_64")]
+    Signed32,
 }
 
 impl NearTextAddressReservation {
@@ -52,15 +63,37 @@ impl NearTextAddressReservation {
     /// Page-table writers must respect this dedicated pool's ownership. An
     /// absent PTE does not prove absent stale TLB entries; no VA access is exposed.
     pub fn new_at(base: Vaddr, span: usize, max_pages: usize) -> Result<Self, Error> {
-        let range = validate_layout(base, span, max_pages)?;
+        Self::new_in_pool(base, span, max_pages, ReservationBackend::NearText)
+    }
+
+    /// Reserves exactly `span` bytes in the separate x86-64 signed-32 pool,
+    /// 1–1.5 GiB above `KERNEL_CODE_BASE_VADDR` (with guard pages). Addresses in
+    /// the pool are sign-extended 32-bit values suitable for absolute R_32S.
+    /// This alone does not guarantee PC32 reach or arbitrary addends/imports;
+    /// complete relocation preflight remains mandatory.
+    /// The same alignment, page-budget, canonical-range, boot-image, and PTE
+    /// checks as [`Self::new_at`] apply. This is a VA reservation, not a mapping.
+    #[cfg(target_arch = "x86_64")]
+    pub fn new_signed32_at(base: Vaddr, span: usize, max_pages: usize) -> Result<Self, Error> {
+        Self::new_in_pool(base, span, max_pages, ReservationBackend::Signed32)
+    }
+
+    fn new_in_pool(
+        base: Vaddr,
+        span: usize,
+        max_pages: usize,
+        backend: ReservationBackend,
+    ) -> Result<Self, Error> {
+        let pool = Self::pool_range(backend);
+        let range = validate_layout(base, span, max_pages, &pool)?;
 
         // Reserve exactly the requested interval. Keep interrupts disabled for
         // both allocator mutation and the subsequent bounded mapping audit.
         let irq_guard = irq::disable_local();
-        NEAR_TEXT_ALLOCATOR
+        Self::allocator(backend)
             .alloc_specific(&range)
             .map_err(|_| Error::NoMemory)?;
-        let owner = Self { range };
+        let owner = Self { range, backend };
 
         let page_table = crate::mm::kspace::KERNEL_PAGE_TABLE
             .get()
@@ -79,6 +112,28 @@ impl NearTextAddressReservation {
     /// Declared dedicated pool, not an ownership claim or proof of availability.
     pub fn arena_range() -> Range<Vaddr> {
         crate::mm::kspace::MODULE_NEAR_TEXT_VADDR_RANGE
+    }
+
+    /// Declared signed-32 pool, not an ownership claim or proof of availability.
+    #[cfg(target_arch = "x86_64")]
+    pub fn signed32_arena_range() -> Range<Vaddr> {
+        crate::mm::kspace::MODULE_SIGNED32_VADDR_RANGE
+    }
+
+    fn pool_range(backend: ReservationBackend) -> Range<Vaddr> {
+        match backend {
+            ReservationBackend::NearText => crate::mm::kspace::MODULE_NEAR_TEXT_VADDR_RANGE,
+            #[cfg(target_arch = "x86_64")]
+            ReservationBackend::Signed32 => crate::mm::kspace::MODULE_SIGNED32_VADDR_RANGE,
+        }
+    }
+
+    fn allocator(backend: ReservationBackend) -> &'static RangeAllocator {
+        match backend {
+            ReservationBackend::NearText => &NEAR_TEXT_ALLOCATOR,
+            #[cfg(target_arch = "x86_64")]
+            ReservationBackend::Signed32 => &SIGNED32_ALLOCATOR,
+        }
     }
 
     /// Returns the exact reserved virtual-address interval.
@@ -100,11 +155,16 @@ impl NearTextAddressReservation {
 impl Drop for NearTextAddressReservation {
     fn drop(&mut self) {
         let _irq_guard = irq::disable_local();
-        NEAR_TEXT_ALLOCATOR.free(self.range.clone());
+        Self::allocator(self.backend).free(self.range.clone());
     }
 }
 
-fn validate_layout(base: Vaddr, span: usize, max_pages: usize) -> Result<Range<Vaddr>, Error> {
+fn validate_layout(
+    base: Vaddr,
+    span: usize,
+    max_pages: usize,
+    pool: &Range<Vaddr>,
+) -> Result<Range<Vaddr>, Error> {
     if span == 0
         || !base.is_multiple_of(PAGE_SIZE)
         || !span.is_multiple_of(PAGE_SIZE)
@@ -115,15 +175,15 @@ fn validate_layout(base: Vaddr, span: usize, max_pages: usize) -> Result<Range<V
     }
     let end = base.checked_add(span).ok_or(Error::InvalidArgs)?;
     let range = base..end;
-    let pool = crate::mm::kspace::MODULE_NEAR_TEXT_VADDR_RANGE;
-    if !pool_contains(&pool, &range) {
+    if !pool_contains(pool, &range) {
         return Err(Error::InvalidArgs);
     }
-    if !crate::mm::kspace::KERNEL_VADDR_RANGE.contains(&pool.start)
+    if pool.start >= pool.end
+        || !crate::mm::kspace::KERNEL_VADDR_RANGE.contains(&pool.start)
         || pool.end > crate::mm::kspace::KERNEL_VADDR_RANGE.end
-        || !ranges_disjoint(&pool, &crate::mm::kspace::LINEAR_MAPPING_VADDR_RANGE)
-        || !ranges_disjoint(&pool, &crate::mm::kspace::VMALLOC_VADDR_RANGE)
-        || !ranges_disjoint(&pool, &crate::mm::kspace::FRAME_METADATA_RANGE)
+        || !ranges_disjoint(pool, &crate::mm::kspace::LINEAR_MAPPING_VADDR_RANGE)
+        || !ranges_disjoint(pool, &crate::mm::kspace::VMALLOC_VADDR_RANGE)
+        || !ranges_disjoint(pool, &crate::mm::kspace::FRAME_METADATA_RANGE)
     {
         return Err(Error::AccessDenied);
     }
@@ -147,7 +207,7 @@ fn validate_layout(base: Vaddr, span: usize, max_pages: usize) -> Result<Range<V
         let virtual_end = physical_end
             .checked_add(offset)
             .ok_or(Error::AccessDenied)?;
-        if virtual_start >= virtual_end || !ranges_disjoint(&pool, &(virtual_start..virtual_end)) {
+        if virtual_start >= virtual_end || !ranges_disjoint(pool, &(virtual_start..virtual_end)) {
             return Err(Error::AccessDenied);
         }
     }

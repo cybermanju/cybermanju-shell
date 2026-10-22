@@ -17,6 +17,9 @@
 //! | |         x86-64 only: dedicated near-text VA reservations in the
 //! | |         preceding 1 GiB, excluding one guard page at either end.
 //! | |         The remaining hole is unused. No module mapping is implied.
+//! | |         A separate signed-32 relocation reservation pool occupies
+//! | |         512 MiB in the high gap above the first kernel-code GiB;
+//! | |         this also implies no mapping.
 //! +-+ <- 0xffff_e100_0000_0000
 //! | |         For frame metadata, 1 TiB.
 //! +-+ <- 0xffff_e000_0000_0000
@@ -119,10 +122,32 @@ const KERNEL_CODE_BASE_VADDR: usize = 0xffff_ffff_8000_0000;
 pub(super) const MODULE_NEAR_TEXT_VADDR_RANGE: Range<Vaddr> =
     (KERNEL_CODE_BASE_VADDR - (1 << 30) + PAGE_SIZE)..(KERNEL_CODE_BASE_VADDR - PAGE_SIZE);
 
+/// Separate x86-64 pool for fixed-base modules requiring signed-32 relocation reach.
+/// This is a VA reservation only; it does not map module contents.
+#[cfg(target_arch = "x86_64")]
+pub(super) const MODULE_SIGNED32_VADDR_RANGE: Range<Vaddr> =
+    (KERNEL_CODE_BASE_VADDR + (1 << 30) + PAGE_SIZE)
+        ..(KERNEL_CODE_BASE_VADDR + (3 << 29) - PAGE_SIZE);
+
 #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
 const KERNEL_CODE_BASE_VADDR: usize = 0xffff_ffff_0000_0000;
 #[cfg(target_arch = "loongarch64")]
 const KERNEL_CODE_BASE_VADDR: usize = 0x9000_0000_0000_0000;
+
+#[cfg(target_arch = "x86_64")]
+const_assert!(MODULE_NEAR_TEXT_VADDR_RANGE.end <= MODULE_SIGNED32_VADDR_RANGE.start);
+#[cfg(target_arch = "x86_64")]
+const_assert!(MODULE_SIGNED32_VADDR_RANGE.start < MODULE_SIGNED32_VADDR_RANGE.end);
+#[cfg(target_arch = "x86_64")]
+const_assert!(
+    MODULE_SIGNED32_VADDR_RANGE.start as u32 as i32 as isize as usize
+        == MODULE_SIGNED32_VADDR_RANGE.start
+);
+#[cfg(target_arch = "x86_64")]
+const_assert!(
+    (MODULE_SIGNED32_VADDR_RANGE.end - 1) as u32 as i32 as isize as usize
+        == MODULE_SIGNED32_VADDR_RANGE.end - 1
+);
 
 const FRAME_METADATA_CAP_VADDR: Vaddr = 0xffff_fff0_8000_0000 << ADDR_WIDTH_SHIFT;
 const FRAME_METADATA_BASE_VADDR: Vaddr = 0xffff_fff0_0000_0000 << ADDR_WIDTH_SHIFT;
