@@ -117,7 +117,7 @@ impl<P: Page> StagedPages<P> {
         self.pages.len()
     }
 
-    #[cfg(all(ktest, target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     pub(super) fn iter(&self) -> core::slice::Iter<'_, P> {
         self.pages.iter()
     }

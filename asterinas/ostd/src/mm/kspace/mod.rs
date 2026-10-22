@@ -44,6 +44,8 @@
 pub(crate) mod kvirt_area;
 #[cfg(all(ktest, target_arch = "x86_64"))]
 mod module_near_text_collision;
+#[cfg(target_arch = "x86_64")]
+pub(crate) mod module_signed32_lease;
 #[cfg(all(ktest, target_arch = "x86_64"))]
 pub(crate) mod module_signed32_map;
 #[cfg(all(ktest, target_arch = "x86_64"))]

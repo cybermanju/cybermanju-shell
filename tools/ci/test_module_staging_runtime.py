@@ -79,7 +79,7 @@ class RuntimeEvidenceTests(unittest.TestCase):
             config.write_text("user configuration must survive\n")
             out = root / "artifacts/runtime"
             out.mkdir(parents=True)
-            for mode in ([], ["--signed32-mapping-fault"]):
+            for mode in ([], ["--signed32-mapping-fault"], ["--signed32-lease"], ["--signed32-lease-smp"]):
                 with self.subTest(mode=mode):
                     (out / "result.json").write_text('{"status":"passed"}')
                     result = subprocess.run(

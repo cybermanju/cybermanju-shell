@@ -86,6 +86,20 @@ case ${2:-} in
         FILTER=cybermanju_signed32_mapping_fault_runtime
         VERIFY=verify_signed32_mapping_fault_runtime.py
         ;;
+    --signed32-lease)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_signed32_lease_runtime
+        VERIFY=verify_signed32_lease_runtime.py
+        ;;
+    --signed32-lease-smp)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_signed32_lease_smp_runtime
+        VERIFY=verify_signed32_lease_smp_runtime.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
+        CPUS=2
+        ;;
     --near-text-collision)
         CRATE=ostd
         CRATE_PATH=ostd

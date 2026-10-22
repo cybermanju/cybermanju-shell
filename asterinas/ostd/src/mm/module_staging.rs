@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Private, owned frame staging for data that will be consumed before a module
-//! loader is integrated. This does not create mappings or executable memory.
+//! Private owned data frames, with an opt-in experimental signed-32 lease on
+//! fixed single-CPU x86-64 boots. Staging itself has no reserved alias; consuming
+//! it into the separate lease creates persistent RW/non-X page-table mappings.
+//! Neither API authorizes execution or qualifies a Linux module loader.
 //!
 //! The real frame allocator is initialized only after boot. This wrapper uses
 //! OSTD's existing linear RW mapping via `VmIo`; it does not establish unmapped
@@ -17,6 +19,10 @@ pub mod fault_injection;
 mod reserved;
 mod storage;
 
+#[cfg(all(ktest, target_arch = "x86_64"))]
+pub use crate::mm::kspace::module_signed32_lease::Signed32LeaseAudit;
+#[cfg(target_arch = "x86_64")]
+pub use crate::mm::kspace::module_signed32_lease::Signed32RwMapping;
 #[cfg(target_arch = "x86_64")]
 pub use reserved::ReservedModuleStaging;
 pub use storage::ModuleChunk;
@@ -77,6 +83,42 @@ impl ModuleStaging {
     /// Number of privately owned frames, including frames for gaps.
     pub fn page_count(&self) -> usize {
         self.pages.page_count()
+    }
+
+    /// Establish a persistent supervisor RW/NX signed-32 mapping. Requires
+    /// initialized boot memory and fixed single-CPU topology. This experimental
+    /// API bounds the reservation to 1024 pages, returns no pointer or execution
+    /// capability, and preserves the existing linear RW alias (not physical W^X).
+    /// Unexpected cleanup failures leak retained resources rather than reuse them;
+    /// page-table bookkeeping OOM/panics remain outside Result.
+    #[cfg(target_arch = "x86_64")]
+    pub fn map_signed32_rw_nx(
+        self,
+        reservation: crate::mm::module_address::NearTextAddressReservation,
+    ) -> Result<Signed32RwMapping, Error> {
+        crate::mm::kspace::module_signed32_lease::new(self, reservation)
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) fn frames_for_signed32(
+        &self,
+    ) -> impl ExactSizeIterator<Item = Frame<()>> + Clone + '_ {
+        self.pages.iter().map(|page| page.0.clone())
+    }
+
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub fn map_signed32_rw_nx_with_fault_for_test(
+        self,
+        reservation: crate::mm::module_address::NearTextAddressReservation,
+        after: usize,
+        observed: &mut usize,
+    ) -> Result<Signed32RwMapping, Error> {
+        crate::mm::kspace::module_signed32_lease::new_with_fault(
+            self,
+            reservation,
+            Some(after),
+            observed,
+        )
     }
 
     /// Reads bytes from the staging span. Out-of-span requests are rejected.
