@@ -1,10 +1,34 @@
 # Gráficos e hardware: o que já foi provado
 
+**Origem física deslocada:** o consumidor agora alinha a cobertura MMIO e posiciona a view no endereço real da superfície. Um novo ktest gráfico já passou com origem sintética deslocada 4.093 bytes sobre MMIO VGA real, cruzando uma página e preservando sentinelas. Endereços deslocados não são oferecidos a mmap: fbdev passa a recusá-los com EINVAL. Ainda não é evidência de firmware fornecendo framebuffer desalinhado, syscall, GPUI ou monitor físico.
+
 **A ISO já instalou em UEFI e o sistema instalado chegou ao stage-2 do Asterinas, mas não ao login.** No run `39715117705` da base `cecd1ce`, instalação e verificação EFI GRUB passaram; o boot instalado carregou kernel/initrd, iniciou `/init` e parou no último ponto observado `running activation script...`, até o timeout de login. **Não passou hello, desktop/GPUI nem aceite completo da ISO.** Foi acrescentado tracing opt-in da ativação para tornar a próxima falha localizável, sem mudar os gates.
 
 **Os FileOps reais de fbdev passaram oito casos em QEMU**, sobre uma superfície sintética de 24 bytes no MMIO VGA real: transferência curta, EOF/ENOSPC, offset extremo e cursor de leitura/escrita vazio. Os metadados informam `smem_len=24` e pitch 12; oito bytes de guarda permaneceram intactos. **Não é uma prova de syscall/ioctl/mmap, GPUI ou módulo Linux executado.**
 
 **Etapa anterior:** o console passou a dimensionar seu buffer e seu scroll pelo span lógico, corrigindo dois panics reproduzidos em QEMU. O framebuffer mantém as escritas limitadas ao span e a prova de readback. A medição real continua em **1280 × 800, 32 bpp, pitch de 5.120 bytes e superfície de 4.096.000 bytes**. Isso não demonstra GPUI nativo, aceleração gráfica ou imagem apresentada em monitor físico.
+
+## Origem física: páginas alinhadas, bytes na posição correta
+
+O descritor OSTD já permitia endereço físico não alinhado, mas o consumidor gráfico recusava esse endereço. O [consumidor](../asterinas/kernel/core/comps/framebuffer/src/framebuffer.rs) agora calcula uma cobertura que começa na página anterior e termina depois do último byte da superfície, com aritmética verificada. Reserva somente essa cobertura pela API segura `IoMem`, preserva WriteCombining e deriva uma view deslocada para a origem real. Falhas de aquisição ou overflow continuam recusadas; não foram adicionados unsafe, alias físico novo ou escrita nos bytes anteriores à imagem.
+
+A origem de `io_mem()` agora significa sempre o endereço físico real, não a base arredondada. Essa view exclui o prefixo, mas ainda pode incluir a cauda da página; `surface_io_mem()` continua limitado a `pitch × height`. `clear`, offsets de pixels, console e FileOps permanecem relativos ao início da imagem.
+
+O [ktest gráfico](../asterinas/kernel/core/comps/framebuffer/src/runtime_tests.rs) reutiliza a mesma função de construção da view usada na produção, com **origem sintética `PAGE_SIZE-3` (4.093), superfície 2×2, pitch 12 e 24 bytes** sobre a abertura VGA real já adquirida. Prova clear dos 24 bytes, pixels com uma escrita cruzando página, readback, rejeição de escrita que cruza o fim, oito bytes de guarda **de cada lado** e restauração integral. Seis checagens adicionais cobrem zero, span vazio, overflow físico, overflow de arredondamento e duas coberturas exatas. Não foi simulado um novo modo do firmware nem readquirida a mesma região MMIO.
+
+**Controle negativo observado:** descartar somente o offset na construção da view fez o teste falhar na comparação da origem física: retornou a página base, não a origem deslocada. O fonte correto foi restaurado. A fixture falhou antes de escrever na superfície deslocada.
+
+O [fbdev](../asterinas/kernel/core/src/device/fb.rs) recusa origem física não múltipla de página com `EINVAL` na admissão `mappable()` e adiciona a mesma defesa em `map()` antes de `map_iomem`. Essa política evita transformar a primeira página parcial em um mmap com origem errada ou expor o prefixo. **Não é a política Linux de compensar o offset dentro do mmap.** Para origens alinhadas, a ABI e o possível acesso à cauda permanecem; `mmap_tail_isolated=false` continua válido.
+
+A fixture adicional de FileOps passou conferindo `smem_start` deslocado, `smem_len=24`, read/write cruzando página, truncamento no EOF e rejeição de admissão de mmap com `FileMmapRequest` real. Chama diretamente métodos do kernel, **não syscall, ioctl despachado ou VMAR**. A nova defesa em `map()` não foi exercitada com `MapHandle` real. O marcador histórico `mmap_tested=false` refere-se a mapping efetivo/VMAR, não à nova admissão direta.
+
+Validação final: **194 regressões Python**, **três ktests positivos em VMs separadas** (contrato de boot, framebuffer/console com origem deslocada, FileOps fbdev com admissão recusada), type-check de produção de `aster-core`/`aster-framebuffer` com VDSO real, rustfmt e diff. Ambiente x86-64/q35/TCG, uma CPU, 1 GiB, GRUB/Multiboot2, QEMU 8.2.2 e Rust `nightly-2026-07-21`. Seriais, JSONs e proveniência em `artifacts/unaligned-fbdev/`, `artifacts/unaligned-hardware-final/` e `artifacts/framebuffer-contract-0400/`; negativo em `artifacts/unaligned-offset-negative/`; diagnósticos e resumo host em `artifacts/cycle-0400/`.
+
+O primeiro build da fixture foi recusado por `unwrap_err()` exigir Debug do tipo de sucesso; foi corrigido sem alterar produção. Depois, o gate recusou o log em que só o teste antigo rodou: o novo ktest tinha ficado fora do filtro. A fixture deslocada foi integrada ao entrypoint selecionado, com regressão host que exige essa chamada; a repetição passou com todos os quatro marcadores. As sentinelas são comparadas ao padrão escrito de cada lado e os bytes originais são restaurados. As falhas iniciais foram preservadas, não aceitas como aprovação.
+
+O [CI da base `3ff021b`](https://github.com/cybermanju/cybermanju-shell/actions/runs/39735124407) concluiu os sete jobs com sucesso; não é aprovação automática desta nova mudança. A ISO com tracing dessa base ainda aguardava sua execução; o último bloqueio de boot instalado continua sendo a ativação descrita abaixo.
+
+Os dois gates exigem seus novos marcadores além dos anteriores, recusam ausência, duplicata e campos alterados. Os JSONs distinguem `physical_offset_view_verified`/`unaligned_fileops_verified` de `bootloader_unaligned_framebuffer_verified=false`, syscall e mmap userspace não verificados. Esta mudança não qualifica nova GPU, arquitetura, versão Linux ou módulo `.ko`.
 
 ## ISO instalada: boot real, bloqueio na ativação
 
@@ -48,7 +72,7 @@ Validação final: **177 regressões Python**, **3 ktests positivos em VMs separ
 
 ## Contrato de mmap: bytes limitados não significam páginas isoladas
 
-A política desta revisão é **preservar o mmap paginado existente, sem prometer isolamento da cauda**. `read_at`/`write_at` e `smem_len` usam o span lógico; `mappable`/`map` continuam oferecendo o `IoMem` bruto. Se a última página contiver bytes posteriores à superfície, esses bytes podem continuar acessíveis pelo mapping. Não se deve tratar `smem_len` como barreira de proteção nem qualificar esse caminho para dados sensíveis ou buffers compartilhados com outro proprietário.
+A política para **origens físicas alinhadas** é preservar o mmap paginado existente, sem prometer isolamento da cauda. Origens físicas desalinhadas passam a ser recusadas com EINVAL na admissão e em `map()`, conforme a prova da nova etapa acima. `read_at`/`write_at` e `smem_len` usam o span lógico; `mappable`/`map` continuam oferecendo o `IoMem` bruto. Se a última página contiver bytes posteriores à superfície, esses bytes podem continuar acessíveis pelo mapping. Não se deve tratar `smem_len` como barreira de proteção nem qualificar esse caminho para dados sensíveis ou buffers compartilhados com outro proprietário.
 
 Não foi adicionada recusa de mmap para superfícies curtas: fazê-lo agora mudaria a ABI sem teste do consumidor. Antes de qualificar mmap/GPUI, é necessário escolher e provar uma política: exigir uma superfície inteira em páginas sob posse exclusiva, recusar a página parcial, ou usar um buffer intermediário isolado com cópia/apresentação. Um slice byte-granular sozinho não remove acesso aos demais bytes da mesma página. A validação futura precisa cobrir offsets, comprimento e última página via VMAR/syscall, além de endereços físicos não alinhados. O teste direto de FileOps não substitui essa prova.
 
@@ -91,6 +115,7 @@ O [header Multiboot2](../asterinas/ostd/src/arch/x86/boot/multiboot2/header.S) s
 | Framebuffer VGA | 1 ktest aprovado: clear amostrado, escrita/leitura/restauração de dois pixels na primeira e última linha, mais seis verificações de limites | Readback de MMIO; limites extras usam superfície sintética, não scanout |
 | View lógica para fbdev | 4 casos dentro do ktest gráfico; superfície sintética de 24 bytes, 8 bytes de guarda e origem física preservada | Não exercita syscall, truncamento dos FileOps em runtime ou isolamento do page-tail de mmap |
 | FileOps fbdev diretos | 1 ktest aprovado em x86-64/q35/TCG, 1 CPU, 1 GiB, GRUB/Multiboot2; oito casos e metadados | Buffers do kernel; sem syscall/ioctl/mmap/registro fbdev |
+| Origem sintética deslocada sobre VGA real | View com offset 4.093, clear/readback/pixels e guardas no ktest gráfico | Não é endereço desalinhado entregue pelo firmware; mmap dessas origens é recusado |
 | Nomes de partições do instalador | Regra shell real executada isoladamente; comparação antes/depois de NVMe/eMMC/NBD e preservação de loop/virtio | Somente strings; sem I/O de disco, controlador, instalação ou boot desses dispositivos |
 | ISO completa UEFI, base `cecd1ce` | Live USB + instalação + EFI GRUB passaram; kernel instalado e `/init` chegaram ao stage-2 | Login expirou em ativação; hello/aceite completo falharam; somente QEMU/TCG, sem GPUI/hardware físico |
 | Adaptadores de produção | `cargo check --locked -p ostd -p linux-module-staging -p aster-framebuffer --target x86_64-unknown-none` aprovado | Type-check, não boot do kernel completo |
@@ -139,6 +164,6 @@ O passo passa a ter dez minutos. Para preservar a invariável já testada de que
 
 ## O que ainda falta
 
-O consumidor ainda recusa endereço físico não alinhado a página. Os formatos de cor são inferidos por bpp; máscaras e ordem de canais não são preservadas. Linux boot, Multiboot v1, 8/16/24 bpp e GPU física não receberam nova qualificação em runtime.
+O consumidor agora trata endereço físico não alinhado no caminho de bytes; o boot com tal endereço vindo do firmware ainda não foi qualificado e mmap dessas origens é recusado. Os formatos de cor são inferidos por bpp; máscaras e ordem de canais não são preservadas. Linux boot, Multiboot v1, 8/16/24 bpp e GPU física não receberam nova qualificação em runtime.
 
-No caminho gráfico faltam formato completo de cor, mapeamento com offset de página, apresentação DRM/input e integração GPUI↔kernel de ponta a ponta. No loader há agora [reserva virtual real testada](linux-module-compatibility.md), agora ligada ao replanejamento e à preparação de dados de uma fixture; já existe readback por mapping temporário somente em ktest de uma CPU; faltam mapping persistente de produção/SMP, proteção considerando o alias linear e chamada controlada de init. Readback de bytes não comprova cores, sincronização de apresentação ou FPS.
+No caminho gráfico faltam formato completo de cor, mmap de superfícies com offset de página, apresentação DRM/input e integração GPUI↔kernel de ponta a ponta. No loader há agora [reserva virtual real testada](linux-module-compatibility.md), agora ligada ao replanejamento e à preparação de dados de uma fixture; já existe readback por mapping temporário somente em ktest de uma CPU; faltam mapping persistente de produção/SMP, proteção considerando o alias linear e chamada controlada de init. Readback de bytes não comprova cores, sincronização de apresentação ou FPS.

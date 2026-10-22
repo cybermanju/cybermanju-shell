@@ -11,6 +11,7 @@ CONTRACT = "CYBERMANJU_FRAMEBUFFER_CONTRACT:PASS"
 BOUNDS = "CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24"
 CONSOLE = "CYBERMANJU_FRAMEBUFFER:console_flush:PASS cases=3 bytes=576 guard_bytes=8"
 SURFACE_VIEW = "CYBERMANJU_FRAMEBUFFER:surface_view:PASS cases=4 bytes=24 guard_bytes=8"
+UNALIGNED_SURFACE = "CYBERMANJU_FRAMEBUFFER:unaligned_surface:PASS offset=4093 bytes=24 guard_bytes=8"
 SUMMARY = re.compile(r"test result:\s*ok\.\s*(\d+) passed;\s*(\d+) failed;(?:\s*\d+ filtered out\.)?", re.I)
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
@@ -30,16 +31,17 @@ def verify(text, kind):
     bounds_count = sum(line.strip() == BOUNDS for line in lines)
     console_count = sum(line.strip() == CONSOLE for line in lines)
     surface_view_count = sum(line.strip() == SURFACE_VIEW for line in lines)
+    unaligned_surface_count = sum(line.strip() == UNALIGNED_SURFACE for line in lines)
     known_marker_lines = [line for line in lines if "CYBERMANJU_FRAMEBUFFER" in line]
-    if any(not (line.strip() in (CONTRACT, BOUNDS, CONSOLE, SURFACE_VIEW) or BOOT.fullmatch(line.strip()) or IO.fullmatch(line.strip())) for line in known_marker_lines):
+    if any(not (line.strip() in (CONTRACT, BOUNDS, CONSOLE, SURFACE_VIEW, UNALIGNED_SURFACE) or BOOT.fullmatch(line.strip()) or IO.fullmatch(line.strip())) for line in known_marker_lines):
         raise ValueError("unknown or malformed framebuffer marker")
     if kind == "contract":
-        if contract_count != 1 or boots or ios or bounds_count or console_count or surface_view_count:
+        if contract_count != 1 or boots or ios or bounds_count or console_count or surface_view_count or unaligned_surface_count:
             raise ValueError("expected exactly one contract marker and no hardware markers")
         scope = "framebuffer_boot_metadata_contract"
     elif kind == "hardware":
-        if contract_count or len(boots) != 1 or len(ios) != 1 or bounds_count != 1 or console_count != 1 or surface_view_count != 1:
-            raise ValueError("expected exactly one boot, io_readback, surface_bounds, console_flush and surface_view marker")
+        if contract_count or len(boots) != 1 or len(ios) != 1 or bounds_count != 1 or console_count != 1 or surface_view_count != 1 or unaligned_surface_count != 1:
+            raise ValueError("expected exactly one boot, io_readback, surface_bounds, console_flush, surface_view and unaligned_surface marker")
         w, h, bpp, pitch, nbytes = map(int, boots[0].groups())
         rows, rowbytes = map(int, ios[0].groups())
         umax = 2**64 - 1
@@ -53,7 +55,7 @@ def verify(text, kind):
     result = {"status": "passed", "kind": kind, "runtime_tests": 1, "failed": 0, "scope": scope}
     result.update(hardware_acceleration_verified=False, gpui_native_verified=False, physical_scanout_verified=False)
     if kind == "hardware":
-        result.update(fbdev_userspace_verified=False, mmap_tail_isolated=False)
+        result.update(fbdev_userspace_verified=False, mmap_tail_isolated=False, physical_offset_view_verified=True, bootloader_unaligned_framebuffer_verified=False, userspace_syscall_verified=False)
         result["framebuffer"] = {"width": w, "height": h, "bpp": bpp, "pitch": pitch, "bytes": nbytes, "rows": rows, "row_bytes": rowbytes}
         result["surface_bounds"] = {"cases": 6, "bytes": 24, "synthetic_subsurface": True}
         result["console_flush"] = {"cases": 3, "bytes": 576, "guard_bytes": 8, "synthetic_subsurface": True}
@@ -61,6 +63,8 @@ def verify(text, kind):
         result["surface_view_bytes"] = 24
         result["surface_view_guard_bytes"] = 8
         result["surface_view_verified"] = True
+        result["unaligned_surface_verified"] = True
+        result["unaligned_surface"] = {"offset": 4093, "bytes": 24, "guard_bytes": 8, "synthetic_mmio_origin": True}
     return result
 
 def main():

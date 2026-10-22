@@ -6,10 +6,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from verify_fbdev_runtime import FILEOPS, SCOPE, SURFACE, verify
+from verify_fbdev_runtime import FILEOPS, SCOPE, SURFACE, UNALIGNED_FILEOPS, verify
 
 SUMMARY = "test result: ok. 1 passed; 0 failed; 0 filtered out."
-LOG = "\n".join((SURFACE, FILEOPS, SCOPE, SUMMARY))
+LOG = "\n".join((SURFACE, FILEOPS, SCOPE, UNALIGNED_FILEOPS, SUMMARY))
 RUNNER = Path(__file__).with_name("test_framebuffer_runtime.sh").read_text()
 
 
@@ -19,6 +19,8 @@ class FbdevRuntimeTests(unittest.TestCase):
             "status": "passed", "scope": "fbdev_direct_fileops_only",
             "direct_fileops_verified": True, "userspace_syscall_verified": False,
             "mmap_tail_isolated": False, "fbdev_init_called": False,
+            "unaligned_fileops_verified": True, "unaligned_mmap_admission_rejected": True,
+            "mmap_userspace_verified": False,
             "linux_modules_executed": False,
             "surface": {"bytes": 24, "pitch": 12, "smem_len": 24, "mapping_larger": True},
             "read_cases": 4, "write_cases": 4, "guard_bytes": 8,
@@ -34,6 +36,7 @@ class FbdevRuntimeTests(unittest.TestCase):
     def test_mixed_extra_corrupt_duplicate_failure_and_cr_rejected(self):
         invalid = [
             LOG + "\n" + SURFACE,
+            LOG + "\n" + UNALIGNED_FILEOPS,
             LOG.replace(SURFACE, SURFACE + "\n" + "CYBERMANJU_FBDEV:extra:PASS"),
             LOG.replace("bytes=24", "bytes=25"),
             LOG.replace(SURFACE, "$ echo " + SURFACE),
@@ -43,6 +46,11 @@ class FbdevRuntimeTests(unittest.TestCase):
             LOG + "\nthread panicked at runtime.rs",
             LOG.replace("\n", "\r"),
             LOG + "\nCYBERMANJU_FBDEV:unknown:PASS",
+            LOG.replace(UNALIGNED_FILEOPS, UNALIGNED_FILEOPS.replace("cases=4", "cases=3")),
+            LOG.replace(UNALIGNED_FILEOPS, UNALIGNED_FILEOPS.replace("bytes=24", "bytes=25")),
+            LOG.replace(UNALIGNED_FILEOPS, UNALIGNED_FILEOPS.replace("mmap_rejected=true", "mmap_rejected=false")),
+            LOG.replace(UNALIGNED_FILEOPS + "\n", ""),
+            LOG.replace(UNALIGNED_FILEOPS, "$ echo " + UNALIGNED_FILEOPS),
         ]
         for text in invalid:
             with self.subTest(text=text), self.assertRaises(ValueError):
@@ -56,6 +64,12 @@ class FbdevRuntimeTests(unittest.TestCase):
         self.assertNotIn("kcmdline", boot)
         self.assertIn('CFG="$ROOT/tools/ci/fbdev-runtime.OSDK.toml"', RUNNER)
         self.assertIn("multiboot2 /boot/aster-core-osdk-bin earlycon --$", RUNNER)
+
+    def test_filtered_native_entry_runs_the_unaligned_fixture(self):
+        source = (Path(__file__).resolve().parents[2] / "asterinas/kernel/core/src/device/fb_runtime_tests.rs").read_text()
+        entry = source.split("fn cybermanju_fbdev_fileops_runtime()", 1)[1].split("fn cybermanju_fbdev_unaligned_fileops_runtime()", 1)[0]
+        self.assertIn("cybermanju_fbdev_unaligned_fileops_runtime();", entry)
+        self.assertEqual(source.count("#[ktest]"), 1)
 
     def test_runner_preserves_config_before_vdso_preflight_and_rejects_before_build(self):
         preserve = RUNNER.index("trap 'if cmp -s")

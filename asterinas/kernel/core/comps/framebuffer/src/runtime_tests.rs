@@ -5,7 +5,7 @@ use alloc::{sync::Arc, vec::Vec};
 use ostd::{
     Error,
     boot::boot_info,
-    mm::{HasPaddr, HasSize, VmIo, VmReader, VmWriter},
+    mm::{HasPaddr, HasSize, PAGE_SIZE, VmIo, VmReader, VmWriter},
     prelude::*,
     sync::Mutex,
 };
@@ -167,6 +167,75 @@ fn cybermanju_framebuffer_runtime() {
     assert_eq!(&observed_view[8..], &[0x6d; 8]);
     fb.io_mem().write_bytes(16, &saved_view).unwrap();
     println!("CYBERMANJU_FRAMEBUFFER:surface_view:PASS cases=4 bytes=24 guard_bytes=8");
+
+    assert!(framebuffer::mmio_cover(0, 1).is_none());
+    assert!(framebuffer::mmio_cover(PAGE_SIZE, 0).is_none());
+    assert!(framebuffer::mmio_cover(usize::MAX - 4, 8).is_none());
+    assert!(framebuffer::mmio_cover(usize::MAX - 16, 1).is_none());
+    assert_eq!(
+        framebuffer::mmio_cover(PAGE_SIZE, PAGE_SIZE),
+        Some((PAGE_SIZE..2 * PAGE_SIZE, 0))
+    );
+    assert_eq!(
+        framebuffer::mmio_cover(PAGE_SIZE - 1, 2),
+        Some((0..2 * PAGE_SIZE, PAGE_SIZE - 1))
+    );
+    const OFFSET: usize = PAGE_SIZE - 3;
+    const SPAN: usize = 24;
+    const GUARD: usize = 8;
+    let shifted = framebuffer::FrameBuffer::test_subsurface_at(OFFSET, 2, 2, 12).unwrap();
+    assert_eq!(shifted.io_mem().paddr(), fb.io_mem().paddr() + OFFSET);
+    assert_eq!(shifted.surface_io_mem().size(), SPAN);
+    assert_ne!(shifted.io_mem().paddr() % PAGE_SIZE, 0);
+    let mut saved = [0; SPAN + 2 * GUARD];
+    fb.io_mem().read_bytes(OFFSET - GUARD, &mut saved).unwrap();
+    fb.io_mem()
+        .write_bytes(OFFSET - GUARD, &[0x6d; SPAN + 2 * GUARD])
+        .unwrap();
+    shifted.clear();
+    let mut observed = [0; SPAN + 2 * GUARD];
+    fb.io_mem()
+        .read_bytes(OFFSET - GUARD, &mut observed)
+        .unwrap();
+    assert_eq!(&observed[..GUARD], &[0x6d; GUARD]);
+    assert_eq!(&observed[GUARD..GUARD + SPAN], &[0; SPAN]);
+    assert_eq!(&observed[GUARD + SPAN..], &[0x6d; GUARD]);
+    shifted
+        .write_pixel_at(shifted.calc_offset(0, 0), shifted.render_pixel(first))
+        .unwrap();
+    shifted
+        .write_pixel_at(shifted.calc_offset(1, 1), shifted.render_pixel(second))
+        .unwrap();
+    assert!(matches!(
+        shifted.write_bytes_at(SPAN - 1, &[0xa1, 0xb2]),
+        Err(Error::InvalidArgs)
+    ));
+    let mut first_pixel = [0; 4];
+    let mut last_pixel = [0; 4];
+    shifted
+        .surface_io_mem()
+        .read_bytes(0, &mut first_pixel)
+        .unwrap();
+    shifted
+        .surface_io_mem()
+        .read_bytes(16, &mut last_pixel)
+        .unwrap();
+    assert_eq!(first_pixel, expected[..4]);
+    assert_eq!(last_pixel, expected[4..]);
+    fb.io_mem()
+        .read_bytes(OFFSET - GUARD, &mut observed)
+        .unwrap();
+    assert_eq!(&observed[..GUARD], &[0x6d; GUARD]);
+    assert_eq!(&observed[GUARD + SPAN..], &[0x6d; GUARD]);
+    fb.io_mem().write_bytes(OFFSET - GUARD, &saved).unwrap();
+    fb.io_mem()
+        .read_bytes(OFFSET - GUARD, &mut observed)
+        .unwrap();
+    assert_eq!(observed, saved);
+    println!(
+        "CYBERMANJU_FRAMEBUFFER:unaligned_surface:PASS offset={} bytes=24 guard_bytes=8",
+        OFFSET
+    );
 
     // Exercise the public console paths on a non-page-sized logical surface.
     // The original console allocated by the larger mapping and panicked here.

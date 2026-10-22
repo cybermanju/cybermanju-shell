@@ -55,6 +55,10 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
+## Hardware: origem de framebuffer não é compatibilidade de módulo
+
+O ciclo acrescenta cobertura MMIO alinhada com view deslocada da superfície e recusa de mmap de fbdev para origem física desalinhada. A prova usa uma subsuperfície sintética sobre MMIO VGA real em QEMU, não um driver `.ko`, nova GPU ou endereço desalinhado entregue pelo firmware. A [matriz gráfica](hardware-graphics-compatibility.md#origem-física-páginas-alinhadas-bytes-na-posição-correta) delimita as evidências. O loader, as fixtures, versões Linux e arquiteturas qualificadas nesta matriz não mudaram; nenhuma chamada de init/exit ou resolução de exports reais foi acrescentada.
+
 ## ISO: evidência separada do loader
 
 A [ISO da base `cecd1ce`](https://github.com/cybermanju/cybermanju-shell/actions/runs/39715117705) concluiu instalação UEFI e iniciou o kernel Asterinas instalado até `/init` e stage-2, mas falhou esperando login em `running activation script...`. Isso não executou `.ko`, lookup de exports Linux ou GPUI. O ciclo acrescenta tracing de ativação **opt-in, desligado por padrão**, habilitado apenas no guest CI descartável, preservando os gates de login/hello/desligamento. As provas e restrições estão na [matriz de hardware](hardware-graphics-compatibility.md#iso-instalada-boot-real-bloqueio-na-ativação). O ktest preparado passou novamente sem mudança no loader, em `artifacts/staging-0330/`; nenhuma arquitetura, versão Linux, ABI ou módulo novo foi qualificado.

@@ -8,7 +8,8 @@ IO = "CYBERMANJU_FRAMEBUFFER:io_readback:PASS rows=2 row_bytes=8"
 BOUNDS = "CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24"
 CONSOLE = "CYBERMANJU_FRAMEBUFFER:console_flush:PASS cases=3 bytes=576 guard_bytes=8"
 SURFACE_VIEW = "CYBERMANJU_FRAMEBUFFER:surface_view:PASS cases=4 bytes=24 guard_bytes=8"
-HARDWARE = (BOOT, IO, BOUNDS, CONSOLE, SURFACE_VIEW)
+UNALIGNED_SURFACE = "CYBERMANJU_FRAMEBUFFER:unaligned_surface:PASS offset=4093 bytes=24 guard_bytes=8"
+HARDWARE = (BOOT, IO, BOUNDS, CONSOLE, SURFACE_VIEW, UNALIGNED_SURFACE)
 
 
 def log(*evidence):
@@ -23,6 +24,8 @@ class RuntimeVerifierTests(unittest.TestCase):
             self.assertFalse(result[key])
         self.assertNotIn("surface_bounds", result)
         self.assertNotIn("console_flush", result)
+        with self.assertRaises(ValueError):
+            verify(log(UNALIGNED_SURFACE), "contract")
 
     def test_valid_hardware_exports_measurements(self):
         result = verify(log(*HARDWARE), "hardware")
@@ -31,9 +34,14 @@ class RuntimeVerifierTests(unittest.TestCase):
         self.assertEqual(result["console_flush"], {"cases": 3, "bytes": 576, "guard_bytes": 8, "synthetic_subsurface": True})
         self.assertEqual((result["surface_view_cases"], result["surface_view_bytes"], result["surface_view_guard_bytes"]), (4, 24, 8))
         self.assertTrue(result["surface_view_verified"])
+        self.assertEqual(result["unaligned_surface"], {"offset": 4093, "bytes": 24, "guard_bytes": 8, "synthetic_mmio_origin": True})
+        self.assertTrue(result["physical_offset_view_verified"])
+        self.assertFalse(result["bootloader_unaligned_framebuffer_verified"])
+        self.assertFalse(result["userspace_syscall_verified"])
         for key in ("fbdev_userspace_verified", "mmap_tail_isolated"):
             self.assertFalse(result[key])
-        self.assertTrue(all(v is False for k, v in result.items() if k.endswith("_verified") and k != "surface_view_verified"))
+        positive = {"surface_view_verified", "unaligned_surface_verified", "physical_offset_view_verified"}
+        self.assertTrue(all(v is (k in positive) for k, v in result.items() if k.endswith("_verified")))
 
     def test_surface_view_marker_required_exact_and_not_echoed(self):
         invalid = (
@@ -49,10 +57,24 @@ class RuntimeVerifierTests(unittest.TestCase):
             with self.subTest(evidence=evidence), self.assertRaises(ValueError):
                 verify(log(*evidence), "hardware")
 
+    def test_unaligned_surface_marker_exact_required_and_unique(self):
+        invalid = (
+            tuple(m for m in HARDWARE if m != UNALIGNED_SURFACE),
+            (*HARDWARE, UNALIGNED_SURFACE),
+            (*HARDWARE[:-1], UNALIGNED_SURFACE.replace("offset=4093", "offset=4092")),
+            (*HARDWARE[:-1], UNALIGNED_SURFACE.replace("bytes=24", "bytes=25")),
+            (*HARDWARE[:-1], UNALIGNED_SURFACE.replace("guard_bytes=8", "guard_bytes=7")),
+            (*HARDWARE[:-1], "$ echo " + UNALIGNED_SURFACE),
+            (*HARDWARE[:-1], "prefix " + UNALIGNED_SURFACE),
+        )
+        for evidence in invalid:
+            with self.subTest(evidence=evidence), self.assertRaises(ValueError):
+                verify(log(*evidence), "hardware")
+
     def test_missing_contradictory_duplicate_and_unknown_markers(self):
         invalid = [
             ((), "contract"), ((CONTRACT, CONTRACT), "contract"),
-            ((CONTRACT, *HARDWARE), "contract"), ((CONTRACT, BOUNDS), "contract"),
+            ((CONTRACT, *HARDWARE), "contract"), ((CONTRACT, BOUNDS), "contract"), ((CONTRACT, UNALIGNED_SURFACE), "contract"),
             ((CONTRACT, CONSOLE), "contract"), ((CONTRACT, SURFACE_VIEW), "contract"),
             ((*HARDWARE, CONTRACT), "hardware"),
             ((*HARDWARE, "CYBERMANJU_FRAMEBUFFER:other:PASS"), "hardware"),

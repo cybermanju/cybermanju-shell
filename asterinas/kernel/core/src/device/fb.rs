@@ -5,7 +5,7 @@ use aster_framebuffer::{
     pixel::PixelFormat,
 };
 use device_id::{DeviceId, MajorId, MinorId};
-use ostd::mm::{HasPaddr, HasSize, VmIo};
+use ostd::mm::{HasPaddr, HasSize, PAGE_SIZE, VmIo};
 
 use super::{Device, DeviceType, registry::char};
 use crate::{
@@ -213,14 +213,15 @@ mod ioctl_defs {
     // Reference: <https://elixir.bootlin.com/linux/v6.17/source/include/uapi/linux/fb.h#L13-L38>
 
     pub(super) type GetVarScreenInfo = ioc!(FBIOGET_VSCREENINFO, 0x4600, OutData<FbVarScreenInfo>);
-    pub(super) type PutVarScreenInfo = ioc!(FBIOPUT_VSCREENINFO, 0x4601, InOutData<FbVarScreenInfo>);
+    pub(super) type PutVarScreenInfo =
+        ioc!(FBIOPUT_VSCREENINFO, 0x4601, InOutData<FbVarScreenInfo>);
     pub(super) type GetFixScreenInfo = ioc!(FBIOGET_FSCREENINFO, 0x4602, OutData<FbFixScreenInfo>);
-    pub(super) type GetColorMap      = ioc!(FBIOGETCMAP,         0x4604, InData<FbCmapUser>);
-    pub(super) type PutColorMap      = ioc!(FBIOPUTCMAP,         0x4605, InData<FbCmapUser>);
+    pub(super) type GetColorMap = ioc!(FBIOGETCMAP, 0x4604, InData<FbCmapUser>);
+    pub(super) type PutColorMap = ioc!(FBIOPUTCMAP, 0x4605, InData<FbCmapUser>);
 
     // `NoData` is used below because they're not supported by efifb.
-    pub(super) type PanDisplay       = ioc!(FBIOPAN_DISPLAY,     0x4606, NoData);
-    pub(super) type Blank            = ioc!(FBIOBLANK,           0x4611, NoData);
+    pub(super) type PanDisplay = ioc!(FBIOPAN_DISPLAY, 0x4606, NoData);
+    pub(super) type Blank = ioc!(FBIOBLANK, 0x4611, NoData);
 }
 
 impl Device for Fb {
@@ -505,6 +506,12 @@ impl PerOpenFileOps for FbHandle {
     }
 
     fn mappable(&self, _request: FileMmapRequest) -> Result<MappableObject<'_>> {
+        if !self.framebuffer.io_mem().paddr().is_multiple_of(PAGE_SIZE) {
+            return_errno_with_message!(
+                Errno::EINVAL,
+                "unaligned framebuffer memory cannot be mmaped"
+            );
+        }
         Ok(MappableObject::Device(self as &dyn Mappable))
     }
 
@@ -557,6 +564,12 @@ impl PerOpenFileOps for FbHandle {
 impl Mappable for FbHandle {
     fn map(&self, offset: usize, mut handle: MapHandle) -> Result<Box<dyn MappedObject>> {
         let io_mem = self.framebuffer.io_mem();
+        if !io_mem.paddr().is_multiple_of(PAGE_SIZE) {
+            return_errno_with_message!(
+                Errno::EINVAL,
+                "unaligned framebuffer memory cannot be mmaped"
+            );
+        }
         let mapped_handle = Box::new(FbMapHandle);
 
         let io_mem_sliced = if offset >= io_mem.size() {

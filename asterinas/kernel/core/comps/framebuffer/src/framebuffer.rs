@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use alloc::{sync::Arc, vec::Vec};
+use core::ops::Range;
 
 use ostd::{
     Error, Result,
     boot::boot_info,
     io::IoMem,
-    mm::{CachePolicy, PAGE_SIZE, VmIo},
+    mm::{CachePolicy, HasPaddr, HasSize, PAGE_SIZE, VmIo},
     sync::Mutex,
 };
 use spin::Once;
@@ -75,11 +76,6 @@ pub(crate) fn init() {
         return;
     }
 
-    if framebuffer_arg.address % PAGE_SIZE != 0 {
-        ostd::error!("Framebuffer address is not page-aligned");
-        return;
-    }
-
     // FIXME: There are several pixel formats that have the same BPP. We lost the information
     // during the boot phase, so here we guess the pixel format on a best effort basis.
     let pixel_format = match framebuffer_arg.bpp {
@@ -100,28 +96,24 @@ pub(crate) fn init() {
         ostd::error!("Invalid framebuffer geometry or pitch");
         return;
     };
-    // Map full pages, but only clear the declared surface, not page-tail bytes.
-    let Some(fb_size) = byte_len
-        .checked_add(PAGE_SIZE - 1)
-        .map(|v| v & !(PAGE_SIZE - 1))
-    else {
-        ostd::error!("Framebuffer page rounding overflow");
-        return;
-    };
-    let Some(fb_end) = framebuffer_arg.address.checked_add(fb_size) else {
-        ostd::error!("Framebuffer physical range overflow");
+    // Reserve/map the entire aligned cover, retaining the logical physical origin.
+    let Some((cover, _)) = mmio_cover(framebuffer_arg.address, byte_len) else {
+        ostd::error!("Framebuffer page cover overflow");
         return;
     };
     let framebuffer = {
         let line_size = framebuffer_arg.pitch;
-        let fb_base = framebuffer_arg.address;
         // Use write-combining for framebuffer to enable faster write operations.
         // Write-combining allows the CPU to combine multiple writes into fewer bus transactions,
         // which is ideal for framebuffer access patterns (sequential writes).
-        let Ok(io_mem) =
-            IoMem::acquire_with_cache_policy(fb_base..fb_end, CachePolicy::WriteCombining)
+        let Ok(io_mem) = IoMem::acquire_with_cache_policy(cover, CachePolicy::WriteCombining)
         else {
             ostd::error!("Framebuffer MMIO range is unavailable");
+            return;
+        };
+
+        let Ok(io_mem) = slice_surface_mapping(&io_mem, framebuffer_arg.address, byte_len) else {
+            ostd::error!("Framebuffer MMIO cover does not match its surface");
             return;
         };
 
@@ -142,6 +134,25 @@ pub(crate) fn init() {
 
     framebuffer.clear();
     FRAMEBUFFER.call_once(|| Arc::new(framebuffer));
+}
+
+// Zero, arithmetic overflow and an unrepresentable page end fail before acquisition.
+fn mmio_cover(address: usize, byte_len: usize) -> Option<(Range<usize>, usize)> {
+    if address == 0 || byte_len == 0 {
+        return None;
+    }
+    let start = address & !(PAGE_SIZE - 1);
+    let end = address.checked_add(byte_len)?.checked_add(PAGE_SIZE - 1)? & !(PAGE_SIZE - 1);
+    Some((start..end, address - start))
+}
+
+// Use the same view construction in production and synthetic MMIO tests.
+fn slice_surface_mapping(mapping: &IoMem, address: usize, byte_len: usize) -> Result<IoMem> {
+    let (cover, offset) = mmio_cover(address, byte_len).ok_or(Error::InvalidArgs)?;
+    if mapping.paddr() != cover.start || mapping.size() != cover.len() {
+        return Err(Error::InvalidArgs);
+    }
+    Ok(mapping.slice(offset..cover.len()))
 }
 
 impl FrameBuffer {
@@ -165,8 +176,10 @@ impl FrameBuffer {
         self.byte_len
     }
 
-    /// Returns the raw page-rounded mapping, which may include a page tail
-    /// beyond the declared surface. Prefer [`Self::surface_io_mem`] for byte I/O.
+    /// View starting exactly at the physical framebuffer origin and extending
+    /// to the end of its page cover. It excludes leading bytes but may include
+    /// a page tail. Prefer [`Self::surface_io_mem`] for byte I/O. A non-page-aligned
+    /// origin is not suitable for page-granular mmap.
     pub fn io_mem(&self) -> &IoMem {
         &self.io_mem
     }
@@ -184,6 +197,17 @@ impl FrameBuffer {
     /// framebuffer if needed; never available in production or userspace.
     #[cfg(ktest)]
     pub fn test_subsurface(width: usize, height: usize, pitch: usize) -> Result<Self> {
+        Self::test_subsurface_at(0, width, height, pitch)
+    }
+
+    /// Offset-origin synthetic MMIO view; no new acquisition or physical device mode.
+    #[cfg(ktest)]
+    pub fn test_subsurface_at(
+        offset: usize,
+        width: usize,
+        height: usize,
+        pitch: usize,
+    ) -> Result<Self> {
         if FRAMEBUFFER.get().is_none() {
             init();
         }
@@ -192,11 +216,30 @@ impl FrameBuffer {
             .checked_mul(parent.pixel_format.nbytes())
             .ok_or(Error::InvalidArgs)?;
         let byte_len = pitch.checked_mul(height).ok_or(Error::InvalidArgs)?;
-        if width == 0 || height == 0 || pitch < row_len || byte_len > parent.byte_len {
+        let end = offset.checked_add(byte_len).ok_or(Error::InvalidArgs)?;
+        if width == 0 || height == 0 || pitch < row_len || end > parent.byte_len {
             return Err(Error::InvalidArgs);
         }
+        let address = parent
+            .io_mem
+            .paddr()
+            .checked_add(offset)
+            .ok_or(Error::InvalidArgs)?;
+        let (cover, _) = mmio_cover(address, byte_len).ok_or(Error::InvalidArgs)?;
+        let start = cover
+            .start
+            .checked_sub(parent.io_mem.paddr())
+            .ok_or(Error::InvalidArgs)?;
+        let end = cover
+            .end
+            .checked_sub(parent.io_mem.paddr())
+            .ok_or(Error::InvalidArgs)?;
+        if end > parent.io_mem.size() {
+            return Err(Error::InvalidArgs);
+        }
+        let mapping = parent.io_mem.slice(start..end);
         Ok(Self {
-            io_mem: parent.io_mem.clone(),
+            io_mem: slice_surface_mapping(&mapping, address, byte_len)?,
             width,
             height,
             line_size: pitch,
