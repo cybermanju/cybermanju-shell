@@ -130,6 +130,8 @@ jobs:
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/module-mapping-smp-rejection --smp-rejection
       - name: Verify local global-TLB invalidation encoding, aggregation and stale readback (one CPU)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-global-runtime --tlb-global
+      - name: Verify remote TLB dispatch acknowledgements (two-CPU q35 TCG; no coherence claim)
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-remote-runtime --tlb-remote
       - name: Prepare real no-import .ko inside QEMU and verify all staged bytes (never call init)
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
       - name: Retain serial evidence and exact harness dependency resolution
@@ -154,6 +156,10 @@ jobs:
             artifacts/tlb-global-runtime/*.json
             artifacts/tlb-global-runtime/*.txt
             artifacts/tlb-global-runtime/harness-Cargo.*
+            artifacts/tlb-remote-runtime/*.log
+            artifacts/tlb-remote-runtime/*.json
+            artifacts/tlb-remote-runtime/*.txt
+            artifacts/tlb-remote-runtime/harness-Cargo.*
           retention-days: 7
           if-no-files-found: warn
 

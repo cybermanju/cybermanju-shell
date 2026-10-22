@@ -1,6 +1,8 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: o flush GLOBAL x86 agora preserva PGE e o estado de IRQ de entrada.** Um ktest reproduziu o efeito colateral anterior: PGE desabilitado voltava habilitado. Depois da correção passaram os dois estados de PGE e três contextos de verificação de IRQ, além das regressões de módulos e framebuffer. **Isso não habilita execução de módulos ou mapping SMP.**
+**Avanço mais recente: passou a prova de despacho e confirmação de pedidos TLB entre duas CPUs em QEMU.** Foram observados quatro lotes no CPU remoto e um no emissor, com dois lotes inclusivos GLOBAL no remoto. **Isso prova o caminho de pedidos/espera, não a coerência de traduções, liberação de frames ou suporte SMP do loader.**
+
+**Etapa anterior:** o flush GLOBAL x86 agora preserva PGE e o estado de IRQ de entrada. Um ktest reproduziu o efeito colateral anterior: PGE desabilitado voltava habilitado. Depois da correção passaram os dois estados de PGE e três contextos de verificação de IRQ, além das regressões de módulos e framebuffer. **Isso não habilita execução de módulos ou mapping SMP.**
 
 **Etapa anterior:** corrigida a agregação TLB que podia enfraquecer pedidos de invalidação GLOBAL ao atingir 32 páginas. O código agora preserva o pedido mais forte. Passaram testes de estado e sete leituras reais locais; **o TCG não distinguiu o controle que exclui GLOBAL**, portanto não há prova de comportamento equivalente em hardware físico ou de shootdown remoto.
 
@@ -25,7 +27,8 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | `linux-module-elf` | **120 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
 | **`linux-module-staging`** | **1 ktest** com bytes preparados, owner conjunto, 3 casos de ciclo de vida e readback pela base real em 10 páginas temporárias | Apenas ktest de uma CPU; sem mapping persistente/produção, syscalls ou init/exit |
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 7 cenários** bruto, incluindo owner, mapping temporário, colisão e tradução stale, mais o novo ktest com ELF e **15 testes host** | Mapping experimental só em ktest de uma CPU; sem execução, SMP ou W^X |
-| **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado, 7 readbacks, 2 estados PGE e 3 contextos IRQ em uma CPU | TCG não discrimina inclusive/exclusive; sem prova remota, benchmark ou hardware físico |
+| **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado, 7 readbacks, 2 estados PGE e 3 contextos IRQ em uma CPU | TCG não discrimina inclusive/exclusive; sem prova de coerência remota, benchmark ou hardware físico |
+| **OSTD TLB remoto: dispatch/ack** | 1 ktest em 2 CPUs; 4 casos, 4 lotes remotos + 1 local, 2 inclusivos GLOBAL; origem 0 → destino 1; 2 casos sem trabalho | Contadores pós-flush, sem aquecer/ler tradução remota; não prova coerência, reclaim, concorrência de emissores ou mapping SMP |
 | **Recusa SMP do protótipo OSTD** | 1 ktest, topologia real reportada de 2 CPUs, 3 chamadas válidas recusadas, 3 páginas de VA sem PTEs e faixa reutilizada após Drop | Somente bloqueio; não testa acesso concorrente, shootdown remoto, W^X ou init |
 | **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Primitiva sem frames/mapping; usada pela ponte de layout, sem garantia geral de alcance de relocations |
 | VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 GiB, BIOS/GRUB multiboot2; mapping positivo em 1 CPU e recusa em 2 CPUs | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
@@ -37,6 +40,20 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | **`cybermanju_noimports_fixture.ko` auxiliar** | Mesmo Linux/arquitetura, `nm -u` vazio; preparação com zero exports; copiada para 10 frames no ktest; init FUNC 4 bytes e exit FUNC 2 bytes identificados na inspeção compacta | Flags não padrão e objtool desviado nesse objeto; init/exit nunca chamados; segurança e ABI não demonstradas |
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
+
+## Pedidos TLB chegando ao outro CPU
+
+O [novo ktest](../asterinas/ostd/src/mm/tlb/remote_runtime.rs) usa o `TlbFlusher` real, não um callback substituto. Exige exatamente duas CPUs, sender IPI inicializado e IRQ habilitada para esperar. Fixa o emissor, drena IPIs anteriores ao baseline e observa contadores por CPU atualizados somente **depois** da invalidação de uma fila não vazia. Nesta VM a origem foi **CPU 0 e o destino CPU 1**. Os hooks e estáticos adicionais existem apenas em `ktest` x86-64; o runtime de produção não foi modificado.
+
+Quatro casos passaram: pedido de uma página só no remoto; flush inclusivo GLOBAL reutilizando o mesmo flusher; pedido misto local/remoto; promoção de range de 32 páginas para inclusivo GLOBAL no remoto. Resultaram **quatro lotes remotos, um local e dois globais remotos**. Os cinco lotes foram contabilizados com IRQ desabilitada durante a execução. Fila vazia e `sync` sem `dispatch` não executaram trabalho; esperas repetidas não reenviaram pedidos. Não foi instalado mapping de módulo nem chamado init.
+
+**Controle negativo:** substituir a drenagem real remota por descarte sem flush manteve o callback/ack de IPI, mas o contador ficou em zero quando o teste exigia um; o ktest falhou. O fonte foi restaurado e o teste positivo repetido. Essa checagem detecta o callback vazio, mas **não mede o efeito de cada instrução TLB no cache**. Não foi aquecida ou lida uma tradução no remoto e nenhum frame foi reciclado. O teste não é bidirecional nem um stress concorrente; contadores são globais à VM de teste, que roda um único ktest filtrado sem workload concorrente. Outros flushes durante a janela poderiam contaminar os deltas e causar falha; a barreira inicial só drena trabalho anterior.
+
+O [gate serial](../tools/ci/verify_tlb_remote_runtime.py) exige três marcadores completos únicos, IDs distintos em `[0,2)` e um único resumo `1 passed; 0 failed`. O JSON marca callback observado, mas mantém `remote_translation_coherence_verified`, `frames_reclaimed_verified`, `smp_mapping_supported`, `linux_modules_executed`, `init_called` e `pages_mapped` como **false**. Rejeita contagens/claims alterados, panic/FAIL, echo, marcadores extras e controles inesperados. O runner invalida sucesso anterior também ao recusar modos conflitantes; regressões detectaram as lacunas antes da correção. A etapa/artefatos foram acrescentados ao job de runtime existente, preservando **sete jobs**.
+
+Passaram **160 testes Python e cinco ktests em VMs separadas**: remoto, GLOBAL local, recusa SMP, staging bruto e fixture preparada. Type-check de produção de OSTD/ponte/framebuffer para `x86_64-unknown-none`, rustfmt, sintaxe e diff passaram. Regressões nativas em `artifacts/tlb-local-2100/`, `artifacts/tlb-smp-rejection-2100/`, `artifacts/staging-2100/` e `artifacts/prepared-2100/`.
+
+Serial, JSON, dependências e hashes em `artifacts/tlb-remote-runtime/`; negativo em `artifacts/tlb-remote-drop-negative/`; logs em `artifacts/cycle-2100/`. **Próximo passo:** uma prova de bytes com tradução remota antiga aquecida, preservando os dois frames até a invalidação e confirmação; depois validar liberação diferida. O loader continua recusando mapping em duas CPUs. Lista de módulos, Linux `6.8.0-147-generic`, arquitetura x86-64 e limites W^X/alias/ABI permanecem inalterados. Não há nova validação de hardware físico, GPUI ou boot instalado.
 
 ## Flush GLOBAL sem alterar a configuração da CPU
 
@@ -217,6 +234,7 @@ bash tools/ci/test_module_staging_runtime.sh artifacts/linux-module-runtime
 bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --address-reservation
 bash tools/ci/test_module_staging_runtime.sh artifacts/module-smp-rejection-runtime --smp-rejection
 bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-global-runtime --tlb-global
+bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-remote-runtime --tlb-remote
 bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
 (cd asterinas && cargo check --locked -p ostd -p linux-module-staging --target x86_64-unknown-none)
 bash tools/ci/test_linux_module_elf.sh
@@ -239,6 +257,8 @@ O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) agora preserva pedidos GLOBAL
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
+
+O [CI da base `ea1243d`, run 39694611534](https://github.com/cybermanju/cybermanju-shell/actions/runs/39694611534), **passou nos sete jobs**. A [ISO dessa base, run 39694611455](https://github.com/cybermanju/cybermanju-shell/actions/runs/39694611455), estava **em andamento** na consulta inicial; não foi cancelada por esta rodada. A prova remota é posterior e aguarda seu próprio CI após publicação.
 
 O [CI da base `d997972`, run 39692176406](https://github.com/cybermanju/cybermanju-shell/actions/runs/39692176406), **passou nos sete jobs**, incluindo o novo teste TLB e framebuffer. Sua ISO estava pendente na consulta inicial. A preservação de PGE/IRQ é uma revisão posterior validada localmente; a aprovação anterior não a qualifica automaticamente.
 

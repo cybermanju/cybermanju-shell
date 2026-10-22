@@ -6,6 +6,7 @@ OUT=${1:-"$ROOT/artifacts/linux-module-runtime"}
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 printf '{"status":"not_verified","linux_modules_executed":false}\n' > "$OUT/result.json"
+if (( $# > 2 )); then echo 'Runtime modes are mutually exclusive' >&2; exit 2; fi
 CONFIG_TEMPLATE="$ROOT/tools/ci/module-staging-runtime.OSDK.toml"
 CPUS=1
 case ${2:-} in
@@ -41,6 +42,14 @@ case ${2:-} in
         CRATE_PATH=ostd
         FILTER=cybermanju_tlb_global_runtime
         VERIFY=verify_tlb_global_runtime.py
+        ;;
+    --tlb-remote)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_tlb_remote_runtime
+        VERIFY=verify_tlb_remote_runtime.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/tlb-remote-runtime.OSDK.toml"
+        CPUS=2
         ;;
     *) echo 'Unknown runtime mode' >&2; exit 2 ;;
 esac

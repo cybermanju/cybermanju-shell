@@ -263,6 +263,12 @@ impl TlbFlushOp {
 // The queues of pending requests on each CPU.
 cpu_local! {
     static FLUSH_OPS: SpinLock<OpsStack, LocalIrqDisabled> = SpinLock::new(OpsStack::new());
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    static COMPLETED_BATCHES: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    static COMPLETED_GLOBAL_BATCHES: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    static IRQ_DISABLED_BATCHES: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
 }
 
 fn do_remote_flush() {
@@ -386,6 +392,10 @@ impl OpsStack {
             });
         }
 
+        #[cfg(all(ktest, target_arch = "x86_64"))]
+        if !self.is_empty() {
+            remote_runtime::record_completed(self.need_flush_all() && self.need_flush_global);
+        }
         self.clear_without_flush();
     }
 
@@ -417,3 +427,7 @@ impl Drop for OpsStack {
 #[cfg(all(ktest, target_arch = "x86_64"))]
 #[path = "tlb/runtime_tests.rs"]
 mod runtime_tests;
+
+#[cfg(all(ktest, target_arch = "x86_64"))]
+#[path = "tlb/remote_runtime.rs"]
+mod remote_runtime;
