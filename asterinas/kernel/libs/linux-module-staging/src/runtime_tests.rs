@@ -1147,3 +1147,5 @@ fn relative32_reservation_runtime(envelope: usize, mut limits: PreparationLimits
         "CYBERMANJU_PREPARED_RUNTIME:relative32_reservation:PASS kinds=2 occupied_candidates=2 staged_cases=2 rejection_cases=8 reclaimed_cases=4 attempts_bounded=true reserved_near_text=false mapping=false execution=false"
     );
 }
+
+mod near_text;

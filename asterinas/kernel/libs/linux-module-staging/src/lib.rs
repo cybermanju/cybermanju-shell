@@ -22,6 +22,10 @@ use ostd::mm::{
 mod reserved;
 #[cfg(target_arch = "x86_64")]
 pub use reserved::{PreparationLimits, ReservedModuleLayout, ReservedPreparedModule};
+#[cfg(target_arch = "x86_64")]
+mod near_text;
+#[cfg(target_arch = "x86_64")]
+pub use near_text::{NearTextModuleLayout, NearTextPreparedModule};
 
 /// A failed transfer never returns a partially staged owner.
 #[derive(Debug)]
@@ -34,7 +38,7 @@ pub enum Error {
     Resources,
     /// The initialized OSTD allocator or frame copy returned an error.
     Frames(ostd::Error),
-    /// The shared VMALLOC allocator could not reserve the virtual range.
+    /// A VMALLOC or near-text virtual reservation could not be claimed.
     AddressSpace(ostd::Error),
 }
 

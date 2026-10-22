@@ -1,0 +1,153 @@
+// SPDX-License-Identifier: MPL-2.0
+
+//! Fixed-base planning and data-only staging in the x86 near-text address pool.
+
+use core::ops::Range;
+
+use linux_module_elf::{Export, Layout, SymbolResolver, page_layout_span_bound, plan_page_layout};
+use ostd::mm::{
+    PAGE_SIZE, Vaddr, module_address::NearTextAddressReservation, module_staging::ModuleStaging,
+};
+
+use crate::{Error, PreparationLimits, stage_prepared};
+
+/// Owns a near-kernel-text virtual reservation and the layout planned at its base.
+///
+/// Reserved virtual coordinates are not aliases of the staged frames: staging
+/// continues to use OSTD's existing linear frame aliases. This type neither
+/// prepares payload nor authorizes execution. Exports are numeric symbol values,
+/// not an ABI certificate. Input bytes are borrowed only during each operation;
+/// changing them between construction and preparation causes preparation to
+/// revalidate the input structurally, but does not provide cryptographic
+/// authentication. Existing allocator bookkeeping OOM is outside `Result`.
+pub struct NearTextModuleLayout {
+    layout: Layout,
+    reservation: NearTextAddressReservation,
+}
+
+impl NearTextModuleLayout {
+    /// Reserve and preflight a fixed base; there is no search or fallback.
+    ///
+    /// ELF/envelope validation occurs before the claim. After claiming, the
+    /// layout is replanned and all relocations are resolved and checked for
+    /// arithmetic reach under `max_entries` before an owner is returned; missing
+    /// exports and unsupported relocation reach therefore release the claim.
+    /// `max_pages` is a checked 4 KiB page budget including alignment gaps and
+    /// tails, and `max_sections` bounds layout bookkeeping. This constructor does
+    /// not prepare payload or allocate frames. OOM in existing reservation
+    /// bookkeeping is not recoverable through this `Result`.
+    pub fn new_at(
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        base: Vaddr,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+    ) -> Result<Self, Error> {
+        if PAGE_SIZE != 4096 {
+            return Err(Error::UnsupportedPageSize);
+        }
+        let max_span = max_pages
+            .checked_mul(PAGE_SIZE)
+            .ok_or(Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        let bound =
+            page_layout_span_bound(bytes, max_span as u64, max_sections).map_err(Error::Plan)?;
+        let span = usize::try_from(bound)
+            .map_err(|_| Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        if span == 0 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+
+        let reservation = NearTextAddressReservation::new_at(base, span, max_pages)
+            .map_err(Error::AddressSpace)?;
+        let layout =
+            plan_page_layout(bytes, base as u64, bound, max_sections).map_err(Error::Plan)?;
+        if layout.span() == 0 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+        let resolver = SymbolResolver::new(bytes, &layout, exports).map_err(Error::Plan)?;
+        resolver
+            .check_relocation_reach(max_entries)
+            .map_err(Error::Plan)?;
+        Ok(Self {
+            layout,
+            reservation,
+        })
+    }
+
+    /// Layout planned at the owned near-text base; not a mapping certificate.
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+
+    /// Entire exact virtual reservation, not a location for staging frame aliases.
+    pub fn range(&self) -> Range<Vaddr> {
+        self.reservation.range()
+    }
+
+    /// Revalidate, resolve and prepare the supplied bytes, then copy them to private frames.
+    ///
+    /// Consumes this owner on success or error. Preparation repeats ELF, symbol,
+    /// relocation, payload, RELA-entry and section-limit checks against the current
+    /// input. Any failure drops the reservation and all acquired frames; no partial
+    /// owner escapes. This is structural validation, not cryptographic authentication,
+    /// and creates no mapping, permission guarantee, pointer or execution capability.
+    pub fn prepare_and_stage(
+        self,
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        limits: PreparationLimits,
+    ) -> Result<NearTextPreparedModule, Error> {
+        let prepared = SymbolResolver::new(bytes, &self.layout, exports)
+            .map_err(Error::Plan)?
+            .prepare_module(
+                limits.max_payload_bytes,
+                limits.max_relocation_entries,
+                limits.max_sections,
+            )
+            .map_err(Error::Plan)?;
+        let staged = stage_prepared(&prepared, &self.layout, limits.max_pages, limits.max_chunks)?;
+        Ok(NearTextPreparedModule {
+            layout: self.layout,
+            staging: staged,
+            reservation: self.reservation,
+        })
+    }
+}
+
+/// Data-only staged frames coupled to their near-text reservation.
+///
+/// Fields are deliberately ordered so frame handles are dropped before the
+/// reserved virtual range. Neither field exposes a mapping or pointer.
+pub struct NearTextPreparedModule {
+    layout: Layout,
+    staging: ModuleStaging,
+    reservation: NearTextAddressReservation,
+}
+
+impl NearTextPreparedModule {
+    /// Metadata only; this does not transfer reservation ownership.
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+
+    /// Exact reserved virtual interval; staging frames remain accessed via linear aliases.
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.reservation.range()
+    }
+
+    /// Actual staged byte span, including layout gaps and tails.
+    pub fn span(&self) -> usize {
+        self.staging.span()
+    }
+
+    /// Number of private staging pages, not reserved virtual pages.
+    pub fn page_count(&self) -> usize {
+        self.staging.page_count()
+    }
+
+    /// Read staged data without exposing a pointer or mapping.
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.staging.read_bytes(offset, out)
+    }
+}
