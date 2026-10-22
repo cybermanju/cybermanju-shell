@@ -5,6 +5,7 @@ The live installer kernel is Linux. Only the subsequently installed system is
 Asterinas. Installation is online and uses the configured Nix binary caches.
 """
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -20,15 +21,36 @@ from vm_settings import TIMEOUTS, settings
 from boot_metrics import timed_phase
 
 
+INSTALLER_PHASES = rb"(?:build-system|install-system|prune-generations|collect-garbage)"
+
+
+def parse_installer_phase(line):
+    begin = re.fullmatch(rb"CYBERMANJU_INSTALL_PHASE:begin phase=(" + INSTALLER_PHASES + rb")", line)
+    if begin:
+        return {"name": begin[1].decode("ascii"), "event": "begin", "exit_status": None}
+    end = re.fullmatch(rb"CYBERMANJU_INSTALL_PHASE:end phase=(" + INSTALLER_PHASES + rb") status=([0-9]{1,3})", line)
+    if end and int(end[2]) <= 255:
+        return {"name": end[1].decode("ascii"), "event": "end", "exit_status": int(end[2])}
+    return None
+
+
 class Console:
     def __init__(self, process):
         self.process = process
         self.buffer = b""
         self.control_state = "text"
+        self.received_bytes = 0
+        self.last_output_at = None
+        self.phase_line_tail = b""
+        self.last_installer_phase = None
+        self.first_installer_failure = None
         self.selector = selectors.DefaultSelector()
         self.selector.register(process.stdout, selectors.EVENT_READ)
 
     def append_output(self, data):
+        if data:
+            self.received_bytes = getattr(self, "received_bytes", 0) + len(data)
+            self.last_output_at = time.monotonic()
         # Keep raw output in the logs, but match terminal-visible text. systemd
         # login emits OSC metadata immediately before the readiness marker.
         # State persists across reads: an escape may be split at any byte.
@@ -59,11 +81,24 @@ class Console:
                     self.control_state = "text"
                 elif byte != 0x1b:
                     self.control_state = "osc"
+        # Keep structured phase evidence even when verbose Nix output evicts it
+        # from the bounded console buffer. Parse complete visible lines only.
+        phase_lines = (getattr(self, "phase_line_tail", b"") + visible).split(b"\n")
+        self.phase_line_tail = phase_lines.pop()[-256:]
+        for line in phase_lines:
+            phase = parse_installer_phase(line.rstrip(b"\r"))
+            if phase is not None:
+                self.last_installer_phase = phase
+                if phase["event"] == "end" and phase["exit_status"] != 0 and getattr(self, "first_installer_failure", None) is None:
+                    self.first_installer_failure = phase
         self.buffer = (self.buffer + visible)[-1024 * 1024:]
 
-    def expect(self, pattern, seconds):
+    def expect(self, pattern, seconds, *, reject_installer_failure=False):
         deadline = time.monotonic() + seconds
         while True:
+            failure = getattr(self, "first_installer_failure", None)
+            if reject_installer_failure and failure is not None:
+                raise RuntimeError(f"Installer phase {failure['name']} failed (exit {failure['exit_status']})")
             match = re.search(pattern, self.buffer, re.MULTILINE)
             if match:
                 self.buffer = self.buffer[match.end():]
@@ -79,6 +114,26 @@ class Console:
             sys.stdout.buffer.write(data)
             sys.stdout.buffer.flush()
             self.append_output(data)
+
+    def write_failure_snapshot(self, path, error):
+        last_output = getattr(self, "last_output_at", None)
+        payload = {
+            "schema_version": 1,
+            "status": "diagnostic_only",
+            "error_type": type(error).__name__,
+            "error": str(error),
+            "launcher_returncode": self.process.poll(),
+            "observed_output_bytes": getattr(self, "received_bytes", 0),
+            "seconds_since_output": None if last_output is None else max(0, time.monotonic() - last_output),
+            "last_observed_installer_phase": getattr(self, "last_installer_phase", None),
+            "first_observed_installer_failure": getattr(self, "first_installer_failure", None),
+            "serial_tail": self.buffer[-8192:].decode("utf-8", errors="replace"),
+            "installation_verified": False,
+            "installed_boot_verified": False,
+        }
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2) + "\n")
 
     def send(self, command):
         self.process.stdin.write((command + "\n").encode())
@@ -145,14 +200,24 @@ def run(phase):
             with timed_phase(artifacts, f"{phase}-diagnostic-config", acceleration):
                 console.checked(activation_trace_config_command(), TIMEOUTS["ISO_VM_COMMAND_SECONDS"])
             with timed_phase(artifacts, f"{phase}-install", acceleration):
-                console.send(
-                    "aster-nixos-install --config /root/ci-configuration.nix "
-                    "--disk /dev/vda --force-format-disk"
-                )
-                console.expect(
-                    rb"^Congratulations! Asterinas NixOS has been installed successfully!\r?$",
-                    TIMEOUTS["ISO_VM_INSTALL_SECONDS"],
-                )
+                try:
+                    console.send(
+                        "aster-nixos-install --config /root/ci-configuration.nix "
+                        "--disk /dev/vda --force-format-disk"
+                    )
+                    console.expect(
+                        rb"^Congratulations! Asterinas NixOS has been installed successfully!\r?$",
+                        TIMEOUTS["ISO_VM_INSTALL_SECONDS"],
+                        reject_installer_failure=True,
+                    )
+                except (TimeoutError, RuntimeError, OSError) as error:
+                    # Diagnostic only: retain the original exception/gates. Do
+                    # not send commands, interrupt the guest or extend its wait.
+                    try:
+                        console.write_failure_snapshot(artifacts / "iso-install-failure-snapshot.json", error)
+                    except OSError as diagnostic_error:
+                        print(f"Could not save installation snapshot: {diagnostic_error}", file=sys.stderr)
+                    raise
             with timed_phase(artifacts, f"{phase}-verify-install", acceleration):
                 console.checked(
                     'test -b /dev/vda1 && test -b /dev/vda2 && '

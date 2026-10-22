@@ -4,6 +4,18 @@
 
 set -e
 
+# Run one installer phase while reporting its exact lifecycle on stderr.
+run_install_phase() {
+    local phase="$1"
+    shift
+    local status=0
+    # Separate markers from prompts or progress that did not end with newline.
+    printf '\nCYBERMANJU_INSTALL_PHASE:begin phase=%s\n' "$phase" >&2
+    "$@" || status=$?
+    printf '\nCYBERMANJU_INSTALL_PHASE:end phase=%s status=%s\n' "$phase" "$status" >&2
+    return "$status"
+}
+
 # Default values
 CONFIG_PATH=""
 DISK=""
@@ -168,7 +180,7 @@ NIXPKGS_PATH="@aster-nixpkgs@"
 # causing redundant downloads after every `make clean`.
 #
 # See: https://www.mankier.com/8/nixos-install#--system
-SYSTEM_CLOSURE=$(nix-build "${NIXPKGS_PATH}/nixos" -A system \
+SYSTEM_CLOSURE=$(run_install_phase build-system nix-build "${NIXPKGS_PATH}/nixos" -A system \
     --option extra-platforms "${NIX_SYSTEM}" \
     --argstr system "${NIX_SYSTEM}" \
     -I "nixos-config=${BUILD_DIR}/etc/nixos/configuration.nix" \
@@ -176,16 +188,16 @@ SYSTEM_CLOSURE=$(nix-build "${NIXPKGS_PATH}/nixos" -A system \
     --no-out-link)
 
 export PATH=${PATH}:/run/current-system/sw/bin
-nixos-install --root ${BUILD_DIR} --no-root-passwd \
+run_install_phase install-system nixos-install --root ${BUILD_DIR} --no-root-passwd \
     --system "${SYSTEM_CLOSURE}" \
     "${COMMON_NIX_ARGS[@]}"
 
 # Retain only the current system generation. Reusing the disk image otherwise
 # preserves old system closures in its Nix store after every installation.
 echo "Pruning obsolete installed system generations..."
-nix-env --store "${BUILD_DIR}" \
+run_install_phase prune-generations nix-env --store "${BUILD_DIR}" \
     -p "${BUILD_DIR}/nix/var/nix/profiles/system" \
     --delete-generations old
 echo "Collecting unreachable paths from the installed Nix store..."
-nix-store --store "${BUILD_DIR}" --gc
+run_install_phase collect-garbage nix-store --store "${BUILD_DIR}" --gc
 echo "Congratulations! Asterinas NixOS has been installed successfully!"

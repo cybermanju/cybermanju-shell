@@ -55,6 +55,10 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
+## Diagnóstico da instalação: não é carregamento de módulos
+
+O ciclo acrescenta fases/status de comandos e snapshot de falha da ISO, com 215 regressões host e pipe Bash real. A [matriz de hardware](hardware-graphics-compatibility.md#instalação-saber-onde-parou-sem-transformar-diagnóstico-em-sucesso) delimita que não houve instalação ou boot completo com a instrumentação nova, nem novo ktest neste ciclo. Corrige também uma interpretação anterior: a listagem de `nixos-install` por `command -v` não comprova execução; as cópias Nix antigas não identificam a fase. Nenhum `.ko` foi executado ou adicionado à matriz; arquitetura, versões Linux, exports, relocations e restrições SMP do loader permanecem inalterados.
+
 ## RGB565 e ISO: evidência separada dos módulos
 
 O ciclo corrige a ordem dos bytes RGB565 e acrescenta readback de sete cores por MMIO real com descritor sintético de 16 bpp; a [matriz gráfica](hardware-graphics-compatibility.md#rgb565-bytes-na-ordem-correta) delimita que o firmware segue 32 bpp e não houve qualificação de scanout 16 bpp. Também preserva a falha de instalação ISO 5dd5209: cópias Nix até o timeout de 3.600 segundos, sem causa interna demonstrada nem confirmação de instalação. Nenhuma destas evidências executa um `.ko`, altera relocations/exports ou amplia arquitetura, versão Linux e módulos realmente testados nesta matriz.
