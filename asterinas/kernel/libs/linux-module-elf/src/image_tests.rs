@@ -449,3 +449,104 @@ fn reach_diagnostics_count_none_when_locating_a_later_entry() {
         None
     );
 }
+
+#[test]
+fn r_x86_64_32s_accepts_valid_sign_extended_words_and_rejects_others() {
+    for (symbol, encoded) in [
+        (0, 0u32),
+        (i32::MAX as u64, i32::MAX as u32),
+        (0xffff_ffff_8000_0000, 0x8000_0000),
+        (u64::MAX, u32::MAX),
+    ] {
+        let mut b = fixture();
+        p64(&mut b, RELA1 + 8, (2u64 << 32) | 11);
+        let image = run(
+            &b,
+            &[Export {
+                name: b"missing",
+                value: symbol,
+            }],
+            36,
+            2,
+            4,
+        )
+        .unwrap();
+        assert_eq!(&image.sections()[0].bytes()[..4], &encoded.to_le_bytes());
+    }
+    for addend in [-1, i32::MIN as i64] {
+        let mut b = fixture();
+        p64(&mut b, RELA1 + 8, (2u64 << 32) | 11);
+        p64(&mut b, RELA1 + 16, addend as u64);
+        let image = run(
+            &b,
+            &[Export {
+                name: b"missing",
+                value: 0,
+            }],
+            36,
+            2,
+            4,
+        )
+        .unwrap();
+        assert_eq!(
+            &image.sections()[0].bytes()[..4],
+            &(addend as i32).to_le_bytes()
+        );
+    }
+    for (symbol, addend) in [
+        (0x0000_0000_8000_0000, 0),
+        (0, i32::MIN as i64 - 1),
+        (u64::MAX, 1),
+    ] {
+        let mut b = fixture();
+        p64(&mut b, RELA1 + 8, (2u64 << 32) | 11);
+        p64(&mut b, RELA1 + 16, addend as u64);
+        assert_eq!(
+            run(
+                &b,
+                &[Export {
+                    name: b"missing",
+                    value: symbol
+                }],
+                36,
+                2,
+                4
+            ),
+            Err(Error::RelocationOverflow)
+        );
+    }
+}
+
+#[test]
+fn r_32_and_pc32_keep_their_strict_unsigned_and_relative_ranges() {
+    let mut b = fixture();
+    p64(&mut b, RELA1 + 8, (2u64 << 32) | 10);
+    assert_eq!(
+        run(
+            &b,
+            &[Export {
+                name: b"missing",
+                value: 0x1_0000_0000
+            }],
+            36,
+            2,
+            4
+        ),
+        Err(Error::RelocationOverflow)
+    );
+    let mut b = fixture();
+    p64(&mut b, RELA1 + 8, (2u64 << 32) | 2);
+    assert_eq!(
+        run(
+            &b,
+            &[Export {
+                name: b"missing",
+                value: 0xffff_ffff_8000_0000
+            }],
+            36,
+            2,
+            4
+        ),
+        Err(Error::RelocationOverflow)
+    );
+}

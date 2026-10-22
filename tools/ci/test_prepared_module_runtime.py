@@ -23,6 +23,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true",
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2",
                     "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2",
+                    "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -52,6 +53,9 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertFalse(result["production_mapping_available"])
         self.assertFalse(result["wx_verified"])
         self.assertTrue(result["reservation_held_during_staging"])
+        self.assertTrue(result["signed32_absolute_sign_extension_verified"])
+        self.assertTrue(result["signed32_kernel_export_numeric_only"])
+        self.assertFalse(result["module_execution_verified"])
         self.assertEqual(result["reserved_layout"]["base"], "0xffffc00000000000")
         self.assertNotIn("linux_modules_loaded", result)
         for field in ("sections", "span", "payload", "relocations", "pages"):
@@ -104,6 +108,19 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
             self.evidence() + "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:FAIL rejection_cases=7 range_overflow=true reservation_released=true\n",
         ):
             with self.subTest(bad=bad[-110:]), self.assertRaises(ValueError):
+                verify(bad)
+
+    def test_signed32_absolute_marker_is_exact_and_mandatory(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false"
+        variants = [self.evidence().replace(marker + "\n", ""), self.evidence() + marker + "\n"]
+        variants += [self.evidence().replace(a, b) for a, b in [
+            ("accepted=2", "accepted=1"), ("rejected=3", "rejected=2"),
+            ("kernel_export_numeric=true", "kernel_export_numeric=false"),
+            ("execution=false", "execution=true"),
+            ("signed32_absolute:PASS", "signed32_absolute:FAIL"),
+        ]]
+        for bad in variants:
+            with self.subTest(log=bad[-120:]), self.assertRaises(ValueError):
                 verify(bad)
 
     def test_each_missing_marker_is_rejected(self):

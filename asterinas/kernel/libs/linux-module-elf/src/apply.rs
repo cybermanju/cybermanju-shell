@@ -351,10 +351,25 @@ fn encode_relocation(kind: u32, value: i128) -> Result<(usize, u64), Error> {
             4,
             u64::from(u32::try_from(value).map_err(|_| Error::RelocationOverflow)?),
         )),
-        2 | 4 | 11 => Ok((
+        2 | 4 => Ok((
             4,
             i32::try_from(value).map_err(|_| Error::RelocationOverflow)? as u32 as u64,
         )),
+        11 => {
+            // R_X86_64_32S stores the low word, but the ABI requires that
+            // sign-extending it reproduces the original 64-bit value. Keep
+            // mathematical negatives distinct from unsigned address aliases.
+            let bits = if value < 0 {
+                i64::try_from(value).map_err(|_| Error::RelocationOverflow)? as u64
+            } else {
+                u64::try_from(value).map_err(|_| Error::RelocationOverflow)?
+            };
+            let word = bits as u32;
+            if (word as i32 as i64 as u64) != bits {
+                return Err(Error::RelocationOverflow);
+            }
+            Ok((4, u64::from(word)))
+        }
         _ => Err(Error::UnsupportedRelocation),
     }
 }

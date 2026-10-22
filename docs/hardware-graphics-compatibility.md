@@ -1,5 +1,7 @@
 # Gráficos e hardware: o que já foi provado
 
+**Loader x86-64, sem nova qualificação gráfica:** a correção [R_X86_64_32S](linux-module-compatibility.md#r_x86_64_32s-endereços-altos-sem-truncação-cega) aceita somente endereços absolutos cujo word de 32 bits reconstrói exatamente o valor por sign-extension. A prova usa também um endereço real de função OSTD apenas como número em staging; não chama módulo ou GPU/GPUI. Não altera framebuffer, ISO ou versões/arquiteturas certificadas. A [ISO 347d3a9](https://github.com/cybermanju/cybermanju-shell/actions/runs/39749255907) estava construindo o instalador completo na consulta deste ciclo; não há novo resultado dos eventos/snapshot de instalação. O [CI da base](https://github.com/cybermanju/cybermanju-shell/actions/runs/39749256057) passou.
+
 **Diagnóstico de instalação:** o instalador agora emite início/término e status de quatro fases. O harness recusa imediatamente uma fase com falha e salva um snapshot diagnóstico em erro/timeout, sem aceitar fases bem-sucedidas como instalação concluída. Esta mudança foi testada em host e pipes Bash reais; **ainda não foi validada numa instalação ISO completa**.
 
 **RGB565 corrigido:** o encoder trocava a ordem dos dois bytes do pixel. A nova prova de MMIO detectou vermelho puro como `F8 00`, em vez de `00 F8`; a correção usa little-endian. A prova é de serialização e readback com descritor sintético de 16 bpp sobre a abertura VGA do QEMU em 32 bpp — não de scanout físico de 16 bpp.

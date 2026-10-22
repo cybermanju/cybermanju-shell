@@ -527,6 +527,96 @@ fn cybermanju_prepared_module_runtime() {
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2"
     );
+    // R_X86_64_32S accepts sign-extended high-half absolute addresses, unlike
+    // PC-relative relocations. The imported kernel address is data only.
+    let (signed_bytes, signed_name, signed_target, signed_offset) = relative_import_fixture(11);
+    let signed_owner =
+        ReservedModuleLayout::new(&signed_bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+            .unwrap();
+    let signed_range = signed_owner.range();
+    let signed_place = signed_owner
+        .layout()
+        .placements()
+        .iter()
+        .find(|p| p.section_index == signed_target)
+        .unwrap()
+        .address
+        .checked_add(signed_offset)
+        .unwrap();
+    let signed_relative = usize::try_from(signed_place - signed_owner.layout().base()).unwrap();
+    let kernel_code_address = ostd::cpu::num_cpus as *const () as usize as u64;
+    assert!(kernel_code_address >= 0xffff_ffff_8000_0000);
+    assert_ne!(kernel_code_address, 0xffff_ffff_8000_0000);
+    let accepted_values = [0xffff_ffff_8000_0000, kernel_code_address];
+    drop(signed_owner);
+    for value in accepted_values {
+        let signed_owner =
+            ReservedModuleLayout::new(&signed_bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        assert_eq!(signed_owner.range(), signed_range);
+        let exports = [Export {
+            name: signed_name,
+            value,
+        }];
+        assert_eq!(
+            SymbolResolver::new(&signed_bytes, signed_owner.layout(), &exports)
+                .unwrap()
+                .check_relocation_reach(65_536)
+                .unwrap(),
+            real_prepared.relocation_entries()
+        );
+        let staged = signed_owner
+            .prepare_and_stage(&signed_bytes, &exports, limits)
+            .unwrap();
+        let mut actual = [0; 4];
+        staged.read_bytes(signed_relative, &mut actual).unwrap();
+        assert_eq!(actual, (value as u32).to_le_bytes());
+        drop(staged);
+    }
+    let rejected_values = [
+        0x8000_0000,
+        0xffff_ffff_7fff_ffff,
+        signed_range.start as u64,
+    ];
+    for value in rejected_values {
+        let owner =
+            ReservedModuleLayout::new(&signed_bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        let range = owner.range();
+        assert_eq!(range, signed_range);
+        let exports = [Export {
+            name: signed_name,
+            value,
+        }];
+        let failure = SymbolResolver::new(&signed_bytes, owner.layout(), &exports)
+            .unwrap()
+            .diagnose_relocation_reach(65_536)
+            .unwrap_err();
+        assert_eq!(failure.cause, ElfError::RelocationOverflow);
+        assert_reach_site(&signed_bytes, failure, signed_target, signed_offset, 11);
+        assert_eq!(
+            SymbolResolver::new(&signed_bytes, owner.layout(), &exports)
+                .unwrap()
+                .check_relocation_reach(65_536),
+            Err(ElfError::RelocationOverflow)
+        );
+        assert!(matches!(
+            owner.prepare_and_stage(&signed_bytes, &exports, limits),
+            Err(Error::Plan(ElfError::RelocationOverflow))
+        ));
+        let probe =
+            ReservedModuleLayout::new(&signed_bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        assert_eq!(
+            probe.range(),
+            range,
+            "failed owner must release its reservation"
+        );
+        drop(probe);
+    }
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false"
+    );
     // No module bytes converted to function pointers and no ELF symbol called.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
 }
