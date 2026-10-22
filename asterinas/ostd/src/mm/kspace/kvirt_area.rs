@@ -77,6 +77,23 @@ impl KVirtReservation {
         Ok(Self { range })
     }
 
+    /// Claims an exact, unmapped range from the existing shared VMALLOC pool.
+    pub(crate) fn new_at(range: Range<Vaddr>) -> Result<Self, crate::Error> {
+        if range.start >= range.end
+            || !range.start.is_multiple_of(PAGE_SIZE)
+            || !range.end.is_multiple_of(PAGE_SIZE)
+            || range.start < super::VMALLOC_VADDR_RANGE.start
+            || range.end > super::VMALLOC_VADDR_RANGE.end
+        {
+            return Err(crate::Error::InvalidArgs);
+        }
+        let irq_guard = irq::disable_local();
+        kvirt_area_allocator(&irq_guard)
+            .alloc_specific(&range)
+            .map_err(|_| crate::Error::NoMemory)?;
+        Ok(Self { range })
+    }
+
     pub(crate) fn range(&self) -> Range<Vaddr> {
         self.range.clone()
     }

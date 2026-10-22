@@ -118,4 +118,69 @@ fn cybermanju_module_address_runtime() {
         reused.range().start,
         reused.range().end
     );
+
+    let reused_range = reused.range();
+    let requested_base = reused_range.start as usize;
+    let invalid_requests = [
+        (requested_base, 0, 2),
+        (requested_base, PAGE_SIZE + 1, 2),
+        (requested_base, 2 * PAGE_SIZE, 0),
+        (requested_base + 1, PAGE_SIZE, 1),
+        (usize::MAX & !(PAGE_SIZE - 1), 2 * PAGE_SIZE, 2),
+        (0, 2 * PAGE_SIZE, 2),
+        (
+            (crate::cpu::num_cpus as usize) & !(PAGE_SIZE - 1),
+            2 * PAGE_SIZE,
+            2,
+        ),
+        (VMALLOC_VADDR_RANGE.end - PAGE_SIZE, 2 * PAGE_SIZE, 2),
+    ];
+    for (base, span, budget) in invalid_requests {
+        assert!(matches!(
+            ModuleAddressReservation::new_at(base, span, budget),
+            Err(Error::InvalidArgs)
+        ));
+    }
+
+    assert!(matches!(
+        ModuleAddressReservation::new_at(requested_base, 2 * PAGE_SIZE, 2),
+        Err(Error::NoMemory)
+    ));
+    let occupied_by_kvirt = KVirtArea::map_frames(
+        PAGE_SIZE,
+        0,
+        core::iter::empty::<Frame<()>>(),
+        PageProperty {
+            flags: PageFlags::RW,
+            cache: CachePolicy::Writeback,
+            priv_flags: PrivilegedPageFlags::empty(),
+        },
+    );
+    let kvirt_range = occupied_by_kvirt.range();
+    assert!(matches!(
+        ModuleAddressReservation::new_at(kvirt_range.start as usize, PAGE_SIZE, 1),
+        Err(Error::NoMemory)
+    ));
+    drop(occupied_by_kvirt);
+    println!(
+        "CYBERMANJU_MODULE_ADDRESS:requested_validation:PASS cases={}",
+        invalid_requests.len()
+    );
+
+    drop(reused);
+    let requested = ModuleAddressReservation::new_at(requested_base, 2 * PAGE_SIZE, 2).unwrap();
+    let requested_range = requested.range();
+    assert_eq!(requested_range, reused_range);
+    assert_unmapped(&requested_range);
+    let conventional = ModuleAddressReservation::new(2 * PAGE_SIZE, 2).unwrap();
+    assert_disjoint(&requested_range, &conventional.range());
+    drop(conventional);
+    drop(requested);
+    let reclaimed = ModuleAddressReservation::new_at(requested_base, 2 * PAGE_SIZE, 2).unwrap();
+    assert_eq!(reclaimed.range(), reused_range);
+    assert_unmapped(&reclaimed.range());
+    println!(
+        "CYBERMANJU_MODULE_ADDRESS:requested_base:PASS start={:#x} end={:#x} pages=2 conflicts=2 releases=2 conventional_exclusion=1 unmapped=1",
+        requested_range.start, requested_range.end
+    );
 }

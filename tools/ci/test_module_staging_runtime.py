@@ -94,18 +94,22 @@ class AddressReservationTests(unittest.TestCase):
         self.second = (self.pool + 0x4000, self.pool + 0x7000)
         self.existing = (self.pool + 0x8000, self.pool + 0x9000)
 
-    def evidence(self, first=None, second=None, existing=None, pool=None, release=None):
+    def evidence(self, first=None, second=None, existing=None, pool=None, release=None,
+                 requested=None, requested_counts=(2, 2, 2, 1, 1), requested_cases=8):
         first, second, existing = first or self.first, second or self.second, existing or self.existing
         pool = pool or (self.pool, self.pool + 0x10000)
         release = release or first
+        requested = requested or release
         return "\n".join([
             "CYBERMANJU_MODULE_ADDRESS:validation:PASS cases=6",
+            f"CYBERMANJU_MODULE_ADDRESS:requested_validation:PASS cases={requested_cases}",
             "CYBERMANJU_MODULE_ADDRESS:reserve:PASS " + " ".join(
                 f"{key}=0x{value:x}" for key, value in zip(
                     ["first_start", "first_end", "second_start", "second_end", "existing_start", "existing_end", "pool_start", "pool_end"],
                     [*first, *second, *existing, *pool])),
             "CYBERMANJU_MODULE_ADDRESS:unmapped:PASS pages=6",
             f"CYBERMANJU_MODULE_ADDRESS:release:PASS start=0x{release[0]:x} end=0x{release[1]:x}",
+            f"CYBERMANJU_MODULE_ADDRESS:requested_base:PASS start=0x{requested[0]:x} end=0x{requested[1]:x} pages={requested_counts[0]} conflicts={requested_counts[1]} releases={requested_counts[2]} conventional_exclusion={requested_counts[3]} unmapped={requested_counts[4]}",
             "test result: ok. 1 passed; 0 failed; 7 filtered out.", ""])
 
     def test_complete_evidence_and_exact_scope(self):
@@ -113,6 +117,9 @@ class AddressReservationTests(unittest.TestCase):
         self.assertEqual((result["runtime_tests"], result["scenarios"], result["failed"]), (1, 4, 0))
         self.assertFalse(result["pages_mapped"])
         self.assertEqual(result["scope"], "vmalloc_reservation_only")
+        self.assertTrue(result["requested_base_reservation_verified"])
+        for flag in ("linux_modules_executed", "frames_allocated", "pages_mapped", "mapping_available", "wx_verified", "module_execution_verified", "near_text_allocation_available"):
+            self.assertFalse(result[flag])
         self.assertEqual(result["ranges"]["first"], {"start": hex(self.first[0]), "end": hex(self.first[1])})
         for value in result["ranges"].values():
             self.assertTrue(value["start"].startswith("0x") and value["end"].startswith("0x"))
@@ -137,13 +144,17 @@ class AddressReservationTests(unittest.TestCase):
 
     def test_required_markers_are_complete_unique_and_no_echo_or_malformed(self):
         evidence = self.evidence()
-        for marker in ["validation:PASS cases=6", "reserve:PASS", "unmapped:PASS pages=6", "release:PASS"]:
+        for marker in ["validation:PASS cases=6", "requested_validation:PASS cases=8", "reserve:PASS", "unmapped:PASS pages=6", "release:PASS", "requested_base:PASS"]:
             line = next(line for line in evidence.splitlines() if marker in line)
             for altered in [evidence.replace(line, ""), evidence + line + "\n", evidence.replace(line, "echo " + line)]:
                 with self.subTest(marker=marker, altered=altered[-100:]), self.assertRaises(ValueError):
                     verify_address(altered)
-        with self.assertRaises(ValueError):
-            verify_address(evidence.replace("cases=6", "cases=6 extra"))
+        for bad in [evidence.replace("cases=6", "cases=6 extra"),
+                    evidence.replace("requested_validation:PASS cases=8", "requested_validation:PASS cases=7"),
+                    evidence.replace("requested_base:PASS", "requested_base:FAIL"),
+                    evidence + "CYBERMANJU_MODULE_ADDRESS:requested_base:PASS start=0x0 end=0x2000 pages=2 conflicts=2 releases=2 conventional_exclusion=1 unmapped=1\n"]:
+            with self.assertRaises(ValueError):
+                verify_address(bad)
 
     def test_summary_panic_failure_and_zero_tests_rejected(self):
         for bad in [self.evidence().replace("1 passed", "0 passed"), self.evidence()+"test result: ok. 1 passed; 0 failed; 0 filtered out.\n", self.evidence()+"kernel panic\n"]:
@@ -168,6 +179,21 @@ class AddressReservationTests(unittest.TestCase):
         release = self.evidence(release=(self.first[0]+0x1000, self.first[1]+0x1000))
         for bad in (overlap, release):
             with self.assertRaises(ValueError):
+                verify_address(bad)
+
+    def test_requested_base_range_and_protocol_counts_are_verified(self):
+        bad_logs = [
+            self.evidence(requested=(self.pool + 0x2000, self.pool + 0x4000)),
+            self.evidence(requested=(0xffffbffffffffff000, 0xffffbffffffffff000 + 0x2000)),
+            self.evidence(requested=(self.pool + 0x1001, self.pool + 0x3001)),
+            self.evidence(requested_counts=(1, 2, 2, 1, 1)),
+            self.evidence(requested_counts=(2, 1, 2, 1, 1)),
+            self.evidence(requested_counts=(2, 2, 1, 1, 1)),
+            self.evidence(requested_counts=(2, 2, 2, 0, 1)),
+            self.evidence(requested_counts=(2, 2, 2, 1, 0)),
+        ]
+        for bad in bad_logs:
+            with self.subTest(marker=bad.splitlines()[-2]), self.assertRaises(ValueError):
                 verify_address(bad)
 
     def test_address_mode_preflight_preserves_config_and_invalidates_result(self):

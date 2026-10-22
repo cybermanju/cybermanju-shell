@@ -46,6 +46,27 @@ impl ModuleAddressReservation {
         })
     }
 
+    /// Reserves exactly `span` virtual bytes at the caller's requested `base`.
+    ///
+    /// The whole range must lie in the existing VMALLOC pool, with a page-aligned
+    /// base, nonzero page-aligned span, checked end and at most `max_pages` pages.
+    /// Invalid input returns InvalidArgs; any occupied byte returns NoMemory.
+    /// Uses the same locked allocator as ordinary reservations and KVirtArea,
+    /// never falls back to a different base, and Drop returns the exact range.
+    /// No search, frames, mapping, permission or TLB changes occur. In particular,
+    /// this cannot reserve an address near kernel text outside the VMALLOC pool.
+    /// Requires initialized OSTD/heap; bookkeeping has no fallible heap-OOM path.
+    /// Caller must replan/recheck the entire ELF at this base and retain the owner.
+    pub fn new_at(base: Vaddr, span: usize, max_pages: usize) -> Result<Self, Error> {
+        if span == 0 || !span.is_multiple_of(PAGE_SIZE) || span / PAGE_SIZE > max_pages {
+            return Err(Error::InvalidArgs);
+        }
+        let end = base.checked_add(span).ok_or(Error::InvalidArgs)?;
+        Ok(Self {
+            reservation: KVirtReservation::new_at(base..end)?,
+        })
+    }
+
     /// Real kernel virtual addresses, not proof that any byte is mapped.
     pub fn range(&self) -> Range<Vaddr> {
         self.reservation.range()
