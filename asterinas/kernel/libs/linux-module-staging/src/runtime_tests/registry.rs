@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Runtime coverage for the explicit OSTD export registry; never maps or executes.
-use alloc::{vec, vec::Vec};
+use alloc::{sync::Arc, vec, vec::Vec};
 
 use linux_module_elf::{Error as ElfError, SymbolResolver, plan_page_layout};
 use ostd::{
     cpu,
-    mm::{PAGE_SIZE, module_address::NearTextAddressReservation},
+    mm::{
+        PAGE_SIZE,
+        module_address::NearTextAddressReservation,
+        module_staging::fault_injection::{FaultMode, FaultStats},
+    },
     prelude::*,
 };
 
@@ -585,7 +589,108 @@ fn cybermanju_internal_exports_runtime() {
         "CYBERMANJU_INTERNAL_EXPORTS:budget:PASS rejected={} early_precedence={} reclaimed={} exact_limit_staged=1 pages=10 chunks={} compared={} pages_mapped=false",
         budget_rejected, early_precedence, budget_reclaimed, chunks, exact_compared
     );
+    // Injected backend-boundary failures use real frames, but are neither real OOM nor mapped pages.
+    // Counters are fresh per attempt; aggregate snapshots below audit exact cleanup.
+    let mut alloc_cases = 0;
+    let mut copy_cases = 0;
+    let mut total_acquired = 0;
+    let mut total_dropped = 0;
+    let mut successful_writes = 0;
+    let mut triggered_cases = 0;
+    let mut reclaimed = 0;
+    for n in [0, 1, 9] {
+        let stats = Arc::new(FaultStats::new());
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert!(matches!(
+            NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        let result = owner.prepare_and_stage_with_fault(
+            FIXTURE,
+            limits,
+            FaultMode::AllocateAfter(n),
+            &stats,
+        );
+        assert!(
+            matches!(result, Err(Error::Frames(ostd::Error::NoMemory))),
+            "fault allocation must not return a partial owner"
+        );
+        let snapshot = stats.snapshot();
+        assert!(snapshot.triggered);
+        assert_eq!(snapshot.acquired, n);
+        assert_eq!(
+            snapshot.dropped, n,
+            "fault allocation must release acquired frames"
+        );
+        assert_eq!(snapshot.writes, 0);
+        alloc_cases += 1;
+        total_acquired += snapshot.acquired;
+        total_dropped += snapshot.dropped;
+        triggered_cases += usize::from(snapshot.triggered);
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        reclaimed += 1;
+    }
+    for n in [0, 1] {
+        let stats = Arc::new(FaultStats::new());
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert!(matches!(
+            NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        let result =
+            owner.prepare_and_stage_with_fault(FIXTURE, limits, FaultMode::CopyAfter(n), &stats);
+        assert!(
+            matches!(result, Err(Error::Frames(ostd::Error::IoError))),
+            "fault copy must not return a partial owner"
+        );
+        let snapshot = stats.snapshot();
+        assert!(snapshot.triggered);
+        assert_eq!(snapshot.acquired, 10);
+        assert_eq!(
+            snapshot.dropped, 10,
+            "fault copy must release acquired frames"
+        );
+        assert_eq!(snapshot.writes, n);
+        copy_cases += 1;
+        total_acquired += snapshot.acquired;
+        total_dropped += snapshot.dropped;
+        successful_writes += snapshot.writes;
+        triggered_cases += usize::from(snapshot.triggered);
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        reclaimed += 1;
+    }
+    assert_eq!(
+        (
+            alloc_cases,
+            copy_cases,
+            total_acquired,
+            total_dropped,
+            successful_writes,
+            reclaimed
+        ),
+        (3, 2, 30, 30, 1, 5)
+    );
+    assert_eq!(triggered_cases, 5);
     println!(
-        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true"
+        "CYBERMANJU_INTERNAL_EXPORTS:fault:PASS alloc_cases=3 copy_cases=2 acquired=30 dropped=30 writes=1 reclaimed=5 real_frames=true production_hook=false actual_oom=false pages_mapped=false"
+    );
+    println!(
+        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true fault_cleanup=true"
     );
 }

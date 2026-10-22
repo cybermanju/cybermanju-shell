@@ -82,5 +82,44 @@ pub fn stage_prepared(
     ModuleStaging::new(plan.span(), &chunks, max_pages, max_chunks).map_err(Error::Frames)
 }
 
+/// Test-only staging adapter for deterministic OSTD allocation/copy fault tests.
+/// It duplicates only the bounded descriptor bridge; it does not simulate real
+/// allocator OOM and is not a production staging hook.
+#[cfg(all(ktest, target_arch = "x86_64"))]
+pub(crate) fn stage_prepared_with_fault(
+    module: &PreparedModule,
+    layout: &Layout,
+    max_pages: usize,
+    max_chunks: usize,
+    mode: ostd::mm::module_staging::fault_injection::FaultMode,
+    stats: &alloc::sync::Arc<ostd::mm::module_staging::fault_injection::FaultStats>,
+) -> Result<ModuleStaging, Error> {
+    if PAGE_SIZE != 4096 {
+        return Err(Error::UnsupportedPageSize);
+    }
+    let plan = module
+        .plan_staging(layout, max_pages, max_chunks)
+        .map_err(Error::Plan)?;
+    let mut chunks = Vec::new();
+    chunks
+        .try_reserve_exact(plan.chunks().len())
+        .map_err(|_| Error::Resources)?;
+    for chunk in plan.chunks() {
+        chunks.push(ModuleChunk {
+            offset: chunk.offset,
+            bytes: chunk.bytes,
+        });
+    }
+    ostd::mm::module_staging::fault_injection::stage_with_fault(
+        plan.span(),
+        &chunks,
+        max_pages,
+        max_chunks,
+        mode,
+        stats,
+    )
+    .map_err(Error::Frames)
+}
+
 #[cfg(all(ktest, target_arch = "x86_64"))]
 mod runtime_tests;

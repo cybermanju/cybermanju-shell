@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 
-from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, OWNER, PAGE, POOL_START, RESOLVER, verify
+from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, FAULT, OWNER, PAGE, POOL_START, RESOLVER, verify
 
 
 class InternalExportsTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class InternalExportsTests(unittest.TestCase):
                       f"span=40960 pages=10 payload=1721 relas=6 symbol=0xffffffff88010000 field={base+32:#x} "
                       "compared=40960 registry_match=true" for kind in (2, 4)]
         self.budget = "CYBERMANJU_INTERNAL_EXPORTS:budget:PASS rejected=5 early_precedence=2 reclaimed=8 exact_limit_staged=1 pages=10 chunks=10 compared=40960 pages_mapped=false"
-        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
+        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, FAULT, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
 
     def test_valid_registry_is_not_linux_abi(self):
         r = verify(self.evidence())
@@ -45,7 +45,7 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_unique_complete_ordered_markers(self):
         good = self.evidence()
-        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, COMPLETE]:
+        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, FAULT, COMPLETE]:
             for bad in (good.replace(marker + "\n", ""), good + marker + "\n", good.replace(marker, "echo " + marker)):
                 with self.assertRaises(ValueError): verify(bad)
         for bad in (good + "CYBERMANJU_OTHER:PASS\n", good.replace("kind=4", "kind=2"),
@@ -165,7 +165,7 @@ class InternalExportsTests(unittest.TestCase):
                           r["policy_budget_page_limit"], r["policy_budget_chunk_limit"],
                           r["policy_budget_compared_bytes"]), (5, 2, 8, 1, 10, 10, 40960))
         self.assertEqual(r["linux_admitted_exports"], 0)
-        for key in ("physical_allocator_failure_injected", "frame_copy_failure_injected", "linux_abi_verified",
+        for key in ("linux_abi_verified",
                     "module_execution_verified", "production_mapping_available", "smp_mapping_verified", "wx_verified"):
             self.assertIs(r[key], False)
 
@@ -194,6 +194,39 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_old_owner_evidence_does_not_prove_budgets(self):
         old = self.evidence().replace(self.budget + "\n", "").replace(" budget_checks=true", "")
+        with self.assertRaises(ValueError): verify(old)
+
+    def test_fault_cleanup_is_not_actual_oom_or_execution(self):
+        r = verify(self.evidence())
+        for key in ("policy_fault_cleanup_verified", "fault_backend_real_frames", "physical_allocator_failure_injected", "frame_copy_failure_injected"):
+            self.assertIs(r[key], True)
+        self.assertEqual((r["policy_fault_allocation_cases"], r["policy_fault_copy_cases"],
+                          r["policy_fault_acquired_handles"], r["policy_fault_dropped_handles"],
+                          r["policy_fault_successful_writes"], r["policy_fault_reclaimed_ranges"]), (3, 2, 30, 30, 1, 5))
+        self.assertEqual(r["linux_admitted_exports"], 0)
+        for key in ("actual_oom_observed", "hardware_write_failure_observed", "production_fault_hook_available",
+                    "linux_abi_verified", "linux_modules_executed", "pages_mapped", "production_mapping_available", "smp_mapping_verified", "wx_verified"):
+            self.assertIs(r[key], False)
+
+    def test_fault_counts_and_scope_are_exact(self):
+        good = self.evidence()
+        for old, new in [("alloc_cases=3", "alloc_cases=2"), ("copy_cases=2", "copy_cases=0"),
+                         ("acquired=30", "acquired=29"), ("dropped=30", "dropped=29"),
+                         ("writes=1", "writes=0"), ("reclaimed=5", "reclaimed=4"),
+                         ("real_frames=true", "real_frames=false"), ("production_hook=false", "production_hook=true"),
+                         ("actual_oom=false", "actual_oom=true"), ("fault_cleanup=true", "fault_cleanup=false")]:
+            with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+
+    def test_fault_marker_must_follow_budgets_before_cleanup(self):
+        good = self.evidence()
+        for index in (0, 1, 2, 3, 4, 5, 6, 8, 9):
+            lines = good.splitlines()
+            lines.remove(FAULT)
+            lines.insert(index, FAULT)
+            with self.subTest(index=index), self.assertRaises(ValueError): verify("\n".join(lines))
+
+    def test_old_budget_evidence_does_not_prove_fault_cleanup(self):
+        old = self.evidence().replace(FAULT + "\n", "").replace(" fault_cleanup=true", "")
         with self.assertRaises(ValueError): verify(old)
 
     def test_geometry_and_full_readback(self):

@@ -10,6 +10,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(all(ktest, target_arch = "x86_64"))]
+pub mod fault_injection;
+
 #[cfg(target_arch = "x86_64")]
 mod reserved;
 mod storage;

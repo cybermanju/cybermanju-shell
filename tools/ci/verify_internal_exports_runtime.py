@@ -18,8 +18,10 @@ OWNER = PREFIX + ("owner:PASS ctor_abi_rejections=2 ctor_unknown_rejections=2 pr
 BUDGET = re.compile(re.escape(PREFIX + "budget:PASS ") +
                     r"rejected=5 early_precedence=2 reclaimed=8 exact_limit_staged=1 pages=10 chunks=([0-9]+) "
                     r"compared=40960 pages_mapped=false")
+FAULT = PREFIX + ("fault:PASS alloc_cases=3 copy_cases=2 acquired=30 dropped=30 writes=1 reclaimed=5 "
+                  "real_frames=true production_hook=false actual_oom=false pages_mapped=false")
 COMPLETE = PREFIX + ("complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 "
-                     "compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true")
+                     "compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true fault_cleanup=true")
 STAGED = re.compile(re.escape(PREFIX + "staged:PASS ") +
                     r"kind=([0-9]+) base=(0x[0-9a-fA-F]+) reserved=([0-9]+) span=([0-9]+) "
                     r"pages=([0-9]+) payload=([0-9]+) relas=([0-9]+) symbol=(0x[0-9a-fA-F]+) "
@@ -34,15 +36,16 @@ def verify(text: str) -> dict:
     markers = [line for line in lines if "CYBERMANJU_" in line]
     staged = [m for line in markers if (m := STAGED.fullmatch(line))]
     budget = [m for line in markers if (m := BUDGET.fullmatch(line))]
-    if (len(markers) != 8 or markers.count(BEGIN) != 1 or markers.count(COMPLETE) != 1
+    if (len(markers) != 9 or markers.count(BEGIN) != 1 or markers.count(COMPLETE) != 1
             or markers.count(ADMISSION) != 1 or markers[1] != ADMISSION
-            or markers.count(RESOLVER) != 1 or markers[-4] != RESOLVER
-            or markers.count(OWNER) != 1 or markers[-3] != OWNER
-            or len(budget) != 1 or markers[-2] != budget[0][0]
+            or markers.count(RESOLVER) != 1 or markers[-5] != RESOLVER
+            or markers.count(OWNER) != 1 or markers[-4] != OWNER
+            or len(budget) != 1 or markers[-3] != budget[0][0]
+            or markers.count(FAULT) != 1 or markers[-2] != FAULT
             or len(staged) != 2 or [int(m[1]) for m in staged] != [2, 4]
-            or set(markers) != {BEGIN, ADMISSION, RESOLVER, OWNER, budget[0][0], COMPLETE, *(m[0] for m in staged)}
+            or set(markers) != {BEGIN, ADMISSION, RESOLVER, OWNER, budget[0][0], FAULT, COMPLETE, *(m[0] for m in staged)}
             or markers[0] != BEGIN or markers[-1] != COMPLETE):
-        raise ValueError("Expected unique ordered registry/ABI-rejection/PC32/PLT32/provider/owner/budget/cleanup markers")
+        raise ValueError("Expected unique ordered registry/ABI-rejection/PC32/PLT32/provider/owner/budget/fault/cleanup markers")
     chunks = int(budget[0][1])
     if not 0 < chunks <= 1024:
         raise ValueError("Invalid exact chunk budget for the bounded fixture layout")
@@ -89,7 +92,12 @@ def verify(text: str) -> dict:
         "policy_budget_early_precedence_cases": 2, "policy_budget_reclaimed_ranges": 8,
         "policy_budget_exact_limit_staged_cases": 1, "policy_budget_page_limit": 10,
         "policy_budget_chunk_limit": chunks, "policy_budget_compared_bytes": 40960,
-        "physical_allocator_failure_injected": False, "frame_copy_failure_injected": False,
+        "physical_allocator_failure_injected": True, "frame_copy_failure_injected": True,
+        "policy_fault_cleanup_verified": True, "policy_fault_allocation_cases": 3, "policy_fault_copy_cases": 2,
+        "policy_fault_acquired_handles": 30, "policy_fault_dropped_handles": 30,
+        "policy_fault_successful_writes": 1, "policy_fault_reclaimed_ranges": 5,
+        "fault_backend_real_frames": True, "production_fault_hook_available": False,
+        "actual_oom_observed": False, "hardware_write_failure_observed": False,
         "kernel_linux_export_lookup_available": False, "linux_abi_verified": False,
         "pages_mapped": False, "production_mapping_available": False, "module_execution_verified": False,
         "linux_modules_executed": False, "init_called": False, "wx_verified": False, "smp_mapping_verified": False,

@@ -114,6 +114,23 @@ impl PolicyNearTextModuleLayout {
         bytes: &[u8],
         limits: PreparationLimits,
     ) -> Result<PolicyNearTextPreparedModule, Error> {
+        self.prepare_and_stage_with(bytes, limits, stage_prepared)
+    }
+
+    fn prepare_and_stage_with<F>(
+        self,
+        bytes: &[u8],
+        limits: PreparationLimits,
+        stage: F,
+    ) -> Result<PolicyNearTextPreparedModule, Error>
+    where
+        F: FnOnce(
+            &linux_module_elf::PreparedModule,
+            &Layout,
+            usize,
+            usize,
+        ) -> Result<ModuleStaging, Error>,
+    {
         let span = usize::try_from(self.inner.layout.span())
             .map_err(|_| Error::Plan(linux_module_elf::Error::LayoutOverflow))?;
         if span / PAGE_SIZE > limits.max_pages
@@ -131,7 +148,7 @@ impl PolicyNearTextModuleLayout {
                 limits.max_sections,
             )
             .map_err(Error::Plan)?;
-        let staging = stage_prepared(
+        let staging = stage(
             &prepared,
             &self.inner.layout,
             limits.max_pages,
@@ -143,6 +160,21 @@ impl PolicyNearTextModuleLayout {
                 staging,
                 reservation: self.inner.reservation,
             },
+        })
+    }
+
+    /// Test-only injection point for exercising staging allocation/copy failures.
+    /// This does not simulate real allocator OOM or expose a production hook.
+    #[cfg(ktest)]
+    pub(crate) fn prepare_and_stage_with_fault(
+        self,
+        bytes: &[u8],
+        limits: PreparationLimits,
+        mode: ostd::mm::module_staging::fault_injection::FaultMode,
+        stats: &alloc::sync::Arc<ostd::mm::module_staging::fault_injection::FaultStats>,
+    ) -> Result<PolicyNearTextPreparedModule, Error> {
+        self.prepare_and_stage_with(bytes, limits, |module, layout, pages, chunks| {
+            crate::stage_prepared_with_fault(module, layout, pages, chunks, mode, stats)
         })
     }
 }
