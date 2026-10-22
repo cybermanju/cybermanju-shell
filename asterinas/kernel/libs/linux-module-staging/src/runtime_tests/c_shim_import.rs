@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Explicit C-shim import policy checks; data-only ELF preparation, never execution.
-use super::{FIXTURE, MAX_SECTIONS, MAX_SPAN, relative_import_fixture};
-use crate::{
-    CShimExportRegistry, Error, OSTD_NUM_CPUS_EXPORT_NAME, PolicyNearTextModuleLayout,
-    PreparationLimits,
-};
 use alloc::{sync::Arc, vec, vec::Vec};
+
 use linux_module_elf::{Error as ElfError, page_layout_span_bound};
 use ostd::{
     mm::{
@@ -14,6 +10,12 @@ use ostd::{
         module_staging::fault_injection::{FaultMode, FaultStats},
     },
     prelude::*,
+};
+
+use super::{FIXTURE, MAX_SECTIONS, MAX_SPAN, relative_import_fixture};
+use crate::{
+    CShimExportRegistry, Error, OSTD_NUM_CPUS_EXPORT_NAME, PolicyNearTextModuleLayout,
+    PreparationLimits,
 };
 
 fn rename_import(mut bytes: Vec<u8>, target: u16, offset: u64, name: &[u8]) -> Vec<u8> {
@@ -70,7 +72,7 @@ fn rename_import(mut bytes: Vec<u8>, target: u16, offset: u64, name: &[u8]) -> V
     panic!("fixture import RELA not found")
 }
 
-fn imported(kind: u32, name: &[u8]) -> (Vec<u8>, u16, u64) {
+pub(super) fn imported(kind: u32, name: &[u8]) -> (Vec<u8>, u16, u64) {
     let (bytes, _, target, offset) = relative_import_fixture(kind);
     (rename_import(bytes, target, offset, name), target, offset)
 }

@@ -158,6 +158,10 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/linux-c-abi-runtime --linux-c-abi
       - name: Verify opt-in C imports in real frames, policy revalidation and failure cleanup (no execution)
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/c-shim-import-runtime --c-shim-import
+      - name: Verify consuming ELF-to-lease handoff and mapped relocation bytes (data only)
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-runtime --elf-lease
+      - name: Verify ELF-to-persistent-lease handoff is denied on two CPUs
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-smp-runtime --elf-lease-smp
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -176,6 +180,14 @@ jobs:
             artifacts/c-shim-import-runtime/*.json
             artifacts/c-shim-import-runtime/*.txt
             artifacts/c-shim-import-runtime/harness-Cargo.*
+            artifacts/elf-lease-runtime/*.log
+            artifacts/elf-lease-runtime/*.json
+            artifacts/elf-lease-runtime/*.txt
+            artifacts/elf-lease-runtime/harness-Cargo.*
+            artifacts/elf-lease-smp-runtime/*.log
+            artifacts/elf-lease-smp-runtime/*.json
+            artifacts/elf-lease-smp-runtime/*.txt
+            artifacts/elf-lease-smp-runtime/harness-Cargo.*
             artifacts/module-address-runtime/*.log
             artifacts/module-address-runtime/*.json
             artifacts/module-address-runtime/*.txt

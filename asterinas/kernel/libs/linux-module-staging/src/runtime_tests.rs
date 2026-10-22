@@ -1155,3 +1155,5 @@ mod registry;
 mod signed32;
 
 mod signed32_search;
+
+mod elf_lease;

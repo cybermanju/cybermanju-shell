@@ -561,4 +561,155 @@ impl NearTextPreparedModule {
         self.staging
             .read_signed32_mapped_for_test(&mut self.reservation, offset, out)
     }
+
+    /// Consume staged frames and the reservation into OSTD's experimental,
+    /// persistent supervisor RW/NX signed-32 mapping. This is an ELF/data
+    /// mapping only: allocated pages are not made RX and ELF initializers are
+    /// not run. Physical W^X is not provided (the linear RW alias remains),
+    /// and OSTD refuses unsupported SMP/topology. This is not production-ready
+    /// module loading or execution authorization. On failure OSTD owns cleanup;
+    /// this owner is consumed and its remaining layout metadata is dropped.
+    #[cfg(target_arch = "x86_64")]
+    pub fn into_signed32_rw_nx(self) -> Result<NearTextMappedModule, ostd::Error> {
+        let Self {
+            layout,
+            staging,
+            reservation,
+        } = self;
+        let mapping = staging.map_signed32_rw_nx(reservation)?;
+        Ok(NearTextMappedModule { layout, mapping })
+    }
+
+    /// Test-only injected failure point for OSTD's mapping handoff.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(crate) fn into_signed32_rw_nx_with_fault_for_test(
+        self,
+        after: usize,
+        observed: &mut usize,
+    ) -> Result<NearTextMappedModule, ostd::Error> {
+        let Self {
+            layout,
+            staging,
+            reservation,
+        } = self;
+        let mapping =
+            staging.map_signed32_rw_nx_with_fault_for_test(reservation, after, observed)?;
+        Ok(NearTextMappedModule { layout, mapping })
+    }
+}
+
+/// Owned lease over ELF-staged data at the reserved signed-32 virtual address.
+///
+/// Every allocated page is mapped supervisor RW/NX; this does not create RX
+/// pages or run initializers. The existing linear RW aliases remain, so
+/// physical W^X is not established. OSTD refuses unsupported SMP/topology.
+/// The API is experimental and not production-ready module loading; it exposes
+/// no pointer, writes, execution capability, or constructor.
+#[cfg(target_arch = "x86_64")]
+pub struct NearTextMappedModule {
+    layout: Layout,
+    mapping: ostd::mm::module_staging::Signed32RwMapping,
+}
+
+#[cfg(target_arch = "x86_64")]
+impl NearTextMappedModule {
+    /// Layout metadata retained from the data-only ELF staging plan.
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+
+    /// Exact virtual interval owned by the persistent mapping.
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.mapping.reserved_range()
+    }
+
+    /// Number of bytes mapped, including layout gaps and tails.
+    pub fn span(&self) -> usize {
+        self.mapping.span()
+    }
+
+    /// Number of mapped staging pages.
+    pub fn page_count(&self) -> usize {
+        self.mapping.page_count()
+    }
+
+    /// Read mapped bytes without exposing a pointer or write capability.
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.mapping.read_bytes(offset, out)
+    }
+
+    /// Audit the lease's permissions and ownership in ktests only.
+    #[cfg(ktest)]
+    pub(crate) fn audit_for_test(
+        &self,
+    ) -> Result<ostd::mm::module_staging::Signed32LeaseAudit, ostd::Error> {
+        self.mapping.audit_for_test()
+    }
+}
+
+/// Fixed-policy counterpart of [`NearTextMappedModule`].
+#[cfg(target_arch = "x86_64")]
+pub struct PolicyNearTextMappedModule {
+    inner: NearTextMappedModule,
+}
+
+#[cfg(target_arch = "x86_64")]
+impl PolicyNearTextMappedModule {
+    /// Retained layout metadata.
+    pub fn layout(&self) -> &Layout {
+        self.inner.layout()
+    }
+
+    /// Exact virtual interval owned by the persistent mapping.
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.inner.reserved_range()
+    }
+
+    /// Number of bytes mapped, including layout gaps and tails.
+    pub fn span(&self) -> usize {
+        self.inner.span()
+    }
+
+    /// Number of mapped staging pages.
+    pub fn page_count(&self) -> usize {
+        self.inner.page_count()
+    }
+
+    /// Read mapped bytes without exposing a pointer or write capability.
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.inner.read_bytes(offset, out)
+    }
+
+    /// Audit the lease's permissions and ownership in ktests only.
+    #[cfg(ktest)]
+    pub(crate) fn audit_for_test(
+        &self,
+    ) -> Result<ostd::mm::module_staging::Signed32LeaseAudit, ostd::Error> {
+        self.inner.audit_for_test()
+    }
+}
+
+impl PolicyNearTextPreparedModule {
+    /// Consume staged data into the OSTD signed-32 RW/NX lease without changing
+    /// the retained fixed import-policy handoff. It does not certify ABI
+    /// completeness, execute initializers, establish physical W^X, or authorize
+    /// production module loading/execution; OSTD refuses unsupported topology.
+    #[cfg(target_arch = "x86_64")]
+    pub fn into_signed32_rw_nx(self) -> Result<PolicyNearTextMappedModule, ostd::Error> {
+        let inner = self.inner.into_signed32_rw_nx()?;
+        Ok(PolicyNearTextMappedModule { inner })
+    }
+
+    /// Test-only injected failure point for OSTD's mapping handoff.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(crate) fn into_signed32_rw_nx_with_fault_for_test(
+        self,
+        after: usize,
+        observed: &mut usize,
+    ) -> Result<PolicyNearTextMappedModule, ostd::Error> {
+        let inner = self
+            .inner
+            .into_signed32_rw_nx_with_fault_for_test(after, observed)?;
+        Ok(PolicyNearTextMappedModule { inner })
+    }
 }

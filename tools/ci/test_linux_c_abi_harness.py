@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 
-MODES = ("--linux-c-abi", "--c-shim-import")
+MODES = ("--linux-c-abi", "--c-shim-import", "--elf-lease", "--elf-lease-smp")
 
 
 class CAbiHarnessTests(unittest.TestCase):
@@ -68,7 +68,7 @@ class CAbiHarnessTests(unittest.TestCase):
                     'printf "fixture" > "$1/cybermanju_noimports_fixture.ko"\n'
                 )
                 (scripts / "test_module_staging_runtime.sh").write_text(
-                    '#!/usr/bin/env bash\nset -eu\ncase "$2" in --linux-c-abi|--c-shim-import) ;; *) exit 2 ;; esac\n'
+                    '#!/usr/bin/env bash\nset -eu\ncase "$2" in --linux-c-abi|--c-shim-import|--elf-lease|--elf-lease-smp) ;; *) exit 2 ;; esac\n'
                     '[[ -s "$CYBERMANJU_STAGING_FIXTURE" ]]\n'
                     'printf "%s\\n" "$2" > "$1/forwarded-mode.txt"\n'
                 )
