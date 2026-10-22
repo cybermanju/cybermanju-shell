@@ -1,7 +1,7 @@
 <!-- CyberManju OS — Persistent, app-local Home workspaces. Not Android Recents. -->
 <!-- Role: app-local Home UI only. Integrates: Vue and bounded persisted workspace state. -->
 <template>
-  <section ref="root" class="home-studio" :class="`identity-${state.theme}`" aria-label="Personal home workspaces" @pointerdown.stop="pointerStart" @pointermove.stop="pointerMove" @pointerup.stop="pointerEnd" @pointercancel.stop="cancelInteraction" @click.capture="guardClick" @touchstart.stop.passive="touchStart" @touchmove.stop="touchMove" @touchend.stop="touchEnd" @touchcancel.stop="cancelInteraction">
+  <section ref="root" class="home-studio" :class="`identity-${state.theme}`" aria-label="Personal home workspaces" @pointerdown.stop="pointerStart" @pointermove.stop="pointerMove" @pointerup.stop="pointerEnd" @pointercancel.stop="cancelInteraction" @click.capture="guardClick" @touchstart.stop.passive="touchStart" @touchmove.stop="touchMove" @touchend.stop="touchEnd" @touchcancel.stop="touchCancel">
     <div class="studio-heading">
       <div><span class="studio-kicker">YOUR ORBIT / {{ String(activeIndex + 1).padStart(2, '0') }}</span><h2>{{ activePage.title }}</h2></div>
       <div class="studio-tools"><button type="button" :aria-pressed="overview" aria-label="Eagle view of home workspaces" @click="overview = !overview"><AppIcon name="solar:widget-bold" :size="20" /></button><button ref="addButton" class="studio-add" type="button" aria-label="Add apps or widgets to home" @click="openPicker('apps')"><span aria-hidden="true">+</span></button></div>
@@ -212,6 +212,12 @@ function touchEnd(event: TouchEvent) {
 }
 function resetTouch() { gesture = null; dragging.value = null }
 function cancelInteraction() { blockedClick = true; pointers.clear(); if (gesture) gesture.cancelled = true; dragging.value = null }
+function touchCancel(event: TouchEvent) {
+  cancelInteraction()
+  // No touchend follows a terminal cancel. Keep partial cancellation latched,
+  // but release an ended session without re-enabling its compatibility click.
+  if (!event.touches.length) resetTouch()
+}
 watch([editing, overview, picker], () => { if (gesture || pointers.size) cancelInteraction() }, { flush: 'sync' })
 function visibilityChanged() { if (document.visibilityState !== 'visible') cancelInteraction() }
 onMounted(() => { window.addEventListener('blur', cancelInteraction); window.addEventListener('pointerup', pointerEnd); window.addEventListener('pointercancel', outsidePointerCancel); document.addEventListener('visibilitychange', visibilityChanged); if (androidApps.supported) void androidApps.refresh().catch(() => {}) })
