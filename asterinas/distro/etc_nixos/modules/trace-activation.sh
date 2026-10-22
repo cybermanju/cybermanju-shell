@@ -3,7 +3,7 @@
 # Build-time instrumentation for disposable diagnostic guests only.
 # Xtrace can expose activation arguments: never enable on configurations with secrets.
 set -euo pipefail
-[[ $# == 1 ]] || { echo 'Usage: trace-activation.sh ACTIVATE' >&2; exit 2; }
+[[ $# == 1 || $# == 6 ]] || { echo 'Usage: trace-activation.sh ACTIVATE [OBSERVER SHELL SLEEP PYTHON PATCHER]' >&2; exit 2; }
 source=$1
 [[ -s "$source" && -x "$source" ]] || { echo 'Missing executable activate' >&2; exit 1; }
 IFS= read -r shebang < "$source"
@@ -24,6 +24,11 @@ set -x
 TRACE
   tail -n +2 -- "$source"
 } > "$temporary"
+# Python is build-time only; no Python path is emitted into activate.
+# A rejected/changed upstream command leaves the original output untouched.
+if [[ $# == 6 ]]; then
+  "$5" "$6" "$temporary" "$2" "$3" "$4"
+fi
 bash -n "$temporary"
 chmod --reference="$source" "$temporary"
 mv -f -- "$temporary" "$source"

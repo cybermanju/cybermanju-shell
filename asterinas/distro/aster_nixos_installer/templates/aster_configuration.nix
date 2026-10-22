@@ -66,7 +66,7 @@
       trace-activation = lib.mkOption {
         type = lib.types.bool;
         default = false;
-        description = "Trace activation commands for disposable diagnostics only; may expose arguments/secrets.";
+        description = "Trace activation and bounded setup-etc process samples for disposable diagnostics only; may expose arguments/secrets; not boot proof.";
       };
       stage-2-hook = lib.mkOption {
         type = lib.types.str;

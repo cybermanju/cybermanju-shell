@@ -111,9 +111,11 @@ in
     ln -s ${initramfs}/initrd $out/initrd
   ''
     # activate is copied by upstream activatableSystemBuilderCommands.
-    # Append only tracing; keep the original core commands at their old priority.
+    # Append only opt-in diagnostics; keep original commands at their old priority.
     (lib.mkAfter (lib.optionalString config.aster_nixos.trace-activation ''
-      ${pkgs.runtimeShell} ${./trace-activation.sh} "$out/activate"
+      ${pkgs.runtimeShell} ${./trace-activation.sh} "$out/activate" \
+        ${./activation-observer.sh} ${pkgs.runtimeShell} ${pkgs.coreutils}/bin/sleep \
+        ${pkgs.python3}/bin/python3 ${./trace-activation-observer.py}
     ''))
   ];
   system.activationScripts.modprobe = lib.mkForce "";
