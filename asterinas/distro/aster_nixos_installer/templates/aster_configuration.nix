@@ -63,6 +63,11 @@
         default = "@aster-disable-systemd@";
         description = "Whether to disable systemd in stage 2 init.";
       };
+      trace-activation = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Trace activation commands for disposable diagnostics only; may expose arguments/secrets.";
+      };
       stage-2-hook = lib.mkOption {
         type = lib.types.str;
         default = "@aster-stage-2-hook@";

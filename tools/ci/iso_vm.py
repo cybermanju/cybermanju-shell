@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import selectors
+import shlex
 import signal
 import subprocess
 import sys
@@ -96,6 +97,20 @@ class Console:
             raise RuntimeError(f"Guest command failed (exit {status}): {command}")
 
 
+def activation_trace_config_command(source="/root/configuration.nix", destination="/root/ci-configuration.nix"):
+    # Embed the original module expression, not an absolute /root import that
+    # would break future evaluation after the installer copies it to /etc/nixos.
+    # Both files stay in the same directory, preserving relative Nix imports.
+    if Path(source).parent != Path(destination).parent or source == destination:
+        raise ValueError("CI config must be a distinct file in the original directory")
+    src, dst = shlex.quote(source), shlex.quote(destination)
+    return (f"test -s {src} && ( set -C; {{ "
+            "printf '%s\\n' '{ imports = [ ('; "
+            f"cat {src}; "
+            "printf '\\n%s\\n' ') ]; aster_nixos.trace-activation = true; }'; "
+            f"}} > {dst} ) && nix-instantiate --parse {dst} >/dev/null")
+
+
 def run(phase):
     root = Path(__file__).resolve().parents[2] / "asterinas"
     artifacts = root.parent / "artifacts"
@@ -127,9 +142,11 @@ def run(phase):
         if phase == "install":
             # This formats only the newly created disposable guest disk.
             # The same published ISO remains interactive on all real hardware.
+            with timed_phase(artifacts, f"{phase}-diagnostic-config", acceleration):
+                console.checked(activation_trace_config_command(), TIMEOUTS["ISO_VM_COMMAND_SECONDS"])
             with timed_phase(artifacts, f"{phase}-install", acceleration):
                 console.send(
-                    "aster-nixos-install --config /root/configuration.nix "
+                    "aster-nixos-install --config /root/ci-configuration.nix "
                     "--disk /dev/vda --force-format-disk"
                 )
                 console.expect(

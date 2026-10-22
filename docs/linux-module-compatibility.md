@@ -55,6 +55,10 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
 
+## ISO: evidência separada do loader
+
+A [ISO da base `cecd1ce`](https://github.com/cybermanju/cybermanju-shell/actions/runs/39715117705) concluiu instalação UEFI e iniciou o kernel Asterinas instalado até `/init` e stage-2, mas falhou esperando login em `running activation script...`. Isso não executou `.ko`, lookup de exports Linux ou GPUI. O ciclo acrescenta tracing de ativação **opt-in, desligado por padrão**, habilitado apenas no guest CI descartável, preservando os gates de login/hello/desligamento. As provas e restrições estão na [matriz de hardware](hardware-graphics-compatibility.md#iso-instalada-boot-real-bloqueio-na-ativação). O ktest preparado passou novamente sem mudança no loader, em `artifacts/staging-0330/`; nenhuma arquitetura, versão Linux, ABI ou módulo novo foi qualificado.
+
 ## Saber qual relocation bloqueou — e medir até código real
 
 [`diagnose_relocation_reach`](../asterinas/kernel/libs/linux-module-elf/src/resolve.rs) retorna `RelocationReachError`: a causa antiga e um `RelocationSite` opcional com seção RELA, índice da entrada, seção-alvo, tipo, índice de símbolo e offset dentro do alvo. O índice inclui entradas NONE anteriores. Budget ou política de tabela, sem uma entrada efetivamente examinada, retorna `site=None`. O preflight antigo usa o mesmo caminho e devolve somente a causa, preservando sua API e ordem de budgets; não foram criados vetores, mappings ou permissões de execução.

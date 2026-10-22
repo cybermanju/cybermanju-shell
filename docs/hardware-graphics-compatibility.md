@@ -1,8 +1,24 @@
 # Gráficos e hardware: o que já foi provado
 
+**A ISO já instalou em UEFI e o sistema instalado chegou ao stage-2 do Asterinas, mas não ao login.** No run `39715117705` da base `cecd1ce`, instalação e verificação EFI GRUB passaram; o boot instalado carregou kernel/initrd, iniciou `/init` e parou no último ponto observado `running activation script...`, até o timeout de login. **Não passou hello, desktop/GPUI nem aceite completo da ISO.** Foi acrescentado tracing opt-in da ativação para tornar a próxima falha localizável, sem mudar os gates.
+
 **Os FileOps reais de fbdev passaram oito casos em QEMU**, sobre uma superfície sintética de 24 bytes no MMIO VGA real: transferência curta, EOF/ENOSPC, offset extremo e cursor de leitura/escrita vazio. Os metadados informam `smem_len=24` e pitch 12; oito bytes de guarda permaneceram intactos. **Não é uma prova de syscall/ioctl/mmap, GPUI ou módulo Linux executado.**
 
 **Etapa anterior:** o console passou a dimensionar seu buffer e seu scroll pelo span lógico, corrigindo dois panics reproduzidos em QEMU. O framebuffer mantém as escritas limitadas ao span e a prova de readback. A medição real continua em **1280 × 800, 32 bpp, pitch de 5.120 bytes e superfície de 4.096.000 bytes**. Isso não demonstra GPUI nativo, aceleração gráfica ou imagem apresentada em monitor físico.
+
+## ISO instalada: boot real, bloqueio na ativação
+
+O [run da base `cecd1ce`](https://github.com/cybermanju/cybermanju-shell/actions/runs/39715117705) terminou com falha no boot instalado. Os passos anteriores concluíram o live USB e a instalação da ISO completa em UEFI/TCG, incluindo o marcador final, checagem das partições e arquivos EFI GRUB e desligamento. No boot seguinte, o EFI stub carregou cmdline/initrd, detectou framebuffer 1280×800, decodificou o ELF, e o kernel iniciou a primeira thread, desempacotou initramfs e executou `/init`. O console mostrou `<<< Asterinas NixOS Stage 2 >>>`, a configuração do sistema e `running activation script...`.
+
+A falha foi **timeout de 2.400 segundos esperando `root@asterinas:`**, não evidência de prompt ou hello. O último comando de ativação não era visível. Não foi identificado qual syscall, script ou espera bloqueou; silêncio não prova panic nem apenas lentidão TCG. Esse resultado supera o antigo bloqueio de conclusão da instalação, mas não valida login, userspace hello, apresentação gráfica ou hardware físico. Logs integrais em `artifacts/cycle-0330/iso-failed.log`; console separado em `installed-console-excerpt.log` e saída guest decodificada em `installed-guest-output.log` no mesmo diretório.
+
+A nova opção **`aster_nixos.trace-activation` é booleana e desligada por padrão**. Só o guest descartável de CI recebe uma configuração embrulhada que a habilita: o módulo original é incorporado como expressão, com imports relativos preservados ao ser copiado para `/etc/nixos`, sem depender de um arquivo `/root` externo. A preparação não sobrescreve destinos existentes e o parser Nix deve aceitá-la antes de iniciar a instalação. A ISO publicada continua interativa e o fluxo normal sem tracing.
+
+O [helper](../asterinas/distro/etc_nixos/modules/trace-activation.sh) insere PS4 com linha e `set -x` depois do shebang de `activate`, preservando intérprete/opções, corpo, modo e status de saída. Se houver symlink, substitui só o arquivo de saída, sem editar o alvo compartilhado. Scripts ausentes, não Bash ou com sintaxe inválida são recusados, com limpeza do temporário. O hook é `mkAfter`: o pin Nixpkgs `fd1462031fdee08f65fd0b4c6b64e22239a77870` cria `activate` em `activatableSystemBuilderCommands`, antes da instrumentação. Os comandos existentes do core mantêm a prioridade anterior.
+
+**Xtrace pode expor argumentos e segredos: não habilitar em configurações pessoais ou com credenciais.** Os logs `CYBERMANJU_ACTIVATION` são somente diagnóstico, nunca marcadores de aprovação. Continuam obrigatórios login, `Hello Asterinas!`, desligamento e status de sucesso; deadlines e capacidade de disco não foram alterados. Nenhum gate passou a aceitar stage-2 ou tracing como sucesso.
+
+Validação local: **192 testes Python**, incluindo oito testes novos que executam helper/wrapper e preservação de falhas; parsing real com Nix 2.18.1 dos dois módulos modificados e do wrapper da configuração real; `bash -n` e diff. As provas de shell não são um boot NixOS. O parser não avalia o módulo completo nem constrói um closure; o novo hook e tracing **ainda não foram validados no boot da ISO**. Passou também o ktest preparado de módulos inalterado como regressão em QEMU, sem executar init/exit. Evidências em `artifacts/cycle-0330/` e `artifacts/staging-0330/`. A ISO da base `5dd5209` ainda estava na etapa de instalação na última consulta; ela não contém esta nova instrumentação.
 
 ## fbdev: não confundir bytes de imagem com capacidade mapeada
 
@@ -76,12 +92,13 @@ O [header Multiboot2](../asterinas/ostd/src/arch/x86/boot/multiboot2/header.S) s
 | View lógica para fbdev | 4 casos dentro do ktest gráfico; superfície sintética de 24 bytes, 8 bytes de guarda e origem física preservada | Não exercita syscall, truncamento dos FileOps em runtime ou isolamento do page-tail de mmap |
 | FileOps fbdev diretos | 1 ktest aprovado em x86-64/q35/TCG, 1 CPU, 1 GiB, GRUB/Multiboot2; oito casos e metadados | Buffers do kernel; sem syscall/ioctl/mmap/registro fbdev |
 | Nomes de partições do instalador | Regra shell real executada isoladamente; comparação antes/depois de NVMe/eMMC/NBD e preservação de loop/virtio | Somente strings; sem I/O de disco, controlador, instalação ou boot desses dispositivos |
+| ISO completa UEFI, base `cecd1ce` | Live USB + instalação + EFI GRUB passaram; kernel instalado e `/init` chegaram ao stage-2 | Login expirou em ativação; hello/aceite completo falharam; somente QEMU/TCG, sem GPUI/hardware físico |
 | Adaptadores de produção | `cargo check --locked -p ostd -p linux-module-staging -p aster-framebuffer --target x86_64-unknown-none` aprovado | Type-check, não boot do kernel completo |
 | Regressões históricas da etapa de limites | 109 testes Python, 115 testes ELF e 15 testes host de staging aprovados | Não executam init/exit de `.ko` |
 | CI da base `34dd887` | [Sete jobs concluídos com sucesso](https://github.com/cybermanju/cybermanju-shell/actions/runs/39701305916), confirmados pelo endpoint de jobs | Não é aprovação automática da nova view; ISO `39701305949` seguia em execução na consulta inicial |
 | CI anterior `4133000` | [Sete jobs de regressão aprovados](https://github.com/cybermanju/cybermanju-shell/actions/runs/39656869405), incluindo framebuffer e staging real | Evidência daquela revisão, não aprovação automática desta mudança |
 
-As VMs são imagens mínimas OSTD, **não a ISO instaladora nem a instalação UEFI completa**. Nenhum módulo, versão Linux ou arquitetura adicional foi qualificado nesta mudança; a [matriz de módulos](linux-module-compatibility.md) mantém as fixtures e suas restrições.
+As VMs dos ktests gráficos são imagens mínimas OSTD, **não a ISO instaladora nem a instalação UEFI completa**; a linha de ISO acima é uma evidência separada. Nenhum módulo, versão Linux ou arquitetura adicional foi qualificado nesta mudança; a [matriz de módulos](linux-module-compatibility.md) mantém as fixtures e suas restrições.
 
 Reprodução a partir da raiz:
 

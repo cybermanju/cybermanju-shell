@@ -98,7 +98,7 @@ in
   environment.sessionVariables = {
     SYSTEMD_LOG_LEVEL = "crit";
   };
-  system.systemBuilderCommands = ''
+  system.systemBuilderCommands = lib.mkMerge [ ''
     echo "PATH=/bin:/nix/var/nix/profiles/system/sw/bin earlycon loglevel=${config.aster_nixos.log-level} console=${config.aster_nixos.console} systemd.getty_auto=no -- root=/dev/vda2 init=/nix/var/nix/profiles/system/init rd.break=${
       if config.aster_nixos.break-into-stage-1-shell then "1" else "0"
     }"  > $out/kernel-params
@@ -109,7 +109,13 @@ in
     fi
     ln -s ${kernel} $out/kernel
     ln -s ${initramfs}/initrd $out/initrd
-  '';
+  ''
+    # activate is copied by upstream activatableSystemBuilderCommands.
+    # Append only tracing; keep the original core commands at their old priority.
+    (lib.mkAfter (lib.optionalString config.aster_nixos.trace-activation ''
+      ${pkgs.runtimeShell} ${./trace-activation.sh} "$out/activate"
+    ''))
+  ];
   system.activationScripts.modprobe = lib.mkForce "";
 
   nix.nixPath = [
