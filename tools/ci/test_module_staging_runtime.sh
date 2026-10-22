@@ -29,6 +29,12 @@ case ${2:-} in
         FILTER=cybermanju_module_address_runtime
         VERIFY=verify_module_address_runtime.py
         ;;
+    --near-text-collision)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_near_text_collision_runtime
+        VERIFY=verify_near_text_collision_runtime.py
+        ;;
     --smp-rejection)
         CRATE=ostd
         CRATE_PATH=ostd

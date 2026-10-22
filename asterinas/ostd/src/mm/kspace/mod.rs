@@ -40,6 +40,8 @@
 
 pub(crate) mod kvirt_area;
 #[cfg(all(ktest, target_arch = "x86_64"))]
+mod module_near_text_collision;
+#[cfg(all(ktest, target_arch = "x86_64"))]
 pub(crate) mod module_staging_map;
 #[cfg(all(ktest, target_arch = "x86_64"))]
 mod module_tlb_readback;

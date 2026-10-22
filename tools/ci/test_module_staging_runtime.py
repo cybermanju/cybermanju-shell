@@ -235,6 +235,38 @@ class AddressReservationTests(unittest.TestCase):
             self.assertEqual(json.loads((out / "result.json").read_text())["status"], "not_verified")
             self.assertFalse((out / "osdk-build.log").exists())
 
+    def test_near_text_collision_mode_preflight_preserves_config_and_invalidates_result(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "tools/ci"
+            scripts.mkdir(parents=True)
+            script = scripts / "test_module_staging_runtime.sh"
+            shutil.copyfile(Path(__file__).with_name(script.name), script)
+            config = root / "asterinas/ostd/OSDK.toml"
+            config.parent.mkdir(parents=True)
+            config.write_text("keep collision config\n")
+            out = root / "artifacts/collision"
+            out.mkdir(parents=True)
+            (out / "result.json").write_text('{"status":"passed"}')
+            result = subprocess.run(["bash", str(script), str(out), "--near-text-collision"], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(config.read_text(), "keep collision config\n")
+            self.assertEqual(json.loads((out / "result.json").read_text())["status"], "not_verified")
+            self.assertFalse((out / "osdk-build.log").exists())
+
+    def test_runtime_modes_are_mutually_exclusive_before_prerequisites(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "tools/ci"
+            scripts.mkdir(parents=True)
+            script = scripts / "test_module_staging_runtime.sh"
+            shutil.copyfile(Path(__file__).with_name(script.name), script)
+            out = root / "artifacts/mutual-exclusion"
+            result = subprocess.run(["bash", str(script), str(out), "--address-reservation", "--near-text-collision"], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("mutually exclusive", result.stderr)
+            self.assertEqual(json.loads((out / "result.json").read_text())["status"], "not_verified")
+
     def test_near_text_markers_are_unique_exact_and_validated(self):
         good = self.evidence()
         reserve, checks = good.splitlines()[6:8]
