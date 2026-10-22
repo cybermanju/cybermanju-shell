@@ -108,6 +108,94 @@ impl NearTextModuleLayout {
         )
     }
 
+    /// Try only a bounded prefix of page-aligned signed-32 pool candidates.
+    ///
+    /// `window` is a caller-supplied filter, not proof of current suitability.
+    /// Each real reservation is replanned and its current relocation constraints
+    /// revalidated; the common constructor preflights reach for all relocations.
+    /// Only an occupied candidate advances. This prefix search is not exhaustive:
+    /// no candidate or exhausted prefix returns `AddressSpace(NoMemory)`, not
+    /// proof that the pool is full. No payload, frames, mapping, pointer or
+    /// execution capability is created. Existing bookkeeping heap OOM is outside
+    /// this `Result`.
+    #[cfg(target_arch = "x86_64")]
+    pub fn new_signed32_in_relative32_window(
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        window: linux_module_elf::Relative32BaseWindow,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+        max_candidates: usize,
+    ) -> Result<Self, Error> {
+        if max_candidates == 0 || max_candidates > 64 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+        if PAGE_SIZE != 4096 {
+            return Err(Error::UnsupportedPageSize);
+        }
+        let max_span = max_pages
+            .checked_mul(PAGE_SIZE)
+            .ok_or(Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        let bound =
+            page_layout_span_bound(bytes, max_span as u64, max_sections).map_err(Error::Plan)?;
+        let span = usize::try_from(bound)
+            .map_err(|_| Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        if span == 0 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+
+        let pool = NearTextAddressReservation::signed32_arena_range();
+        let max_base = pool
+            .end
+            .checked_sub(span)
+            .ok_or(Error::AddressSpace(ostd::Error::NoMemory))?;
+        let Some(filtered) = window.restrict(pool.start as u64, max_base as u64) else {
+            return Err(Error::AddressSpace(ostd::Error::NoMemory));
+        };
+        let mut candidate = filtered
+            .first_aligned(PAGE_SIZE as u64)
+            .ok_or(Error::AddressSpace(ostd::Error::NoMemory))?;
+        for attempt in 0..max_candidates {
+            let base = Vaddr::try_from(candidate)
+                .map_err(|_| Error::AddressSpace(ostd::Error::InvalidArgs))?;
+            match NearTextAddressReservation::new_signed32_at(base, span, max_pages) {
+                Ok(reservation) => {
+                    let owner = Self::new_with_reservation(
+                        bytes,
+                        exports,
+                        reservation,
+                        bound,
+                        max_sections,
+                        max_entries,
+                    )?;
+                    let resolver =
+                        SymbolResolver::new(bytes, owner.layout(), exports).map_err(Error::Plan)?;
+                    let fresh = resolver
+                        .relative32_placement_constraints(max_entries)
+                        .map_err(Error::Plan)?;
+                    if !fresh
+                        .window()
+                        .is_some_and(|current| current.contains(candidate))
+                    {
+                        return Err(Error::Plan(linux_module_elf::Error::RelocationOverflow));
+                    }
+                    return Ok(owner);
+                }
+                Err(ostd::Error::NoMemory) => (),
+                Err(error) => return Err(Error::AddressSpace(error)),
+            }
+            if attempt + 1 == max_candidates {
+                break;
+            }
+            candidate = candidate
+                .checked_add(PAGE_SIZE as u64)
+                .filter(|next| filtered.contains(*next))
+                .ok_or(Error::AddressSpace(ostd::Error::NoMemory))?;
+        }
+        Err(Error::AddressSpace(ostd::Error::NoMemory))
+    }
+
     fn new_with_reservation(
         bytes: &[u8],
         exports: &[Export<'_>],

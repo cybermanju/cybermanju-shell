@@ -142,6 +142,8 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/near-text-prepared-runtime --near-text-prepared
       - name: Prepare R32S and relative ELF in separate signed32 arena without execution
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-prepared-runtime --signed32-prepared
+      - name: Search bounded signed32 candidates and verify full staged bytes without execution
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-search-runtime --signed32-search
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -200,6 +202,11 @@ jobs:
             artifacts/signed32-prepared-runtime/*.txt
             artifacts/signed32-prepared-runtime/harness-Cargo.*
             artifacts/signed32-prepared-runtime/fixture/
+            artifacts/signed32-search-runtime/*.log
+            artifacts/signed32-search-runtime/*.json
+            artifacts/signed32-search-runtime/*.txt
+            artifacts/signed32-search-runtime/harness-Cargo.*
+            artifacts/signed32-search-runtime/fixture/
           retention-days: 7
           if-no-files-found: warn
 

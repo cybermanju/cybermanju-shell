@@ -1150,3 +1150,5 @@ fn relative32_reservation_runtime(envelope: usize, mut limits: PreparationLimits
 
 mod near_text;
 mod signed32;
+
+mod signed32_search;

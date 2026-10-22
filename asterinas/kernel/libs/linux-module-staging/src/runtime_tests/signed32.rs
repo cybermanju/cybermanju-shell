@@ -24,7 +24,7 @@ fn u64_at(b: &[u8], o: usize) -> u64 {
 
 // Turn the parent's trusted U32 relocation into R_X86_64_32S, then independently
 // recover and validate the RELA target and its local section symbol from ELF headers.
-fn signed_self_fixture() -> (alloc::vec::Vec<u8>, u16, u64, u16) {
+pub(super) fn signed_self_fixture() -> (alloc::vec::Vec<u8>, u16, u64, u16) {
     let mut bytes = fixture_with_u32_relocation();
     let changed = bytes.iter().zip(FIXTURE).position(|(a, b)| a != b).unwrap();
     bytes[changed..changed + 4].copy_from_slice(&11u32.to_le_bytes());
