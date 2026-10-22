@@ -735,3 +735,274 @@ fn relative32_constraints_count_absolute_and_local_as_ignored_but_preflight_othe
     assert_eq!(constraints.import_relocations(), 0);
     assert_eq!(constraints.ignored_relative32_relocations(), 1);
 }
+
+#[test]
+fn full_relative32_absolute_symbols_constrain_both_direct_kinds() {
+    for kind in [2, 4] {
+        let mut b = fixture();
+        let value = 0xffff_ffff_8000_0000;
+        p16(&mut b, SYMBOLS + 30, 0xfff1);
+        p64(&mut b, SYMBOLS + 32, value);
+        entry(&mut b, RELA1, 0, 1, kind, 0);
+        entry(&mut b, RELA2, 0, 0, 0, 0);
+        let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+        let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+        let full = resolver.relative32_placement_constraints(2).unwrap();
+        assert_eq!(full.absolute_relocations(), 1);
+        assert_eq!(full.import_relocations(), 0);
+        assert_eq!(full.section_relative_relocations(), 0);
+        assert_eq!(full.rela_entries(), 2);
+        assert_eq!(
+            full.window(),
+            crate::relative32_base_window(value, 0, 0, layout.span())
+        );
+        assert!(!full.window().unwrap().contains(layout.base()));
+        let old = resolver.relative32_import_constraints(2).unwrap();
+        assert_eq!(old.ignored_relative32_relocations(), 1);
+        assert_eq!(
+            old.window(),
+            crate::Relative32BaseWindow::for_module_span(layout.span())
+        );
+    }
+}
+
+#[test]
+fn full_relative32_section_symbols_cancel_two_layout_bases() {
+    for kind in [2, 4] {
+        for base in [0x1000, 0xffff_c000_0000_1000] {
+            let mut b = fixture();
+            entry(&mut b, RELA1, 0, 1, kind, 0);
+            entry(&mut b, RELA2, 0, 0, 0, 0);
+            let layout = plan_layout(&b, base, 1024, 10).unwrap();
+            let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+            let full = resolver.relative32_placement_constraints(2).unwrap();
+            assert_eq!(full.import_relocations(), 0);
+            assert_eq!(full.absolute_relocations(), 0);
+            assert_eq!(full.section_relative_relocations(), 1);
+            assert_eq!(
+                full.window(),
+                crate::Relative32BaseWindow::for_module_span(layout.span())
+            );
+            assert!(full.window().unwrap().contains(base));
+            assert_eq!(resolver.check_relocation_reach(2), Ok(2));
+        }
+    }
+}
+
+#[test]
+fn full_relative32_impossible_local_delta_has_no_window_at_either_base() {
+    for kind in [2, 4] {
+        for base in [0x1000, 0xffff_c000_0000_1000] {
+            let mut b = fixture();
+            entry(&mut b, RELA1, 0, 1, kind, i64::MIN);
+            entry(&mut b, RELA2, 0, 0, 0, 0);
+            let layout = plan_layout(&b, base, 1024, 10).unwrap();
+            let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+            let full = resolver.relative32_placement_constraints(2).unwrap();
+            assert_eq!(full.section_relative_relocations(), 1);
+            assert_eq!(full.window(), None);
+            assert_eq!(
+                resolver.check_relocation_reach(2),
+                Err(Error::RelocationOverflow)
+            );
+            assert!(
+                resolver
+                    .relative32_import_constraints(2)
+                    .unwrap()
+                    .window()
+                    .is_some()
+            );
+        }
+    }
+}
+
+#[test]
+fn full_relative32_empty_local_window_does_not_mask_later_missing_import() {
+    let mut b = fixture();
+    entry(&mut b, RELA1, 0, 1, 2, i64::MIN);
+    entry(&mut b, RELA2, 8, 2, 4, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    assert_eq!(
+        resolver.relative32_placement_constraints(2),
+        Err(Error::MissingSymbol)
+    );
+    assert_eq!(
+        resolver.relative32_placement_constraints(1),
+        Err(Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver.relative32_placement_constraints(0),
+        Err(Error::ResourceLimit)
+    );
+}
+
+#[test]
+fn full_relative32_rejects_common_and_tls_while_import_api_still_ignores_them() {
+    for (section, info) in [(0xfff2, 0x11), (2, 0x16)] {
+        let mut b = fixture();
+        p16(&mut b, SYMBOLS + 30, section);
+        b[SYMBOLS + 28] = info;
+        entry(&mut b, RELA1, 0, 1, 2, 0);
+        entry(&mut b, RELA2, 0, 0, 0, 0);
+        let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+        let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+        assert_eq!(
+            resolver.relative32_placement_constraints(2),
+            Err(Error::UnsupportedSymbol)
+        );
+        let old = resolver.relative32_import_constraints(2).unwrap();
+        assert_eq!(old.ignored_relative32_relocations(), 1);
+        assert_eq!(
+            old.window(),
+            crate::Relative32BaseWindow::for_module_span(layout.span())
+        );
+    }
+}
+
+#[test]
+fn full_relative32_intersects_absolute_and_import_windows() {
+    let mut b = fixture();
+    let value = 1u64 << 32;
+    p16(&mut b, SYMBOLS + 30, 0xfff1);
+    p64(&mut b, SYMBOLS + 32, value);
+    entry(&mut b, RELA1, 0, 1, 2, 0);
+    entry(&mut b, RELA2, 8, 2, 4, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let p1 = layout
+        .placements()
+        .iter()
+        .find(|p| p.section_index == 1)
+        .unwrap()
+        .address
+        - layout.base();
+    let p2 = layout
+        .placements()
+        .iter()
+        .find(|p| p.section_index == 2)
+        .unwrap()
+        .address
+        - layout.base()
+        + 8;
+    let addend = i64::try_from((1i128 << 32) + i128::from(p2) - i128::from(p1)).unwrap();
+    entry(&mut b, RELA2, 8, 2, 4, addend);
+    let provided = [Export {
+        name: b"missing",
+        value,
+    }];
+    let resolver = SymbolResolver::new(&b, &layout, &provided).unwrap();
+    let full = resolver.relative32_placement_constraints(2).unwrap();
+    assert_eq!(full.absolute_relocations(), 1);
+    assert_eq!(full.import_relocations(), 1);
+    assert_eq!(full.section_relative_relocations(), 0);
+    assert_eq!(full.window(), None);
+    assert!(
+        resolver
+            .relative32_import_constraints(2)
+            .unwrap()
+            .window()
+            .is_some()
+    );
+}
+
+#[test]
+fn full_relative32_budget_counts_other_kinds_and_none_and_rejects_note() {
+    let mut b = fixture();
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    assert_eq!(
+        resolver.relative32_placement_constraints(1),
+        Err(Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver
+            .relative32_placement_constraints(2)
+            .unwrap()
+            .import_relocations(),
+        0
+    );
+    assert_eq!(
+        resolver.check_relocation_reach(2),
+        Err(Error::MissingSymbol)
+    );
+    entry(&mut b, RELA1, 0, 0, 0, 0);
+    entry(&mut b, RELA2, 0, 2, 4, 0);
+    p32(&mut b, h(8) + 44, 9);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    let full = resolver.relative32_placement_constraints(1).unwrap();
+    assert_eq!(full.rela_entries(), 1);
+    assert_eq!(full.import_relocations(), 0);
+    assert_eq!(
+        full.window(),
+        crate::Relative32BaseWindow::for_module_span(layout.span())
+    );
+    p32(&mut b, h(7) + 44, 3);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    assert_eq!(
+        resolver.relative32_placement_constraints(2),
+        Err(Error::RelocationTarget)
+    );
+}
+
+#[test]
+fn full_relative32_local_boundaries_include_both_section_offsets() {
+    for kind in [2, 4] {
+        for base in [0x1000, 0xffff_c000_0000_1000] {
+            for wanted in [
+                i128::from(i32::MIN) - 1,
+                i128::from(i32::MIN),
+                i128::from(i32::MAX),
+                i128::from(i32::MAX) + 1,
+            ] {
+                let mut b = fixture();
+                entry(&mut b, RELA1, 0, 1, kind, 0);
+                entry(&mut b, RELA2, 0, 0, 0, 0);
+                let layout = plan_layout(&b, base, 1024, 10).unwrap();
+                let symbol = SymbolResolver::new(&b, &layout, &[])
+                    .unwrap()
+                    .resolve(6, 1)
+                    .unwrap();
+                let place = layout
+                    .placements()
+                    .iter()
+                    .find(|p| p.section_index == 1)
+                    .unwrap()
+                    .address;
+                let local_delta = i128::from(symbol) - i128::from(place);
+                let addend = i64::try_from(wanted - local_delta).unwrap();
+                entry(&mut b, RELA1, 0, 1, kind, addend);
+                let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+                let fits = i32::try_from(wanted).is_ok();
+                let full = resolver.relative32_placement_constraints(2).unwrap();
+                assert_eq!(
+                    full.window().is_some(),
+                    fits,
+                    "kind={kind} base={base:#x} delta={wanted}"
+                );
+                assert_eq!(resolver.check_relocation_reach(2).is_ok(), fits);
+            }
+        }
+    }
+}
+
+#[test]
+fn full_relative32_accepts_section_defined_stb_local_binding() {
+    for kind in [2, 4] {
+        let mut b = fixture();
+        b[SYMBOLS + 28] = 0x01;
+        p32(&mut b, h(6) + 44, 2);
+        entry(&mut b, RELA1, 0, 1, kind, 0);
+        entry(&mut b, RELA2, 0, 0, 0, 0);
+        let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+        let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+        let full = resolver.relative32_placement_constraints(2).unwrap();
+        assert_eq!(full.section_relative_relocations(), 1);
+        assert_eq!(
+            full.window(),
+            crate::Relative32BaseWindow::for_module_span(layout.span())
+        );
+        assert_eq!(resolver.check_relocation_reach(2), Ok(2));
+    }
+}

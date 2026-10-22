@@ -51,6 +51,43 @@ pub struct Relative32ImportConstraints {
     ignored_relative32_relocations: usize,
 }
 
+/// Intersected direct PC32/PLT32 placement constraints for imports and definitions.
+/// Applies only to this layout's relative geometry; not a complete placement
+/// plan, address reservation, ABI admission, permission or execution proof.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Relative32PlacementConstraints {
+    window: Option<crate::Relative32BaseWindow>,
+    rela_entries: usize,
+    import_relocations: usize,
+    absolute_relocations: usize,
+    section_relative_relocations: usize,
+}
+
+impl Relative32PlacementConstraints {
+    /// Inclusive intersection, or no base for this relative geometry/empty span.
+    /// With no selected entries, this has only the module-span bound.
+    pub const fn window(self) -> Option<crate::Relative32BaseWindow> {
+        self.window
+    }
+    /// All budgeted ALLOC-target RELA, including NONE and other relocation kinds.
+    pub const fn rela_entries(self) -> usize {
+        self.rela_entries
+    }
+    /// Undefined-symbol PC32/PLT32 entries, not distinct export names.
+    pub const fn import_relocations(self) -> usize {
+        self.import_relocations
+    }
+    /// SHN_ABS PC32/PLT32 entries constrained by their literal symbol values.
+    pub const fn absolute_relocations(self) -> usize {
+        self.absolute_relocations
+    }
+    /// PC32/PLT32 entries with symbols defined in planned sections, irrespective
+    /// of LOCAL/GLOBAL binding. Their S+A-P delta includes both section offsets.
+    pub const fn section_relative_relocations(self) -> usize {
+        self.section_relative_relocations
+    }
+}
+
 impl Relative32ImportConstraints {
     /// Inclusive intersection; no imports yields only the module-span bound.
     pub const fn window(self) -> Option<crate::Relative32BaseWindow> {
@@ -326,6 +363,163 @@ impl<'a> SymbolResolver<'a> {
             rela_entries: total,
             import_relocations: imports,
             ignored_relative32_relocations: ignored,
+        })
+    }
+
+    /// Numeric constraints from all direct PC32/PLT32 in ALLOC sections.
+    /// UNDEF/ABS values constrain the base; section-defined symbols use the
+    /// base-cancelling delta S+A-P, including both sections' relative offsets.
+    /// Counts all ALLOC RELA (including NONE/other kinds) before resolving any
+    /// selected symbols, hard cap 65,536; NOTE rejected, non-ALLOC ignored.
+    /// All selected symbols are resolved for validation, even after window=None.
+    /// COMMON/TLS/IFUNC and unsupported bindings/visibility remain errors.
+    /// No payload/patch/frame/VA allocation; resolver metadata already exists.
+    /// None means no base for THIS relative geometry, not every possible replan.
+    /// Replan/recollect at the chosen base and run complete preflight/preparation.
+    /// Other relocation kinds, write overlaps, canonicality, arena availability,
+    /// ABI, permissions and execution are not established by this partial scan.
+    pub fn relative32_placement_constraints(
+        &self,
+        max_entries: usize,
+    ) -> Result<Relative32PlacementConstraints, Error> {
+        let table = file_range(
+            self.bytes,
+            u64_at(self.bytes, 40),
+            u64::from(u16_at(self.bytes, 60)) * SECTION_SIZE as u64,
+        )?;
+        let section = |i: usize| -> Result<&[u8], Error> {
+            let start = i.checked_mul(SECTION_SIZE).ok_or(Error::SectionTable)?;
+            table
+                .get(start..start.checked_add(SECTION_SIZE).ok_or(Error::SectionTable)?)
+                .ok_or(Error::SectionTable)
+        };
+        let mut total = 0usize;
+        for rela in table.chunks_exact(SECTION_SIZE) {
+            if u32_at(rela, 4) != 4 {
+                continue;
+            }
+            let target =
+                section(usize::try_from(u32_at(rela, 44)).map_err(|_| Error::RelocationTarget)?)?;
+            if u64_at(target, 8) & 2 == 0 {
+                continue;
+            }
+            if !matches!(u32_at(target, 4), 1 | 8) {
+                return Err(Error::RelocationTarget);
+            }
+            total = total
+                .checked_add(
+                    usize::try_from(u64_at(rela, 32) / 24).map_err(|_| Error::ResourceLimit)?,
+                )
+                .ok_or(Error::ResourceLimit)?;
+            if total > core::cmp::min(max_entries, 65536) {
+                return Err(Error::ResourceLimit);
+            }
+        }
+        let mut window = crate::Relative32BaseWindow::for_module_span(self.layout.span());
+        let (mut imports, mut absolute, mut locals) = (0usize, 0usize, 0usize);
+        for rela in table.chunks_exact(SECTION_SIZE) {
+            if u32_at(rela, 4) != 4 {
+                continue;
+            }
+            let target_index = u32_at(rela, 44);
+            let target =
+                section(usize::try_from(target_index).map_err(|_| Error::RelocationTarget)?)?;
+            if u64_at(target, 8) & 2 == 0 {
+                continue;
+            }
+            if u32_at(target, 4) == 7 {
+                return Err(Error::RelocationTarget);
+            }
+            let placement = self
+                .layout
+                .placements()
+                .iter()
+                .find(|p| u32::from(p.section_index) == target_index)
+                .ok_or(Error::RelocationTarget)?;
+            let symtab = u16::try_from(u32_at(rela, 40)).map_err(|_| Error::RelocationLink)?;
+            let symtab_data = section(usize::from(symtab))?;
+            let symbols = file_range(self.bytes, u64_at(symtab_data, 24), u64_at(symtab_data, 32))?;
+            for entry in
+                file_range(self.bytes, u64_at(rela, 24), u64_at(rela, 32))?.chunks_exact(24)
+            {
+                let info = u64_at(entry, 8);
+                let kind = info as u32;
+                if !matches!(kind, 2 | 4) {
+                    continue;
+                }
+                let si = (info >> 32) as u32;
+                let off = u64_at(entry, 0);
+                if off.checked_add(4).ok_or(Error::RelocationRange)? > placement.size {
+                    return Err(Error::RelocationRange);
+                }
+                let sy = usize::try_from(si)
+                    .map_err(|_| Error::SymbolTable)?
+                    .checked_mul(SYMBOL_SIZE)
+                    .ok_or(Error::SymbolTable)?;
+                let sym = symbols
+                    .get(sy..sy.checked_add(SYMBOL_SIZE).ok_or(Error::SymbolTable)?)
+                    .ok_or(Error::SymbolTable)?;
+                let shndx = u16_at(sym, 6);
+                if shndx == SHN_UNDEF {
+                    let value = self.resolve(symtab, si)?;
+                    imports += 1;
+                    let po = placement
+                        .address
+                        .checked_sub(self.layout.base())
+                        .and_then(|x| x.checked_add(off))
+                        .ok_or(Error::RelocationRange)?;
+                    let c = crate::relative32_base_window(
+                        value,
+                        u64_at(entry, 16) as i64,
+                        po,
+                        self.layout.span(),
+                    );
+                    window = match (window, c) {
+                        (Some(a), Some(b)) => a.intersect(b),
+                        _ => None,
+                    };
+                } else if shndx == SHN_ABS {
+                    let value = self.resolve(symtab, si)?;
+                    absolute += 1;
+                    let po = placement
+                        .address
+                        .checked_sub(self.layout.base())
+                        .and_then(|x| x.checked_add(off))
+                        .ok_or(Error::RelocationRange)?;
+                    let c = crate::relative32_base_window(
+                        value,
+                        u64_at(entry, 16) as i64,
+                        po,
+                        self.layout.span(),
+                    );
+                    window = match (window, c) {
+                        (Some(a), Some(b)) => a.intersect(b),
+                        _ => None,
+                    };
+                } else {
+                    // Resolve enforces symbol class/binding/visibility/section validity.
+                    let resolved = self.resolve(symtab, si)?;
+                    locals += 1;
+                    let place = placement
+                        .address
+                        .checked_add(off)
+                        .ok_or(Error::RelocationRange)?;
+                    // S and P include their different section offsets. Only the
+                    // common module base cancels; st_value - r_offset is not enough.
+                    let delta = i128::from(resolved) + i128::from(u64_at(entry, 16) as i64)
+                        - i128::from(place);
+                    if i32::try_from(delta).is_err() {
+                        window = None
+                    }
+                }
+            }
+        }
+        Ok(Relative32PlacementConstraints {
+            window,
+            rela_entries: total,
+            import_relocations: imports,
+            absolute_relocations: absolute,
+            section_relative_relocations: locals,
         })
     }
 

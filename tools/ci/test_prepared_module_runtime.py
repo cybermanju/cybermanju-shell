@@ -26,6 +26,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false",
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false",
                     'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false',
+                    "CYBERMANJU_PREPARED_RUNTIME:relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -47,6 +48,27 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify(text)
         self.assertTrue(verify(good)["relative32_import_constraints_verified"])
+
+    def test_defined_symbol_collection_marker_exact_and_mandatory(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false"
+        good = self.evidence()
+        bad = [good.replace(marker + "\n", ""), good + marker + "\n",
+               good.replace(marker, "echo " + marker)]
+        for old, new in [("types=2", "types=1"), ("section_relative=2", "section_relative=1"),
+                         ("absolute=2", "absolute=1"),
+                         ("kernel_address_numeric=true", "kernel_address_numeric=false"),
+                         ("reserved_near_text=false", "reserved_near_text=true"),
+                         ("execution=false", "execution=true")]:
+            bad.append(good.replace(marker, marker.replace(old, new)))
+        for text in bad:
+            with self.subTest(marker=text[-180:]), self.assertRaises(ValueError):
+                verify(text)
+        result = verify(good)
+        self.assertTrue(result["relative32_defined_symbol_constraints_verified"])
+        self.assertEqual(result["relative32_defined_section_relative_cases"], 2)
+        self.assertEqual(result["relative32_defined_absolute_cases"], 2)
+        for flag in ("near_text_allocation_available", "module_execution_verified", "linux_modules_executed", "wx_verified"):
+            self.assertFalse(result[flag])
 
     def test_complete_evidence_and_result_contract(self):
         result = verify(self.evidence())
@@ -75,6 +97,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertTrue(result["signed32_kernel_export_numeric_only"])
         self.assertFalse(result["module_execution_verified"])
         self.assertTrue(result["relative32_numeric_placement_window_verified"])
+        self.assertTrue(result["relative32_defined_symbol_constraints_verified"])
         self.assertFalse(result["near_text_allocation_available"])
         self.assertEqual(result["reserved_layout"]["base"], "0xffffc00000000000")
         self.assertNotIn("linux_modules_loaded", result)

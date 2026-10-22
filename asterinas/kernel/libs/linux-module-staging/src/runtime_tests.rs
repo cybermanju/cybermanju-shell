@@ -588,6 +588,123 @@ fn cybermanju_prepared_module_runtime() {
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false"
     );
+    // Defined section-relative PC32/PLT32 entries cancel the module base.
+    for kind in [2, 4] {
+        let (mut defined, _, target, offset) = relative_import_fixture(kind);
+        let r32 = |b: &[u8], o| u32::from_le_bytes(b[o..o + 4].try_into().unwrap());
+        let r64 = |b: &[u8], o| u64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+        let table = r64(&defined, 40) as usize;
+        let count = u16::from_le_bytes(defined[60..62].try_into().unwrap()) as usize;
+        let mut picked = None;
+        for si in 0..count {
+            let rela = table + si * 64;
+            if r32(&defined, rela + 4) != 4 || r32(&defined, rela + 44) != u32::from(target) {
+                continue;
+            }
+            let off = r64(&defined, rela + 24) as usize;
+            let size = r64(&defined, rela + 32) as usize;
+            for entry in (off..off + size).step_by(24) {
+                let info = r64(&defined, entry + 8);
+                if info as u32 == kind && r64(&defined, entry) == offset {
+                    picked = Some(((info >> 32) as usize, r32(&defined, rela + 40) as usize));
+                    break;
+                }
+            }
+            if picked.is_some() {
+                break;
+            }
+        }
+        let (symbol_index, symtab_index) = picked.expect("selected relative RELA");
+        let symsh = table + symtab_index * 64;
+        let symoff = r64(&defined, symsh + 24) as usize + symbol_index * 24;
+        defined[symoff..symoff + 24].copy_from_slice(&FIXTURE[symoff..symoff + 24]);
+        let owner =
+            ReservedModuleLayout::new(&defined, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        let current_layout = owner.layout();
+        let base = SymbolResolver::new(&defined, current_layout, &[])
+            .unwrap()
+            .relative32_placement_constraints(65_536)
+            .unwrap();
+        assert_eq!(
+            (
+                base.section_relative_relocations(),
+                base.import_relocations(),
+                base.absolute_relocations()
+            ),
+            (1, 0, 0)
+        );
+        assert_eq!(base.rela_entries(), real_prepared.relocation_entries());
+        let window = base.window().unwrap();
+        assert_eq!(
+            window,
+            linux_module_elf::Relative32BaseWindow::for_module_span(current_layout.span()).unwrap()
+        );
+        assert!(window.contains(owner.range().start as u64));
+        assert_eq!(
+            SymbolResolver::new(&defined, current_layout, &[])
+                .unwrap()
+                .check_relocation_reach(65_536)
+                .unwrap(),
+            base.rela_entries()
+        );
+        drop(owner);
+
+        let mut absolute = defined.clone();
+        let address = ostd::cpu::num_cpus as *const () as usize as u64;
+        assert!(address >= 0xffff_ffff_8000_0000);
+        absolute[symoff + 6..symoff + 8].copy_from_slice(&0xfff1u16.to_le_bytes());
+        absolute[symoff + 8..symoff + 16].copy_from_slice(&address.to_le_bytes());
+        let owner =
+            ReservedModuleLayout::new(&absolute, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        let current_layout = owner.layout();
+        let constraints = SymbolResolver::new(&absolute, current_layout, &[])
+            .unwrap()
+            .relative32_placement_constraints(65_536)
+            .unwrap();
+        assert_eq!(
+            (
+                constraints.absolute_relocations(),
+                constraints.section_relative_relocations(),
+                constraints.import_relocations()
+            ),
+            (1, 0, 0)
+        );
+        assert_eq!(
+            constraints.rela_entries(),
+            real_prepared.relocation_entries()
+        );
+        assert!(
+            !constraints
+                .window()
+                .unwrap()
+                .contains(owner.range().start as u64)
+        );
+        let old = SymbolResolver::new(&absolute, current_layout, &[])
+            .unwrap()
+            .relative32_import_constraints(65_536)
+            .unwrap();
+        assert_eq!(old.ignored_relative32_relocations(), 1);
+        let candidate = constraints
+            .window()
+            .unwrap()
+            .first_aligned(PAGE_SIZE as u64)
+            .unwrap();
+        let candidate_layout =
+            plan_page_layout(&absolute, candidate, MAX_SPAN, MAX_SECTIONS).unwrap();
+        assert_eq!(
+            SymbolResolver::new(&absolute, &candidate_layout, &[])
+                .unwrap()
+                .check_relocation_reach(65_536)
+                .unwrap(),
+            constraints.rela_entries()
+        );
+        drop(owner);
+    }
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false"
+    );
     let owner =
         ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
     let failure = SymbolResolver::new(FIXTURE, owner.layout(), &[])
