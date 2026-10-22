@@ -89,13 +89,15 @@ describe('home workspaces', () => {
     expect(state.pages[0].title).toHaveLength(40)
     expect(Object.hasOwn(state.pages[0].items[0].data!, '__proto__')).toBe(false)
   })
-  it('classifies directional one- and three-finger gestures at thresholds', () => {
+  it('classifies directional one-, two- and three-finger gestures at thresholds', () => {
     expect(classifyHomeGesture(0, -72, 3)).toBe('overview-open')
     expect(classifyHomeGesture(0, 72, 3)).toBe('overview-close')
     expect(classifyHomeGesture(64, 0, 1)).toBe('previous')
     expect(classifyHomeGesture(-64, 0, 1)).toBe('next')
     expect(classifyHomeGesture(64, 64, 1)).toBeNull()
-    expect(classifyHomeGesture(200, 0, 2)).toBeNull()
+    expect(classifyHomeGesture(200, 0, 2)).toBe('previous')
+    expect(classifyHomeGesture(-64, 0, 2)).toBe('next')
+    expect(classifyHomeGesture(70, 60, 2)).toBeNull()
     expect(classifyHomeGesture(0, 100, 1)).toBeNull()
   })
 })

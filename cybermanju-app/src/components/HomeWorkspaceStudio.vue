@@ -1,7 +1,7 @@
 <!-- CyberManju OS — Persistent, app-local Home workspaces. Not Android Recents. -->
 <!-- Role: app-local Home UI only. Integrates: Vue and bounded persisted workspace state. -->
 <template>
-  <section ref="root" class="home-studio" :class="`identity-${state.theme}`" aria-label="Personal home workspaces" @touchstart.stop.passive="touchStart" @touchmove.stop="touchMove" @touchend.stop="touchEnd" @touchcancel.stop="resetTouch">
+  <section ref="root" class="home-studio" :class="`identity-${state.theme}`" aria-label="Personal home workspaces" @pointerdown.stop="pointerStart" @pointermove.stop="pointerMove" @pointerup.stop="pointerEnd" @pointercancel.stop="cancelInteraction" @click.capture="guardClick" @touchstart.stop.passive="touchStart" @touchmove.stop="touchMove" @touchend.stop="touchEnd" @touchcancel.stop="cancelInteraction">
     <div class="studio-heading">
       <div><span class="studio-kicker">YOUR ORBIT / {{ String(activeIndex + 1).padStart(2, '0') }}</span><h2>{{ activePage.title }}</h2></div>
       <div class="studio-tools"><button type="button" :aria-pressed="overview" aria-label="Eagle view of home workspaces" @click="overview = !overview"><AppIcon name="solar:widget-bold" :size="20" /></button><button ref="addButton" class="studio-add" type="button" aria-label="Add apps or widgets to home" @click="openPicker('apps')"><span aria-hidden="true">+</span></button></div>
@@ -26,13 +26,13 @@
       <Transition name="orbit" mode="out-in">
         <div :key="activePage.id" class="workspace-content">
           <div v-if="!activePage.items.length" class="empty-orbit"><div class="pixel-city" aria-hidden="true"><i /><i /><i /><i /><i /></div><h3>A new corner of your world</h3><p>Apps, small rituals, a little pixel magic.<br />Make this screen yours.</p><button type="button" @click="openPicker('apps')">+ Add your first item</button></div>
-          <div class="workspace-apps" v-if="activeApps.length"><article v-for="item in activeApps" :key="item.id" class="workspace-app"><button class="workspace-launch" type="button" :aria-label="`Open ${itemTitle(item)}`" @click="launch(item.ref)" @contextmenu.prevent="customize(item.ref)"><span class="workspace-app-icon"><img v-if="appFor(item.ref)?.image" :src="appFor(item.ref)?.image" alt="" /><AppIcon v-else :name="itemIcon(item)" :size="25" /></span><span>{{ itemTitle(item) }}</span></button><div v-if="editing" class="item-edit"><button type="button" :aria-label="`Customize ${itemTitle(item)}`" @click="customize(item.ref)">Style</button><button type="button" :aria-label="`Remove ${itemTitle(item)} from screen`" @click="removeItem(item)">×</button><label :aria-label="`Move ${itemTitle(item)} to screen`"><select :value="activePage.id" :aria-label="`Move ${itemTitle(item)} to screen`" @change="moveItem(item, ($event.target as HTMLSelectElement).value)"><option v-for="p in state.pages" :key="p.id" :value="p.id">{{ p.title }}</option></select></label></div></article></div>
+          <div class="workspace-apps" v-if="activeApps.length"><article v-for="item in activeApps" :key="item.id" class="workspace-app"><button class="workspace-launch" type="button" :aria-label="`Open ${itemTitle(item)}`" @click="launch(item.ref, $event)" @contextmenu.prevent="customize(item.ref)"><span class="workspace-app-icon"><img v-if="appFor(item.ref)?.image" :src="appFor(item.ref)?.image" alt="" /><AppIcon v-else :name="itemIcon(item)" :size="25" /></span><span>{{ itemTitle(item) }}</span></button><div v-if="editing" class="item-edit"><button type="button" :aria-label="`Customize ${itemTitle(item)}`" @click="customize(item.ref)">Style</button><button type="button" :aria-label="`Remove ${itemTitle(item)} from screen`" @click="removeItem(item)">×</button><label :aria-label="`Move ${itemTitle(item)} to screen`"><select :value="activePage.id" :aria-label="`Move ${itemTitle(item)} to screen`" @change="moveItem(item, ($event.target as HTMLSelectElement).value)"><option v-for="p in state.pages" :key="p.id" :value="p.id">{{ p.title }}</option></select></label></div></article></div>
           <div class="workspace-widgets"><article v-for="item in activeWidgets" :key="item.id" class="workspace-widget"><header><span><AppIcon :name="itemIcon(item)" :size="16" />{{ itemTitle(item) }}</span><button v-if="editing" type="button" :aria-label="`Remove ${itemTitle(item)}`" @click="removeItem(item)">×</button></header><HomeLocalWidget :item="item" :app-id="widgetFor(item.ref)?.appId" @update="item.data = $event" @open="launch" /><label v-if="editing" class="widget-move">Move to<select :value="activePage.id" :aria-label="`Move ${itemTitle(item)} to screen`" @change="moveItem(item, ($event.target as HTMLSelectElement).value)"><option v-for="p in state.pages" :key="p.id" :value="p.id">{{ p.title }}</option></select></label></article></div>
           <p v-if="editing" class="studio-hint">Remove only unpins the tile; it never uninstalls an app. Move tiles using the screen selector or Eagle view.</p>
         </div>
       </Transition>
       <nav class="screen-nav" aria-label="Home screen navigation"><button type="button" :disabled="activeIndex === 0" aria-label="Previous home screen" @click="navigate(activeIndex - 1)">←</button><span>{{ activeIndex + 1 }} / {{ state.pages.length }}</span><button type="button" :disabled="activeIndex === state.pages.length - 1" aria-label="Next home screen" @click="navigate(activeIndex + 1)">→</button></nav>
-      <p class="studio-hint gesture-hint">Swipe sideways between screens · Three fingers up for Eagle view</p>
+      <p class="studio-hint gesture-hint">Swipe sideways with two fingers between screens · Three fingers up for Eagle view</p>
     </template>
     <div v-if="picker" class="studio-veil" @click.self="closePicker" @keydown="dialogKeys">
       <section ref="dialog" class="studio-picker" role="dialog" aria-modal="true" aria-labelledby="home-picker-title" tabindex="-1">
@@ -74,7 +74,7 @@ function itemTitle(item: HomeItem) { return item.kind === 'app' ? appFor(item.re
 function itemIcon(item: HomeItem) { return (item.kind === 'app' ? appFor(item.ref)?.icon : widgetFor(item.ref)?.icon) || 'solar:widget-bold' }
 watch(state, value => { try { localStorage.setItem(HOME_WORKSPACE_KEY, JSON.stringify(value)) } catch { message.value = 'Storage unavailable — changes last only for this session.' } }, { deep: true, immediate: true })
 function navigate(index: number) { if (state.value.pages[index]) { state.value.activeId = state.value.pages[index]!.id; message.value = '' } }
-async function launch(id: string) { if (id.startsWith('android:')) { try { await androidApps.openApp(id.slice(8)) } catch { message.value = 'This Android app is unavailable. Try refreshing All apps.' } } else emit('open', id) }
+async function launch(id: string, event?: MouseEvent) { if (editing.value || dragging.value || blockedClick && event?.detail !== 0) return; if (id.startsWith('android:')) { try { await androidApps.openApp(id.slice(8)) } catch { message.value = 'This Android app is unavailable. Try refreshing All apps.' } } else emit('open', id) }
 function customize(id: string) { if (!id.startsWith('android:')) emit('customize', id); else message.value = 'Customize Android apps in All apps.' }
 function hasItem(kind: HomeItem['kind'], id: string) { return activePage.value.items.some(i => i.kind === kind && i.ref === id) }
 function add(kind: HomeItem['kind'], id: string) { const item = { id: globalThis.crypto?.randomUUID?.() || `item-${Date.now()}-${Math.random().toString(36).slice(2)}`, kind, ref: id }; if (hasItem(kind, id)) return; message.value = addHomeItem(state.value, activePage.value.id, item) ? 'Added to this screen.' : `This screen is full (${MAX_ITEMS_PER_WORKSPACE} items). Choose another screen.` }
@@ -93,18 +93,132 @@ const identities = [{ id: 'aurora' as const, title: 'Neon orbit', description: '
 const dragging = ref<{ id: string; from: string; x: number; y: number } | null>(null)
 function beginDrag(event: PointerEvent, item: HomeItem, from: string) { if (event.button !== 0 || !overview.value) return; event.stopPropagation(); dragging.value = { id: item.id, from, x: event.clientX, y: event.clientY }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId) }
 function finishDrag(event: PointerEvent) { if (!dragging.value) return; const drag = dragging.value; dragging.value = null; if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 12) return; const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-workspace-id]')?.dataset.workspaceId; if (target && target !== drag.from) message.value = moveHomeItem(state.value, drag.id, drag.from, target) ? 'Tile moved.' : 'Destination is full or already contains this item.' }
-let gesture: { x: number; y: number; fingers: number; lastX: number; lastY: number; distance: number; zoom: number; panX: number; panY: number } | null = null
-function center(touches: TouchList) { const points = Array.from(touches); return { x: points.reduce((a, p) => a + p.clientX, 0) / points.length, y: points.reduce((a, p) => a + p.clientY, 0) / points.length } }
-function distance(touches: TouchList) { return touches.length >= 2 ? Math.hypot(touches[0]!.clientX - touches[1]!.clientX, touches[0]!.clientY - touches[1]!.clientY) : 0 }
-function touchStart(event: TouchEvent) { if (picker.value || dragging.value || event.touches.length === 2 && !(event.target as HTMLElement).closest('.eagle-viewport')) { gesture = null; return } const point = center(event.touches); if (point.x < 24 || point.x > innerWidth - 24 || point.y > innerHeight - 32) return; if (event.touches.length === 1 && ((event.target as HTMLElement).closest('button,input,textarea,select,a') || overview.value)) { gesture = null; return } gesture = { ...point, fingers: event.touches.length, lastX: point.x, lastY: point.y, distance: distance(event.touches), zoom: zoom.value, panX: panX.value, panY: panY.value } }
-function touchMove(event: TouchEvent) { if (!gesture || picker.value) return; if (event.touches.length === gesture.fingers) { const point = center(event.touches); gesture.lastX = point.x; gesture.lastY = point.y } if (event.touches.length === 2 && gesture.fingers === 2 && overview.value) { event.preventDefault(); const point = center(event.touches); zoom.value = Math.max(.65, Math.min(1.4, gesture.zoom * distance(event.touches) / Math.max(1, gesture.distance))); panX.value = Math.max(-600, Math.min(600, gesture.panX + point.x - gesture.x)); panY.value = Math.max(-600, Math.min(600, gesture.panY + point.y - gesture.y)) } else if (gesture.fingers >= 3) event.preventDefault() }
-function touchEnd(event: TouchEvent) { if (!gesture || event.touches.length) return; const end = event.changedTouches[0]; if (!end) { resetTouch(); return } const action = classifyHomeGesture(gesture.lastX - gesture.x, gesture.lastY - gesture.y, gesture.fingers); if (action === 'overview-open') overview.value = true; if (action === 'overview-close') overview.value = false; if (!overview.value && action === 'next') navigate(activeIndex.value + 1); if (!overview.value && action === 'previous') navigate(activeIndex.value - 1); resetTouch() }
+// Pointer events own click eligibility; touch events own Home page chords.
+// Never capture a normal press: native button/keyboard activation stays intact.
+let blockedClick = false
+const pointers = new Map<number, { x: number; y: number }>()
+function pointerStart(event: PointerEvent) {
+  if (!pointers.size) blockedClick = false
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  if (pointers.size > 1) blockedClick = true
+}
+function pointerMove(event: PointerEvent) {
+  const start = pointers.get(event.pointerId)
+  if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) blockedClick = true
+}
+function pointerEnd(event: PointerEvent) { pointerMove(event); pointers.delete(event.pointerId) }
+function outsidePointerCancel(event: PointerEvent) { if (pointers.has(event.pointerId)) cancelInteraction() }
+function guardClick(event: MouseEvent) {
+  if (blockedClick && event.detail !== 0) { event.preventDefault(); event.stopPropagation() }
+}
+type HomePoint = { id: number; x: number; y: number }
+type HomeTouchSession = {
+  formedAt: number; fingers: number; starts: HomePoint[]; last: HomePoint[]
+  cancelled: boolean; moved: boolean; ending: boolean; inOverview: boolean
+  zoom: number; panX: number; panY: number; liftPoints?: HomePoint[]
+}
+let gesture: HomeTouchSession | null = null
+function points(touches: TouchList): HomePoint[] { return Array.from(touches, t => ({ id: t.identifier, x: t.clientX, y: t.clientY })) }
+function center(points: HomePoint[]) { return { x: points.reduce((sum, p) => sum + p.x, 0) / points.length, y: points.reduce((sum, p) => sum + p.y, 0) / points.length } }
+function distance(points: HomePoint[]) { return points.length >= 2 ? Math.hypot(points[0]!.x - points[1]!.x, points[0]!.y - points[1]!.y) : 0 }
+function forbiddenTouch(event: TouchEvent) {
+  return Array.from(event.touches).some(t => {
+    const target = (t.target || event.target) as HTMLElement
+    return !target?.closest || !!target.closest('button,input,textarea,select,a,[contenteditable],[role="button"],.workspace-widget,[data-native-widget]') ||
+      overview.value && !target.closest('.eagle-viewport') ||
+      t.clientX < 24 || t.clientX > innerWidth - 24 || t.clientY < 24 || t.clientY > innerHeight - 32
+  })
+}
+function touchStart(event: TouchEvent) {
+  const current = points(event.touches)
+  if (!current.length) return
+  if (!gesture && current.length === 1 && !pointers.size) blockedClick = false
+  if (current.length > 1) blockedClick = true
+  const forbidden = picker.value !== null || editing.value || !!dragging.value || forbiddenTouch(event)
+  if (!gesture) {
+    gesture = { formedAt: Date.now(), fingers: current.length, starts: current, last: current.map(p => ({ ...p })), cancelled: forbidden || current.length > 3, moved: false, ending: false, inOverview: overview.value, zoom: zoom.value, panX: panX.value, panY: panY.value }
+    return
+  }
+  // Fingers may join only in the initial stationary 160ms formation window.
+  // Rejected starts cannot be promoted into a chord by adding another finger.
+  const shifted = gesture.starts.some(p => { const now = current.find(t => t.id === p.id); return !now || Math.hypot(now.x - p.x, now.y - p.y) > 10 })
+  if (gesture.cancelled || gesture.ending || gesture.moved || shifted || forbidden || Date.now() - gesture.formedAt > 160 || current.length <= gesture.fingers || current.length > 3) {
+    gesture.cancelled = true
+    return
+  }
+  gesture.fingers = current.length
+  gesture.starts = current
+  gesture.last = current.map(p => ({ ...p }))
+}
+function updateTouch(current: HomePoint[]) {
+  if (!gesture) return
+  for (const p of current) {
+    const index = gesture.last.findIndex(old => old.id === p.id)
+    if (index < 0) { gesture.cancelled = true; continue }
+    const start = gesture.starts[index]!
+    const last = (gesture.liftPoints || gesture.last)[index]!
+    if (gesture.ending && Math.hypot(p.x - last.x, p.y - last.y) > 10) gesture.cancelled = true
+    if (Math.hypot(p.x - start.x, p.y - start.y) > 10) { gesture.moved = true; blockedClick = true }
+    gesture.last[index] = p
+  }
+}
+function touchMove(event: TouchEvent) {
+  if (!gesture) return
+  if (picker.value || editing.value || dragging.value || overview.value !== gesture.inOverview) gesture.cancelled = true
+  if (!gesture.ending && event.touches.length !== gesture.fingers) gesture.cancelled = true
+  updateTouch(points(event.touches))
+  if (gesture.cancelled || gesture.ending) return
+  const start = center(gesture.starts), last = center(gesture.last)
+  const dx = last.x - start.x, dy = last.y - start.y
+  if (gesture.inOverview && gesture.fingers === 2) {
+    if (event.cancelable) event.preventDefault()
+    zoom.value = Math.max(.65, Math.min(1.4, gesture.zoom * distance(gesture.last) / Math.max(1, distance(gesture.starts))))
+    panX.value = Math.max(-600, Math.min(600, gesture.panX + dx))
+    panY.value = Math.max(-600, Math.min(600, gesture.panY + dy))
+  } else {
+    // Latch ambiguous or wrong-axis travel rather than later interpreting a turn.
+    if (gesture.fingers === 2 && Math.abs(distance(gesture.last) - distance(gesture.starts)) > Math.max(32, Math.abs(dx) * .7)) gesture.cancelled = true
+    const primary = gesture.fingers === 3 ? Math.abs(dy) : Math.abs(dx)
+    const cross = gesture.fingers === 3 ? Math.abs(dx) : Math.abs(dy)
+    if (Math.max(primary, cross) >= 24 && primary < cross * 1.5) gesture.cancelled = true
+    if (!gesture.cancelled && gesture.fingers >= 2 && primary > 10 && event.cancelable) event.preventDefault()
+  }
+}
+function touchEnd(event: TouchEvent) {
+  if (!gesture) return
+  updateTouch(points(event.changedTouches))
+  // A normal staggered lift is allowed, but cannot move or add contacts again.
+  if (event.touches.length) { gesture.liftPoints ??= gesture.last.map(p => ({ ...p })); gesture.ending = true; return }
+  const session = gesture
+  gesture = null
+  if (session.cancelled || picker.value || editing.value || dragging.value || overview.value !== session.inOverview) return
+  if (session.inOverview && session.fingers === 2) return // pan/pinch only
+  const start = center(session.starts), last = center(session.last)
+  const dx = last.x - start.x, dy = last.y - start.y
+  if (session.fingers === 2) {
+    // Parallel translation only: pinch, rotation and an unmoving second finger
+    // must never travel to another persistent page.
+    if (Math.abs(distance(session.last) - distance(session.starts)) > Math.max(24, Math.abs(dx) * .35)) return
+    if (session.starts.some((p, i) => {
+      const end = session.last[i]!, travel = end.x - p.x
+      return Math.abs(travel) < 48 || Math.sign(travel) !== Math.sign(dx) || Math.abs(travel) < Math.abs(end.y - p.y) * 1.5
+    })) return
+  }
+  const action = classifyHomeGesture(dx, dy, session.fingers)
+  if (action === 'overview-open') overview.value = true
+  if (action === 'overview-close') overview.value = false
+  if (!session.inOverview && action === 'next') navigate(activeIndex.value + 1)
+  if (!session.inOverview && action === 'previous') navigate(activeIndex.value - 1)
+}
 function resetTouch() { gesture = null; dragging.value = null }
-onMounted(() => { if (androidApps.supported) void androidApps.refresh().catch(() => {}) })
+function cancelInteraction() { blockedClick = true; pointers.clear(); if (gesture) gesture.cancelled = true; dragging.value = null }
+watch([editing, overview, picker], () => { if (gesture || pointers.size) cancelInteraction() }, { flush: 'sync' })
+function visibilityChanged() { if (document.visibilityState !== 'visible') cancelInteraction() }
+onMounted(() => { window.addEventListener('blur', cancelInteraction); window.addEventListener('pointerup', pointerEnd); window.addEventListener('pointercancel', outsidePointerCancel); document.addEventListener('visibilitychange', visibilityChanged); if (androidApps.supported) void androidApps.refresh().catch(() => {}) })
 function removeApp(id: string) { for (const page of state.value.pages) { const item = page.items.find(i => i.kind === 'app' && i.ref === id); if (item) removeHomeItem(state.value, page.id, item.id) } }
 function reorderApp(id: string, direction: -1 | 1) { const items = activePage.value.items; const from = items.findIndex(i => i.kind === 'app' && i.ref === id); const target = from + direction; if (from < 0 || target < 0 || target >= items.length) return; const [item] = items.splice(from, 1); items.splice(target, 0, item!) }
 defineExpose({ removeApp, reorderApp })
-onUnmounted(resetTouch)
+onUnmounted(() => { window.removeEventListener('blur', cancelInteraction); window.removeEventListener('pointerup', pointerEnd); window.removeEventListener('pointercancel', outsidePointerCancel); document.removeEventListener('visibilitychange', visibilityChanged); cancelInteraction(); resetTouch() })
 </script>
 <style scoped>
 .home-studio { --hw-bg: #10182d; --hw-surface: #17223a; --hw-text: #eef5ff; --hw-muted: #b9c6dc; --hw-accent: #7ce8f4; --hw-line: #36465f; color: var(--hw-text); background: var(--hw-bg); border: 1px solid var(--hw-line); border-radius: 22px; padding: 16px; min-width: 0; position: relative; flex-shrink: 0; }

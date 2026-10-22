@@ -138,6 +138,6 @@ export function removeHomeItem(state: HomeWorkspaceState, pageId: string, itemId
 export function classifyHomeGesture(dx: number, dy: number, fingers: number): 'overview-open' | 'overview-close' | 'previous' | 'next' | null {
   if (![dx, dy].every(Number.isFinite)) return null
   if (fingers === 3 && Math.abs(dy) >= 72 && Math.abs(dy) > Math.abs(dx)) return dy < 0 ? 'overview-open' : 'overview-close'
-  if (fingers === 1 && Math.abs(dx) >= 64 && Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'previous' : 'next'
+  if ((fingers === 1 || fingers === 2) && Math.abs(dx) >= 64 && Math.abs(dx) > Math.abs(dy) * (fingers === 2 ? 1.5 : 1)) return dx > 0 ? 'previous' : 'next'
   return null
 }

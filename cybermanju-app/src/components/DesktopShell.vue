@@ -849,7 +849,9 @@ onUnmounted(() => {
   /* The empty workspace stacks above the launcher. Let taps pass through it,
      while keeping the fullscreen app sheets themselves interactive. */
   .desktop-workspace { pointer-events: none; }
+  .desktop-strip { pointer-events: none; }
   .desktop-workspace :deep(.app-window) { pointer-events: auto; }
+  .desktop-strip :deep(.app-window) { pointer-events: auto; }
   .desktop-icons { display: none; }
 }
 </style>
