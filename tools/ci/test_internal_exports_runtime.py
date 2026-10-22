@@ -14,7 +14,8 @@ class InternalExportsTests(unittest.TestCase):
         self.cases = [f"CYBERMANJU_INTERNAL_EXPORTS:staged:PASS kind={kind} base={base:#x} reserved=40960 "
                       f"span=40960 pages=10 payload=1721 relas=6 symbol=0xffffffff88010000 field={base+32:#x} "
                       "compared=40960 registry_match=true" for kind in (2, 4)]
-        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
+        self.budget = "CYBERMANJU_INTERNAL_EXPORTS:budget:PASS rejected=5 early_precedence=2 reclaimed=8 exact_limit_staged=1 pages=10 chunks=10 compared=40960 pages_mapped=false"
+        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
 
     def test_valid_registry_is_not_linux_abi(self):
         r = verify(self.evidence())
@@ -44,7 +45,7 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_unique_complete_ordered_markers(self):
         good = self.evidence()
-        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, COMPLETE]:
+        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, COMPLETE]:
             for bad in (good.replace(marker + "\n", ""), good + marker + "\n", good.replace(marker, "echo " + marker)):
                 with self.assertRaises(ValueError): verify(bad)
         for bad in (good + "CYBERMANJU_OTHER:PASS\n", good.replace("kind=4", "kind=2"),
@@ -155,6 +156,45 @@ class InternalExportsTests(unittest.TestCase):
         for key in ("linux_abi_verified", "module_execution_verified", "linux_modules_executed", "init_called",
                     "production_mapping_available", "wx_verified", "smp_mapping_verified", "policy_owner_numeric_downgrade_available"):
             self.assertIs(r[key], False)
+
+    def test_budget_metadata_and_physical_failure_scope(self):
+        r = verify(self.evidence())
+        self.assertTrue(r["policy_budget_checks_verified"])
+        self.assertEqual((r["policy_budget_rejected_cases"], r["policy_budget_early_precedence_cases"],
+                          r["policy_budget_reclaimed_ranges"], r["policy_budget_exact_limit_staged_cases"],
+                          r["policy_budget_page_limit"], r["policy_budget_chunk_limit"],
+                          r["policy_budget_compared_bytes"]), (5, 2, 8, 1, 10, 10, 40960))
+        self.assertEqual(r["linux_admitted_exports"], 0)
+        for key in ("physical_allocator_failure_injected", "frame_copy_failure_injected", "linux_abi_verified",
+                    "module_execution_verified", "production_mapping_available", "smp_mapping_verified", "wx_verified"):
+            self.assertIs(r[key], False)
+
+    def test_budget_claims_are_complete(self):
+        good = self.evidence()
+        for old, new in [("rejected=5", "rejected=4"), ("early_precedence=2", "early_precedence=1"),
+                         ("reclaimed=8", "reclaimed=7"), ("exact_limit_staged=1", "exact_limit_staged=0"),
+                         ("budget_checks=true", "budget_checks=false")]:
+            with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+
+    def test_budget_must_follow_owner_before_cleanup(self):
+        good = self.evidence()
+        for index in (0, 1, 2, 3, 4, 5, 7, 8):
+            lines = good.splitlines()
+            lines.remove(self.budget)
+            lines.insert(index, self.budget)
+            with self.subTest(index=index), self.assertRaises(ValueError): verify("\n".join(lines))
+
+    def test_budget_chunk_limit_must_fit_fixture_bound(self):
+        good = self.evidence()
+        for value in (0, 1025):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "chunk budget"):
+                verify(good.replace("chunks=10", f"chunks={value}"))
+        for value in (1, 1024):
+            self.assertEqual(verify(good.replace("chunks=10", f"chunks={value}"))["policy_budget_chunk_limit"], value)
+
+    def test_old_owner_evidence_does_not_prove_budgets(self):
+        old = self.evidence().replace(self.budget + "\n", "").replace(" budget_checks=true", "")
+        with self.assertRaises(ValueError): verify(old)
 
     def test_geometry_and_full_readback(self):
         good = self.evidence()

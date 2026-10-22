@@ -408,6 +408,8 @@ fn cybermanju_internal_exports_runtime() {
         )
         .unwrap();
     let span = usize::try_from(fixture_layout.span()).unwrap();
+    let chunks = fixture_layout.placements().len();
+    assert!(chunks > 0);
     let mut expected = vec![0; span];
     for section in expected_prepared.sections() {
         let start = usize::try_from(section.placement().address - base as u64).unwrap();
@@ -426,6 +428,140 @@ fn cybermanju_internal_exports_runtime() {
     let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
     drop(raw);
     policy_reclaimed += 1;
+    let mut budget_rejected = 0usize;
+    let mut early_precedence = 0usize;
+    let mut budget_reclaimed = 0usize;
+    let budget_limits = [
+        PreparationLimits {
+            max_payload_bytes: 1_720,
+            ..limits
+        },
+        PreparationLimits {
+            max_relocation_entries: 5,
+            ..limits
+        },
+        PreparationLimits {
+            max_sections: 0,
+            ..limits
+        },
+        PreparationLimits {
+            max_pages: 9,
+            ..limits
+        },
+        PreparationLimits {
+            max_chunks: chunks - 1,
+            ..limits
+        },
+    ];
+    for restricted in budget_limits {
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert!(matches!(
+            NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        assert!(
+            matches!(
+                owner.prepare_and_stage(FIXTURE, restricted),
+                Err(Error::Plan(ElfError::ResourceLimit))
+            ),
+            "module policy budget must reject"
+        );
+        budget_rejected += 1;
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        budget_reclaimed += 1;
+    }
+    let (denied_bytes, _, _) = renamed_import_fixture(2);
+    for (restricted, expected_message) in [
+        (
+            PreparationLimits {
+                max_pages: 9,
+                ..limits
+            },
+            "policy staging page budget must precede payload resolution",
+        ),
+        (
+            PreparationLimits {
+                max_chunks: chunks - 1,
+                ..limits
+            },
+            "policy staging chunk budget must precede payload resolution",
+        ),
+    ] {
+        // The generated PC32 fixture names the known but ABI-denied OSTD export.
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert!(
+            matches!(
+                owner.prepare_and_stage(&denied_bytes, restricted),
+                Err(Error::Plan(ElfError::ResourceLimit))
+            ),
+            "{}",
+            expected_message
+        );
+        early_precedence += 1;
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        budget_reclaimed += 1;
+    }
+    let exact_limits = PreparationLimits {
+        max_pages: 10,
+        max_chunks: chunks,
+        max_payload_bytes: 1_721,
+        max_relocation_entries: 6,
+        max_sections: MAX_SECTIONS,
+    };
+    let exact_owner =
+        PolicyNearTextModuleLayout::new_signed32_at(FIXTURE, base, max_pages, MAX_SECTIONS, 65_536)
+            .unwrap();
+    let exact_layout = exact_owner.layout();
+    let expected_exact = SymbolResolver::new(FIXTURE, exact_layout, &[])
+        .unwrap()
+        .prepare_module(1_721, 6, MAX_SECTIONS)
+        .unwrap();
+    let exact_span = usize::try_from(exact_layout.span()).unwrap();
+    let mut expected_exact_bytes = vec![0; exact_span];
+    for section in expected_exact.sections() {
+        let start = usize::try_from(section.placement().address - base as u64).unwrap();
+        expected_exact_bytes[start..start + section.bytes().len()].copy_from_slice(section.bytes());
+    }
+    let exact_staged = exact_owner
+        .prepare_and_stage(FIXTURE, exact_limits)
+        .unwrap();
+    assert_eq!(
+        (exact_staged.page_count(), exact_staged.span()),
+        (10, 40_960)
+    );
+    let mut actual_exact_bytes = vec![0xff; exact_span];
+    exact_staged.read_bytes(0, &mut actual_exact_bytes).unwrap();
+    assert_eq!(actual_exact_bytes, expected_exact_bytes);
+    let exact_compared = actual_exact_bytes.len();
+    assert_eq!(exact_compared, 40_960);
+    assert!(matches!(
+        NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+        Err(ostd::Error::NoMemory)
+    ));
+    drop(exact_staged);
+    let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+    drop(raw);
+    budget_reclaimed += 1;
+    assert_eq!(
+        (budget_rejected, early_precedence, budget_reclaimed),
+        (5, 2, 8)
+    );
     assert_eq!(
         (ctor_abi, ctor_unknown, prepare_abi, policy_reclaimed),
         (2, 2, 2, 7)
@@ -446,6 +582,10 @@ fn cybermanju_internal_exports_runtime() {
         "CYBERMANJU_INTERNAL_EXPORTS:owner:PASS ctor_abi_rejections=2 ctor_unknown_rejections=2 prepare_abi_rejections=2 occupied_precedence=2 reclaimed_ranges=7 local_only_staged=1 compared=40960 typed_policy=true pages_mapped=false"
     );
     println!(
-        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true"
+        "CYBERMANJU_INTERNAL_EXPORTS:budget:PASS rejected={} early_precedence={} reclaimed={} exact_limit_staged=1 pages=10 chunks={} compared={} pages_mapped=false",
+        budget_rejected, early_precedence, budget_reclaimed, chunks, exact_compared
+    );
+    println!(
+        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true"
     );
 }

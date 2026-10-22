@@ -105,11 +105,22 @@ impl PolicyNearTextModuleLayout {
     /// Revalidate current bytes against the same fixed policy and stage data.
     /// This consumes the owner on success or error. No exports or policy are
     /// caller-selectable; preparation still does not authorize execution.
+    /// With the known fixed, paginated layout, page/chunk budget rejection has
+    /// priority before the resolver examines current bytes or prepares payload.
+    /// This is not authentication or proof against physical allocation failure
+    /// or OOM; the pipeline retains its other limits and structural checks.
     pub fn prepare_and_stage(
         self,
         bytes: &[u8],
         limits: PreparationLimits,
     ) -> Result<PolicyNearTextPreparedModule, Error> {
+        let span = usize::try_from(self.inner.layout.span())
+            .map_err(|_| Error::Plan(linux_module_elf::Error::LayoutOverflow))?;
+        if span / PAGE_SIZE > limits.max_pages
+            || self.inner.layout.placements().len() > limits.max_chunks
+        {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
         let prepared = self
             .registry
             .linux_symbol_resolver(bytes, &self.inner.layout)
