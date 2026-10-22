@@ -31,6 +31,8 @@ pub use reserved::{PreparationLimits, ReservedModuleLayout, ReservedPreparedModu
 mod near_text;
 #[cfg(target_arch = "x86_64")]
 pub use near_text::{NearTextModuleLayout, NearTextPreparedModule};
+#[cfg(target_arch = "x86_64")]
+pub use near_text::{PolicyNearTextModuleLayout, PolicyNearTextPreparedModule};
 
 /// A failed transfer never returns a partially staged owner.
 #[derive(Debug)]

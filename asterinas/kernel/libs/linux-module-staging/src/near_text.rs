@@ -25,6 +25,144 @@ pub struct NearTextModuleLayout {
     reservation: NearTextAddressReservation,
 }
 
+/// Fixed-policy signed-32 owner using only the closed OSTD export registry.
+///
+/// The registry currently rejects every Linux import (its sole symbol has a
+/// Rust-internal ABI). Consequently only local/no-import modules can prepare;
+/// this is not Linux ABI approval. Construction and preparation are structural,
+/// not cryptographic authentication. Preparation rechecks the current bytes and
+/// consumes this owner on every error. OOM in kernel allocator bookkeeping is
+/// outside `Result`. This constructor is fixed-base and x86_64-only; it does not
+/// search, fall back, accept caller exports or create payload/frames.
+pub struct PolicyNearTextModuleLayout {
+    inner: NearTextModuleLayout,
+    registry: crate::OstdExportRegistry,
+}
+
+/// Private staged result of the fixed OSTD-policy path.
+pub struct PolicyNearTextPreparedModule {
+    inner: NearTextPreparedModule,
+}
+
+impl PolicyNearTextModuleLayout {
+    /// Claim a real signed-32 reservation at exactly `base` and check the
+    /// closed OSTD import policy and relocation reach. No search or fallback.
+    /// Only local/no-import modules currently pass the OSTD policy; success is
+    /// not Linux ABI approval or cryptographic authentication. Kernel
+    /// bookkeeping OOM remains outside `Result`.
+    #[cfg(target_arch = "x86_64")]
+    pub fn new_signed32_at(
+        bytes: &[u8],
+        base: Vaddr,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+    ) -> Result<Self, Error> {
+        if PAGE_SIZE != 4096 {
+            return Err(Error::UnsupportedPageSize);
+        }
+        let max_span = max_pages
+            .checked_mul(PAGE_SIZE)
+            .ok_or(Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        let bound =
+            page_layout_span_bound(bytes, max_span as u64, max_sections).map_err(Error::Plan)?;
+        let span = usize::try_from(bound)
+            .map_err(|_| Error::Plan(linux_module_elf::Error::ResourceLimit))?;
+        if span == 0 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+
+        let reservation = NearTextAddressReservation::new_signed32_at(base, span, max_pages)
+            .map_err(Error::AddressSpace)?;
+        let layout = plan_page_layout(bytes, reservation.range().start as u64, bound, max_sections)
+            .map_err(Error::Plan)?;
+        if layout.span() == 0 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+        let registry = crate::OstdExportRegistry::new();
+        registry
+            .linux_symbol_resolver(bytes, &layout)
+            .map_err(Error::Plan)?
+            .check_relocation_reach(max_entries)
+            .map_err(Error::Plan)?;
+        let inner = NearTextModuleLayout {
+            layout,
+            reservation,
+        };
+        Ok(Self { inner, registry })
+    }
+
+    /// Planned layout metadata; borrowing it does not transfer reservation ownership.
+    pub fn layout(&self) -> &Layout {
+        self.inner.layout()
+    }
+
+    /// Exact reserved virtual interval, in the real signed-32 address range.
+    pub fn range(&self) -> Range<Vaddr> {
+        self.inner.range()
+    }
+
+    /// Revalidate current bytes against the same fixed policy and stage data.
+    /// This consumes the owner on success or error. No exports or policy are
+    /// caller-selectable; preparation still does not authorize execution.
+    pub fn prepare_and_stage(
+        self,
+        bytes: &[u8],
+        limits: PreparationLimits,
+    ) -> Result<PolicyNearTextPreparedModule, Error> {
+        let prepared = self
+            .registry
+            .linux_symbol_resolver(bytes, &self.inner.layout)
+            .map_err(Error::Plan)?
+            .prepare_module(
+                limits.max_payload_bytes,
+                limits.max_relocation_entries,
+                limits.max_sections,
+            )
+            .map_err(Error::Plan)?;
+        let staging = stage_prepared(
+            &prepared,
+            &self.inner.layout,
+            limits.max_pages,
+            limits.max_chunks,
+        )?;
+        Ok(PolicyNearTextPreparedModule {
+            inner: NearTextPreparedModule {
+                layout: self.inner.layout,
+                staging,
+                reservation: self.inner.reservation,
+            },
+        })
+    }
+}
+
+impl PolicyNearTextPreparedModule {
+    /// Staged layout metadata only.
+    pub fn layout(&self) -> &Layout {
+        self.inner.layout()
+    }
+
+    /// Exact reserved virtual interval; staging frames remain accessed by aliases.
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.inner.reserved_range()
+    }
+
+    /// Actual staged byte span, including layout gaps and tails.
+    pub fn span(&self) -> usize {
+        self.inner.span()
+    }
+
+    /// Number of private staging pages.
+    pub fn page_count(&self) -> usize {
+        self.inner.page_count()
+    }
+
+    /// Read staged bytes without exposing a pointer or mapping.
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.inner.read_bytes(offset, out)
+    }
+}
+
 impl NearTextModuleLayout {
     /// Reserve and preflight a fixed base; there is no search or fallback.
     ///

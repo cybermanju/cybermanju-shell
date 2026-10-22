@@ -13,8 +13,10 @@ ADMISSION = PREFIX + ("admission:PASS described=1 rust_internal=1 rejected_abi=1
                       "numeric_export_preserved=true no_admitted_linux_exports=true")
 RESOLVER = PREFIX + ("resolver:PASS checked_abi_rejections=2 checked_unknown_rejections=2 "
                      "preflight_rejections=2 local_only_prepared=1 numeric_fallback=false")
+OWNER = PREFIX + ("owner:PASS ctor_abi_rejections=2 ctor_unknown_rejections=2 prepare_abi_rejections=2 "
+                  "occupied_precedence=2 reclaimed_ranges=7 local_only_staged=1 compared=40960 typed_policy=true pages_mapped=false")
 COMPLETE = PREFIX + ("complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 "
-                     "compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true")
+                     "compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true")
 STAGED = re.compile(re.escape(PREFIX + "staged:PASS ") +
                     r"kind=([0-9]+) base=(0x[0-9a-fA-F]+) reserved=([0-9]+) span=([0-9]+) "
                     r"pages=([0-9]+) payload=([0-9]+) relas=([0-9]+) symbol=(0x[0-9a-fA-F]+) "
@@ -28,13 +30,14 @@ def verify(text: str) -> dict:
     lines = text.splitlines()
     markers = [line for line in lines if "CYBERMANJU_" in line]
     staged = [m for line in markers if (m := STAGED.fullmatch(line))]
-    if (len(markers) != 6 or markers.count(BEGIN) != 1 or markers.count(COMPLETE) != 1
+    if (len(markers) != 7 or markers.count(BEGIN) != 1 or markers.count(COMPLETE) != 1
             or markers.count(ADMISSION) != 1 or markers[1] != ADMISSION
-            or markers.count(RESOLVER) != 1 or markers[-2] != RESOLVER
+            or markers.count(RESOLVER) != 1 or markers[-3] != RESOLVER
+            or markers.count(OWNER) != 1 or markers[-2] != OWNER
             or len(staged) != 2 or [int(m[1]) for m in staged] != [2, 4]
-            or set(markers) != {BEGIN, ADMISSION, RESOLVER, COMPLETE, *(m[0] for m in staged)}
+            or set(markers) != {BEGIN, ADMISSION, RESOLVER, OWNER, COMPLETE, *(m[0] for m in staged)}
             or markers[0] != BEGIN or markers[-1] != COMPLETE):
-        raise ValueError("Expected unique ordered registry/ABI-rejection/PC32/PLT32/provider/cleanup markers")
+        raise ValueError("Expected unique ordered registry/ABI-rejection/PC32/PLT32/provider/owner/cleanup markers")
     summaries = [line for line in lines if "test result:" in line.lower()]
     if len(summaries) != 1 or not SUMMARY.fullmatch(summaries[0]) or lines.index(summaries[0]) < lines.index(COMPLETE):
         raise ValueError("Expected one successful native summary after cleanup")
@@ -54,6 +57,8 @@ def verify(text: str) -> dict:
                       "field": hex(field), "compared": compared, "registry_match": True})
     if any(cases[0][key] != cases[1][key] for key in ("base", "reserved_bytes", "span", "pages", "payload", "relocations", "symbol")):
         raise ValueError("Both fixture mutations must share registry address and geometry")
+    if cases[0]["span"] != 40960:
+        raise ValueError("Typed owner and numeric fixture must share their full readback span")
     return {
         "status": "passed", "scope": "internal_ostd_export_registry_data_only",
         "runtime_tests": 1, "failed": 0, "internal_registry_lookup_verified": True,
@@ -67,6 +72,11 @@ def verify(text: str) -> dict:
         "policy_symbol_resolver_verified": True, "policy_numeric_fallback_available": False,
         "policy_abi_rejected_prepare_cases": 2, "policy_unknown_rejected_prepare_cases": 2,
         "policy_preflight_rejected_cases": 2, "policy_local_only_prepared_cases": 1,
+        "typed_policy_owner_verified": True, "policy_owner_ctor_abi_rejections": 2,
+        "policy_owner_ctor_unknown_rejections": 2, "policy_owner_prepare_abi_rejections": 2,
+        "policy_owner_occupied_precedence_cases": 2, "policy_owner_reclaimed_ranges": 7,
+        "policy_owner_local_only_staged_cases": 1, "policy_owner_compared_bytes": 40960,
+        "policy_owner_numeric_downgrade_available": False,
         "kernel_linux_export_lookup_available": False, "linux_abi_verified": False,
         "pages_mapped": False, "production_mapping_available": False, "module_execution_verified": False,
         "linux_modules_executed": False, "init_called": False, "wx_verified": False, "smp_mapping_verified": False,

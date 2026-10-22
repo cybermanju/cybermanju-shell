@@ -12,7 +12,7 @@ use ostd::{
 use super::{FIXTURE, MAX_SECTIONS, MAX_SPAN, PreparationLimits, relative_import_fixture};
 use crate::{
     Error, ExportAbi, ExportSignature, LinuxExportAdmissionError, NearTextModuleLayout,
-    OSTD_NUM_CPUS_EXPORT_NAME, OstdExportRegistry,
+    OSTD_NUM_CPUS_EXPORT_NAME, OstdExportRegistry, PolicyNearTextModuleLayout,
 };
 
 fn u32_at(bytes: &[u8], offset: usize) -> u32 {
@@ -181,6 +181,11 @@ fn cybermanju_internal_exports_runtime() {
     let mut compared = 0usize;
     let mut missing = 0usize;
     let mut reclaimed = 0usize;
+    let mut policy_reclaimed = 0usize;
+    let mut ctor_abi = 0usize;
+    let mut ctor_unknown = 0usize;
+    let mut prepare_abi = 0usize;
+    let mut occupied_precedence = 0usize;
     for kind in [2u32, 4] {
         let (original, _alias, target, offset) = relative_import_fixture(kind);
         let checked_layout =
@@ -243,6 +248,80 @@ fn cybermanju_internal_exports_runtime() {
             "policy resolver must not fall back to numeric exports"
         );
         checked_abi += 1;
+        let held = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        assert!(
+            matches!(
+                PolicyNearTextModuleLayout::new_signed32_at(
+                    &bytes,
+                    base,
+                    max_pages,
+                    MAX_SECTIONS,
+                    65_536
+                ),
+                Err(Error::AddressSpace(ostd::Error::NoMemory))
+            ),
+            "policy owner must claim before admission"
+        );
+        drop(held);
+        occupied_precedence += 1;
+        assert!(
+            matches!(
+                PolicyNearTextModuleLayout::new_signed32_at(
+                    &bytes,
+                    base,
+                    max_pages,
+                    MAX_SECTIONS,
+                    65_536
+                ),
+                Err(Error::Plan(ElfError::ExportNotAdmitted))
+            ),
+            "policy owner constructor must enforce admission"
+        );
+        ctor_abi += 1;
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        policy_reclaimed += 1;
+        assert!(
+            matches!(
+                PolicyNearTextModuleLayout::new_signed32_at(
+                    &original,
+                    base,
+                    max_pages,
+                    MAX_SECTIONS,
+                    65_536
+                ),
+                Err(Error::Plan(ElfError::MissingSymbol))
+            ),
+            "policy owner constructor must reject unknown imports"
+        );
+        ctor_unknown += 1;
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        policy_reclaimed += 1;
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert_eq!(owner.range(), base..base + envelope);
+        assert!(matches!(
+            NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        assert!(
+            matches!(
+                owner.prepare_and_stage(&bytes, limits),
+                Err(Error::Plan(ElfError::ExportNotAdmitted))
+            ),
+            "policy owner prepare must revalidate admission"
+        );
+        prepare_abi += 1;
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        policy_reclaimed += 1;
         let expected_prepared = SymbolResolver::new(&bytes, &page_layout, exports)
             .unwrap()
             .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
@@ -315,6 +394,43 @@ fn cybermanju_internal_exports_runtime() {
         drop(raw);
         reclaimed += 1;
     }
+    let policy_owner =
+        PolicyNearTextModuleLayout::new_signed32_at(FIXTURE, base, max_pages, MAX_SECTIONS, 65_536)
+            .unwrap();
+    assert_eq!(policy_owner.range(), base..base + envelope);
+    let fixture_layout = policy_owner.layout();
+    let expected_prepared = SymbolResolver::new(FIXTURE, fixture_layout, &[])
+        .unwrap()
+        .prepare_module(
+            limits.max_payload_bytes,
+            limits.max_relocation_entries,
+            limits.max_sections,
+        )
+        .unwrap();
+    let span = usize::try_from(fixture_layout.span()).unwrap();
+    let mut expected = vec![0; span];
+    for section in expected_prepared.sections() {
+        let start = usize::try_from(section.placement().address - base as u64).unwrap();
+        expected[start..start + section.bytes().len()].copy_from_slice(section.bytes());
+    }
+    let staged = policy_owner.prepare_and_stage(FIXTURE, limits).unwrap();
+    assert_eq!((staged.span(), staged.page_count()), (40_960, 10));
+    let mut actual = vec![0xff; span];
+    staged.read_bytes(0, &mut actual).unwrap();
+    assert_eq!(actual, expected);
+    assert!(matches!(
+        NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+        Err(ostd::Error::NoMemory)
+    ));
+    drop(staged);
+    let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+    drop(raw);
+    policy_reclaimed += 1;
+    assert_eq!(
+        (ctor_abi, ctor_unknown, prepare_abi, policy_reclaimed),
+        (2, 2, 2, 7)
+    );
+    assert_eq!(occupied_precedence, 2);
     assert_eq!((compared, missing, reclaimed), (2 * 40_960, 2, 4));
     assert_eq!(
         (checked_abi, checked_unknown, preflight_rejections),
@@ -327,6 +443,9 @@ fn cybermanju_internal_exports_runtime() {
         local_only_prepared
     );
     println!(
-        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true"
+        "CYBERMANJU_INTERNAL_EXPORTS:owner:PASS ctor_abi_rejections=2 ctor_unknown_rejections=2 prepare_abi_rejections=2 occupied_precedence=2 reclaimed_ranges=7 local_only_staged=1 compared=40960 typed_policy=true pages_mapped=false"
+    );
+    println!(
+        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true"
     );
 }

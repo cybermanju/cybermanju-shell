@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 
-from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, PAGE, POOL_START, RESOLVER, verify
+from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, OWNER, PAGE, POOL_START, RESOLVER, verify
 
 
 class InternalExportsTests(unittest.TestCase):
@@ -14,7 +14,7 @@ class InternalExportsTests(unittest.TestCase):
         self.cases = [f"CYBERMANJU_INTERNAL_EXPORTS:staged:PASS kind={kind} base={base:#x} reserved=40960 "
                       f"span=40960 pages=10 payload=1721 relas=6 symbol=0xffffffff88010000 field={base+32:#x} "
                       "compared=40960 registry_match=true" for kind in (2, 4)]
-        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
+        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
 
     def test_valid_registry_is_not_linux_abi(self):
         r = verify(self.evidence())
@@ -30,6 +30,12 @@ class InternalExportsTests(unittest.TestCase):
         self.assertFalse(r["policy_numeric_fallback_available"])
         self.assertEqual((r["policy_abi_rejected_prepare_cases"], r["policy_unknown_rejected_prepare_cases"],
                           r["policy_preflight_rejected_cases"], r["policy_local_only_prepared_cases"]), (2, 2, 2, 1))
+        self.assertTrue(r["typed_policy_owner_verified"])
+        self.assertEqual((r["policy_owner_ctor_abi_rejections"], r["policy_owner_ctor_unknown_rejections"],
+                          r["policy_owner_prepare_abi_rejections"], r["policy_owner_occupied_precedence_cases"],
+                          r["policy_owner_reclaimed_ranges"], r["policy_owner_local_only_staged_cases"],
+                          r["policy_owner_compared_bytes"]), (2, 2, 2, 2, 7, 1, 40960))
+        self.assertFalse(r["policy_owner_numeric_downgrade_available"])
         for key in ("internal_registry_lookup_verified", "full_span_readback_verified", "fixture_imports_renamed_for_internal_registry"):
             self.assertTrue(r[key])
         for key in ("kernel_linux_export_lookup_available", "linux_abi_verified", "pages_mapped", "production_mapping_available",
@@ -38,7 +44,7 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_unique_complete_ordered_markers(self):
         good = self.evidence()
-        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, COMPLETE]:
+        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, COMPLETE]:
             for bad in (good.replace(marker + "\n", ""), good + marker + "\n", good.replace(marker, "echo " + marker)):
                 with self.assertRaises(ValueError): verify(bad)
         for bad in (good + "CYBERMANJU_OTHER:PASS\n", good.replace("kind=4", "kind=2"),
@@ -111,6 +117,43 @@ class InternalExportsTests(unittest.TestCase):
         self.assertEqual(r["linux_admitted_exports"], 0)
         for key in ("linux_abi_verified", "linux_modules_executed", "module_execution_verified", "init_called",
                     "production_mapping_available", "smp_mapping_verified", "wx_verified", "policy_numeric_fallback_available"):
+            self.assertIs(r[key], False)
+
+    def test_owner_requires_all_transactional_proofs(self):
+        good = self.evidence()
+        for old, new in [("ctor_abi_rejections=2", "ctor_abi_rejections=1"),
+                         ("ctor_unknown_rejections=2", "ctor_unknown_rejections=0"),
+                         ("prepare_abi_rejections=2", "prepare_abi_rejections=0"),
+                         ("occupied_precedence=2", "occupied_precedence=0"),
+                         ("reclaimed_ranges=7", "reclaimed_ranges=6"),
+                         ("local_only_staged=1", "local_only_staged=0"),
+                         ("typed_policy=true", "typed_policy=false"), ("policy_owner=true", "policy_owner=false")]:
+            with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+
+    def test_owner_must_follow_provider_before_cleanup(self):
+        good = self.evidence()
+        for index in (0, 1, 2, 3, 4, 6, 7):
+            lines = good.splitlines()
+            lines.remove(OWNER)
+            lines.insert(index, OWNER)
+            with self.subTest(index=index), self.assertRaises(ValueError): verify("\n".join(lines))
+
+    def test_provider_only_evidence_cannot_prove_owner(self):
+        old = self.evidence().replace(OWNER + "\n", "").replace(" policy_owner=true", "")
+        with self.assertRaises(ValueError): verify(old)
+
+    def test_typed_owner_span_must_match_numeric_fixture(self):
+        good = self.evidence()
+        for case in self.cases:
+            good = good.replace(case, case.replace("span=40960", "span=8192").replace("pages=10", "pages=2").replace("compared=40960", "compared=8192"))
+        with self.assertRaisesRegex(ValueError, "Typed owner"): verify(good)
+
+    def test_typed_policy_does_not_promote_execution_or_global_admission(self):
+        r = verify(self.evidence())
+        self.assertTrue(r["typed_policy_owner_verified"])
+        self.assertEqual(r["linux_admitted_exports"], 0)
+        for key in ("linux_abi_verified", "module_execution_verified", "linux_modules_executed", "init_called",
+                    "production_mapping_available", "wx_verified", "smp_mapping_verified", "policy_owner_numeric_downgrade_available"):
             self.assertIs(r[key], False)
 
     def test_geometry_and_full_readback(self):
