@@ -79,12 +79,17 @@ class RuntimeEvidenceTests(unittest.TestCase):
             config.write_text("user configuration must survive\n")
             out = root / "artifacts/runtime"
             out.mkdir(parents=True)
-            (out / "result.json").write_text('{"status":"passed"}')
-            result = subprocess.run(["bash", str(script), str(out)], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 2)
-            self.assertEqual(config.read_text(), "user configuration must survive\n")
-            self.assertEqual(json.loads((out / "result.json").read_text())["status"], "not_verified")
-            self.assertFalse((out / "osdk-build.log").exists())
+            for mode in ([], ["--signed32-mapping-fault"]):
+                with self.subTest(mode=mode):
+                    (out / "result.json").write_text('{"status":"passed"}')
+                    result = subprocess.run(
+                        ["bash", str(script), str(out), *mode],
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(config.read_text(), "user configuration must survive\n")
+                    self.assertEqual(json.loads((out / "result.json").read_text())["status"], "not_verified")
+                    self.assertFalse((out / "osdk-build.log").exists())
 
 
 class AddressReservationTests(unittest.TestCase):

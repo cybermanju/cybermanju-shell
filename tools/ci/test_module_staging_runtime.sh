@@ -66,6 +66,12 @@ case ${2:-} in
         FILTER=cybermanju_module_address_runtime
         VERIFY=verify_module_address_runtime.py
         ;;
+    --signed32-mapping-fault)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_signed32_mapping_fault_runtime
+        VERIFY=verify_signed32_mapping_fault_runtime.py
+        ;;
     --near-text-collision)
         CRATE=ostd
         CRATE_PATH=ostd

@@ -78,6 +78,18 @@ pub(crate) fn read_scoped(
     offset: usize,
     out: &mut [u8],
 ) -> Result<(), Error> {
+    read_scoped_inner(reservation, span, frames, offset, out, None, &mut 0)
+}
+
+fn read_scoped_inner(
+    reservation: &NearTextAddressReservation,
+    span: usize,
+    frames: impl ExactSizeIterator<Item = Frame<()>> + Clone,
+    offset: usize,
+    out: &mut [u8],
+    fault_after: Option<usize>,
+    observed_installed: &mut usize,
+) -> Result<(), Error> {
     let end = offset.checked_add(out.len()).ok_or(Error::Overflow)?;
     let range = reservation.range();
     let arena = NearTextAddressReservation::signed32_arena_range();
@@ -120,7 +132,40 @@ pub(crate) fn read_scoped(
             cache: CachePolicy::Writeback,
             priv_flags: PrivilegedPageFlags::GLOBAL,
         };
-        for frame in frames {
+        macro_rules! audit_fault_prefix {
+            ($pages:expr) => {{
+                let mut observed = 0;
+                for (page, expected_frame) in expected_frames.clone().take($pages).enumerate() {
+                    cursor.jump(range.start + page * PAGE_SIZE)?;
+                    let Some(MappedItemRef::Tracked(actual, actual_prop)) = cursor.query()?.1
+                    else {
+                        panic!("injected fault prefix PTE missing");
+                    };
+                    assert_eq!(actual.paddr(), expected_frame.paddr());
+                    let mut expected_prop = prop;
+                    expected_prop.priv_flags |= PrivilegedPageFlags::AVAIL1;
+                    assert_eq!(actual_prop, expected_prop);
+                    observed += 1;
+                }
+                assert_eq!(
+                    observed, $pages,
+                    "signed32 fault must follow expected installed prefix"
+                );
+                for address in (range.start + observed * PAGE_SIZE..range.end).step_by(PAGE_SIZE) {
+                    cursor.jump(address)?;
+                    assert!(
+                        cursor.query()?.1.is_none(),
+                        "fault checkpoint suffix/slack must be unmapped"
+                    );
+                }
+                *observed_installed = observed;
+            }};
+        }
+        if fault_after == Some(0) {
+            audit_fault_prefix!(0);
+            return Err(Error::IoError);
+        }
+        for (index, frame) in frames.enumerate() {
             if scope.installed.end >= range.start + span {
                 return Err(Error::InvalidArgs);
             }
@@ -129,6 +174,10 @@ pub(crate) fn read_scoped(
             // supervisor WB/RW without X; no pointer or callback escapes.
             unsafe {
                 cursor.map(MappedItem::Tracked(Frame::from_unsized(frame), prop));
+            }
+            if fault_after == Some(index + 1) {
+                audit_fault_prefix!(index + 1);
+                return Err(Error::IoError);
             }
         }
     }
@@ -173,3 +222,6 @@ pub(crate) fn read_scoped(
     assert_unmapped(reservation);
     Ok(())
 }
+
+#[cfg(ktest)]
+mod fault_runtime;

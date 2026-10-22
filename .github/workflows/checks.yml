@@ -128,6 +128,8 @@ jobs:
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --address-reservation
       - name: Verify near-text foreign-PTE fault injection, not production mapping
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/near-text-collision-runtime --near-text-collision
+      - name: Verify signed32 partial mapping rollback and preservation of a foreign PTE
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-mapping-fault-runtime --signed32-mapping-fault
       - name: Verify module mapping calls are rejected under two-CPU topology (one test, three calls; no mappings)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/module-mapping-smp-rejection --smp-rejection
       - name: Verify local global-TLB invalidation encoding, aggregation and stale readback (one CPU)
@@ -166,6 +168,10 @@ jobs:
             artifacts/near-text-collision-runtime/*.json
             artifacts/near-text-collision-runtime/*.txt
             artifacts/near-text-collision-runtime/harness-Cargo.*
+            artifacts/signed32-mapping-fault-runtime/*.log
+            artifacts/signed32-mapping-fault-runtime/*.json
+            artifacts/signed32-mapping-fault-runtime/*.txt
+            artifacts/signed32-mapping-fault-runtime/harness-Cargo.*
             artifacts/module-mapping-smp-rejection/*.log
             artifacts/module-mapping-smp-rejection/*.json
             artifacts/module-mapping-smp-rejection/*.txt
