@@ -165,9 +165,18 @@ impl FrameBuffer {
         self.byte_len
     }
 
-    /// Returns a reference to the `IoMem` instance of the framebuffer.
+    /// Returns the raw page-rounded mapping, which may include a page tail
+    /// beyond the declared surface. Prefer [`Self::surface_io_mem`] for byte I/O.
     pub fn io_mem(&self) -> &IoMem {
         &self.io_mem
+    }
+
+    /// Returns a byte-granular view limited to the declared surface.
+    ///
+    /// Use this for byte I/O, not page-granular mmap. It shares the existing
+    /// mapping/reservation but does not expose the mapped page-tail bytes.
+    pub fn surface_io_mem(&self) -> IoMem {
+        self.io_mem.slice(0..self.byte_len)
     }
 
     /// Returns the pixel format of the framebuffer.

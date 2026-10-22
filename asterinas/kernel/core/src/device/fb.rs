@@ -312,7 +312,7 @@ impl FbHandle {
     fn collect_fix_screen_info(&self) -> FbFixScreenInfo {
         FbFixScreenInfo {
             smem_start: self.framebuffer.io_mem().paddr() as u64,
-            smem_len: self.framebuffer.io_mem().size() as u32,
+            smem_len: self.framebuffer.byte_len() as u32,
             line_length: self.framebuffer.line_size() as u32,
             ..Default::default()
         }
@@ -421,7 +421,7 @@ impl FileOps for FbHandle {
             return Ok(0);
         }
 
-        let io_mem = self.framebuffer.io_mem();
+        let io_mem = self.framebuffer.surface_io_mem();
         let size = io_mem.size();
         if offset >= size {
             return Ok(0);
@@ -461,7 +461,7 @@ impl FileOps for FbHandle {
             return Ok(0);
         }
 
-        let io_mem = self.framebuffer.io_mem();
+        let io_mem = self.framebuffer.surface_io_mem();
         let size = io_mem.size();
         if offset >= size {
             return_errno_with_message!(

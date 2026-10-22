@@ -2,7 +2,13 @@
 //! Real boot framebuffer MMIO in a disposable VGA/TCG VM, not GPU acceleration.
 use alloc::{sync::Arc, vec::Vec};
 
-use ostd::{Error, boot::boot_info, mm::VmIo, prelude::*, sync::Mutex};
+use ostd::{
+    Error,
+    boot::boot_info,
+    mm::{HasPaddr, HasSize, VmIo, VmReader, VmWriter},
+    prelude::*,
+    sync::Mutex,
+};
 
 use crate::{
     framebuffer,
@@ -116,6 +122,51 @@ fn cybermanju_framebuffer_runtime() {
         "rejected writes must not modify even an in-range prefix"
     );
     println!("CYBERMANJU_FRAMEBUFFER:surface_bounds:PASS cases=6 bytes=24");
+
+    // fbdev byte I/O must use this bounded view, not the larger raw mapping.
+    // mmap remains page-granular and is intentionally outside this contract.
+    let surface = short.surface_io_mem();
+    assert_eq!(surface.size(), 24);
+    assert_eq!(surface.paddr(), fb.io_mem().paddr());
+    let mut saved_view = [0; 16];
+    fb.io_mem().read_bytes(16, &mut saved_view).unwrap();
+    fb.io_mem().write_bytes(16, &[0x6d; 16]).unwrap();
+
+    let input = [0xa5; 2];
+    let mut reader = VmReader::from(input.as_slice()).to_fallible();
+    assert!(matches!(
+        surface.write_fallible(23, &mut reader),
+        Err((Error::InvalidArgs, 0))
+    ));
+    assert_eq!(reader.remain(), 2);
+    let mut output = [0x9a; 2];
+    let mut writer = VmWriter::from(output.as_mut_slice()).to_fallible();
+    assert!(matches!(
+        surface.read_fallible(23, &mut writer),
+        Err((Error::InvalidArgs, 0))
+    ));
+    assert_eq!(writer.avail(), 2);
+    drop(writer);
+    assert_eq!(output, [0x9a; 2]);
+    let mut observed_view = [0; 16];
+    fb.io_mem().read_bytes(16, &mut observed_view).unwrap();
+    assert_eq!(observed_view, [0x6d; 16], "no prefix write on rejection");
+
+    let mut reader = VmReader::from(&input[..1]).to_fallible();
+    assert_eq!(surface.write_fallible(23, &mut reader).unwrap(), 1);
+    assert_eq!(reader.remain(), 0);
+    let mut output = [0; 1];
+    let mut writer = VmWriter::from(output.as_mut_slice()).to_fallible();
+    assert_eq!(surface.read_fallible(23, &mut writer).unwrap(), 1);
+    assert_eq!(writer.avail(), 0);
+    drop(writer);
+    assert_eq!(output, [0xa5]);
+    fb.io_mem().read_bytes(16, &mut observed_view).unwrap();
+    assert_eq!(&observed_view[..7], &[0x6d; 7]);
+    assert_eq!(observed_view[7], 0xa5);
+    assert_eq!(&observed_view[8..], &[0x6d; 8]);
+    fb.io_mem().write_bytes(16, &saved_view).unwrap();
+    println!("CYBERMANJU_FRAMEBUFFER:surface_view:PASS cases=4 bytes=24 guard_bytes=8");
 
     // Exercise the public console paths on a non-page-sized logical surface.
     // The original console allocated by the larger mapping and panicked here.

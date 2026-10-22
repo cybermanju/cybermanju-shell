@@ -1,6 +1,6 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: oito bytes foram lidos no CPU remoto antes e depois da troca de um frame real.** A leitura passou, mas **omitir o shootdown também passou no TCG**: ainda não é uma prova causal de invalidação TLB ou autorização de mapping SMP. O controle de payload incorreto falhou como esperado.
+**Avanço mais recente do TLB: oito bytes foram lidos no CPU remoto antes e depois da troca de um frame real.** A leitura passou, mas **omitir o shootdown também passou no TCG**: ainda não é uma prova causal de invalidação TLB ou autorização de mapping SMP. O controle de payload incorreto falhou como esperado.
 
 **Etapa anterior:** passou a prova de despacho e confirmação de pedidos TLB entre duas CPUs em QEMU. Foram observados quatro lotes no CPU remoto e um no emissor, com dois lotes inclusivos GLOBAL no remoto. **Isso prova o caminho de pedidos/espera, não a coerência de traduções, liberação de frames ou suporte SMP do loader.**
 
@@ -19,6 +19,8 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 **Avanço gráfico posterior:** o [contrato de framebuffer e o readback MMIO em QEMU](hardware-graphics-compatibility.md) passaram em VMs mínimas; o staging bruto foi revalidado com o novo header Multiboot2. Essa prova não executa `.ko`, não resolve placement/W^X e não revalida o boot instalado desta revisão. As contagens e fixtures abaixo descrevem a rodada de integração ELF→frames, não uma nova qualificação universal.
 
 **Integração gráfica mais recente:** o [console de framebuffer](hardware-graphics-compatibility.md) foi corrigido para não confundir span lógico com capacidade MMIO. Dois controles negativos reproduziram panics de ativação e scroll; os três caminhos públicos testados passaram após a correção, com bytes de guarda intactos. Passaram 2 ktests gráficos, 131 regressões e type-check. Isso não muda o loader, ABI ou a lista de módulos/versões/arquiteturas qualificadas.
+
+**Integração gráfica posterior:** [fbdev usa agora uma view limitada ao span lógico](hardware-graphics-compatibility.md) para read/write e informa esse span em `smem_len`. Quatro casos MMIO passaram em superfície curta com guards; mmap permanece por páginas e a ABI de userspace não foi exercitada. Passaram 169 regressões Python, quatro ktests em VMs separadas (contrato, gráfico, staging bruto e fixture preparada) e type-check de `aster-core`/framebuffer com o VDSO real fixado no projeto. Nenhum novo módulo, ABI Linux, arquitetura, init/exit, GPUI nativo ou hardware físico foi qualificado.
 
 ## Matriz atual
 
@@ -277,6 +279,8 @@ O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) agora preserva pedidos GLOBAL
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
+
+Na base [`34dd887`, run 39701305916](https://github.com/cybermanju/cybermanju-shell/actions/runs/39701305916), os sete jobs foram confirmados como `completed/success`, incluindo `ostd-check`. Há agora uma execução posterior com todos os jobs concluídos; a consulta antiga continua registrada como fotografia daquela revisão. Isso não aprova automaticamente a nova correção de fbdev. A ISO `39701305949` continuava em execução na consulta inicial; não foi cancelada e não há novo aceite de boot instalado nesta rodada.
 
 A [consulta da base `8e86637`, run 39698451069](https://github.com/cybermanju/cybermanju-shell/actions/runs/39698451069), retornou workflow `completed/success` e seis jobs com `success`, mas o endpoint de jobs ainda mostrava `ostd-check` em `in_progress`, sem conclusão. Não contamos esse job como aprovado nem tratamos a inconsistência como falha demonstrada. A ISO anterior `39694611455` continuava em execução na consulta inicial; não foi cancelada. O novo readback tem evidência local e aguarda seu próprio CI após publicação.
 
