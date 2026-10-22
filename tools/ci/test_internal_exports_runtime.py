@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 
-from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, PAGE, POOL_START, verify
+from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, PAGE, POOL_START, RESOLVER, verify
 
 
 class InternalExportsTests(unittest.TestCase):
@@ -14,7 +14,7 @@ class InternalExportsTests(unittest.TestCase):
         self.cases = [f"CYBERMANJU_INTERNAL_EXPORTS:staged:PASS kind={kind} base={base:#x} reserved=40960 "
                       f"span=40960 pages=10 payload=1721 relas=6 symbol=0xffffffff88010000 field={base+32:#x} "
                       "compared=40960 registry_match=true" for kind in (2, 4)]
-        return "\n".join([BEGIN, ADMISSION, *self.cases, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
+        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
 
     def test_valid_registry_is_not_linux_abi(self):
         r = verify(self.evidence())
@@ -26,6 +26,10 @@ class InternalExportsTests(unittest.TestCase):
         self.assertEqual((r["linux_admitted_exports"], r["linux_abi_rejection_cases"], r["linux_unknown_name_rejection_cases"]), (0, 1, 5))
         self.assertTrue(r["export_descriptor_verified"])
         self.assertTrue(r["linux_admission_rejection_verified"])
+        self.assertTrue(r["policy_symbol_resolver_verified"])
+        self.assertFalse(r["policy_numeric_fallback_available"])
+        self.assertEqual((r["policy_abi_rejected_prepare_cases"], r["policy_unknown_rejected_prepare_cases"],
+                          r["policy_preflight_rejected_cases"], r["policy_local_only_prepared_cases"]), (2, 2, 2, 1))
         for key in ("internal_registry_lookup_verified", "full_span_readback_verified", "fixture_imports_renamed_for_internal_registry"):
             self.assertTrue(r[key])
         for key in ("kernel_linux_export_lookup_available", "linux_abi_verified", "pages_mapped", "production_mapping_available",
@@ -34,7 +38,7 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_unique_complete_ordered_markers(self):
         good = self.evidence()
-        for marker in [BEGIN, ADMISSION, *self.cases, COMPLETE]:
+        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, COMPLETE]:
             for bad in (good.replace(marker + "\n", ""), good + marker + "\n", good.replace(marker, "echo " + marker)):
                 with self.assertRaises(ValueError): verify(bad)
         for bad in (good + "CYBERMANJU_OTHER:PASS\n", good.replace("kind=4", "kind=2"),
@@ -77,6 +81,36 @@ class InternalExportsTests(unittest.TestCase):
         self.assertTrue(r["linux_admission_rejection_verified"])
         for key in ("linux_abi_verified", "module_execution_verified", "linux_modules_executed",
                     "kernel_linux_export_lookup_available", "production_mapping_available", "wx_verified", "smp_mapping_verified"):
+            self.assertIs(r[key], False)
+
+    def test_provider_claims_require_rejections_and_no_fallback(self):
+        good = self.evidence()
+        for old, new in [("checked_abi_rejections=2", "checked_abi_rejections=1"),
+                         ("checked_unknown_rejections=2", "checked_unknown_rejections=0"),
+                         ("preflight_rejections=2", "preflight_rejections=1"),
+                         ("local_only_prepared=1", "local_only_prepared=0"),
+                         ("numeric_fallback=false", "numeric_fallback=true"),
+                         ("policy_resolver=true", "policy_resolver=false")]:
+            with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+
+    def test_provider_marker_must_follow_staging_before_cleanup(self):
+        good = self.evidence()
+        for index in (0, 1, 2, 3, 5, 6):
+            lines = good.splitlines()
+            lines.remove(RESOLVER)
+            lines.insert(index, RESOLVER)
+            with self.subTest(index=index), self.assertRaises(ValueError): verify("\n".join(lines))
+
+    def test_old_admission_only_evidence_does_not_prove_provider(self):
+        old = self.evidence().replace(RESOLVER + "\n", "").replace(" policy_resolver=true", "")
+        with self.assertRaises(ValueError): verify(old)
+
+    def test_checked_resolution_does_not_admit_linux_or_execute(self):
+        r = verify(self.evidence())
+        self.assertTrue(r["policy_symbol_resolver_verified"])
+        self.assertEqual(r["linux_admitted_exports"], 0)
+        for key in ("linux_abi_verified", "linux_modules_executed", "module_execution_verified", "init_called",
+                    "production_mapping_available", "smp_mapping_verified", "wx_verified", "policy_numeric_fallback_available"):
             self.assertIs(r[key], False)
 
     def test_geometry_and_full_readback(self):

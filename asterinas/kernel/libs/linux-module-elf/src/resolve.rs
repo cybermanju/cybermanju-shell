@@ -16,7 +16,13 @@ pub struct Export<'a> {
     pub name: &'a [u8],
     pub value: u64,
 }
-
+/// Resolves an external export to a numeric value; this is not ABI admission.
+/// A provider must remain stable for as long as a resolver borrowing it exists.
+pub trait ExportProvider: Send + Sync {
+    /// Return a numeric value or an unchanged policy failure for a requested import.
+    /// Only structurally validated undefined symbols reach this method.
+    fn resolve_export(&self, name: &[u8]) -> Result<u64, Error>;
+}
 /// Location of one failing ALLOC-target RELA entry, not a loaded address.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RelocationSite {
@@ -114,6 +120,7 @@ pub struct SymbolResolver<'a> {
     table: &'a [u8],
     layout: &'a Layout,
     exports: Vec<Export<'a>>,
+    provider: Option<&'a dyn ExportProvider>,
 }
 
 impl<'a> SymbolResolver<'a> {
@@ -161,7 +168,20 @@ impl<'a> SymbolResolver<'a> {
             table,
             layout,
             exports: sorted,
+            provider: None,
         })
+    }
+
+    /// Resolve undefined imports through a provider instead of a numeric list.
+    /// Provider errors, including refusal, are propagated without fallback.
+    pub fn with_provider(
+        bytes: &'a [u8],
+        layout: &'a Layout,
+        provider: &'a dyn ExportProvider,
+    ) -> Result<Self, Error> {
+        let mut resolver = Self::new(bytes, layout, &[])?;
+        resolver.provider = Some(provider);
+        Ok(resolver)
     }
 
     /// Apply every RELA targeting one planned section to a fresh data-only copy.
@@ -591,6 +611,9 @@ impl<'a> SymbolResolver<'a> {
                 if binding == 0 || symbol[5] != 0 {
                     return Err(Error::UnsupportedSymbol);
                 }
+                if let Some(provider) = self.provider {
+                    return provider.resolve_export(name);
+                }
                 self.exports
                     .binary_search_by(|entry| entry.name.cmp(name))
                     .map(|index| self.exports[index].value)
@@ -616,6 +639,7 @@ impl<'a> SymbolResolver<'a> {
 
 #[cfg(test)]
 mod tests {
+    use core::sync::atomic::{AtomicUsize, Ordering};
     use std::{vec, vec::Vec};
 
     use super::*;
@@ -674,6 +698,104 @@ mod tests {
     fn resolver<'a>(b: &'a [u8], ex: &[Export<'a>]) -> SymbolResolver<'a> {
         let l = std::boxed::Box::leak(std::boxed::Box::new(plan_layout(b, 0x1000, 16, 1).unwrap()));
         SymbolResolver::new(b, l, ex).unwrap()
+    }
+
+    struct MockProvider {
+        calls: AtomicUsize,
+        refusal: bool,
+    }
+    impl ExportProvider for MockProvider {
+        fn resolve_export(&self, name: &[u8]) -> Result<u64, Error> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            if self.refusal {
+                return Err(Error::ExportNotAdmitted);
+            }
+            if name == b"undef" {
+                Ok(177)
+            } else {
+                Err(Error::MissingSymbol)
+            }
+        }
+    }
+
+    fn provider_resolver<'a>(b: &'a [u8], p: &'a dyn ExportProvider) -> SymbolResolver<'a> {
+        let l = std::boxed::Box::leak(std::boxed::Box::new(plan_layout(b, 0x1000, 16, 1).unwrap()));
+        SymbolResolver::with_provider(b, l, p).unwrap()
+    }
+
+    #[test]
+    fn provider_is_exact_for_undefined_imports_and_errors_do_not_fallback() {
+        let b = fixture();
+        let p = MockProvider {
+            calls: AtomicUsize::new(0),
+            refusal: false,
+        };
+        let mut b = b;
+        put32(&mut b, 408, 1); // weak symbol now names "defined", not "undef"
+        let r = provider_resolver(&b, &p);
+        assert_eq!(r.resolve(3, 2), Ok(177));
+        assert_eq!(r.resolve(3, 3), Err(Error::MissingSymbol));
+        assert_eq!(p.calls.load(Ordering::Relaxed), 2);
+
+        let p = MockProvider {
+            calls: AtomicUsize::new(0),
+            refusal: true,
+        };
+        let r = provider_resolver(&b, &p);
+        assert_eq!(r.resolve(3, 2), Err(Error::ExportNotAdmitted));
+        assert_eq!(p.calls.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn provider_is_not_called_for_defined_or_absolute_symbols() {
+        let mut b = fixture();
+        let p = MockProvider {
+            calls: AtomicUsize::new(0),
+            refusal: true,
+        };
+        let r = provider_resolver(&b, &p);
+        assert_eq!(r.resolve(3, 1), Ok(0x1004));
+        assert_eq!(p.calls.load(Ordering::Relaxed), 0);
+        put16(&mut b, 366, SHN_ABS);
+        put64(&mut b, 368, 99);
+        let l = plan_layout(&b, 0x1000, 16, 1).unwrap();
+        let r = SymbolResolver::with_provider(&b, &l, &p).unwrap();
+        assert_eq!(r.resolve(3, 1), Ok(99));
+        assert_eq!(p.calls.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn provider_constructor_and_invalid_inputs_do_not_query_exports() {
+        let b = fixture();
+        let l = plan_layout(&b, 0x1000, 16, 1).unwrap();
+        let p = MockProvider {
+            calls: AtomicUsize::new(0),
+            refusal: true,
+        };
+        assert!(SymbolResolver::with_provider(&b[..60], &l, &p).is_err());
+        let r = SymbolResolver::with_provider(&b, &l, &p).unwrap();
+        assert_eq!(p.calls.load(Ordering::Relaxed), 0);
+        assert_eq!(r.resolve(9, 1), Err(Error::SymbolTable));
+        assert_eq!(r.resolve(3, 8), Err(Error::SymbolTable));
+        assert_eq!(r.resolve(3, 0), Err(Error::MissingSymbol));
+        assert_eq!(p.calls.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn provider_missing_or_denied_weak_is_not_implicit_zero() {
+        let mut b = fixture();
+        put32(&mut b, 408, 1); // Weak import names "defined", absent from the provider.
+        for (refusal, expected) in [
+            (false, Error::MissingSymbol),
+            (true, Error::ExportNotAdmitted),
+        ] {
+            let p = MockProvider {
+                calls: AtomicUsize::new(0),
+                refusal,
+            };
+            assert_eq!(provider_resolver(&b, &p).resolve(3, 3), Err(expected));
+            assert_eq!(p.calls.load(Ordering::Relaxed), 1);
+        }
     }
 
     #[test]

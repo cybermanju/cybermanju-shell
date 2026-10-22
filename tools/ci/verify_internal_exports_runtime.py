@@ -11,8 +11,10 @@ PREFIX = "CYBERMANJU_INTERNAL_EXPORTS:"
 BEGIN = PREFIX + "begin:PASS cpus=1 entries=1"
 ADMISSION = PREFIX + ("admission:PASS described=1 rust_internal=1 rejected_abi=1 rejected_names=5 "
                       "numeric_export_preserved=true no_admitted_linux_exports=true")
+RESOLVER = PREFIX + ("resolver:PASS checked_abi_rejections=2 checked_unknown_rejections=2 "
+                     "preflight_rejections=2 local_only_prepared=1 numeric_fallback=false")
 COMPLETE = PREFIX + ("complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 "
-                     "compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true")
+                     "compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true")
 STAGED = re.compile(re.escape(PREFIX + "staged:PASS ") +
                     r"kind=([0-9]+) base=(0x[0-9a-fA-F]+) reserved=([0-9]+) span=([0-9]+) "
                     r"pages=([0-9]+) payload=([0-9]+) relas=([0-9]+) symbol=(0x[0-9a-fA-F]+) "
@@ -26,12 +28,13 @@ def verify(text: str) -> dict:
     lines = text.splitlines()
     markers = [line for line in lines if "CYBERMANJU_" in line]
     staged = [m for line in markers if (m := STAGED.fullmatch(line))]
-    if (len(markers) != 5 or markers.count(BEGIN) != 1 or markers.count(COMPLETE) != 1
+    if (len(markers) != 6 or markers.count(BEGIN) != 1 or markers.count(COMPLETE) != 1
             or markers.count(ADMISSION) != 1 or markers[1] != ADMISSION
+            or markers.count(RESOLVER) != 1 or markers[-2] != RESOLVER
             or len(staged) != 2 or [int(m[1]) for m in staged] != [2, 4]
-            or set(markers) != {BEGIN, ADMISSION, COMPLETE, *(m[0] for m in staged)}
+            or set(markers) != {BEGIN, ADMISSION, RESOLVER, COMPLETE, *(m[0] for m in staged)}
             or markers[0] != BEGIN or markers[-1] != COMPLETE):
-        raise ValueError("Expected unique ordered registry/ABI-rejection/PC32/PLT32/cleanup markers")
+        raise ValueError("Expected unique ordered registry/ABI-rejection/PC32/PLT32/provider/cleanup markers")
     summaries = [line for line in lines if "test result:" in line.lower()]
     if len(summaries) != 1 or not SUMMARY.fullmatch(summaries[0]) or lines.index(summaries[0]) < lines.index(COMPLETE):
         raise ValueError("Expected one successful native summary after cleanup")
@@ -61,6 +64,9 @@ def verify(text: str) -> dict:
         "registry_function_signature": "fn() -> usize", "export_descriptor_verified": True,
         "linux_admission_policy": "reject_only", "linux_admission_rejection_verified": True,
         "linux_admitted_exports": 0, "linux_abi_rejection_cases": 1, "linux_unknown_name_rejection_cases": 5,
+        "policy_symbol_resolver_verified": True, "policy_numeric_fallback_available": False,
+        "policy_abi_rejected_prepare_cases": 2, "policy_unknown_rejected_prepare_cases": 2,
+        "policy_preflight_rejected_cases": 2, "policy_local_only_prepared_cases": 1,
         "kernel_linux_export_lookup_available": False, "linux_abi_verified": False,
         "pages_mapped": False, "production_mapping_available": False, "module_execution_verified": False,
         "linux_modules_executed": False, "init_called": False, "wx_verified": False, "smp_mapping_verified": False,

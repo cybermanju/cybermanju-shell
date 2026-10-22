@@ -127,6 +127,33 @@ impl OstdExportRegistry {
             ExportAbi::RustInternal => Err(LinuxExportAdmissionError::AbiNotAdmitted),
         }
     }
+
+    /// Create an ELF resolver that consults Linux export admission only for
+    /// requested undefined imports. This is not global admission or Linux
+    /// certification, and it does not map or execute module code. Numeric
+    /// registry lookup and the numeric resolver remain independently available.
+    pub fn linux_symbol_resolver<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        layout: &'a linux_module_elf::Layout,
+    ) -> Result<linux_module_elf::SymbolResolver<'a>, linux_module_elf::Error> {
+        linux_module_elf::SymbolResolver::with_provider(bytes, layout, self)
+    }
+}
+
+impl linux_module_elf::ExportProvider for OstdExportRegistry {
+    fn resolve_export(&self, name: &[u8]) -> Result<u64, linux_module_elf::Error> {
+        self.admit_linux_export(name)
+            .map(|export| export.value)
+            .map_err(|error| match error {
+                LinuxExportAdmissionError::UnregisteredName => {
+                    linux_module_elf::Error::MissingSymbol
+                }
+                LinuxExportAdmissionError::AbiNotAdmitted => {
+                    linux_module_elf::Error::ExportNotAdmitted
+                }
+            })
+    }
 }
 
 impl Default for OstdExportRegistry {

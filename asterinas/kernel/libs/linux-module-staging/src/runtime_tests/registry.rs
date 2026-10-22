@@ -158,11 +158,44 @@ fn cybermanju_internal_exports_runtime() {
         max_pages,
         max_chunks: MAX_SECTIONS,
     };
+    let local_layout = plan_page_layout(FIXTURE, base as u64, MAX_SPAN, MAX_SECTIONS).unwrap();
+    let local_prepared = registry
+        .linux_symbol_resolver(FIXTURE, &local_layout)
+        .unwrap()
+        .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
+        .expect("local-only fixture must prepare with the policy resolver");
+    assert_eq!(
+        (
+            local_layout.span(),
+            local_prepared.payload_bytes(),
+            local_prepared.relocation_entries()
+        ),
+        (40_960, 1_721, 6)
+    );
+    let mut local_only_prepared = 0usize;
+    local_only_prepared += 1;
+    drop(local_prepared);
+    let mut checked_unknown = 0usize;
+    let mut checked_abi = 0usize;
+    let mut preflight_rejections = 0usize;
     let mut compared = 0usize;
     let mut missing = 0usize;
     let mut reclaimed = 0usize;
     for kind in [2u32, 4] {
         let (original, _alias, target, offset) = relative_import_fixture(kind);
+        let checked_layout =
+            plan_page_layout(&original, base as u64, MAX_SPAN, MAX_SECTIONS).unwrap();
+        assert!(
+            matches!(
+                registry
+                    .linux_symbol_resolver(&original, &checked_layout)
+                    .unwrap()
+                    .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS),
+                Err(ElfError::MissingSymbol)
+            ),
+            "policy resolver must reject unknown imports"
+        );
+        checked_unknown += 1;
         let missing_result = NearTextModuleLayout::new_signed32_in_relative32_window(
             &original,
             exports,
@@ -185,6 +218,31 @@ fn cybermanju_internal_exports_runtime() {
         let (bytes, renamed_target, renamed_offset) = renamed_import_fixture(kind);
         assert_eq!((renamed_target, renamed_offset), (target, offset));
         let page_layout = plan_page_layout(&bytes, base as u64, MAX_SPAN, MAX_SECTIONS).unwrap();
+        let checked = registry
+            .linux_symbol_resolver(&bytes, &page_layout)
+            .unwrap();
+        let failure = checked
+            .diagnose_relocation_reach(65_536)
+            .expect_err("policy preflight must reject internal Rust ABI");
+        assert_eq!(
+            failure.cause,
+            ElfError::ExportNotAdmitted,
+            "policy preflight must preserve admission denial"
+        );
+        let site = failure.site.expect("denial should identify its relocation");
+        assert_eq!(
+            (site.target_section, site.kind, site.offset),
+            (target, kind, offset)
+        );
+        preflight_rejections += 1;
+        assert!(
+            matches!(
+                checked.prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS),
+                Err(ElfError::ExportNotAdmitted)
+            ),
+            "policy resolver must not fall back to numeric exports"
+        );
+        checked_abi += 1;
         let expected_prepared = SymbolResolver::new(&bytes, &page_layout, exports)
             .unwrap()
             .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
@@ -258,8 +316,17 @@ fn cybermanju_internal_exports_runtime() {
         reclaimed += 1;
     }
     assert_eq!((compared, missing, reclaimed), (2 * 40_960, 2, 4));
+    assert_eq!(
+        (checked_abi, checked_unknown, preflight_rejections),
+        (2, 2, 2)
+    );
+    assert_eq!(local_only_prepared, 1);
     assert_eq!(denied.len(), 5);
     println!(
-        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true"
+        "CYBERMANJU_INTERNAL_EXPORTS:resolver:PASS checked_abi_rejections=2 checked_unknown_rejections=2 preflight_rejections=2 local_only_prepared={} numeric_fallback=false",
+        local_only_prepared
+    );
+    println!(
+        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true"
     );
 }

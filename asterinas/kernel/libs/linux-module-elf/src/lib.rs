@@ -38,8 +38,8 @@ pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, page_layout_span_bound, plan_layout, plan_page_layout};
 pub use placement::{Relative32BaseWindow, relative32_base_window};
 pub use resolve::{
-    Export, Relative32ImportConstraints, Relative32PlacementConstraints, RelocationReachError,
-    RelocationSite, SymbolResolver,
+    Export, ExportProvider, Relative32ImportConstraints, Relative32PlacementConstraints,
+    RelocationReachError, RelocationSite, SymbolResolver,
 };
 pub use staging::{StagingChunk, StagingPlan};
 
@@ -83,6 +83,8 @@ pub enum Error {
     LayoutMismatch,
     UnsupportedSymbol,
     DuplicateExport,
+    /// A provider declined an export; this is not proof of ABI compatibility.
+    ExportNotAdmitted,
     PageAlignment,
     WritableExecutableSection,
 }
