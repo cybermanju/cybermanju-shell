@@ -44,6 +44,13 @@ case ${2:-} in
         VERIFY=verify_signed32_search_runtime.py
         [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
         ;;
+    --internal-exports)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_internal_exports_runtime
+        VERIFY=verify_internal_exports_runtime.py
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
     --address-reservation)
         CRATE=ostd
         CRATE_PATH=ostd

@@ -144,6 +144,8 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-prepared-runtime --signed32-prepared
       - name: Search bounded signed32 candidates and verify full staged bytes without execution
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-search-runtime --signed32-search
+      - name: Verify fixed OSTD internal exports and complete staged bytes without Linux ABI
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/internal-exports-runtime --internal-exports
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -207,6 +209,11 @@ jobs:
             artifacts/signed32-search-runtime/*.txt
             artifacts/signed32-search-runtime/harness-Cargo.*
             artifacts/signed32-search-runtime/fixture/
+            artifacts/internal-exports-runtime/*.log
+            artifacts/internal-exports-runtime/*.json
+            artifacts/internal-exports-runtime/*.txt
+            artifacts/internal-exports-runtime/harness-Cargo.*
+            artifacts/internal-exports-runtime/fixture/
           retention-days: 7
           if-no-files-found: warn
 
