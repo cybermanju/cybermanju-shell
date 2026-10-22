@@ -134,6 +134,10 @@ jobs:
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-lease-runtime --signed32-lease
       - name: Verify persistent signed32 lease is denied under two-CPU topology
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-lease-smp-runtime --signed32-lease-smp
+      - name: Verify single-CPU RO non-X alias PTEs, mutable linear alias and transition-fault cleanup (no write-fault probe)
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-ro-lease-runtime --signed32-ro-lease
+      - name: Verify RO non-X mapping factory is denied under two-CPU topology
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-ro-lease-smp-runtime --signed32-ro-lease-smp
       - name: Verify module mapping calls are rejected under two-CPU topology (one test, three calls; no mappings)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/module-mapping-smp-rejection --smp-rejection
       - name: Verify local global-TLB invalidation encoding, aggregation and stale readback (one CPU)
@@ -220,6 +224,14 @@ jobs:
             artifacts/signed32-lease-smp-runtime/*.json
             artifacts/signed32-lease-smp-runtime/*.txt
             artifacts/signed32-lease-smp-runtime/harness-Cargo.*
+            artifacts/signed32-ro-lease-runtime/*.log
+            artifacts/signed32-ro-lease-runtime/*.json
+            artifacts/signed32-ro-lease-runtime/*.txt
+            artifacts/signed32-ro-lease-runtime/harness-Cargo.*
+            artifacts/signed32-ro-lease-smp-runtime/*.log
+            artifacts/signed32-ro-lease-smp-runtime/*.json
+            artifacts/signed32-ro-lease-smp-runtime/*.txt
+            artifacts/signed32-ro-lease-smp-runtime/harness-Cargo.*
             artifacts/module-mapping-smp-rejection/*.log
             artifacts/module-mapping-smp-rejection/*.json
             artifacts/module-mapping-smp-rejection/*.txt

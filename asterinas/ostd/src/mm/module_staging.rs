@@ -22,6 +22,8 @@ mod storage;
 #[cfg(all(ktest, target_arch = "x86_64"))]
 pub use crate::mm::kspace::module_signed32_lease::Signed32LeaseAudit;
 #[cfg(target_arch = "x86_64")]
+pub use crate::mm::kspace::module_signed32_lease::Signed32RoMapping;
+#[cfg(target_arch = "x86_64")]
 pub use crate::mm::kspace::module_signed32_lease::Signed32RwMapping;
 #[cfg(target_arch = "x86_64")]
 pub use reserved::ReservedModuleStaging;
@@ -109,6 +111,19 @@ impl ModuleStaging {
         reservation: crate::mm::module_address::NearTextAddressReservation,
     ) -> Result<Signed32RwMapping, Error> {
         crate::mm::kspace::module_signed32_lease::new(self, reservation)
+    }
+
+    /// Consume staging into an experimental read-only/non-X reserved alias.
+    /// Uses the same bounded single-CPU RW mapping preflight, then removes W.
+    /// The existing linear RW alias remains mutable; this is not physical W^X,
+    /// an immutable snapshot, or a Linux execution/production-mapping guarantee.
+    /// Errors consume the staging/reservation and run existing fail-closed cleanup.
+    #[cfg(target_arch = "x86_64")]
+    pub fn map_signed32_ro_nx(
+        self,
+        reservation: crate::mm::module_address::NearTextAddressReservation,
+    ) -> Result<Signed32RoMapping, Error> {
+        self.map_signed32_rw_nx(reservation)?.into_read_only_nx()
     }
 
     #[cfg(target_arch = "x86_64")]

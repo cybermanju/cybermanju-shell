@@ -29,6 +29,7 @@ pub struct Signed32LeaseAudit {
     pub writeback: usize,
     pub global: usize,
     pub slack_absent: usize,
+    pub ro_nonx: usize,
 }
 // Declaration order releases original frame references before the VA owner.
 struct Owners {
@@ -44,8 +45,13 @@ pub struct Signed32RwMapping {
     owners: ManuallyDrop<Owners>,
     installed: Range<Vaddr>,
 }
-fn valid_property(p: PageProperty) -> bool {
-    p.flags.contains(PageFlags::RW)
+fn valid_property(p: PageProperty, read_only: bool) -> bool {
+    p.flags.contains(PageFlags::R)
+        && (if read_only {
+            !p.flags.contains(PageFlags::W)
+        } else {
+            p.flags.contains(PageFlags::W)
+        })
         && !p.flags.contains(PageFlags::X)
         && !p.priv_flags.contains(PrivilegedPageFlags::USER)
         && p.cache == CachePolicy::Writeback
@@ -62,7 +68,11 @@ impl Signed32RwMapping {
         self.owners.staging.page_count()
     }
 
-    fn audit(&self, guard: &DisabledLocalIrqGuard) -> Result<Signed32LeaseAudit, Error> {
+    fn audit_expected(
+        &self,
+        guard: &DisabledLocalIrqGuard,
+        read_only: bool,
+    ) -> Result<Signed32LeaseAudit, Error> {
         let table = KERNEL_PAGE_TABLE.get().ok_or(Error::AccessDenied)?;
         let range = self.reserved_range();
         let mut cursor = table.cursor(guard, &range)?;
@@ -76,10 +86,15 @@ impl Signed32RwMapping {
             audit.frame_matches += usize::from(actual.paddr() == expected.paddr());
             audit.rw_nonx +=
                 usize::from(p.flags.contains(PageFlags::RW) && !p.flags.contains(PageFlags::X));
+            audit.ro_nonx += usize::from(
+                p.flags.contains(PageFlags::R)
+                    && !p.flags.contains(PageFlags::W)
+                    && !p.flags.contains(PageFlags::X),
+            );
             audit.supervisor += usize::from(!p.priv_flags.contains(PrivilegedPageFlags::USER));
             audit.writeback += usize::from(p.cache == CachePolicy::Writeback);
             audit.global += usize::from(p.priv_flags.contains(PrivilegedPageFlags::GLOBAL));
-            if actual.paddr() != expected.paddr() || !valid_property(p) {
+            if actual.paddr() != expected.paddr() || !valid_property(p, read_only) {
                 return Err(Error::AccessDenied);
             }
         }
@@ -98,7 +113,7 @@ impl Signed32RwMapping {
         if num_cpus() != 1 {
             return Err(Error::AccessDenied);
         }
-        self.audit(&guard)
+        self.audit_expected(&guard, false)
     }
     /// Read through the reserved alias, with checked bounds and a per-call IRQ
     /// guard. The output is untouched on validation/topology errors.
@@ -122,6 +137,29 @@ impl Signed32RwMapping {
         };
         assert_eq!(reader.read(&mut VmWriter::from(out)), len);
         Ok(())
+    }
+    #[cfg(ktest)]
+    pub(crate) fn audit_ro_for_test(&self) -> Result<Signed32LeaseAudit, Error> {
+        let guard = irq::disable_local();
+        if num_cpus() != 1 {
+            return Err(Error::AccessDenied);
+        }
+        self.audit_expected(&guard, true)
+    }
+    /// Consume this RW lease and remove W from each owned alias PTE, retaining NX.
+    /// Errors consume the owner and run its unmap/flush cleanup. Only fixed one-CPU
+    /// boots are supported. The linear RW alias remains: data is not immutable,
+    /// physical W^X is not established, and no execution capability is returned.
+    pub fn into_read_only_nx(self) -> Result<Signed32RoMapping, Error> {
+        transition(self, None, &mut 0)
+    }
+    #[cfg(ktest)]
+    pub fn into_read_only_nx_with_fault_for_test(
+        self,
+        after: usize,
+        observed: &mut usize,
+    ) -> Result<Signed32RoMapping, Error> {
+        transition(self, Some(after), observed)
     }
     fn cleanup(&self, guard: &DisabledLocalIrqGuard) -> Result<(), Error> {
         if self.installed.is_empty() {
@@ -253,7 +291,7 @@ fn new_inner(
                     let Some(MappedItemRef::Tracked(actual, p)) = cursor.query()?.1 else {
                         return Err(Error::AccessDenied);
                     };
-                    if actual.paddr() != expected.paddr() || !valid_property(p) {
+                    if actual.paddr() != expected.paddr() || !valid_property(p, false) {
                         return Err(Error::AccessDenied);
                     }
                     count += 1;
@@ -291,8 +329,89 @@ fn new_inner(
         }
     }
     tlb_flush_addr_range(&lease.installed);
-    lease.audit(&guard)?;
+    lease.audit_expected(&guard, false)?;
     Ok(lease)
 }
+#[cfg(target_arch = "x86_64")]
+mod readonly;
+#[cfg(target_arch = "x86_64")]
+pub use readonly::Signed32RoMapping;
+#[cfg(ktest)]
+mod readonly_runtime;
 #[cfg(ktest)]
 mod runtime;
+
+// Fresh PTE observations, never a counter advanced merely by the protect loop.
+fn read_only_prefix(
+    lease: &Signed32RwMapping,
+    guard: &DisabledLocalIrqGuard,
+) -> Result<usize, Error> {
+    let table = KERNEL_PAGE_TABLE.get().ok_or(Error::AccessDenied)?;
+    let mut cursor = table.cursor(guard, &lease.installed)?;
+    let mut prefix = 0;
+    let mut rw_seen = false;
+    for (i, frame) in lease.owners.staging.frames_for_signed32().enumerate() {
+        cursor.jump(lease.installed.start + i * PAGE_SIZE)?;
+        let Some(MappedItemRef::Tracked(actual, p)) = cursor.query()?.1 else {
+            return Err(Error::AccessDenied);
+        };
+        if actual.paddr() != frame.paddr() {
+            return Err(Error::AccessDenied);
+        }
+        if valid_property(p, true) && !rw_seen {
+            prefix += 1;
+        } else if valid_property(p, false) {
+            rw_seen = true;
+        } else {
+            return Err(Error::AccessDenied);
+        }
+    }
+    Ok(prefix)
+}
+fn transition(
+    lease: Signed32RwMapping,
+    fault: Option<usize>,
+    observed: &mut usize,
+) -> Result<Signed32RoMapping, Error> {
+    let guard = irq::disable_local();
+    if num_cpus() != 1 {
+        return Err(Error::AccessDenied);
+    }
+    lease.audit_expected(&guard, false)?;
+    let table = KERNEL_PAGE_TABLE.get().ok_or(Error::AccessDenied)?;
+    if fault == Some(0) {
+        *observed = read_only_prefix(&lease, &guard)?;
+        return Err(Error::IoError);
+    }
+    for (i, expected) in lease.owners.staging.frames_for_signed32().enumerate() {
+        let va = lease.installed.start + i * PAGE_SIZE;
+        {
+            let slot = va..va + PAGE_SIZE;
+            let mut cursor = table.cursor_mut(&guard, &slot)?;
+            let Some(MappedItemRef::Tracked(actual, p)) = cursor.query()?.1 else {
+                return Err(Error::AccessDenied);
+            };
+            if actual.paddr() != expected.paddr() || !valid_property(p, false) {
+                return Err(Error::AccessDenied);
+            }
+            // SAFETY: this tracked 4-KiB slot matches our retained frame. Removing
+            // only W preserves R, NX, cache policy, GLOBAL, AVAIL1 and other flags.
+            // Sole CPU, local IRQs disabled; no pointer escapes. On error, Drop
+            // removes all owned slots and flushes before releasing frames/VA.
+            let protected = unsafe {
+                cursor.protect_next(PAGE_SIZE, &mut |prop| prop.flags.remove(PageFlags::W))
+            }
+            .ok_or(Error::AccessDenied)?;
+            if protected != slot {
+                return Err(Error::AccessDenied);
+            }
+        } // The mutable cursor must be gone before a fresh read cursor or Drop.
+        if fault == Some(i + 1) {
+            *observed = read_only_prefix(&lease, &guard)?;
+            return Err(Error::IoError);
+        }
+    }
+    tlb_flush_addr_range(&lease.installed);
+    lease.audit_expected(&guard, true)?;
+    Ok(readonly::wrap(lease))
+}
