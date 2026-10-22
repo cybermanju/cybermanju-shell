@@ -41,6 +41,8 @@ pub mod cpu;
 mod error;
 pub mod io;
 pub mod irq;
+#[cfg(target_arch = "x86_64")]
+pub mod linux_abi;
 pub mod log;
 pub mod mm;
 pub mod panic;

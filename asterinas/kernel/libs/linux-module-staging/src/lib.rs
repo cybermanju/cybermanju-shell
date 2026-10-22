@@ -13,6 +13,8 @@ extern crate alloc;
 mod exports;
 use alloc::vec::Vec;
 
+#[cfg(target_arch = "x86_64")]
+pub use exports::{CShimExportRegistry, LINUX_MEMCMP_EXPORT_NAME};
 pub use exports::{
     ExportAbi, ExportSignature, LinuxExportAdmissionError, OSTD_NUM_CPUS_EXPORT_NAME,
     OstdExportDescriptor, OstdExportRegistry,

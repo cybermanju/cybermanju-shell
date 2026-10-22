@@ -1148,6 +1148,7 @@ fn relative32_reservation_runtime(envelope: usize, mut limits: PreparationLimits
     );
 }
 
+mod c_abi;
 mod near_text;
 mod registry;
 mod signed32;

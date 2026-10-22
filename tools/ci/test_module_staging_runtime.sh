@@ -60,6 +60,13 @@ case ${2:-} in
         VERIFY=verify_internal_exports_runtime.py
         [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
         ;;
+    --linux-c-abi)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_linux_c_abi_runtime
+        VERIFY=verify_linux_c_abi_runtime.py
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
     --address-reservation)
         CRATE=ostd
         CRATE_PATH=ostd
@@ -148,4 +155,11 @@ cp "$ROOT/asterinas/target/osdk/$CRATE-test-base/Cargo.lock" "$OUT/harness-Cargo
     sha256sum "$ROOT/asterinas/target/osdk/$CRATE-osdk-bin.elf" "$ROOT/asterinas/target/osdk/$CRATE/$CRATE-osdk-bin.iso"
     if [[ -n ${CYBERMANJU_STAGING_FIXTURE:-} ]]; then sha256sum "$CYBERMANJU_STAGING_FIXTURE"; fi
 } > "$OUT/provenance.txt"
+if [[ ${2:-} == --linux-c-abi ]]; then
+    {
+        "${CYBERMANJU_ABI_CC:-cc}" --version | head -1
+        "${CYBERMANJU_ABI_AR:-ar}" --version | head -1
+        sha256sum "$ROOT/asterinas/ostd/memcmp_c_probe.c" "$ROOT/asterinas/ostd/src/linux_abi.rs" "$ROOT/asterinas/ostd/build.rs"
+    } > "$OUT/c-probe-provenance.txt"
+fi
 python3 "$ROOT/tools/ci/$VERIFY" "$OUT/runtime.log"

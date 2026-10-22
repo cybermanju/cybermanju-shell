@@ -5,8 +5,8 @@ set -euo pipefail
 profile=${1-}
 [[ $# -eq 1 ]] || { echo "uso: $0 {framebuffer|module-staging|kbuild}" >&2; exit 2; }
 case "$profile" in
-  framebuffer) packages=(qemu-system-x86 grub-common grub-pc-bin xorriso mtools) ;;
-  module-staging) packages=(qemu-system-x86 grub-common grub-pc-bin xorriso mtools linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod) ;;
+  framebuffer) packages=(qemu-system-x86 grub-common grub-pc-bin xorriso mtools gcc binutils) ;;
+  module-staging) packages=(qemu-system-x86 grub-common grub-pc-bin xorriso mtools linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod gcc binutils) ;;
   kbuild) packages=(linux-headers-6.8.0-147-generic=6.8.0-147.147 gcc-13 kmod) ;;
   *) echo "perfil desconhecido: $profile" >&2; exit 2 ;;
 esac

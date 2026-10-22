@@ -10,11 +10,16 @@
 /// The sole export name owned by this registry.
 pub const OSTD_NUM_CPUS_EXPORT_NAME: &[u8] = b"cybermanju_ostd_num_cpus";
 
+/// The sole C ABI shim export admitted by the experimental closed registry.
+pub const LINUX_MEMCMP_EXPORT_NAME: &[u8] = b"memcmp";
+
 /// ABI class recorded for a registered OSTD export.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ExportAbi {
     /// The function uses Rust's internal ABI and is not admitted as a Linux export.
     RustInternal,
+    /// x86_64 freestanding C calling convention for the OSTD memcmp shim.
+    X86_64FreestandingC,
 }
 
 /// Compile-time-checked function signature metadata.
@@ -22,6 +27,8 @@ pub enum ExportAbi {
 pub enum ExportSignature {
     /// A function taking no arguments and returning `usize`.
     NoArgsUsize,
+    /// `memcmp(const void *, const void *, usize) -> i32`.
+    Memcmp,
 }
 
 /// Why a registered name cannot be admitted as a Linux export.
@@ -125,6 +132,7 @@ impl OstdExportRegistry {
             .ok_or(LinuxExportAdmissionError::UnregisteredName)?;
         match descriptor.abi {
             ExportAbi::RustInternal => Err(LinuxExportAdmissionError::AbiNotAdmitted),
+            ExportAbi::X86_64FreestandingC => Err(LinuxExportAdmissionError::AbiNotAdmitted),
         }
     }
 
@@ -157,6 +165,92 @@ impl linux_module_elf::ExportProvider for OstdExportRegistry {
 }
 
 impl Default for OstdExportRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Closed registry for one x86_64 C-callable OSTD memcmp shim.
+#[cfg(target_arch = "x86_64")]
+pub struct CShimExportRegistry {
+    exports: [linux_module_elf::Export<'static>; 1],
+}
+
+#[cfg(target_arch = "x86_64")]
+impl CShimExportRegistry {
+    /// Construct the fixed one-export registry; no caller data is accepted.
+    pub fn new() -> Self {
+        let function: ostd::linux_abi::MemcmpFn = ostd::linux_abi::memcmp_entry();
+        let value = function as usize as u64;
+        Self {
+            exports: [linux_module_elf::Export {
+                name: LINUX_MEMCMP_EXPORT_NAME,
+                value,
+            }],
+        }
+    }
+
+    /// Borrow the fixed export list.
+    pub fn exports(&self) -> &[linux_module_elf::Export<'static>] {
+        &self.exports
+    }
+
+    /// Describe only the exact registered name.
+    pub fn describe(&self, name: &[u8]) -> Option<OstdExportDescriptor> {
+        let export = self
+            .exports
+            .iter()
+            .copied()
+            .find(|export| export.name == name)?;
+        Some(OstdExportDescriptor {
+            export,
+            abi: ExportAbi::X86_64FreestandingC,
+            signature: ExportSignature::Memcmp,
+        })
+    }
+
+    /// Admit the single exact C shim export.
+    pub fn admit_linux_export(
+        &self,
+        name: &[u8],
+    ) -> Result<linux_module_elf::Export<'static>, LinuxExportAdmissionError> {
+        let descriptor = self
+            .describe(name)
+            .ok_or(LinuxExportAdmissionError::UnregisteredName)?;
+        match (descriptor.abi, descriptor.signature) {
+            (ExportAbi::X86_64FreestandingC, ExportSignature::Memcmp) => Ok(descriptor.export),
+            _ => Err(LinuxExportAdmissionError::AbiNotAdmitted),
+        }
+    }
+
+    /// Create an ELF resolver that consults this closed provider for imports.
+    pub fn linux_symbol_resolver<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        layout: &'a linux_module_elf::Layout,
+    ) -> Result<linux_module_elf::SymbolResolver<'a>, linux_module_elf::Error> {
+        linux_module_elf::SymbolResolver::with_provider(bytes, layout, self)
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl linux_module_elf::ExportProvider for CShimExportRegistry {
+    fn resolve_export(&self, name: &[u8]) -> Result<u64, linux_module_elf::Error> {
+        self.admit_linux_export(name)
+            .map(|export| export.value)
+            .map_err(|error| match error {
+                LinuxExportAdmissionError::UnregisteredName => {
+                    linux_module_elf::Error::MissingSymbol
+                }
+                LinuxExportAdmissionError::AbiNotAdmitted => {
+                    linux_module_elf::Error::ExportNotAdmitted
+                }
+            })
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl Default for CShimExportRegistry {
     fn default() -> Self {
         Self::new()
     }
