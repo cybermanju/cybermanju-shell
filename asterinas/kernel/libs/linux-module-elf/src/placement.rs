@@ -6,11 +6,12 @@
 //! interval does not guarantee canonical x86 addresses, VA reservation, mmap,
 //! W^X, or validity of remaining relocations.
 
-/// Inclusive module-base interval satisfying one direct PC32/PLT32 relocation.
+/// Inclusive numeric module-base interval for direct PC32/PLT32 planning.
 ///
 /// Fields are private so callers can only create windows through checked
 /// operations. The interval ensures `base + module_span` is representable;
-/// it does not reserve or map that address range.
+/// it does not reserve or map that address range. A span-only window has no
+/// symbol constraint until it is intersected with relocation windows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Relative32BaseWindow {
     min_base: u64,
@@ -21,6 +22,18 @@ impl Relative32BaseWindow {
     #[cfg(test)]
     pub(crate) const fn test_window(min_base: u64, max_base: u64) -> Self {
         Self { min_base, max_base }
+    }
+
+    /// All representable bases for which the complete module span fits.
+    /// A zero span is not a valid placement.
+    pub fn for_module_span(span: u64) -> Option<Self> {
+        if span == 0 {
+            return None;
+        }
+        Some(Self {
+            min_base: 0,
+            max_base: u64::MAX.checked_sub(span)?,
+        })
     }
 
     /// Lowest allowed base, inclusive.

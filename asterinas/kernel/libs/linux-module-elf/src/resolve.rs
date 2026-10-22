@@ -42,6 +42,34 @@ impl From<Error> for RelocationReachError {
     }
 }
 
+/// Intersected direct PC32/PLT32 placement constraints for undefined imports.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Relative32ImportConstraints {
+    window: Option<crate::Relative32BaseWindow>,
+    rela_entries: usize,
+    import_relocations: usize,
+    ignored_relative32_relocations: usize,
+}
+
+impl Relative32ImportConstraints {
+    /// Inclusive intersection; no imports yields only the module-span bound.
+    pub const fn window(self) -> Option<crate::Relative32BaseWindow> {
+        self.window
+    }
+    /// All budgeted ALLOC-target RELA entries, including NONE and other kinds.
+    pub const fn rela_entries(self) -> usize {
+        self.rela_entries
+    }
+    /// Selected undefined-symbol relocation entries, not distinct symbol names.
+    pub const fn import_relocations(self) -> usize {
+        self.import_relocations
+    }
+    /// PC32/PLT32 entries with non-undefined symbols, including local and ABS.
+    pub const fn ignored_relative32_relocations(self) -> usize {
+        self.ignored_relative32_relocations
+    }
+}
+
 /// Resolves requested symbols only; debug/non-ALLOC symbols need not resolve.
 /// Layout matching is structural, not a cryptographic identity check of the ELF.
 pub struct SymbolResolver<'a> {
@@ -162,6 +190,143 @@ impl<'a> SymbolResolver<'a> {
         max_entries: usize,
     ) -> Result<usize, RelocationReachError> {
         crate::apply::diagnose_relocation_reach(self.bytes, self.layout, self, max_entries)
+    }
+
+    /// Intersect numeric windows for undefined-symbol direct PC32/PLT32 imports.
+    /// Counts all ALLOC-target RELA, including NONE, before resolving imports;
+    /// the hard aggregate cap is 65,536. Rejects NOTE-target tables and ignores
+    /// debug/non-ALLOC targets. Local/ABS relative32 symbols and other kinds do
+    /// not constrain the window and still require full relocation validation.
+    /// No imports gives the module-span-only window; None means an empty span
+    /// or no common base. Even an empty window does not mask later bad imports.
+    /// No payload, patch, or VA allocation; resolver metadata already exists.
+    /// This is not a full write-overlap, canonicality, arena, ABI or W^X check.
+    /// After choosing a candidate, replan (offsets/span can change), recollect
+    /// constraints and rerun complete preflight/preparation before staging.
+    pub fn relative32_import_constraints(
+        &self,
+        max_entries: usize,
+    ) -> Result<Relative32ImportConstraints, Error> {
+        let table = file_range(
+            self.bytes,
+            u64_at(self.bytes, 40),
+            u64::from(u16_at(self.bytes, 60)) * SECTION_SIZE as u64,
+        )?;
+        let section = |i: usize| -> Result<&[u8], Error> {
+            let start = i.checked_mul(SECTION_SIZE).ok_or(Error::SectionTable)?;
+            table
+                .get(start..start.checked_add(SECTION_SIZE).ok_or(Error::SectionTable)?)
+                .ok_or(Error::SectionTable)
+        };
+        let mut total = 0usize;
+        for rela in table.chunks_exact(SECTION_SIZE) {
+            if u32_at(rela, 4) != 4 {
+                continue;
+            }
+            let target =
+                section(usize::try_from(u32_at(rela, 44)).map_err(|_| Error::RelocationTarget)?)?;
+            if u64_at(target, 8) & 2 == 0 {
+                continue;
+            }
+            if !matches!(u32_at(target, 4), 1 | 8) {
+                return Err(Error::RelocationTarget);
+            }
+            total = total
+                .checked_add(
+                    usize::try_from(u64_at(rela, 32) / 24).map_err(|_| Error::ResourceLimit)?,
+                )
+                .ok_or(Error::ResourceLimit)?;
+            if total > core::cmp::min(max_entries, 65_536) {
+                return Err(Error::ResourceLimit);
+            }
+        }
+        let mut window = crate::Relative32BaseWindow::for_module_span(self.layout.span());
+        let mut imports = 0usize;
+        let mut ignored = 0usize;
+        for rela in table.chunks_exact(SECTION_SIZE) {
+            if u32_at(rela, 4) != 4 {
+                continue;
+            }
+            let target_index = u32_at(rela, 44);
+            let target =
+                section(usize::try_from(target_index).map_err(|_| Error::RelocationTarget)?)?;
+            if u64_at(target, 8) & 2 == 0 {
+                continue;
+            }
+            if u32_at(target, 4) == 7 {
+                return Err(Error::RelocationTarget);
+            }
+            let placement = self
+                .layout
+                .placements()
+                .iter()
+                .find(|p| u32::from(p.section_index) == target_index)
+                .ok_or(Error::RelocationTarget)?;
+            let symtab = u16::try_from(u32_at(rela, 40)).map_err(|_| Error::RelocationLink)?;
+            for entry in
+                file_range(self.bytes, u64_at(rela, 24), u64_at(rela, 32))?.chunks_exact(24)
+            {
+                let info = u64_at(entry, 8);
+                let kind = info as u32;
+                if !matches!(kind, 2 | 4) {
+                    continue;
+                }
+                let symbol_index = (info >> 32) as u32;
+                let symtab_off = usize::from(symtab)
+                    .checked_mul(SECTION_SIZE)
+                    .ok_or(Error::SymbolTable)?;
+                let symtab_data = self
+                    .table
+                    .get(
+                        symtab_off
+                            ..symtab_off
+                                .checked_add(SECTION_SIZE)
+                                .ok_or(Error::SymbolTable)?,
+                    )
+                    .ok_or(Error::SymbolTable)?;
+                let symbols =
+                    file_range(self.bytes, u64_at(symtab_data, 24), u64_at(symtab_data, 32))?;
+                let symoff = usize::try_from(symbol_index)
+                    .map_err(|_| Error::SymbolTable)?
+                    .checked_mul(SYMBOL_SIZE)
+                    .ok_or(Error::SymbolTable)?;
+                let symbol = symbols
+                    .get(symoff..symoff.checked_add(SYMBOL_SIZE).ok_or(Error::SymbolTable)?)
+                    .ok_or(Error::SymbolTable)?;
+                if u16_at(symbol, 6) != SHN_UNDEF {
+                    ignored = ignored.checked_add(1).ok_or(Error::ResourceLimit)?;
+                    continue;
+                }
+                // resolve() performs all name, binding, visibility, and export checks.
+                let value = self.resolve(symtab, symbol_index)?;
+                imports = imports.checked_add(1).ok_or(Error::ResourceLimit)?;
+                let offset = u64_at(entry, 0);
+                if offset.checked_add(4).ok_or(Error::RelocationRange)? > placement.size {
+                    return Err(Error::RelocationRange);
+                }
+                let place_offset = placement
+                    .address
+                    .checked_sub(self.layout.base())
+                    .and_then(|base_offset| base_offset.checked_add(offset))
+                    .ok_or(Error::RelocationRange)?;
+                let candidate = crate::relative32_base_window(
+                    value,
+                    u64_at(entry, 16) as i64,
+                    place_offset,
+                    self.layout.span(),
+                );
+                window = match (window, candidate) {
+                    (Some(a), Some(b)) => a.intersect(b),
+                    _ => None,
+                };
+            }
+        }
+        Ok(Relative32ImportConstraints {
+            window,
+            rela_entries: total,
+            import_relocations: imports,
+            ignored_relative32_relocations: ignored,
+        })
     }
 
     pub fn resolve(&self, symtab_index: u16, symbol_index: u32) -> Result<u64, Error> {

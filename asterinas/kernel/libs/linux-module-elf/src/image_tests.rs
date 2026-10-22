@@ -550,3 +550,188 @@ fn r_32_and_pc32_keep_their_strict_unsigned_and_relative_ranges() {
         Err(Error::RelocationOverflow)
     );
 }
+
+#[test]
+fn relative32_import_constraints_intersect_imports_and_report_counters() {
+    let mut b = fixture();
+    entry(&mut b, RELA1, 0, 2, 2, 0);
+    entry(&mut b, RELA2, 8, 2, 4, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &exports()).unwrap();
+    let constraints = resolver.relative32_import_constraints(2).unwrap();
+    assert_eq!(constraints.rela_entries(), 2);
+    assert_eq!(constraints.import_relocations(), 2);
+    assert_eq!(constraints.ignored_relative32_relocations(), 0);
+    assert!(constraints.window().unwrap().contains(layout.base()));
+}
+
+#[test]
+fn relative32_import_constraints_full_window_without_imports_and_counts_locals() {
+    let mut b = fixture();
+    entry(&mut b, RELA1, 0, 1, 2, 0);
+    entry(&mut b, RELA2, 0, 0, 0, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    let constraints = resolver.relative32_import_constraints(2).unwrap();
+    assert_eq!(constraints.rela_entries(), 2);
+    assert_eq!(constraints.import_relocations(), 0);
+    assert_eq!(constraints.ignored_relative32_relocations(), 1);
+    assert_eq!(
+        constraints.window(),
+        crate::Relative32BaseWindow::for_module_span(layout.span())
+    );
+}
+
+#[test]
+fn relative32_import_constraints_report_disjoint_import_windows() {
+    let mut b = fixture();
+    entry(&mut b, RELA1, 0, 2, 2, 0);
+    entry(&mut b, RELA2, 8, 2, 4, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let p1 = layout
+        .placements()
+        .iter()
+        .find(|p| p.section_index == 1)
+        .unwrap()
+        .address
+        - layout.base();
+    let p2 = layout
+        .placements()
+        .iter()
+        .find(|p| p.section_index == 2)
+        .unwrap()
+        .address
+        - layout.base()
+        + 8;
+    entry(&mut b, RELA2, 8, 2, 4, (1i64 << 32) + p2 as i64 - p1 as i64);
+    let resolver = SymbolResolver::new(
+        &b,
+        &layout,
+        &[Export {
+            name: b"missing",
+            value: 1 << 32,
+        }],
+    )
+    .unwrap();
+    let constraints = resolver.relative32_import_constraints(2).unwrap();
+    assert_eq!(constraints.rela_entries(), 2);
+    assert_eq!(constraints.import_relocations(), 2);
+    assert_eq!(constraints.ignored_relative32_relocations(), 0);
+    assert_eq!(constraints.window(), None);
+}
+
+#[test]
+fn relative32_import_constraints_missing_symbol_after_empty_window() {
+    let mut b = fixture();
+    b[STRINGS..STRINGS + 16].copy_from_slice(b"\0missing\0absent\0");
+    p64(&mut b, h(5) + 32, 16);
+    p32(&mut b, SYMBOLS + 24, 9);
+    p16(&mut b, SYMBOLS + 30, 0);
+    p64(&mut b, SYMBOLS + 32, 0);
+    entry(&mut b, RELA1, 0, 2, 2, i64::MIN);
+    entry(&mut b, RELA2, 8, 1, 2, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let provided = [Export {
+        name: b"missing",
+        value: 0,
+    }];
+    assert!(crate::relative32_base_window(0, i64::MIN, 0, layout.span()).is_none());
+    let resolver = SymbolResolver::new(&b, &layout, &provided).unwrap();
+    assert_eq!(
+        resolver.relative32_import_constraints(2),
+        Err(Error::MissingSymbol)
+    );
+}
+
+#[test]
+fn relative32_constraints_budget_precedes_missing_symbols_and_counts_none() {
+    let mut b = fixture();
+    b[STRINGS..STRINGS + 16].copy_from_slice(b"\0missing\0absent\0");
+    p64(&mut b, h(5) + 32, 16);
+    p32(&mut b, SYMBOLS + 24, 9);
+    p16(&mut b, SYMBOLS + 30, 0);
+    p64(&mut b, SYMBOLS + 32, 0);
+    entry(&mut b, RELA1, 0, 2, 2, i64::MIN);
+    entry(&mut b, RELA2, 8, 1, 2, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    assert_eq!(
+        resolver.relative32_import_constraints(0),
+        Err(Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver.relative32_import_constraints(1),
+        Err(Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver.relative32_import_constraints(2),
+        Err(Error::MissingSymbol)
+    );
+
+    entry(&mut b, RELA1, 0, 0, 0, 0);
+    entry(&mut b, RELA2, 0, 0, 0, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let constraints = SymbolResolver::new(&b, &layout, &[])
+        .unwrap()
+        .relative32_import_constraints(2)
+        .unwrap();
+    assert_eq!(constraints.rela_entries(), 2);
+    assert_eq!(constraints.import_relocations(), 0);
+}
+
+#[test]
+fn relative32_constraints_ignore_debug_target_but_reject_note_target() {
+    let mut b = fixture();
+    p32(&mut b, h(8) + 44, 9);
+    entry(&mut b, RELA1, 0, 0, 0, 0);
+    entry(&mut b, RELA2, 0, 2, 2, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let constraints = SymbolResolver::new(&b, &layout, &exports())
+        .unwrap()
+        .relative32_import_constraints(2)
+        .unwrap();
+    assert_eq!(constraints.rela_entries(), 1);
+    assert_eq!(constraints.import_relocations(), 0);
+    assert_eq!(constraints.ignored_relative32_relocations(), 0);
+    p32(&mut b, h(8) + 44, 3);
+    assert_eq!(
+        SymbolResolver::new(&b, &layout, &exports())
+            .unwrap()
+            .relative32_import_constraints(2),
+        Err(Error::RelocationTarget)
+    );
+}
+
+#[test]
+fn relative32_constraints_validate_offset_ranges_and_checked_overflow() {
+    for offset in [13, u64::MAX] {
+        let mut b = fixture();
+        entry(&mut b, RELA1, offset, 2, 2, 0);
+        assert_eq!(crate::inspect(&b), Err(Error::RelocationRange));
+    }
+}
+
+#[test]
+fn relative32_constraints_count_absolute_and_local_as_ignored_but_preflight_others() {
+    let mut b = fixture();
+    entry(&mut b, RELA1, 0, 1, 2, 0);
+    p16(&mut b, SYMBOLS + 54, 0xfff1);
+    entry(&mut b, RELA2, 0, 2, 2, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let constraints = SymbolResolver::new(&b, &layout, &[])
+        .unwrap()
+        .relative32_import_constraints(2)
+        .unwrap();
+    assert_eq!(constraints.import_relocations(), 0);
+    assert_eq!(constraints.ignored_relative32_relocations(), 2);
+
+    p16(&mut b, SYMBOLS + 54, 0);
+    entry(&mut b, RELA2, 8, 2, 1, 0);
+    let constraints = SymbolResolver::new(&b, &layout, &[])
+        .unwrap()
+        .relative32_import_constraints(2)
+        .unwrap();
+    assert_eq!(constraints.rela_entries(), 2);
+    assert_eq!(constraints.import_relocations(), 0);
+    assert_eq!(constraints.ignored_relative32_relocations(), 1);
+}

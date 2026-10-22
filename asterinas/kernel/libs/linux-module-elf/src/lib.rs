@@ -37,7 +37,9 @@ pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, page_layout_span_bound, plan_layout, plan_page_layout};
 pub use placement::{Relative32BaseWindow, relative32_base_window};
-pub use resolve::{Export, RelocationReachError, RelocationSite, SymbolResolver};
+pub use resolve::{
+    Export, Relative32ImportConstraints, RelocationReachError, RelocationSite, SymbolResolver,
+};
 pub use staging::{StagingChunk, StagingPlan};
 
 const HEADER_SIZE: usize = 64;

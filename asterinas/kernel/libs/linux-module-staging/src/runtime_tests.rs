@@ -507,13 +507,22 @@ fn cybermanju_prepared_module_runtime() {
             .checked_add(offset)
             .unwrap();
         // relative_import_fixture preserves the original zero-addend RELA.
-        let window = linux_module_elf::relative32_base_window(
+        let expected_window = linux_module_elf::relative32_base_window(
             code_address,
             0,
             place_offset,
             current_layout.span(),
         )
         .expect("a 32-bit reachability interval exists for the numeric import");
+        let collected = SymbolResolver::new(&bytes, current_layout, &real)
+            .unwrap()
+            .relative32_import_constraints(65_536)
+            .unwrap();
+        assert_eq!(collected.import_relocations(), 1);
+        assert_eq!(collected.rela_entries(), real_prepared.relocation_entries());
+        assert_eq!(collected.ignored_relative32_relocations(), 0);
+        let window = collected.window().unwrap();
+        assert_eq!(window, expected_window);
         assert!(!window.contains(owner.range().start as u64));
         assert_eq!(
             SymbolResolver::new(&bytes, current_layout, &real)
@@ -575,6 +584,9 @@ fn cybermanju_prepared_module_runtime() {
     );
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false"
+    );
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false"
     );
     let owner =
         ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();

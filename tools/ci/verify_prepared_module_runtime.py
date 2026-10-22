@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window", "relative32_import_collection")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
@@ -15,6 +15,7 @@ RELATIVE32_REACH = PREFIX + "relative32_reach:PASS types=2 boundary_cases=8 miss
 REACH_DIAGNOSTICS = PREFIX + "reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2"
 SIGNED32_ABSOLUTE = PREFIX + "signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false"
 RELATIVE32_PLACEMENT_WINDOW = PREFIX + "relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false"
+RELATIVE32_IMPORT_COLLECTION = 'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false'
 
 
 def relative32_numeric_placement_window(target: int, field_offset: int = 0) -> tuple[int, int, int]:
@@ -67,7 +68,7 @@ def verify(text: str) -> dict:
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
     scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW}:
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW, RELATIVE32_IMPORT_COLLECTION}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -107,6 +108,7 @@ def verify(text: str) -> dict:
         "signed32_absolute_sign_extension_verified": True,
         "signed32_kernel_export_numeric_only": True,
         "relative32_numeric_placement_window_verified": True,
+        "relative32_import_constraints_verified": True,
         "near_text_allocation_available": False,
         "module_execution_verified": False,
         "real_code_addresses_tested": 2,

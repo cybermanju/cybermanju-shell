@@ -25,11 +25,28 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2",
                     "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false",
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false",
+                    'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false',
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
             + "\n"
         )
+
+    def test_import_collection_marker_exact_and_mandatory(self):
+        marker = 'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false'
+        good = self.evidence()
+        variants = [good.replace(marker + "\n", ""), good + marker + "\n",
+                    good.replace(marker, "echo " + marker)]
+        for original, changed in [("kinds=2", "kinds=3"),
+                                  ("collected_imports=2", "collected_imports=0"),
+                                  ("candidate_preflight=2", "candidate_preflight=1"),
+                                  ("reserved_near_text=false", "reserved_near_text=true"),
+                                  ("execution=false", "execution=true")]:
+            variants.append(good.replace(marker, marker.replace(original, changed)))
+        for text in variants:
+            with self.assertRaises(ValueError):
+                verify(text)
+        self.assertTrue(verify(good)["relative32_import_constraints_verified"])
 
     def test_complete_evidence_and_result_contract(self):
         result = verify(self.evidence())
