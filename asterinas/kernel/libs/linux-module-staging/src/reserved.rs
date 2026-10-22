@@ -75,6 +75,73 @@ impl ReservedModuleLayout {
         })
     }
 
+    /// Try a bounded prefix of page-aligned bases in a conservative numeric window.
+    ///
+    /// The caller's window is only a filter, possibly collected at another base.
+    /// Each successful claim is replanned, its direct PC32/PLT32 constraints are
+    /// recollected, and ALL relocation kinds receive arithmetic reach preflight
+    /// before returning an owner. `max_entries` bounds both scans. No payload,
+    /// frames, mappings, permissions or execution are created by this constructor.
+    ///
+    /// Only occupied candidates (AddressSpace(NoMemory)) advance by PAGE_SIZE.
+    /// Other errors, including out-of-pool addresses, stale geometry, missing
+    /// exports and full-preflight failure, return immediately and release the
+    /// claim; a later candidate is NOT tried after such an error. Zero or more
+    /// than 64 candidates returns ResourceLimit before claiming. No aligned base
+    /// or exhaustion of that prefix returns AddressSpace(NoMemory), not proof
+    /// that the whole window/pool is full. The existing VMALLOC gate is unchanged;
+    /// no near-text arena is introduced. Bookkeeping heap OOM is outside Result.
+    pub fn new_in_relative32_window(
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        window: linux_module_elf::Relative32BaseWindow,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+        max_candidates: usize,
+    ) -> Result<Self, Error> {
+        if max_candidates == 0 || max_candidates > 64 {
+            return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
+        }
+        let no_candidate = || Error::AddressSpace(ostd::Error::NoMemory);
+        let mut candidate = window
+            .first_aligned(PAGE_SIZE as u64)
+            .ok_or_else(no_candidate)?;
+        for attempt in 0..max_candidates {
+            let base = Vaddr::try_from(candidate)
+                .map_err(|_| Error::AddressSpace(ostd::Error::InvalidArgs))?;
+            match Self::new_at(bytes, base, max_pages, max_sections) {
+                Ok(owner) => {
+                    let resolver =
+                        SymbolResolver::new(bytes, owner.layout(), exports).map_err(Error::Plan)?;
+                    let constraints = resolver
+                        .relative32_placement_constraints(max_entries)
+                        .map_err(Error::Plan)?;
+                    if !constraints
+                        .window()
+                        .is_some_and(|fresh| fresh.contains(candidate))
+                    {
+                        return Err(Error::Plan(linux_module_elf::Error::RelocationOverflow));
+                    }
+                    resolver
+                        .check_relocation_reach(max_entries)
+                        .map_err(Error::Plan)?;
+                    return Ok(owner);
+                }
+                Err(Error::AddressSpace(ostd::Error::NoMemory)) => (),
+                Err(error) => return Err(error),
+            }
+            if attempt + 1 == max_candidates {
+                break;
+            }
+            candidate = candidate
+                .checked_add(PAGE_SIZE as u64)
+                .filter(|next| window.contains(*next))
+                .ok_or_else(no_candidate)?;
+        }
+        Err(no_candidate())
+    }
+
     fn new_with_reservation(
         bytes: &[u8],
         max_pages: usize,

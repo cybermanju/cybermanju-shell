@@ -808,6 +808,7 @@ fn cybermanju_prepared_module_runtime() {
         "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false"
     );
     requested_layout_runtime(envelope, limits);
+    relative32_reservation_runtime(envelope, limits);
     // No module bytes converted to function pointers and no ELF symbol called.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
 }
@@ -970,5 +971,179 @@ fn requested_layout_runtime(envelope: usize, mut limits: PreparationLimits) {
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:requested_layout:PASS base={:#x} reserved={} span={} pages={} invalid_cases=8 conflict_cases=2 rollback_cases=3 exact_reclaim=true mapping=false execution=false",
         base, envelope, span, pages
+    );
+}
+
+// Search is only a bounded prefix in the existing VMALLOC pool. Synthetic
+// near-by imports exercise PC32/PLT32 without claiming Linux ABI or kernel exports.
+fn relative32_reservation_runtime(envelope: usize, mut limits: PreparationLimits) {
+    use linux_module_elf::Relative32BaseWindow;
+    use ostd::mm::module_address::ModuleAddressReservation;
+    let max_pages = MAX_SPAN as usize / PAGE_SIZE;
+    let probe = ModuleAddressReservation::new(envelope + 3 * PAGE_SIZE, max_pages).unwrap();
+    let base = probe.range().start;
+    drop(probe);
+    let second = base + PAGE_SIZE;
+    let filter = Relative32BaseWindow::for_module_span(envelope as u64)
+        .unwrap()
+        .restrict(base as u64, second as u64)
+        .unwrap();
+    for kind in [2, 4] {
+        let (bytes, name, target, offset) = relative_import_fixture(kind);
+        let initial = plan_page_layout(&bytes, base as u64, MAX_SPAN, MAX_SECTIONS).unwrap();
+        let field = initial
+            .placements()
+            .iter()
+            .find(|p| p.section_index == target)
+            .unwrap()
+            .address
+            .checked_add(offset)
+            .unwrap();
+        let exports = [Export {
+            name,
+            value: field.checked_add(29).unwrap(),
+        }];
+        let constraints = SymbolResolver::new(&bytes, &initial, &exports)
+            .unwrap()
+            .relative32_placement_constraints(65_536)
+            .unwrap();
+        assert_eq!(constraints.import_relocations(), 1);
+        let window = constraints.window().unwrap().intersect(filter).unwrap();
+        assert!(window.contains(base as u64) && window.contains(second as u64));
+        // Only the first candidate's initial page is held. The next base must
+        // remain available even though whole module envelopes overlap.
+        let occupied = ModuleAddressReservation::new_at(base, PAGE_SIZE, 1).unwrap();
+        let owner = ReservedModuleLayout::new_in_relative32_window(
+            &bytes,
+            &exports,
+            window,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+            2,
+        )
+        .unwrap();
+        assert_eq!(
+            owner.range().start,
+            second,
+            "occupied first candidate must be skipped"
+        );
+        assert_eq!(owner.layout().base(), second as u64);
+        assert_eq!(occupied.range(), base..second);
+        let selected = plan_page_layout(&bytes, second as u64, MAX_SPAN, MAX_SECTIONS).unwrap();
+        let prepared = SymbolResolver::new(&bytes, &selected, &exports)
+            .unwrap()
+            .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
+            .unwrap();
+        let span = selected.span() as usize;
+        limits.max_pages = span / PAGE_SIZE;
+        let mut expected = vec![0; span];
+        for section in prepared.sections() {
+            let start = usize::try_from(section.placement().address - second as u64).unwrap();
+            expected[start..start + section.bytes().len()].copy_from_slice(section.bytes());
+        }
+        // Also compare the direct displacement against an independent scalar.
+        let selected_field = selected
+            .placements()
+            .iter()
+            .find(|p| p.section_index == target)
+            .unwrap()
+            .address
+            .checked_add(offset)
+            .unwrap();
+        let delta =
+            i32::try_from(i128::from(exports[0].value) - i128::from(selected_field)).unwrap();
+        let relative = usize::try_from(selected_field - second as u64).unwrap();
+        assert_eq!(&expected[relative..relative + 4], &delta.to_le_bytes());
+        let staged = owner.prepare_and_stage(&bytes, &exports, limits).unwrap();
+        let range = staged.reserved_range();
+        assert_eq!(range, second..second + envelope);
+        let mut actual = vec![0xff; span];
+        staged.read_bytes(0, &mut actual).unwrap();
+        assert_eq!(
+            actual, expected,
+            "selected candidate's complete prepared span"
+        );
+        assert!(matches!(
+            ModuleAddressReservation::new_at(second, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        drop(staged);
+        let reclaim = ModuleAddressReservation::new_at(second, envelope, max_pages).unwrap();
+        assert_eq!(reclaim.range(), range);
+        drop(reclaim);
+        drop(occupied);
+    }
+    let narrowed = fixture_with_u32_relocation();
+    let (imported, name, _, _) = relative_import_fixture(2);
+    let far_exports = [Export {
+        name,
+        value: ostd::cpu::num_cpus as *const () as usize as u64,
+    }];
+    for case in 0..8 {
+        let occupied = if case == 3 {
+            Some(ModuleAddressReservation::new_at(base, PAGE_SIZE, 1).unwrap())
+        } else {
+            None
+        };
+        let bytes = match case {
+            4 => narrowed.as_slice(),
+            5 | 7 => imported.as_slice(),
+            _ => FIXTURE,
+        };
+        let exports = if case == 7 {
+            far_exports.as_slice()
+        } else {
+            &[]
+        };
+        let window = if case == 2 {
+            filter.restrict(base as u64 + 1, second as u64 - 1).unwrap()
+        } else {
+            filter
+        };
+        let attempts = match case {
+            0 => 0,
+            1 => 65,
+            3 => 1,
+            _ => 2,
+        };
+        let entries = if case == 6 { 0 } else { 65_536 };
+        let result = ReservedModuleLayout::new_in_relative32_window(
+            bytes,
+            exports,
+            window,
+            max_pages,
+            MAX_SECTIONS,
+            entries,
+            attempts,
+        );
+        match case {
+            0 | 1 | 6 => assert!(matches!(result, Err(Error::Plan(ElfError::ResourceLimit)))),
+            2 | 3 => assert!(matches!(
+                result,
+                Err(Error::AddressSpace(ostd::Error::NoMemory))
+            )),
+            4 | 7 => assert!(matches!(
+                result,
+                Err(Error::Plan(ElfError::RelocationOverflow))
+            )),
+            5 => assert!(matches!(result, Err(Error::Plan(ElfError::MissingSymbol)))),
+            _ => unreachable!(),
+        }
+        if let Some(occupied) = occupied {
+            assert_eq!(occupied.range(), base..second);
+            // Failure of a one-attempt prefix says nothing about the next free base.
+            let next =
+                ReservedModuleLayout::new_at(FIXTURE, second, max_pages, MAX_SECTIONS).unwrap();
+            assert_eq!(next.range().start, second);
+            drop(next);
+            drop(occupied);
+        }
+        let reclaim = ModuleAddressReservation::new_at(base, envelope, max_pages).unwrap();
+        assert_eq!(reclaim.range(), base..base + envelope);
+        drop(reclaim);
+    }
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:relative32_reservation:PASS kinds=2 occupied_candidates=2 staged_cases=2 rejection_cases=8 reclaimed_cases=4 attempts_bounded=true reserved_near_text=false mapping=false execution=false"
     );
 }

@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window", "relative32_import_collection", "relative32_defined_collection", "requested_layout")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window", "relative32_import_collection", "relative32_defined_collection", "requested_layout", "relative32_reservation")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
@@ -18,6 +18,7 @@ RELATIVE32_PLACEMENT_WINDOW = PREFIX + "relative32_placement_window:PASS kinds=2
 RELATIVE32_IMPORT_COLLECTION = 'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false'
 RELATIVE32_DEFINED_COLLECTION = PREFIX + "relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false"
 REQUESTED_LAYOUT = re.compile(re.escape(PREFIX + "requested_layout:PASS ") + r"base=(0x[0-9a-fA-F]+) reserved=(\d+) span=(\d+) pages=(\d+) invalid_cases=(\d+) conflict_cases=(\d+) rollback_cases=(\d+) exact_reclaim=(true|false) mapping=(true|false) execution=(true|false)")
+RELATIVE32_RESERVATION = "CYBERMANJU_PREPARED_RUNTIME:relative32_reservation:PASS kinds=2 occupied_candidates=2 staged_cases=2 rejection_cases=8 reclaimed_cases=4 attempts_bounded=true reserved_near_text=false mapping=false execution=false"
 
 
 def relative32_numeric_placement_window(target: int, field_offset: int = 0) -> tuple[int, int, int]:
@@ -71,7 +72,7 @@ def verify(text: str) -> dict:
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
     scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
     requested = [m for line in markers if (m := REQUESTED_LAYOUT.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or len(requested) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), requested[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW, RELATIVE32_IMPORT_COLLECTION, RELATIVE32_DEFINED_COLLECTION}:
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or len(requested) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), requested[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW, RELATIVE32_IMPORT_COLLECTION, RELATIVE32_DEFINED_COLLECTION, RELATIVE32_RESERVATION}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -134,6 +135,12 @@ def verify(text: str) -> dict:
         "relative32_defined_symbol_constraints_verified": True,
         "relative32_defined_section_relative_cases": 2,
         "relative32_defined_absolute_cases": 2,
+        "relative32_reservation_verified": True,
+        "relative32_reservation_kinds": 2,
+        "relative32_reserved_staged_cases": 2,
+        "relative32_reservation_rejection_cases": 8,
+        "relative32_reservation_reclaimed_cases": 4,
+        "relative32_candidate_search_bounded": True,
         "near_text_allocation_available": False,
         "module_execution_verified": False,
         "real_code_addresses_tested": 2,

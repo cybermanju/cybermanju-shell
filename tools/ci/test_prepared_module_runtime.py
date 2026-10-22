@@ -28,6 +28,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false',
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false",
                     "CYBERMANJU_PREPARED_RUNTIME:requested_layout:PASS base=0xffffc00000010000 reserved=40960 span=36864 pages=9 invalid_cases=8 conflict_cases=2 rollback_cases=3 exact_reclaim=true mapping=false execution=false",
+                    "CYBERMANJU_PREPARED_RUNTIME:relative32_reservation:PASS kinds=2 occupied_candidates=2 staged_cases=2 rejection_cases=8 reclaimed_cases=4 attempts_bounded=true reserved_near_text=false mapping=false execution=false",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -69,6 +70,31 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertEqual(result["relative32_defined_section_relative_cases"], 2)
         self.assertEqual(result["relative32_defined_absolute_cases"], 2)
         for flag in ("near_text_allocation_available", "module_execution_verified", "linux_modules_executed", "wx_verified"):
+            self.assertFalse(result[flag])
+
+    def test_relative32_reservation_marker_exact_mandatory_and_bounded(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:relative32_reservation:PASS kinds=2 occupied_candidates=2 staged_cases=2 rejection_cases=8 reclaimed_cases=4 attempts_bounded=true reserved_near_text=false mapping=false execution=false"
+        good = self.evidence()
+        bad = [good.replace(marker + "\n", ""), good + marker + "\n",
+               good.replace(marker, "echo " + marker), good.replace(marker, marker[:-10])]
+        for old, new in [("kinds=2", "kinds=1"), ("occupied_candidates=2", "occupied_candidates=1"),
+                         ("staged_cases=2", "staged_cases=1"), ("rejection_cases=8", "rejection_cases=7"),
+                         ("reclaimed_cases=4", "reclaimed_cases=3"),
+                         ("attempts_bounded=true", "attempts_bounded=false"),
+                         ("reserved_near_text=false", "reserved_near_text=true"),
+                         ("mapping=false", "mapping=true"), ("execution=false", "execution=true")]:
+            bad.append(good.replace(marker, marker.replace(old, new)))
+        for text in bad:
+            with self.subTest(marker=text[-190:]), self.assertRaises(ValueError):
+                verify(text)
+        result = verify(good)
+        self.assertTrue(result["relative32_reservation_verified"])
+        self.assertEqual(result["relative32_reservation_kinds"], 2)
+        self.assertEqual(result["relative32_reserved_staged_cases"], 2)
+        self.assertEqual(result["relative32_reservation_rejection_cases"], 8)
+        self.assertEqual(result["relative32_reservation_reclaimed_cases"], 4)
+        self.assertTrue(result["relative32_candidate_search_bounded"])
+        for flag in ("near_text_allocation_available", "production_mapping_available", "module_execution_verified"):
             self.assertFalse(result[flag])
 
     def test_complete_evidence_and_result_contract(self):
