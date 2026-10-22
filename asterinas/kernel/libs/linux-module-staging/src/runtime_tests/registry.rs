@@ -10,7 +10,10 @@ use ostd::{
 };
 
 use super::{FIXTURE, MAX_SECTIONS, MAX_SPAN, PreparationLimits, relative_import_fixture};
-use crate::{Error, NearTextModuleLayout, OSTD_NUM_CPUS_EXPORT_NAME, OstdExportRegistry};
+use crate::{
+    Error, ExportAbi, ExportSignature, LinuxExportAdmissionError, NearTextModuleLayout,
+    OSTD_NUM_CPUS_EXPORT_NAME, OstdExportRegistry,
+};
 
 fn u32_at(bytes: &[u8], offset: usize) -> u32 {
     u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
@@ -96,6 +99,18 @@ fn cybermanju_internal_exports_runtime() {
         "registry address must match OSTD function"
     );
     assert_eq!(registry.lookup(OSTD_NUM_CPUS_EXPORT_NAME), Some(value));
+    let described = registry.describe(OSTD_NUM_CPUS_EXPORT_NAME).unwrap();
+    assert_eq!(described.name(), OSTD_NUM_CPUS_EXPORT_NAME);
+    let independent_function: fn() -> usize = cpu::num_cpus;
+    let independent_value = independent_function as *const () as usize as u64;
+    assert_eq!(described.value(), independent_value);
+    assert_eq!(described.abi(), ExportAbi::RustInternal);
+    assert_eq!(described.signature(), ExportSignature::NoArgsUsize);
+    assert_eq!(
+        registry.admit_linux_export(OSTD_NUM_CPUS_EXPORT_NAME),
+        Err(LinuxExportAdmissionError::AbiNotAdmitted),
+        "internal Rust ABI must not be admitted as Linux"
+    );
     let denied: [&[u8]; 5] = [
         b"__fentry__",
         b"kmalloc",
@@ -109,7 +124,21 @@ fn cybermanju_internal_exports_runtime() {
             None,
             "registry must reject unregistered names"
         );
+        assert_eq!(
+            registry.describe(name),
+            None,
+            "descriptor lookup must reject unregistered names"
+        );
+        assert_eq!(
+            registry.admit_linux_export(name),
+            Err(LinuxExportAdmissionError::UnregisteredName),
+            "unknown export must retain name rejection"
+        );
     }
+
+    println!(
+        "CYBERMANJU_INTERNAL_EXPORTS:admission:PASS described=1 rust_internal=1 rejected_abi=1 rejected_names=5 numeric_export_preserved=true no_admitted_linux_exports=true"
+    );
 
     let pool = NearTextAddressReservation::signed32_arena_range();
     let base = pool.start.checked_add(16 * PAGE_SIZE).unwrap();
@@ -231,6 +260,6 @@ fn cybermanju_internal_exports_runtime() {
     assert_eq!((compared, missing, reclaimed), (2 * 40_960, 2, 4));
     assert_eq!(denied.len(), 5);
     println!(
-        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false"
+        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true"
     );
 }

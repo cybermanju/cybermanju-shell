@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 
-from verify_internal_exports_runtime import BEGIN, COMPLETE, PAGE, POOL_START, verify
+from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, PAGE, POOL_START, verify
 
 
 class InternalExportsTests(unittest.TestCase):
@@ -14,13 +14,18 @@ class InternalExportsTests(unittest.TestCase):
         self.cases = [f"CYBERMANJU_INTERNAL_EXPORTS:staged:PASS kind={kind} base={base:#x} reserved=40960 "
                       f"span=40960 pages=10 payload=1721 relas=6 symbol=0xffffffff88010000 field={base+32:#x} "
                       "compared=40960 registry_match=true" for kind in (2, 4)]
-        return "\n".join([BEGIN, *self.cases, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
+        return "\n".join([BEGIN, ADMISSION, *self.cases, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
 
     def test_valid_registry_is_not_linux_abi(self):
         r = verify(self.evidence())
         self.assertEqual((r["internal_registry_entries"], r["denied_name_cases"], r["missing_import_cases"], r["staged_cases"], r["available_range_checks"]), (1, 5, 2, 2, 4))
         self.assertEqual(r["internal_registry_symbol"], "cybermanju_ostd_num_cpus")
         self.assertEqual(r["registry_function_abi"], "rust_internal")
+        self.assertEqual(r["registry_function_signature"], "fn() -> usize")
+        self.assertEqual(r["linux_admission_policy"], "reject_only")
+        self.assertEqual((r["linux_admitted_exports"], r["linux_abi_rejection_cases"], r["linux_unknown_name_rejection_cases"]), (0, 1, 5))
+        self.assertTrue(r["export_descriptor_verified"])
+        self.assertTrue(r["linux_admission_rejection_verified"])
         for key in ("internal_registry_lookup_verified", "full_span_readback_verified", "fixture_imports_renamed_for_internal_registry"):
             self.assertTrue(r[key])
         for key in ("kernel_linux_export_lookup_available", "linux_abi_verified", "pages_mapped", "production_mapping_available",
@@ -29,7 +34,7 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_unique_complete_ordered_markers(self):
         good = self.evidence()
-        for marker in [BEGIN, *self.cases, COMPLETE]:
+        for marker in [BEGIN, ADMISSION, *self.cases, COMPLETE]:
             for bad in (good.replace(marker + "\n", ""), good + marker + "\n", good.replace(marker, "echo " + marker)):
                 with self.assertRaises(ValueError): verify(bad)
         for bad in (good + "CYBERMANJU_OTHER:PASS\n", good.replace("kind=4", "kind=2"),
@@ -45,6 +50,34 @@ class InternalExportsTests(unittest.TestCase):
                          ("compared_full_span=true", "compared_full_span=false"), ("pages_mapped=false", "pages_mapped=true"),
                          ("linux_abi=false", "linux_abi=true"), ("execution=false", "execution=true")]:
             with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+
+    def test_admission_requires_all_rejection_claims(self):
+        good = self.evidence()
+        for old, new in [("described=1", "described=0"), ("rust_internal=1", "rust_internal=0"),
+                         ("rejected_abi=1", "rejected_abi=0"), ("rejected_names=5", "rejected_names=4"),
+                         ("numeric_export_preserved=true", "numeric_export_preserved=false"),
+                         ("no_admitted_linux_exports=true", "no_admitted_linux_exports=false"),
+                         ("abi_rejection=true", "abi_rejection=false")]:
+            with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+
+    def test_admission_must_precede_staging(self):
+        good = self.evidence()
+        for index in (0, 3, 4):
+            lines = good.splitlines()
+            lines.remove(ADMISSION)
+            lines.insert(index, ADMISSION)
+            with self.subTest(index=index), self.assertRaises(ValueError): verify("\n".join(lines))
+
+    def test_old_numeric_only_evidence_cannot_prove_admission(self):
+        old = self.evidence().replace(ADMISSION + "\n", "").replace(" abi_rejection=true", "")
+        with self.assertRaises(ValueError): verify(old)
+
+    def test_admission_metadata_does_not_promote_other_capabilities(self):
+        r = verify(self.evidence())
+        self.assertTrue(r["linux_admission_rejection_verified"])
+        for key in ("linux_abi_verified", "module_execution_verified", "linux_modules_executed",
+                    "kernel_linux_export_lookup_available", "production_mapping_available", "wx_verified", "smp_mapping_verified"):
+            self.assertIs(r[key], False)
 
     def test_geometry_and_full_readback(self):
         good = self.evidence()

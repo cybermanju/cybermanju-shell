@@ -13,7 +13,10 @@ extern crate alloc;
 mod exports;
 use alloc::vec::Vec;
 
-pub use exports::{OSTD_NUM_CPUS_EXPORT_NAME, OstdExportRegistry};
+pub use exports::{
+    ExportAbi, ExportSignature, LinuxExportAdmissionError, OSTD_NUM_CPUS_EXPORT_NAME,
+    OstdExportDescriptor, OstdExportRegistry,
+};
 use linux_module_elf::{Layout, PreparedModule};
 use ostd::mm::{
     PAGE_SIZE,
