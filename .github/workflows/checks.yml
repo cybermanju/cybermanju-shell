@@ -236,6 +236,10 @@ jobs:
         run: bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-contract --kind contract
       - name: Read back pixels through the boot framebuffer and real VGA MMIO in QEMU
         run: bash tools/ci/test_framebuffer_runtime.sh artifacts/framebuffer-hardware --kind hardware
+      - name: Prepare pinned kernel VDSO library for direct fbdev fileops
+        run: bash tools/ci/prepare_kernel_vdso.sh artifacts/kernel-vdso
+      - name: Exercise direct fbdev fileops in the runtime kernel
+        run: VDSO_LIBRARY_DIR="$GITHUB_WORKSPACE/artifacts/kernel-vdso" bash tools/ci/test_framebuffer_runtime.sh artifacts/fbdev-runtime --kind fbdev
       - name: Retain serial, actual image GRUB config and harness provenance
         if: always()
         uses: actions/upload-artifact@v4
@@ -252,5 +256,10 @@ jobs:
             artifacts/framebuffer-hardware/*.txt
             artifacts/framebuffer-hardware/grub.cfg
             artifacts/framebuffer-hardware/harness-Cargo.*
+            artifacts/fbdev-runtime/*.log
+            artifacts/fbdev-runtime/*.json
+            artifacts/fbdev-runtime/*.txt
+            artifacts/fbdev-runtime/grub.cfg
+            artifacts/fbdev-runtime/harness-Cargo.*
           retention-days: 7
           if-no-files-found: warn

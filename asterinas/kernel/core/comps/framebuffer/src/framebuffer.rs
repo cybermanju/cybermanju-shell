@@ -179,6 +179,35 @@ impl FrameBuffer {
         self.io_mem.slice(0..self.byte_len)
     }
 
+    /// Builds a validated synthetic subsurface over the real boot MMIO for
+    /// cross-crate ktests in a disposable, single-CPU VM. Initializes the boot
+    /// framebuffer if needed; never available in production or userspace.
+    #[cfg(ktest)]
+    pub fn test_subsurface(width: usize, height: usize, pitch: usize) -> Result<Self> {
+        if FRAMEBUFFER.get().is_none() {
+            init();
+        }
+        let parent = FRAMEBUFFER.get().ok_or(Error::AccessDenied)?;
+        let row_len = width
+            .checked_mul(parent.pixel_format.nbytes())
+            .ok_or(Error::InvalidArgs)?;
+        let byte_len = pitch.checked_mul(height).ok_or(Error::InvalidArgs)?;
+        if width == 0 || height == 0 || pitch < row_len || byte_len > parent.byte_len {
+            return Err(Error::InvalidArgs);
+        }
+        Ok(Self {
+            io_mem: parent.io_mem.clone(),
+            width,
+            height,
+            line_size: pitch,
+            byte_len,
+            pixel_format: parent.pixel_format,
+            cmap: Mutex::new(FbCmap {
+                entries: Vec::new(),
+            }),
+        })
+    }
+
     /// Returns the pixel format of the framebuffer.
     pub fn pixel_format(&self) -> PixelFormat {
         self.pixel_format

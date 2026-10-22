@@ -589,3 +589,7 @@ pub(super) fn init_in_first_kthread() {
 
     char::register(Arc::new(Fb)).expect("failed to register framebuffer char device");
 }
+
+#[cfg(ktest)]
+#[path = "fb_runtime_tests.rs"]
+mod runtime_tests;

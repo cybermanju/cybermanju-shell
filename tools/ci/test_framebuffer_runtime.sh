@@ -2,16 +2,17 @@
 # Disposable OSTD metadata / boot framebuffer tests, not the installer ISO.
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-OUT=${1:?usage: test_framebuffer_runtime.sh OUT --kind contract|hardware}
+OUT=${1:?usage: test_framebuffer_runtime.sh OUT --kind contract|hardware|fbdev}
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 printf '{"status":"not_verified"}\n' > "$OUT/result.json"
-[[ $# == 3 && $2 == --kind ]] || { echo 'expected OUT --kind contract|hardware' >&2; exit 2; }
+[[ $# == 3 && $2 == --kind ]] || { echo 'expected OUT --kind contract|hardware|fbdev' >&2; exit 2; }
 KIND=$3
 case "$KIND" in
-    contract) CRATE=ostd; PATHCRATE=ostd; FILTER=cybermanju_framebuffer_boot_contract; CFG="$ROOT/tools/ci/framebuffer-contract.OSDK.toml" ;;
-    hardware) CRATE=aster-framebuffer; PATHCRATE=kernel/core/comps/framebuffer; FILTER=cybermanju_framebuffer_runtime; CFG="$ROOT/tools/ci/framebuffer-runtime.OSDK.toml" ;;
-    *) echo 'expected --kind contract|hardware' >&2; exit 2 ;;
+    contract) CRATE=ostd; PATHCRATE=ostd; FILTER=cybermanju_framebuffer_boot_contract; CFG="$ROOT/tools/ci/framebuffer-contract.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_framebuffer_runtime.py" ;;
+    hardware) CRATE=aster-framebuffer; PATHCRATE=kernel/core/comps/framebuffer; FILTER=cybermanju_framebuffer_runtime; CFG="$ROOT/tools/ci/framebuffer-runtime.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_framebuffer_runtime.py" ;;
+    fbdev) CRATE=aster-core; PATHCRATE=kernel/core; FILTER=cybermanju_fbdev_fileops_runtime; CFG="$ROOT/tools/ci/fbdev-runtime.OSDK.toml"; VERIFY="$ROOT/tools/ci/verify_fbdev_runtime.py" ;;
+    *) echo 'expected --kind contract|hardware|fbdev' >&2; exit 2 ;;
 esac
 CONFIG="$ROOT/asterinas/$PATHCRATE/OSDK.toml"
 if [[ -e "$CONFIG" || -L "$CONFIG" ]]; then
@@ -34,6 +35,14 @@ ln -sf "$LLVM" "$OUT/llvm-bin/rust-objcopy"
 export PATH="$OUT/llvm-bin:$PATH"
 (set -o noclobber; cat "$CFG" > "$CONFIG") || exit 2
 trap 'if cmp -s "$CONFIG" "$CFG"; then rm -f "$CONFIG"; else echo "Changed configuration preserved: $CONFIG" >&2; fi' EXIT
+if [[ "$KIND" == fbdev ]]; then
+    [[ -n "${VDSO_LIBRARY_DIR:-}" && -s "$VDSO_LIBRARY_DIR/vdso_x86_64.so" ]] || {
+        echo 'fbdev runtime requires VDSO_LIBRARY_DIR/vdso_x86_64.so (non-empty); prepare it before running this mode' >&2
+        exit 2
+    }
+    # Preflight above requires an existing file: this verifies it, never a stub.
+    bash "$ROOT/tools/ci/prepare_kernel_vdso.sh" "$VDSO_LIBRARY_DIR"
+fi
 # Rebuild only this generated disposable bundle, never a source tree or installed
 # disk. Record the GRUB config extracted from that image, not a guessed config.
 BUNDLE="$ROOT/asterinas/target/osdk/$CRATE"
@@ -51,11 +60,19 @@ cp "$ROOT/asterinas/target/osdk/$CRATE-test-base/Cargo.lock" "$OUT/harness-Cargo
 ISO="$ROOT/asterinas/target/osdk/$CRATE/$CRATE-osdk-bin.iso"
 rm -f "$OUT/grub.cfg"
 xorriso -osirrox on -indev "$ISO" -extract /boot/grub/grub.cfg "$OUT/grub.cfg" > "$OUT/grub-extract.log" 2>&1
+if [[ "$KIND" == fbdev ]]; then
+    grep -Eq '^[[:space:]]*multiboot2 /boot/aster-core-osdk-bin earlycon --$' "$OUT/grub.cfg" || {
+        echo 'fbdev image lacks the required earlycon boot argument' >&2; exit 2;
+    }
+fi
 {
     (cd "$ROOT/asterinas" && rustc --version && cargo --version)
     qemu-system-x86_64 --version | head -1
     printf 'kind=%s; x86_64; q35; TCG; 1 CPU; 1 GiB; BIOS/GRUB multiboot2; OSDK_LOCAL_DEV=1\n' "$KIND"
     sha256sum "$ROOT/asterinas/target/osdk/$CRATE-osdk-bin.elf" "$ISO" "$OUT/grub.cfg" "$OUT/harness-Cargo.toml" "$OUT/harness-Cargo.lock"
-    sha256sum "$CFG" "$ROOT/tools/ci/test_framebuffer_runtime.sh" "$ROOT/tools/ci/verify_framebuffer_runtime.py"
+    sha256sum "$CFG" "$ROOT/tools/ci/test_framebuffer_runtime.sh" "$VERIFY"
+    if [[ "$KIND" == fbdev ]]; then
+        sha256sum "$ROOT/tools/ci/prepare_kernel_vdso.sh" "$VDSO_LIBRARY_DIR/vdso_x86_64.so"
+    fi
 } > "$OUT/provenance.txt"
-python3 "$ROOT/tools/ci/verify_framebuffer_runtime.py" "$OUT/runtime.log" "$KIND" "$OUT/result.json"
+python3 "$VERIFY" "$OUT/runtime.log" "$KIND" "$OUT/result.json"
