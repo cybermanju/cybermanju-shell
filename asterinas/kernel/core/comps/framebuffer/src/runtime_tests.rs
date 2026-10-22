@@ -379,8 +379,137 @@ fn cybermanju_framebuffer_offset_init_runtime() {
     assert_eq!(guards, saved);
     drop(restored);
     assert!(framebuffer::FRAMEBUFFER.get().is_none());
+    rgb565_descriptor_readback();
     println!("CYBERMANJU_FB_OFFSET_INIT:lifetime:PASS release_reacquire=true restored=true");
     println!(
         "CYBERMANJU_FB_OFFSET_INIT:scope:PASS synthetic_descriptor=true firmware_unaligned=false userspace=false"
     );
+}
+
+// This descriptor changes the byte layout only: the firmware remains in the
+// original 32-bpp QEMU mode. Do not qualify physical 16-bpp scanout from this.
+fn rgb565_descriptor_readback() {
+    use ostd::{io::IoMem, mm::CachePolicy};
+
+    const OFFSET: usize = PAGE_SIZE - 3;
+    const SPAN: usize = 12;
+    const GUARD: usize = 8;
+    let mut descriptor = boot_info().framebuffer_arg.unwrap();
+    assert_eq!(descriptor.address % PAGE_SIZE, 0);
+    descriptor.address = descriptor.address.checked_add(OFFSET).unwrap();
+    descriptor.width = 2;
+    descriptor.height = 2;
+    descriptor.bpp = 16;
+    descriptor.pitch = 6;
+    let (cover, _) = framebuffer::mmio_cover(descriptor.address, SPAN).unwrap();
+    let seed =
+        IoMem::acquire_with_cache_policy(cover.clone(), CachePolicy::WriteCombining).unwrap();
+    let mut saved = [0; SPAN + 2 * GUARD];
+    seed.read_bytes(OFFSET - GUARD, &mut saved).unwrap();
+    seed.write_bytes(OFFSET - GUARD, &[0x6d; SPAN + 2 * GUARD])
+        .unwrap();
+    drop(seed);
+
+    let fb = framebuffer::framebuffer_from_boot_arg(descriptor).unwrap();
+    assert_eq!(fb.byte_len(), SPAN);
+    assert_eq!(fb.line_size(), 6);
+    let view = fb.surface_io_mem();
+    assert_eq!(view.size(), SPAN);
+    fb.clear();
+    let mut logical = [0xff; SPAN];
+    view.read_bytes(0, &mut logical).unwrap();
+    assert_eq!(logical, [0; SPAN]);
+    // Independent fixed word encodings, not expectations built with render().
+    let colors = [
+        (
+            Pixel {
+                red: 0x00,
+                green: 0x00,
+                blue: 0x00,
+            },
+            [0x00, 0x00],
+        ),
+        (
+            Pixel {
+                red: 0xff,
+                green: 0xff,
+                blue: 0xff,
+            },
+            [0xff, 0xff],
+        ),
+        (
+            Pixel {
+                red: 0xff,
+                green: 0x00,
+                blue: 0x00,
+            },
+            [0x00, 0xf8],
+        ),
+        (
+            Pixel {
+                red: 0x00,
+                green: 0xff,
+                blue: 0x00,
+            },
+            [0xe0, 0x07],
+        ),
+        (
+            Pixel {
+                red: 0x00,
+                green: 0x00,
+                blue: 0xff,
+            },
+            [0x1f, 0x00],
+        ),
+        (
+            Pixel {
+                red: 0x12,
+                green: 0x34,
+                blue: 0x56,
+            },
+            [0xaa, 0x11],
+        ),
+        (
+            Pixel {
+                red: 0x7a,
+                green: 0x8b,
+                blue: 0x9c,
+            },
+            [0x53, 0x7c],
+        ),
+    ];
+    let offset = fb.calc_offset(1, 0);
+    assert_eq!(offset.as_usize(), 2); // physical PAGE_SIZE-1: this word crosses a page.
+    for (color, expected) in colors {
+        let rendered = fb.render_pixel(color);
+        assert_eq!(rendered.nbytes(), 2);
+        fb.write_pixel_at(offset, rendered).unwrap();
+        let mut actual = [0; 2];
+        view.read_bytes(offset.as_usize(), &mut actual).unwrap();
+        assert_eq!(actual, expected);
+    }
+    let last = Pixel {
+        red: 0x7a,
+        green: 0x8b,
+        blue: 0x9c,
+    };
+    assert_eq!(fb.calc_offset(1, 1).as_usize(), 8);
+    fb.write_pixel_at(fb.calc_offset(1, 1), fb.render_pixel(last))
+        .unwrap();
+    view.read_bytes(0, &mut logical).unwrap();
+    assert_eq!(logical, [0, 0, 0x53, 0x7c, 0, 0, 0, 0, 0x53, 0x7c, 0, 0]);
+    drop(view);
+    drop(fb);
+
+    let restored = IoMem::acquire_with_cache_policy(cover, CachePolicy::WriteCombining).unwrap();
+    let mut observed = [0; SPAN + 2 * GUARD];
+    restored.read_bytes(OFFSET - GUARD, &mut observed).unwrap();
+    assert_eq!(&observed[..GUARD], &[0x6d; GUARD]);
+    assert_eq!(&observed[GUARD + SPAN..], &[0x6d; GUARD]);
+    restored.write_bytes(OFFSET - GUARD, &saved).unwrap();
+    restored.read_bytes(OFFSET - GUARD, &mut observed).unwrap();
+    assert_eq!(observed, saved);
+    drop(restored);
+    assert!(framebuffer::FRAMEBUFFER.get().is_none());
+    println!("CYBERMANJU_FB_OFFSET_INIT:rgb565:PASS colors=7 bytes_per_pixel=2 pitch=6");
 }

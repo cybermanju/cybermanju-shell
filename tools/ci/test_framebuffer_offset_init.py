@@ -35,8 +35,9 @@ class OffsetInitVerifierTests(unittest.TestCase):
         result = verify(log(*MARKERS, crlf=True))
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["scope"], "framebuffer_synthetic_descriptor_real_acquisition")
-        for key in ("production_constructor_verified", "actual_mmio_acquisition_verified", "reacquisition_verified", "bytes_restored", "last_view_retains_reservation_verified", "synthetic_descriptor"):
+        for key in ("production_constructor_verified", "actual_mmio_acquisition_verified", "reacquisition_verified", "bytes_restored", "last_view_retains_reservation_verified", "synthetic_descriptor", "rgb565_little_endian_readback_verified", "rgb565_synthetic_descriptor"):
             self.assertIs(result[key], True)
+        self.assertIs(result["firmware_rgb565_mode_verified"], False)
         for key in ("bootloader_unaligned_framebuffer_verified", "userspace_syscall_verified", "mmap_userspace_verified", "gpui_native_verified", "linux_modules_executed"):
             self.assertIs(result[key], False)
         self.assertEqual(json.loads(json.dumps(result)), result)
@@ -48,7 +49,7 @@ class OffsetInitVerifierTests(unittest.TestCase):
             MARKERS[:-1],
             (*MARKERS, MARKERS[0]),
             (*MARKERS[:-1], "$ echo " + MARKERS[-1]),
-            (*MARKERS[:-1], MARKERS[-1].replace("false", "true")),
+            (*MARKERS[:-1], MARKERS[-1].replace("pitch=6", "pitch=4")),
             (*MARKERS, "CYBERMANJU_FB_OFFSET_INIT:extra:PASS"),
             (*MARKERS, "CYBERMANJU_FRAMEBUFFER:io_readback:PASS rows=2 row_bytes=8"),
         ]
@@ -66,7 +67,7 @@ class OffsetInitVerifierTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify(log(*MARKERS), "hardware")
 
-    def test_osdk_filtered_counts_are_not_cargo_test_counts(self):
+    def test_osdk_filtered_counts_are_variable_not_cargo_test_counts(self):
         for filtered in (0, 4, 142):
             self.assertEqual(verify(log(*MARKERS, summary=f"test result: ok. 1 passed; 0 failed; {filtered} filtered out."))["status"], "passed")
         with self.assertRaises(ValueError):

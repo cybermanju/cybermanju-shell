@@ -10,9 +10,10 @@ MARKERS = (
     "CYBERMANJU_FB_OFFSET_INIT:io:PASS guard_bytes=8 crossing_bytes=4",
     "CYBERMANJU_FB_OFFSET_INIT:lifetime:PASS release_reacquire=true restored=true",
     "CYBERMANJU_FB_OFFSET_INIT:scope:PASS synthetic_descriptor=true firmware_unaligned=false userspace=false",
+    "CYBERMANJU_FB_OFFSET_INIT:rgb565:PASS colors=7 bytes_per_pixel=2 pitch=6",
 )
 SUMMARY = "test result: ok. 1 passed; 0 failed; 4 filtered out."
-SUMMARY_PATTERN = re.compile(r"test result:\s*ok\.\s*(\d+) passed;\s*(\d+) failed;(?:\s*\d+ filtered out\.)?", re.I)
+SUMMARY_PATTERN = re.compile(r"test result:\s*ok\.\s*(\d+) passed;\s*(\d+) failed;(?:\s*(\d+) filtered out\.)?", re.I)
 
 
 def verify(text, kind="offset-init"):
@@ -29,7 +30,7 @@ def verify(text, kind="offset-init"):
     if any(marker_lines.count(marker) != 1 for marker in MARKERS):
         raise ValueError("each required offset-init marker must occur exactly once")
     summaries = [m.groups() for line in lines if (m := SUMMARY_PATTERN.fullmatch(line.strip()))]
-    if len(summaries) != 1 or summaries[0] != ("1", "0") or sum("test result:" in line.lower() for line in lines) != 1:
+    if len(summaries) != 1 or summaries[0][:2] != ("1", "0") or sum("test result:" in line.lower() for line in lines) != 1:
         raise ValueError("expected exactly one successful isolated Rust test summary")
     if any("test result:" not in line.lower() and re.search(r"(?:\bFAIL(?:ED)?\b|panic|panicked|assertion.*failed|runner failed)", line, re.I) for line in lines):
         raise ValueError("panic or contradictory failure evidence")
@@ -42,6 +43,9 @@ def verify(text, kind="offset-init"):
         "bytes_restored": True,
         "last_view_retains_reservation_verified": True,
         "synthetic_descriptor": True,
+        "rgb565_little_endian_readback_verified": True,
+        "rgb565_synthetic_descriptor": True,
+        "firmware_rgb565_mode_verified": False,
         "bootloader_unaligned_framebuffer_verified": False,
         "userspace_syscall_verified": False,
         "mmap_userspace_verified": False,

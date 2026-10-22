@@ -47,7 +47,8 @@ impl Pixel {
                 let g = (self.green >> 2) as u16; // Green (6 bits)
                 let b = (self.blue >> 3) as u16; // Blue (5 bits)
                 let rgb565 = (r << 11) | (g << 5) | b; // Combine into RGB565 format
-                buf[0..2].copy_from_slice(&rgb565.to_be_bytes());
+                // The framebuffer word is little-endian, not network byte order.
+                buf[0..2].copy_from_slice(&rgb565.to_le_bytes());
                 RenderedPixel { buf, len: 2 }
             }
             PixelFormat::Rgb888 => {
