@@ -33,7 +33,7 @@ mod target_tests;
 pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, page_layout_span_bound, plan_layout, plan_page_layout};
-pub use resolve::{Export, SymbolResolver};
+pub use resolve::{Export, RelocationReachError, RelocationSite, SymbolResolver};
 pub use staging::{StagingChunk, StagingPlan};
 
 const HEADER_SIZE: usize = 64;

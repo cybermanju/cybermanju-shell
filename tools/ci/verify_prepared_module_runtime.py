@@ -5,13 +5,14 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
 RESERVED = re.compile(re.escape(PREFIX + "reserved_layout:PASS ") + r"base=(0x[0-9a-fA-F]+) reserved=(\d+) span=(\d+) sections=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)")
 PREPARED_TRANSACTION = PREFIX + "prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true"
 RELATIVE32_REACH = PREFIX + "relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
+REACH_DIAGNOSTICS = PREFIX + "reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2"
 
 
 def _strip_terminal_controls(text: str) -> str:
@@ -40,7 +41,7 @@ def verify(text: str) -> dict:
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
     scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH}:
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -75,6 +76,10 @@ def verify(text: str) -> dict:
         "relative32_boundary_cases": 8,
         "relative32_far_exports_rejected": 2,
         "exports_are_synthetic": True,
+        "test_export_bindings_are_synthetic": True,
+        "reach_diagnostics_verified": True,
+        "real_code_addresses_tested": 2,
+        "kernel_linux_export_lookup_available": False,
         "fixture_staged": True, "linux_modules_executed": False, "init_called": False,
         "pages_mapped": True, "wx_verified": False,
         "mapping_persists_after_read": False,

@@ -127,6 +127,33 @@ fn relative_import_fixture(kind: u32) -> (Vec<u8>, &'static [u8], u16, u64) {
     panic!("fixture needs an existing named global symbol and ALLOC RELA");
 }
 
+// Cross-check diagnostic metadata against the cloned ELF, not a guessed section index.
+fn assert_reach_site(
+    bytes: &[u8],
+    failure: linux_module_elf::RelocationReachError,
+    target: u16,
+    offset: u64,
+    kind: u32,
+) {
+    let r32 = |o| u32::from_le_bytes(bytes[o..o + 4].try_into().unwrap());
+    let r64 = |o| u64::from_le_bytes(bytes[o..o + 8].try_into().unwrap());
+    let site = failure.site.expect("entry failure needs a diagnostic site");
+    assert_eq!(
+        (site.target_section, site.offset, site.kind),
+        (target, offset, kind)
+    );
+    let sh = usize::try_from(r64(40)).unwrap() + usize::from(site.rela_section) * 64;
+    assert_eq!(r32(sh + 4), 4);
+    assert_eq!(r32(sh + 44), u32::from(target));
+    assert!(site.entry_index < usize::try_from(r64(sh + 32)).unwrap() / 24);
+    let entry = usize::try_from(r64(sh + 24)).unwrap() + site.entry_index * 24;
+    let info = r64(entry + 8);
+    assert_eq!(
+        (site.symbol_index, site.kind, site.offset),
+        ((info >> 32) as u32, info as u32, r64(entry))
+    );
+}
+
 #[ktest]
 fn cybermanju_prepared_module_runtime() {
     let layout = plan_page_layout(FIXTURE, BASE, MAX_SPAN, MAX_SECTIONS).unwrap();
@@ -427,6 +454,12 @@ fn cybermanju_prepared_module_runtime() {
             name,
             value: 0xffff_ffff_8000_0000,
         }];
+        let failure = SymbolResolver::new(&bytes, owner.layout(), &far)
+            .unwrap()
+            .diagnose_relocation_reach(65_536)
+            .unwrap_err();
+        assert_eq!(failure.cause, ElfError::RelocationOverflow);
+        assert_reach_site(&bytes, failure, target, offset, kind);
         assert_eq!(
             SymbolResolver::new(&bytes, owner.layout(), &far)
                 .unwrap()
@@ -437,10 +470,36 @@ fn cybermanju_prepared_module_runtime() {
             owner.prepare_and_stage(&bytes, &far, limits),
             Err(Error::Plan(ElfError::RelocationOverflow))
         ));
+        // Real linked kernel function address, but a synthetic import name/binding.
+        // This number is never converted back to a callable module pointer.
+        let owner =
+            ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
+        let code_address = ostd::cpu::num_cpus as *const () as usize as u64;
+        assert!(code_address >= 0xffff_ffff_8000_0000);
+        let real = [Export {
+            name,
+            value: code_address,
+        }];
+        let failure = SymbolResolver::new(&bytes, owner.layout(), &real)
+            .unwrap()
+            .diagnose_relocation_reach(65_536)
+            .unwrap_err();
+        assert_eq!(failure.cause, ElfError::RelocationOverflow);
+        assert_reach_site(&bytes, failure, target, offset, kind);
+        assert!(matches!(
+            owner.prepare_and_stage(&bytes, &real, limits),
+            Err(Error::Plan(ElfError::RelocationOverflow))
+        ));
         if kind == 2 {
             let owner =
                 ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
                     .unwrap();
+            let failure = SymbolResolver::new(&bytes, owner.layout(), &[])
+                .unwrap()
+                .diagnose_relocation_reach(65_536)
+                .unwrap_err();
+            assert_eq!(failure.cause, ElfError::MissingSymbol);
+            assert_reach_site(&bytes, failure, target, offset, kind);
             assert_eq!(
                 SymbolResolver::new(&bytes, owner.layout(), &[])
                     .unwrap()
@@ -456,6 +515,18 @@ fn cybermanju_prepared_module_runtime() {
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
     );
-    // No pointer conversion, function pointer or call to an ELF symbol.
+    let owner =
+        ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
+    let failure = SymbolResolver::new(FIXTURE, owner.layout(), &[])
+        .unwrap()
+        .diagnose_relocation_reach(0)
+        .unwrap_err();
+    assert_eq!(failure.cause, ElfError::ResourceLimit);
+    assert_eq!(failure.site, None);
+    drop(owner);
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2"
+    );
+    // No module bytes converted to function pointers and no ELF symbol called.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
 }

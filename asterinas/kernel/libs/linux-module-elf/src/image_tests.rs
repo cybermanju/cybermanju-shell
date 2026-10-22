@@ -372,3 +372,80 @@ fn reach_preflight_ignores_nonalloc_but_rejects_note_even_empty() {
         Err(Error::RelocationTarget)
     );
 }
+
+#[test]
+fn reach_diagnostics_preserve_cause_and_pinpoint_the_failing_rela() {
+    let b = fixture();
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    let issue = resolver.diagnose_relocation_reach(2).unwrap_err();
+    assert_eq!(issue.cause, Error::MissingSymbol);
+    assert_eq!(
+        issue.site,
+        Some(crate::RelocationSite {
+            rela_section: 8,
+            entry_index: 0,
+            target_section: 2,
+            kind: 1,
+            symbol_index: 2,
+            offset: 8
+        })
+    );
+    assert_eq!(resolver.check_relocation_reach(2), Err(issue.cause));
+    let budget = resolver.diagnose_relocation_reach(1).unwrap_err();
+    assert_eq!(budget.cause, Error::ResourceLimit);
+    assert_eq!(budget.site, None);
+}
+
+#[test]
+fn reach_diagnostics_distinguish_overflow_and_policy_without_changing_input() {
+    let mut b = fixture();
+    entry(&mut b, RELA2, 8, 2, 2, 0);
+    let before = b.clone();
+    let layout = plan_layout(&b, 0xffff_c000_0000_0000, 1024, 10).unwrap();
+    let ex = exports();
+    let resolver = SymbolResolver::new(&b, &layout, &ex).unwrap();
+    let issue = resolver.diagnose_relocation_reach(2).unwrap_err();
+    assert_eq!(issue.cause, Error::RelocationOverflow);
+    assert_eq!(issue.site.unwrap().kind, 2);
+    assert_eq!(resolver.check_relocation_reach(2), Err(issue.cause));
+    assert_eq!(b, before);
+    p32(&mut b, h(8) + 44, 3);
+    p64(&mut b, h(8) + 32, 0);
+    let issue = SymbolResolver::new(&b, &layout, &ex)
+        .unwrap()
+        .diagnose_relocation_reach(2)
+        .unwrap_err();
+    assert_eq!(issue.cause, Error::RelocationTarget);
+    assert_eq!(issue.site, None);
+}
+
+#[test]
+fn reach_diagnostics_success_matches_legacy_preflight() {
+    let b = fixture();
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let ex = exports();
+    let resolver = SymbolResolver::new(&b, &layout, &ex).unwrap();
+    assert_eq!(resolver.diagnose_relocation_reach(2), Ok(2));
+    assert_eq!(resolver.check_relocation_reach(2), Ok(2));
+}
+
+#[test]
+fn reach_diagnostics_count_none_when_locating_a_later_entry() {
+    let mut b = fixture();
+    let off = b.len();
+    b.resize(off + 48, 0);
+    p64(&mut b, h(8) + 24, off as u64);
+    p64(&mut b, h(8) + 32, 48);
+    entry(&mut b, off, 0, 0, 0, 0);
+    entry(&mut b, off + 24, 8, 2, 1, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    let issue = resolver.diagnose_relocation_reach(3).unwrap_err();
+    assert_eq!(issue.cause, Error::MissingSymbol);
+    assert_eq!(issue.site.unwrap().entry_index, 1);
+    assert_eq!(
+        resolver.diagnose_relocation_reach(2).unwrap_err().site,
+        None
+    );
+}

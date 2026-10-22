@@ -237,6 +237,15 @@ pub(super) fn check_relocation_reach(
     resolver: &crate::SymbolResolver<'_>,
     max_entries: usize,
 ) -> Result<usize, Error> {
+    diagnose_relocation_reach(bytes, layout, resolver, max_entries).map_err(|failure| failure.cause)
+}
+
+pub(super) fn diagnose_relocation_reach(
+    bytes: &[u8],
+    layout: &crate::Layout,
+    resolver: &crate::SymbolResolver<'_>,
+    max_entries: usize,
+) -> Result<usize, crate::RelocationReachError> {
     let table = file_range(
         bytes,
         u64_at(bytes, 40),
@@ -253,16 +262,16 @@ pub(super) fn check_relocation_reach(
             continue;
         }
         if !matches!(u32_at(target, 4), 1 | 8) {
-            return Err(Error::RelocationTarget);
+            return Err(Error::RelocationTarget.into());
         }
         total = total
             .checked_add(usize::try_from(u64_at(rela, 32) / 24).map_err(|_| Error::ResourceLimit)?)
             .ok_or(Error::ResourceLimit)?;
         if total > core::cmp::min(max_entries, 65_536) {
-            return Err(Error::ResourceLimit);
+            return Err(Error::ResourceLimit.into());
         }
     }
-    for rela in table.chunks_exact(SECTION_SIZE) {
+    for (rela_index, rela) in table.chunks_exact(SECTION_SIZE).enumerate() {
         if u32_at(rela, 4) != 4 {
             continue;
         }
@@ -276,20 +285,38 @@ pub(super) fn check_relocation_reach(
             .find(|p| u32::from(p.section_index) == index)
             .ok_or(Error::RelocationTarget)?;
         let symtab = u16::try_from(u32_at(rela, 40)).map_err(|_| Error::RelocationLink)?;
-        for entry in file_range(bytes, u64_at(rela, 24), u64_at(rela, 32))?.chunks_exact(24) {
+        for (entry_index, entry) in file_range(bytes, u64_at(rela, 24), u64_at(rela, 32))?
+            .chunks_exact(24)
+            .enumerate()
+        {
             let info = u64_at(entry, 8);
             let kind = info as u32;
             if kind == 0 {
                 continue;
             }
-            let symbol = resolver.resolve(symtab, (info >> 32) as u32)?;
+            let site = crate::RelocationSite {
+                rela_section: u16::try_from(rela_index).map_err(|_| Error::RelocationTable)?,
+                entry_index,
+                target_section: u16::try_from(index).map_err(|_| Error::RelocationTarget)?,
+                kind,
+                symbol_index: (info >> 32) as u32,
+                offset: u64_at(entry, 0),
+            };
+            let contextual = |cause| crate::RelocationReachError {
+                cause,
+                site: Some(site),
+            };
+            let symbol = resolver
+                .resolve(symtab, (info >> 32) as u32)
+                .map_err(contextual)?;
             encode_resolved(
                 kind,
                 symbol,
                 u64_at(entry, 16) as i64,
                 placement.address,
                 u64_at(entry, 0),
-            )?;
+            )
+            .map_err(contextual)?;
         }
     }
     Ok(total)

@@ -17,6 +17,31 @@ pub struct Export<'a> {
     pub value: u64,
 }
 
+/// Location of one failing ALLOC-target RELA entry, not a loaded address.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RelocationSite {
+    pub rela_section: u16,
+    pub entry_index: usize,
+    pub target_section: u16,
+    pub kind: u32,
+    pub symbol_index: u32,
+    pub offset: u64,
+}
+
+/// Preflight failure with entry context only when an entry was actually checked.
+/// Budget and table-policy failures have no fabricated entry location.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RelocationReachError {
+    pub cause: Error,
+    pub site: Option<RelocationSite>,
+}
+
+impl From<Error> for RelocationReachError {
+    fn from(cause: Error) -> Self {
+        Self { cause, site: None }
+    }
+}
+
 /// Resolves requested symbols only; debug/non-ALLOC symbols need not resolve.
 /// Layout matching is structural, not a cryptographic identity check of the ELF.
 pub struct SymbolResolver<'a> {
@@ -127,6 +152,16 @@ impl<'a> SymbolResolver<'a> {
     /// preparation is still required before staging any bytes.
     pub fn check_relocation_reach(&self, max_entries: usize) -> Result<usize, Error> {
         crate::apply::check_relocation_reach(self.bytes, self.layout, self, max_entries)
+    }
+
+    /// Same preflight as check_relocation_reach, with the first failing entry's
+    /// section/index/type/symbol/offset. Budget and table failures have no site.
+    /// This adds no allocation, mapping, execution or ABI permission.
+    pub fn diagnose_relocation_reach(
+        &self,
+        max_entries: usize,
+    ) -> Result<usize, RelocationReachError> {
+        crate::apply::diagnose_relocation_reach(self.bytes, self.layout, self, max_entries)
     }
 
     pub fn resolve(&self, symtab_index: u16, symbol_index: u32) -> Result<u64, Error> {

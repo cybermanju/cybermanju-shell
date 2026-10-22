@@ -22,6 +22,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:scoped_rw_mapping:PASS pages=10",
                     "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true",
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2",
+                    "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -66,6 +67,19 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertEqual(verify(self.evidence().replace("\n", "\r\n"))["status"], "passed")
         with self.assertRaises(ValueError):
             verify(self.evidence().replace("prepared_transaction", "prepared\r_transaction"))
+
+    def test_reach_diagnostics_marker_is_exact_and_mandatory(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2"
+        variants = [self.evidence().replace(marker + "\n", ""), self.evidence() + marker + "\n"]
+        variants += [self.evidence().replace(a, b) for a, b in [("overflow_sites=4", "overflow_sites=3"), ("missing_sites=1", "missing_sites=0"), ("budget_no_site=1", "budget_no_site=0"), ("real_code_exports=2", "real_code_exports=0"), ("reach_diagnostics:PASS", "reach_diagnostics:FAIL")]]
+        for bad in variants:
+            with self.subTest(log=bad), self.assertRaises(ValueError):
+                verify(bad)
+        result = verify(self.evidence())
+        self.assertTrue(result["reach_diagnostics_verified"])
+        self.assertEqual(result["real_code_addresses_tested"], 2)
+        self.assertFalse(result["kernel_linux_export_lookup_available"])
+        self.assertTrue(result["test_export_bindings_are_synthetic"])
 
     def test_relative_reach_marker_is_exact_and_mandatory(self):
         marker = "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
