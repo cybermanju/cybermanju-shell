@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 
-from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, FAULT, OWNER, PAGE, POOL_START, RESOLVER, verify
+from verify_internal_exports_runtime import ADMISSION, BEGIN, COMPLETE, FAULT, OWNER, PAGE, POOL_START, RECOVERY, RESOLVER, verify
 
 
 class InternalExportsTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class InternalExportsTests(unittest.TestCase):
                       f"span=40960 pages=10 payload=1721 relas=6 symbol=0xffffffff88010000 field={base+32:#x} "
                       "compared=40960 registry_match=true" for kind in (2, 4)]
         self.budget = "CYBERMANJU_INTERNAL_EXPORTS:budget:PASS rejected=5 early_precedence=2 reclaimed=8 exact_limit_staged=1 pages=10 chunks=10 compared=40960 pages_mapped=false"
-        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, FAULT, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
+        return "\n".join([BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, FAULT, RECOVERY, COMPLETE, "test result: ok. 1 passed; 0 failed; 4 filtered out.", ""])
 
     def test_valid_registry_is_not_linux_abi(self):
         r = verify(self.evidence())
@@ -37,6 +37,13 @@ class InternalExportsTests(unittest.TestCase):
                           r["policy_owner_reclaimed_ranges"], r["policy_owner_local_only_staged_cases"],
                           r["policy_owner_compared_bytes"]), (2, 2, 2, 2, 7, 1, 40960))
         self.assertFalse(r["policy_owner_numeric_downgrade_available"])
+        self.assertTrue(r["policy_preflight_backend_untouched_verified"])
+        self.assertEqual((r["policy_preflight_budget_rejections"], r["policy_preflight_import_rejections"],
+                          r["policy_preflight_untouched_backends"], r["policy_preflight_reclaimed_ranges"]), (5, 2, 7, 7))
+        self.assertTrue(r["policy_post_fault_recovery_verified"])
+        self.assertEqual((r["policy_recovery_staged_cases"], r["policy_recovery_compared_bytes"],
+                          r["policy_recovery_reclaimed_ranges"]), (1, 40960, 1))
+        self.assertTrue(r["policy_recovery_uses_production_path"])
         for key in ("internal_registry_lookup_verified", "full_span_readback_verified", "fixture_imports_renamed_for_internal_registry"):
             self.assertTrue(r[key])
         for key in ("kernel_linux_export_lookup_available", "linux_abi_verified", "pages_mapped", "production_mapping_available",
@@ -45,7 +52,7 @@ class InternalExportsTests(unittest.TestCase):
 
     def test_unique_complete_ordered_markers(self):
         good = self.evidence()
-        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, FAULT, COMPLETE]:
+        for marker in [BEGIN, ADMISSION, *self.cases, RESOLVER, OWNER, self.budget, FAULT, RECOVERY, COMPLETE]:
             for bad in (good.replace(marker + "\n", ""), good + marker + "\n", good.replace(marker, "echo " + marker)):
                 with self.assertRaises(ValueError): verify(bad)
         for bad in (good + "CYBERMANJU_OTHER:PASS\n", good.replace("kind=4", "kind=2"),
@@ -217,6 +224,28 @@ class InternalExportsTests(unittest.TestCase):
                          ("actual_oom=false", "actual_oom=true"), ("fault_cleanup=true", "fault_cleanup=false")]:
             with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
 
+    def test_recovery_claims_and_scope_are_fail_closed(self):
+        good = self.evidence()
+        for old, new in [("budget_rejections=5", "budget_rejections=4"),
+                         ("import_rejections=2", "import_rejections=1"),
+                         ("untouched_backends=7", "untouched_backends=6"),
+                         ("preflight_reclaimed=7", "preflight_reclaimed=6"),
+                         ("recovered_staged=1", "recovered_staged=0"),
+                         ("compared=40960", "compared=40959"),
+                         ("recovered_reclaimed=1", "recovered_reclaimed=0"),
+                         ("production_path=true", "production_path=false"),
+                         ("pages_mapped=false", "pages_mapped=true"),
+                         ("recovery=true", "recovery=false")]:
+            with self.subTest(old=old), self.assertRaises(ValueError): verify(good.replace(old, new))
+        for bad in (good.replace(RECOVERY + "\n", ""), good + RECOVERY + "\n",
+                    good.replace(FAULT + "\n" + RECOVERY, RECOVERY + "\n" + FAULT),
+                    good.replace(RECOVERY, "CYBERMANJU_INTERNAL_EXPORTS:recovery:PASS old_fault_only=true")):
+            with self.subTest(bad=bad[-160:]), self.assertRaises(ValueError): verify(bad)
+
+    def test_old_fault_transcript_cannot_prove_recovery(self):
+        old = self.evidence().replace(RECOVERY + "\n", "").replace(" recovery=true", "")
+        with self.assertRaises(ValueError): verify(old)
+
     def test_fault_marker_must_follow_budgets_before_cleanup(self):
         good = self.evidence()
         for index in (0, 1, 2, 3, 4, 5, 6, 8, 9):
@@ -228,6 +257,11 @@ class InternalExportsTests(unittest.TestCase):
     def test_old_budget_evidence_does_not_prove_fault_cleanup(self):
         old = self.evidence().replace(FAULT + "\n", "").replace(" fault_cleanup=true", "")
         with self.assertRaises(ValueError): verify(old)
+
+    def test_entry_observation_is_required_for_untouched_claim(self):
+        good = self.evidence()
+        self.assertTrue(verify(good)["policy_backend_entry_observation_verified"])
+        with self.assertRaises(ValueError): verify(good.replace("entry_observed=true", "entry_observed=false"))
 
     def test_geometry_and_full_readback(self):
         good = self.evidence()

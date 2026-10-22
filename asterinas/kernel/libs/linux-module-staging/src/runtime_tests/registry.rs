@@ -623,6 +623,7 @@ fn cybermanju_internal_exports_runtime() {
             "fault allocation must not return a partial owner"
         );
         let snapshot = stats.snapshot();
+        assert_eq!(snapshot.entries, 1, "fault backend must be entered once");
         assert!(snapshot.triggered);
         assert_eq!(snapshot.acquired, n);
         assert_eq!(
@@ -659,6 +660,7 @@ fn cybermanju_internal_exports_runtime() {
             "fault copy must not return a partial owner"
         );
         let snapshot = stats.snapshot();
+        assert_eq!(snapshot.entries, 1, "fault backend must be entered once");
         assert!(snapshot.triggered);
         assert_eq!(snapshot.acquired, 10);
         assert_eq!(
@@ -690,7 +692,150 @@ fn cybermanju_internal_exports_runtime() {
     println!(
         "CYBERMANJU_INTERNAL_EXPORTS:fault:PASS alloc_cases=3 copy_cases=2 acquired=30 dropped=30 writes=1 reclaimed=5 real_frames=true production_hook=false actual_oom=false pages_mapped=false"
     );
+    let preflight_budgets = [
+        PreparationLimits {
+            max_payload_bytes: 1_720,
+            ..limits
+        },
+        PreparationLimits {
+            max_relocation_entries: 5,
+            ..limits
+        },
+        PreparationLimits {
+            max_sections: 0,
+            ..limits
+        },
+        PreparationLimits {
+            max_pages: 9,
+            ..limits
+        },
+        PreparationLimits {
+            max_chunks: chunks - 1,
+            ..limits
+        },
+    ];
+    let mut preflight_reclaimed = 0;
+    for restricted in preflight_budgets {
+        let stats = Arc::new(FaultStats::new());
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert!(matches!(
+            NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        assert!(
+            matches!(
+                owner.prepare_and_stage_with_fault(
+                    FIXTURE,
+                    restricted,
+                    FaultMode::AllocateAfter(0),
+                    &stats,
+                ),
+                Err(Error::Plan(ElfError::ResourceLimit))
+            ),
+            "policy rejection must precede fault backend"
+        );
+        let snapshot = stats.snapshot();
+        assert_eq!(
+            (
+                snapshot.entries,
+                snapshot.acquired,
+                snapshot.dropped,
+                snapshot.writes,
+                snapshot.triggered
+            ),
+            (0, 0, 0, 0, false),
+            "staging backend must remain untouched"
+        );
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        preflight_reclaimed += 1;
+    }
+    let denied_bytes = renamed_import_fixture(2).0;
+    let mut missing_bytes = renamed_import_fixture(4).0;
+    let name_offset = missing_bytes.len() - OSTD_NUM_CPUS_EXPORT_NAME.len() - 1;
+    assert_eq!(
+        &missing_bytes[name_offset..missing_bytes.len() - 1],
+        OSTD_NUM_CPUS_EXPORT_NAME
+    );
+    missing_bytes[name_offset] = b'x';
+    for (bytes, expected) in [
+        (&denied_bytes, ElfError::ExportNotAdmitted),
+        (&missing_bytes, ElfError::MissingSymbol),
+    ] {
+        let stats = Arc::new(FaultStats::new());
+        let owner = PolicyNearTextModuleLayout::new_signed32_at(
+            FIXTURE,
+            base,
+            max_pages,
+            MAX_SECTIONS,
+            65_536,
+        )
+        .unwrap();
+        assert!(matches!(
+            NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ));
+        assert!(
+            matches!(
+                owner.prepare_and_stage_with_fault(
+                    bytes, limits, FaultMode::AllocateAfter(0), &stats,
+                ),
+                Err(Error::Plan(cause)) if cause == expected
+            ),
+            "policy rejection must precede fault backend"
+        );
+        let snapshot = stats.snapshot();
+        assert_eq!(
+            (
+                snapshot.entries,
+                snapshot.acquired,
+                snapshot.dropped,
+                snapshot.writes,
+                snapshot.triggered
+            ),
+            (0, 0, 0, 0, false),
+            "staging backend must remain untouched"
+        );
+        let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+        drop(raw);
+        preflight_reclaimed += 1;
+    }
+    assert_eq!(preflight_reclaimed, 7);
+    let recovery_owner =
+        PolicyNearTextModuleLayout::new_signed32_at(FIXTURE, base, max_pages, MAX_SECTIONS, 65_536)
+            .unwrap();
+    assert_eq!(recovery_owner.range(), base..base + envelope);
+    let recovery_staged = recovery_owner
+        .prepare_and_stage(FIXTURE, limits)
+        .expect("post-fault production staging must recover");
+    assert_eq!(
+        (recovery_staged.page_count(), recovery_staged.span()),
+        (10, 40_960)
+    );
+    let mut recovery_bytes = vec![0xff; 40_960];
+    recovery_staged.read_bytes(0, &mut recovery_bytes).unwrap();
+    assert_eq!(
+        recovery_bytes, expected_exact_bytes,
+        "post-fault production staging must match independent bytes"
+    );
+    assert!(matches!(
+        NearTextAddressReservation::new_signed32_at(base, envelope, max_pages),
+        Err(ostd::Error::NoMemory)
+    ));
+    drop(recovery_staged);
+    let raw = NearTextAddressReservation::new_signed32_at(base, envelope, max_pages).unwrap();
+    drop(raw);
     println!(
-        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true fault_cleanup=true"
+        "CYBERMANJU_INTERNAL_EXPORTS:recovery:PASS budget_rejections=5 import_rejections=2 untouched_backends=7 preflight_reclaimed=7 recovered_staged=1 compared=40960 recovered_reclaimed=1 production_path=true entry_observed=true pages_mapped=false"
+    );
+    println!(
+        "CYBERMANJU_INTERNAL_EXPORTS:complete:PASS staged=2 denied_names=5 missing_imports=2 available_checks=4 compared_full_span=true pages_mapped=false linux_abi=false execution=false abi_rejection=true policy_resolver=true policy_owner=true budget_checks=true fault_cleanup=true recovery=true"
     );
 }

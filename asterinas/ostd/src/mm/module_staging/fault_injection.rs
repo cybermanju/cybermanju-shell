@@ -32,6 +32,7 @@ pub enum FaultMode {
 
 /// Thread-safe counters shared with the caller for one staging attempt.
 pub struct FaultStats {
+    entries: AtomicUsize,
     acquired: AtomicUsize,
     dropped: AtomicUsize,
     writes: AtomicUsize,
@@ -41,6 +42,7 @@ pub struct FaultStats {
 /// A point-in-time snapshot of backend activity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FaultSnapshot {
+    pub entries: usize,
     pub acquired: usize,
     pub dropped: usize,
     pub writes: usize,
@@ -51,6 +53,7 @@ impl FaultStats {
     /// Creates an empty set of counters.
     pub fn new() -> Self {
         Self {
+            entries: AtomicUsize::new(0),
             acquired: AtomicUsize::new(0),
             dropped: AtomicUsize::new(0),
             writes: AtomicUsize::new(0),
@@ -61,6 +64,7 @@ impl FaultStats {
     /// Returns the current activity counters.
     pub fn snapshot(&self) -> FaultSnapshot {
         FaultSnapshot {
+            entries: self.entries.load(Ordering::Relaxed),
             acquired: self.acquired.load(Ordering::Relaxed),
             dropped: self.dropped.load(Ordering::Relaxed),
             writes: self.writes.load(Ordering::Relaxed),
@@ -113,7 +117,8 @@ impl Drop for TrackedPage {
 /// Runs the production staging validations/copy logic with failure injection.
 ///
 /// `stats` must be fresh (all counters zero and not triggered), otherwise this
-/// returns `InvalidArgs`. `AllocateAfter(n)` fails after `n` successful frame
+/// returns `InvalidArgs`. Every call increments `entries`, even when validation
+/// rejects it before an allocator call. `AllocateAfter(n)` fails after `n` successful frame
 /// allocations; `CopyAfter(n)` fails before the write following `n` successful
 /// writes. Successful staging is dropped and returns `InvalidArgs` by design.
 pub fn stage_with_fault(
@@ -124,8 +129,13 @@ pub fn stage_with_fault(
     mode: FaultMode,
     stats: &Arc<FaultStats>,
 ) -> Result<ModuleStaging, Error> {
+    let prior_entries = stats.entries.fetch_add(1, Ordering::Relaxed);
     let snapshot = stats.snapshot();
-    if snapshot.acquired != 0 || snapshot.dropped != 0 || snapshot.writes != 0 || snapshot.triggered
+    if prior_entries != 0
+        || snapshot.acquired != 0
+        || snapshot.dropped != 0
+        || snapshot.writes != 0
+        || snapshot.triggered
     {
         return Err(Error::InvalidArgs);
     }
