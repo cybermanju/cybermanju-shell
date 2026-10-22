@@ -94,6 +94,47 @@ fn copies_across_pages_and_preserves_zero_gaps_and_tail() {
     assert!(out[SIZE * 2 + 3..].iter().all(|x| *x == 0));
     assert_eq!(c.alive.get(), 3);
 }
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn ordered_exact_iterator_clones_borrow_pages_without_changing_ownership() {
+    let (counts, alloc) = setup();
+    let mut bytes = vec![0x31; SIZE * 2];
+    bytes[SIZE..].fill(0xa9);
+    let staged = StagedPages::new(
+        SIZE * 2,
+        &[ModuleChunk {
+            offset: 0,
+            bytes: &bytes,
+        }],
+        2,
+        1,
+        alloc,
+    )
+    .unwrap();
+    let mut original = staged.iter();
+    let mut cloned = original.clone();
+    assert_eq!(original.len(), 2);
+    assert_eq!(cloned.len(), 2);
+    let first = original.next().unwrap();
+    assert_eq!(first.data, bytes[..SIZE]);
+    assert!(core::ptr::eq(first, cloned.next().unwrap()));
+    assert_eq!(original.len(), 1);
+    assert_eq!(cloned.len(), 1);
+    let second = original.next().unwrap();
+    assert_eq!(second.data, bytes[SIZE..]);
+    assert!(core::ptr::eq(second, cloned.next().unwrap()));
+    assert_eq!(original.len(), 0);
+    assert_eq!(cloned.len(), 0);
+    assert!(original.next().is_none());
+    assert!(cloned.next().is_none());
+    assert_eq!(counts.alive.get(), 2);
+    assert_eq!(counts.dropped.get(), 0);
+    drop(staged);
+    assert_eq!(counts.alive.get(), 0);
+    assert_eq!(counts.dropped.get(), 2);
+}
+
 #[test]
 fn empty_span_and_empty_chunks() {
     let (c, alloc) = setup();
