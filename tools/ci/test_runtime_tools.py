@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -19,8 +20,38 @@ class RuntimeToolsTests(unittest.TestCase):
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.log = self.root / "apt.log"
+        self.sleep_log = self.root / "sleep.log"
+        self.update_audit = self.root / "update-audit.log"
         self._stub("dpkg", '#!/bin/sh\necho "${TEST_ARCH:-amd64}"\n')
-        self._stub("apt-get", '#!/bin/sh\nprintf "%s\\n" "$*" >> "$APT_LOG"\nfor arg in "$@"; do case "$arg" in Dir::Etc::sourcelist=*) cat "${arg#*=}" > "$APT_SOURCES";; esac; done\ncase " ${*} " in *" update "*) exit "${UPDATE_STATUS:-0}";; *" install "*) exit "${INSTALL_STATUS:-0}";; esac\n')
+        apt_stub = r'''#!/bin/sh
+printf '%s\n' "$*" >> "$APT_LOG"
+listdir=
+source=
+for arg in "$@"; do
+  case "$arg" in
+    Dir::State::lists=*) listdir=${arg#*=} ;;
+    Dir::Etc::sourcelist=*) source=${arg#*=}; cat "$source" > "$APT_SOURCES" ;;
+  esac
+done
+case " $* " in
+  *" update "*)
+    count=0; [ ! -f "$APT_UPDATE_COUNT" ] || count=$(cat "$APT_UPDATE_COUNT")
+    count=$((count + 1)); printf '%s' "$count" > "$APT_UPDATE_COUNT"
+    [ -z "$listdir" ] || { [ -d "$listdir" ] && printf '%s %s\n' "$listdir" "$(find "$listdir" -type f | wc -l)" >> "$UPDATE_AUDIT"; }
+    [ "${FAKE_APT_WRITE_MARKER:-0}" != 1 ] || { mkdir -p "$listdir"; : > "$listdir/previous-attempt-marker"; }
+    failures=${UPDATE_FAILURES:-0}
+    if [ "${PARTIAL_UPDATE_ERROR:-0}" = 1 ]; then
+      case " $* " in *" APT::Update::Error-Mode=any "*) exit 100 ;; esac
+      exit 0
+    fi
+    if [ "$count" -le "$failures" ]; then echo "Hash Sum mismatch / mirror failure" >&2; exit "${UPDATE_FAILURE_STATUS:-100}"; fi
+    exit "${UPDATE_STATUS:-0}" ;;
+  *" install "*) exit "${INSTALL_STATUS:-0}" ;;
+esac
+exit 90
+'''
+        self._stub("apt-get", apt_stub)
+        self._stub("sleep", '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$SLEEP_LOG"\n')
 
     def _stub(self, name, body):
         path = self.bin / name
@@ -29,7 +60,12 @@ class RuntimeToolsTests(unittest.TestCase):
 
     def run_script(self, profile, **extra):
         env = os.environ.copy()
-        env.update(PATH=f"{self.bin}:{env['PATH']}", CI_RUNTIME_TOOLS_ROOT=str(self.root), APT_LOG=str(self.log), APT_SOURCES=str(self.root / "captured.sources"))
+        env.update(
+            PATH=f"{self.bin}:{env['PATH']}", CI_RUNTIME_TOOLS_ROOT=str(self.root),
+            APT_LOG=str(self.log), APT_SOURCES=str(self.root / "captured.sources"),
+            APT_UPDATE_COUNT=str(self.root / "apt-update-count"), SLEEP_LOG=str(self.sleep_log),
+            UPDATE_AUDIT=str(self.update_audit),
+        )
         env.update(extra)
         return subprocess.run(["bash", str(SCRIPT), *profile], env=env, text=True, capture_output=True)
 
@@ -61,6 +97,8 @@ class RuntimeToolsTests(unittest.TestCase):
             temp_path = lines[0].split("Dir::Etc::sourcelist=", 1)[1].split()[0]
             self.assertFalse(pathlib.Path(temp_path).exists())
             self.log.write_text("")
+            for path in (self.root / "apt-update-count", self.sleep_log, self.update_audit):
+                path.unlink(missing_ok=True)
 
     def test_simulation_is_only_install(self):
         result = self.run_script(["kbuild"], CI_RUNTIME_TOOLS_SIMULATE="1")
@@ -84,15 +122,109 @@ class RuntimeToolsTests(unittest.TestCase):
         self.assertEqual(self.log.read_text() if self.log.exists() else "", "")
 
     def test_failures_propagate_and_install_requires_update(self):
-        result = self.run_script(["framebuffer"], UPDATE_STATUS="19")
+        result = self.run_script(["framebuffer"], UPDATE_FAILURES="3", UPDATE_FAILURE_STATUS="19")
         self.assertEqual(result.returncode, 19)
-        self.assertEqual(len(self.log.read_text().splitlines()), 1)
+        self.assertEqual(len(self.log.read_text().splitlines()), 3)
         self.assert_temp_removed()
         self.log.write_text("")
         result = self.run_script(["framebuffer"], INSTALL_STATUS="23")
         self.assertEqual(result.returncode, 23)
         self.assertEqual(len(self.log.read_text().splitlines()), 2)
         self.assert_temp_removed()
+
+    def test_update_recovers_after_one_and_two_failures(self):
+        for failures in (1, 2):
+            with self.subTest(failures=failures):
+                self.log.write_text("")
+                self.sleep_log.unlink(missing_ok=True)
+                self.update_audit.unlink(missing_ok=True)
+                (self.root / "apt-update-count").unlink(missing_ok=True)
+                result = self.run_script(["framebuffer"], UPDATE_FAILURES=str(failures), FAKE_APT_WRITE_MARKER="1")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                calls = self.log.read_text().splitlines()
+                self.assertEqual(len(calls), failures + 2)
+                updates = calls[:-1]
+                self.assertTrue(all("Error-Mode=any" in call for call in updates))
+                self.assertEqual(self.sleep_log.read_text().splitlines(), ["5", "10"][:failures])
+                self.assertIn("Hash Sum mismatch / mirror failure", result.stderr)
+
+    def test_permanent_update_failure_exhausts_retries_and_returns_last_status(self):
+        result = self.run_script(["framebuffer"], UPDATE_FAILURES="9", UPDATE_FAILURE_STATUS="37")
+        self.assertEqual(result.returncode, 37)
+        self.assertEqual(len(self.log.read_text().splitlines()), 3)
+        self.assertEqual(self.sleep_log.read_text().splitlines(), ["5", "10"])
+        self.assert_temp_removed()
+
+    def test_each_update_gets_fresh_empty_lists_and_install_uses_last_success(self):
+        result = self.run_script(["kbuild"], UPDATE_FAILURES="2", FAKE_APT_WRITE_MARKER="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.log.read_text().splitlines()
+        self.assertEqual(len(calls), 4)
+        updates = [shlex.split(call) for call in calls[:3]]
+        install = shlex.split(calls[3])
+        def listdir(args):
+            return next(arg.split("=", 1)[1] for arg in args if arg.startswith("Dir::State::lists="))
+        dirs = [listdir(args) for args in updates]
+        self.assertEqual(len(set(dirs)), 3)
+        self.assertEqual([pathlib.Path(entry.split()[0]) for entry in self.update_audit.read_text().splitlines()], list(map(pathlib.Path, dirs)))
+        self.assertEqual([int(entry.split()[1]) for entry in self.update_audit.read_text().splitlines()], [0, 0, 0])
+        self.assertEqual(listdir(install), dirs[-1])
+        self.assertEqual(updates[-1][:-3], install[:install.index("install")])
+        self.assertFalse((self.root / "etc/apt/sources.list").exists())
+
+    def test_retry_simulation_preserves_install_options_and_official_signed_sources(self):
+        result = self.run_script(["kbuild"], UPDATE_FAILURES="1", CI_RUNTIME_TOOLS_SIMULATE="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.log.read_text().splitlines()
+        self.assertEqual(len(calls), 3)
+        install = calls[-1]
+        self.assertIn("--simulate install --no-install-recommends", install)
+        self.assertIn("Dir::Etc::sourcelist=", install)
+        self.assertIn("Dir::Etc::sourceparts=-", install)
+        self.assertIn("Signed-By", (self.root / "captured.sources").read_text())
+        self.assertNotIn("--allow-unauthenticated", install)
+        self.assertNotIn("trusted=yes", install)
+
+    def test_install_failure_is_not_retried(self):
+        result = self.run_script(["kbuild"], INSTALL_STATUS="23")
+        self.assertEqual(result.returncode, 23)
+        self.assertEqual(len(self.log.read_text().splitlines()), 2)
+        self.assertFalse(self.sleep_log.exists())
+
+    def test_partial_update_failure_never_reaches_install(self):
+        result = self.run_script(["framebuffer"], PARTIAL_UPDATE_ERROR="1")
+        self.assertEqual(result.returncode, 100)
+        calls = self.log.read_text().splitlines()
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(" update" in call and " install " not in call for call in calls))
+        self.assertEqual(self.sleep_log.read_text().splitlines(), ["5", "10"])
+        self.assert_temp_removed()
+
+    def test_update_error_mode_precedes_override_on_every_attempt(self):
+        result = self.run_script(["framebuffer"], UPDATE_FAILURES="2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for call in self.log.read_text().splitlines()[:3]:
+            self.assertLess(call.index("APT::Update::Error-Mode=any"), call.index("update"))
+            self.assertNotIn("AllowInsecure", call)
+
+    def test_cleanup_removes_all_attempt_lists_and_preserves_host_source_cache(self):
+        source = self.root / "etc/apt/sources.list.d/host.list"
+        source.parent.mkdir(parents=True)
+        source.write_text("deb https://third-party.invalid noble main\n")
+        cache = self.root / "var/cache/apt/archives/sentinel.deb"
+        cache.parent.mkdir(parents=True)
+        cache.write_bytes(b"keep")
+        host_lists = self.root / "var/lib/apt/lists/sentinel"
+        host_lists.parent.mkdir(parents=True)
+        host_lists.write_bytes(b"keep host lists")
+        result = self.run_script(["framebuffer"], UPDATE_FAILURES="2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        dirs = [next(arg.split("=", 1)[1] for arg in shlex.split(call) if arg.startswith("Dir::State::lists=")) for call in self.log.read_text().splitlines()]
+        self.assertEqual(len(set(dirs)), 3)
+        self.assertTrue(all(not pathlib.Path(path).exists() for path in dirs))
+        self.assertEqual(source.read_text(), "deb https://third-party.invalid noble main\n")
+        self.assertEqual(cache.read_bytes(), b"keep")
+        self.assertEqual(host_lists.read_bytes(), b"keep host lists")
 
     def assert_temp_removed(self):
         line = self.log.read_text().splitlines()[0]

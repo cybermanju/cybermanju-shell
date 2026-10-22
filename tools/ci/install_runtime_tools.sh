@@ -37,7 +37,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 # Os índices e pacotes são públicos; _apt precisa atravessar o diretório.
 chmod 0755 "$tmp"
-mkdir -p "$tmp/lists/partial" "$tmp/cache/archives/partial"
+mkdir -p "$tmp/cache/archives/partial"
 sources="$tmp/ubuntu.sources"
 cat > "$sources" <<EOF_SOURCES
 Types: deb
@@ -52,15 +52,32 @@ Suites: noble-security
 Components: main universe
 Signed-By: $keyring
 EOF_SOURCES
-apt_opts=(
+base_apt_opts=(
   -o "Dir::Etc::sourcelist=$sources"
   -o Dir::Etc::sourceparts=-
-  -o "Dir::State::lists=$tmp/lists"
   -o "Dir::Cache::archives=$tmp/cache/archives"
   -o Dir::Cache::pkgcache=
   -o Dir::Cache::srcpkgcache=
 )
-apt-get "${apt_opts[@]}" -o APT::Update::Error-Mode=any update
+# Um mirror em sincronização pode entregar Release e Packages inconsistentes.
+# Cada tentativa usa listas novas dentro do tmp, sem tocar índices do host nem
+# reutilizar índices parciais/antigos. Assinaturas e Error-Mode=any permanecem.
+for attempt in 1 2 3; do
+  lists="$tmp/lists-$attempt"
+  mkdir -p "$lists/partial"
+  apt_opts=("${base_apt_opts[@]}" -o "Dir::State::lists=$lists")
+  if apt-get "${apt_opts[@]}" -o APT::Update::Error-Mode=any update; then
+    break
+  else
+    status=$?
+  fi
+  echo "APT update falhou na tentativa $attempt/3 (código $status)" >&2
+  if [[ "$attempt" == 3 ]]; then
+    exit "$status"
+  fi
+  sleep "$((attempt * 5))"
+done
+# Não repete install/dpkg: falhas de instalação continuam fatais.
 if [[ "$simulate" == 1 ]]; then
   apt-get "${apt_opts[@]}" --simulate install --no-install-recommends "${packages[@]}"
 else
