@@ -152,6 +152,8 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/internal-exports-runtime --internal-exports
       - name: Verify explicit memcmp C-to-Rust calling convention and closed registry only
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/linux-c-abi-runtime --linux-c-abi
+      - name: Verify opt-in C imports in real frames, policy revalidation and failure cleanup (no execution)
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/c-shim-import-runtime --c-shim-import
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -166,6 +168,10 @@ jobs:
             artifacts/linux-c-abi-runtime/*.json
             artifacts/linux-c-abi-runtime/*.txt
             artifacts/linux-c-abi-runtime/harness-Cargo.*
+            artifacts/c-shim-import-runtime/*.log
+            artifacts/c-shim-import-runtime/*.json
+            artifacts/c-shim-import-runtime/*.txt
+            artifacts/c-shim-import-runtime/harness-Cargo.*
             artifacts/module-address-runtime/*.log
             artifacts/module-address-runtime/*.json
             artifacts/module-address-runtime/*.txt

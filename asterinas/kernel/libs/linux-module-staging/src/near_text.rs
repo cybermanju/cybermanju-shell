@@ -28,31 +28,52 @@ pub struct NearTextModuleLayout {
     reservation: NearTextAddressReservation,
 }
 
-/// Fixed-policy signed-32 owner using only the closed OSTD export registry.
+/// Fixed-policy signed-32 owner using a closed, internally selected registry.
 ///
-/// The registry currently rejects every Linux import (its sole symbol has a
-/// Rust-internal ABI). Consequently only local/no-import modules can prepare;
-/// this is not Linux ABI approval. Construction and preparation are structural,
-/// not cryptographic authentication. Preparation rechecks the current bytes and
-/// consumes this owner on every error. OOM in kernel allocator bookkeeping is
-/// outside `Result`. This constructor is fixed-base and x86_64-only; it does not
-/// search, fall back, accept caller exports or create payload/frames.
+/// The default constructor denies every Linux import; the explicit C-shim
+/// constructor admits only the fixed `memcmp` shim. Neither policy certifies a
+/// complete Linux ABI. Construction and preparation are structural, not
+/// cryptographic authentication. Preparation rechecks the current bytes and
+/// consumes this owner on every error. Success stages data only; it does not
+/// authorize execution, guarantee WX/SMP properties, or create a mapping,
+/// pointer, or execution capability. OOM in kernel allocator bookkeeping is
+/// outside `Result`. These constructors are fixed-base and x86_64-only; they do
+/// not search, fall back, accept caller exports or create payload/frames.
 pub struct PolicyNearTextModuleLayout {
     inner: NearTextModuleLayout,
-    registry: crate::OstdExportRegistry,
+    registry: FixedImportRegistry,
 }
 
-/// Private staged result of the fixed OSTD-policy path.
+enum FixedImportRegistry {
+    RustDenied(crate::OstdExportRegistry),
+    #[cfg(target_arch = "x86_64")]
+    ExplicitC(crate::CShimExportRegistry),
+}
+
+impl FixedImportRegistry {
+    fn linux_symbol_resolver<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        layout: &'a Layout,
+    ) -> Result<SymbolResolver<'a>, linux_module_elf::Error> {
+        match self {
+            Self::RustDenied(registry) => registry.linux_symbol_resolver(bytes, layout),
+            #[cfg(target_arch = "x86_64")]
+            Self::ExplicitC(registry) => registry.linux_symbol_resolver(bytes, layout),
+        }
+    }
+}
+
+/// Private staged result of a retained fixed import policy.
 pub struct PolicyNearTextPreparedModule {
     inner: NearTextPreparedModule,
 }
 
 impl PolicyNearTextModuleLayout {
-    /// Claim a real signed-32 reservation at exactly `base` and check the
-    /// closed OSTD import policy and relocation reach. No search or fallback.
-    /// Only local/no-import modules currently pass the OSTD policy; success is
-    /// not Linux ABI approval or cryptographic authentication. Kernel
-    /// bookkeeping OOM remains outside `Result`.
+    /// Claim a real signed-32 reservation at exactly `base` under the default
+    /// deny-all Linux import policy. No search or fallback. Success is data-only,
+    /// not complete Linux ABI approval or execution/WX/SMP authorization.
+    /// Kernel bookkeeping OOM remains outside `Result`.
     #[cfg(target_arch = "x86_64")]
     pub fn new_signed32_at(
         bytes: &[u8],
@@ -60,6 +81,48 @@ impl PolicyNearTextModuleLayout {
         max_pages: usize,
         max_sections: usize,
         max_entries: usize,
+    ) -> Result<Self, Error> {
+        Self::new_signed32_at_with_registry(
+            bytes,
+            base,
+            max_pages,
+            max_sections,
+            max_entries,
+            FixedImportRegistry::RustDenied(crate::OstdExportRegistry::new()),
+        )
+    }
+
+    /// Claim a real signed-32 reservation with the opt-in, closed C-shim policy
+    /// (currently only `memcmp`). No caller exports or providers are accepted.
+    /// Success is data-only, not complete Linux ABI approval or execution/WX/SMP
+    /// authorization. No search or fallback; kernel bookkeeping OOM is outside
+    /// `Result`.
+    #[cfg(target_arch = "x86_64")]
+    pub fn new_signed32_c_shims_at(
+        bytes: &[u8],
+        base: Vaddr,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+    ) -> Result<Self, Error> {
+        Self::new_signed32_at_with_registry(
+            bytes,
+            base,
+            max_pages,
+            max_sections,
+            max_entries,
+            FixedImportRegistry::ExplicitC(crate::CShimExportRegistry::new()),
+        )
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn new_signed32_at_with_registry(
+        bytes: &[u8],
+        base: Vaddr,
+        max_pages: usize,
+        max_sections: usize,
+        max_entries: usize,
+        registry: FixedImportRegistry,
     ) -> Result<Self, Error> {
         if PAGE_SIZE != 4096 {
             return Err(Error::UnsupportedPageSize);
@@ -82,7 +145,6 @@ impl PolicyNearTextModuleLayout {
         if layout.span() == 0 {
             return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
         }
-        let registry = crate::OstdExportRegistry::new();
         registry
             .linux_symbol_resolver(bytes, &layout)
             .map_err(Error::Plan)?

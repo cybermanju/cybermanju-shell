@@ -67,6 +67,13 @@ case ${2:-} in
         VERIFY=verify_linux_c_abi_runtime.py
         [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
         ;;
+    --c-shim-import)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_c_shim_import_runtime
+        VERIFY=verify_c_shim_import_runtime.py
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
     --address-reservation)
         CRATE=ostd
         CRATE_PATH=ostd
