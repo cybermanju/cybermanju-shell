@@ -2,7 +2,7 @@
 //! Trusted, embedded kbuild fixture. Deliberately never calls any module entry.
 use alloc::{vec, vec::Vec};
 
-use linux_module_elf::{Error as ElfError, SymbolResolver, plan_layout, plan_page_layout};
+use linux_module_elf::{Error as ElfError, Export, SymbolResolver, plan_layout, plan_page_layout};
 use ostd::{mm::PAGE_SIZE, prelude::*};
 
 use super::{Error, PreparationLimits, ReservedModuleLayout, stage_prepared};
@@ -72,6 +72,59 @@ fn fixture_with_u32_relocation() -> Vec<u8> {
         }
     }
     panic!("fixture needs a zero-addend local-section R_X86_64_64 in ALLOC");
+}
+
+// Clone-only fixture instrumentation: an existing global symbol becomes an
+// undefined numeric import; section layout and symbol-table local boundary stay intact.
+fn relative_import_fixture(kind: u32) -> (Vec<u8>, &'static [u8], u16, u64) {
+    let r32 = |o| u32::from_le_bytes(FIXTURE[o..o + 4].try_into().unwrap());
+    let r64 = |o| u64::from_le_bytes(FIXTURE[o..o + 8].try_into().unwrap());
+    let mut bytes = fixture_with_u32_relocation();
+    let changed = bytes.iter().zip(FIXTURE).position(|(a, b)| a != b).unwrap();
+    let table = usize::try_from(r64(40)).unwrap();
+    let count = u16::from_le_bytes(FIXTURE[60..62].try_into().unwrap()) as usize;
+    for i in 0..count {
+        let sh = table + i * 64;
+        if r32(sh + 4) != 4 {
+            continue;
+        }
+        let off = usize::try_from(r64(sh + 24)).unwrap();
+        let size = usize::try_from(r64(sh + 32)).unwrap();
+        if changed < off || changed >= off + size {
+            continue;
+        }
+        assert_eq!((changed - off) % 24, 8);
+        let entry = changed - 8;
+        let symsh = table + r32(sh + 40) as usize * 64;
+        let symbols = usize::try_from(r64(symsh + 24)).unwrap();
+        let strsh = table + r32(symsh + 40) as usize * 64;
+        let strings = usize::try_from(r64(strsh + 24)).unwrap();
+        let strings_end = strings + usize::try_from(r64(strsh + 32)).unwrap();
+        for symidx in 1..usize::try_from(r64(symsh + 32)).unwrap() / 24 {
+            let symbol = symbols + symidx * 24;
+            if FIXTURE[symbol + 4] >> 4 != 1 || r32(symbol) == 0 {
+                continue;
+            }
+            let start = strings + r32(symbol) as usize;
+            let end = start
+                + FIXTURE[start..strings_end]
+                    .iter()
+                    .position(|b| *b == 0)
+                    .unwrap();
+            bytes[symbol + 4] = 0x10; // STB_GLOBAL/STT_NOTYPE
+            bytes[symbol + 5] = 0;
+            bytes[symbol + 6..symbol + 24].fill(0); // SHN_UNDEF/value/size
+            bytes[entry + 8..entry + 16]
+                .copy_from_slice(&(((symidx as u64) << 32) | u64::from(kind)).to_le_bytes());
+            return (
+                bytes,
+                &FIXTURE[start..end],
+                u16::try_from(r32(sh + 44)).unwrap(),
+                r64(entry),
+            );
+        }
+    }
+    panic!("fixture needs an existing named global symbol and ALLOC RELA");
 }
 
 #[ktest]
@@ -320,6 +373,88 @@ fn cybermanju_prepared_module_runtime() {
     }
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true"
+    );
+    for kind in [2, 4] {
+        let (bytes, name, target, offset) = relative_import_fixture(kind);
+        for delta in [
+            i128::from(i32::MIN),
+            i128::from(i32::MAX),
+            i128::from(i32::MIN) - 1,
+            i128::from(i32::MAX) + 1,
+        ] {
+            let owner =
+                ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                    .unwrap();
+            let range = owner.range();
+            let placement = owner
+                .layout()
+                .placements()
+                .iter()
+                .find(|p| p.section_index == target)
+                .unwrap();
+            let place = placement.address.checked_add(offset).unwrap();
+            let relative_offset = usize::try_from(place - owner.layout().base()).unwrap();
+            let exports = [Export {
+                name,
+                value: u64::try_from(i128::from(place) + delta).unwrap(),
+            }];
+            let preflight = SymbolResolver::new(&bytes, owner.layout(), &exports)
+                .unwrap()
+                .check_relocation_reach(65_536);
+            if i32::try_from(delta).is_ok() {
+                assert_eq!(preflight.unwrap(), real_prepared.relocation_entries());
+                let staged = owner.prepare_and_stage(&bytes, &exports, limits).unwrap();
+                let mut actual = [0; 4];
+                staged.read_bytes(relative_offset, &mut actual).unwrap();
+                assert_eq!(actual, i32::try_from(delta).unwrap().to_le_bytes());
+                drop(staged);
+            } else {
+                assert_eq!(preflight, Err(ElfError::RelocationOverflow));
+                assert!(matches!(
+                    owner.prepare_and_stage(&bytes, &exports, limits),
+                    Err(Error::Plan(ElfError::RelocationOverflow))
+                ));
+            }
+            let probe =
+                ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                    .unwrap();
+            assert_eq!(probe.range(), range);
+            drop(probe);
+        }
+        let owner =
+            ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
+        let far = [Export {
+            name,
+            value: 0xffff_ffff_8000_0000,
+        }];
+        assert_eq!(
+            SymbolResolver::new(&bytes, owner.layout(), &far)
+                .unwrap()
+                .check_relocation_reach(65_536),
+            Err(ElfError::RelocationOverflow)
+        );
+        assert!(matches!(
+            owner.prepare_and_stage(&bytes, &far, limits),
+            Err(Error::Plan(ElfError::RelocationOverflow))
+        ));
+        if kind == 2 {
+            let owner =
+                ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                    .unwrap();
+            assert_eq!(
+                SymbolResolver::new(&bytes, owner.layout(), &[])
+                    .unwrap()
+                    .check_relocation_reach(65_536),
+                Err(ElfError::MissingSymbol)
+            );
+            assert!(matches!(
+                owner.prepare_and_stage(&bytes, &[], limits),
+                Err(Error::Plan(ElfError::MissingSymbol))
+            ));
+        }
+    }
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
     );
     // No pointer conversion, function pointer or call to an ELF symbol.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");

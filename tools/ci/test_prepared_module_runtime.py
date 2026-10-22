@@ -21,6 +21,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3",
                     "CYBERMANJU_PREPARED_RUNTIME:scoped_rw_mapping:PASS pages=10",
                     "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true",
+                    "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -65,6 +66,17 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertEqual(verify(self.evidence().replace("\n", "\r\n"))["status"], "passed")
         with self.assertRaises(ValueError):
             verify(self.evidence().replace("prepared_transaction", "prepared\r_transaction"))
+
+    def test_relative_reach_marker_is_exact_and_mandatory(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
+        for bad in [self.evidence().replace(marker + "\n", ""), self.evidence() + marker + "\n"] + [self.evidence().replace(a, b) for a, b in [("types=2", "types=1"), ("boundary_cases=8", "boundary_cases=7"), ("missing_exports=1", "missing_exports=0"), ("far_exports=2", "far_exports=1"), ("relative32_reach", "unknown_relative_reach")]]:
+            with self.subTest(log=bad), self.assertRaises(ValueError):
+                verify(bad)
+        result = verify(self.evidence())
+        self.assertTrue(result["relative32_reach_preflight_verified"])
+        self.assertTrue(result["exports_are_synthetic"])
+        for flag in ("linux_modules_executed", "init_called", "production_mapping_available", "wx_verified"):
+            self.assertFalse(result[flag])
 
     def test_transaction_marker_is_exact_and_mandatory(self):
         marker = "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true"

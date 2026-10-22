@@ -74,12 +74,13 @@ pub fn relocate_section(
         }
         let symbol = symbol_values[(info >> 32) as usize].ok_or(Error::MissingSymbol)?;
         let offset = u64_at(entry, 0);
-        let place = i128::from(target_address) + i128::from(offset);
-        let mut value = i128::from(symbol) + i128::from(u64_at(entry, 16) as i64);
-        if matches!(kind, 2 | 4 | 24) {
-            value -= place;
-        }
-        let (width, encoded) = encode_relocation(kind, value)?;
+        let (width, encoded) = encode_resolved(
+            kind,
+            symbol,
+            u64_at(entry, 16) as i64,
+            target_address,
+            offset,
+        )?;
         patches.push(Patch {
             offset: usize::try_from(offset).map_err(|_| Error::RelocationRange)?,
             width,
@@ -184,12 +185,13 @@ pub(super) fn relocate_target(
             }
             let symbol = resolver.resolve(symtab_index, (info >> 32) as u32)?;
             let offset = u64_at(entry, 0);
-            let place = i128::from(target_address) + i128::from(offset);
-            let mut value = i128::from(symbol) + i128::from(u64_at(entry, 16) as i64);
-            if matches!(kind, 2 | 4 | 24) {
-                value -= place;
-            }
-            let (width, encoded) = encode_relocation(kind, value)?;
+            let (width, encoded) = encode_resolved(
+                kind,
+                symbol,
+                u64_at(entry, 16) as i64,
+                target_address,
+                offset,
+            )?;
             let offset = usize::try_from(offset).map_err(|_| Error::RelocationRange)?;
             let end = offset.checked_add(width).ok_or(Error::RelocationRange)?;
             if end > size {
@@ -226,6 +228,85 @@ pub(super) fn relocate_target(
             .copy_from_slice(&patch.value[..patch.width]);
     }
     Ok(output)
+}
+
+// Only reached through a resolver that already validated this immutable ELF/layout.
+pub(super) fn check_relocation_reach(
+    bytes: &[u8],
+    layout: &crate::Layout,
+    resolver: &crate::SymbolResolver<'_>,
+    max_entries: usize,
+) -> Result<usize, Error> {
+    let table = file_range(
+        bytes,
+        u64_at(bytes, 40),
+        u64::from(crate::u16_at(bytes, 60)) * SECTION_SIZE as u64,
+    )?;
+    let section = |i: usize| &table[i * SECTION_SIZE..(i + 1) * SECTION_SIZE];
+    let mut total = 0usize;
+    for rela in table.chunks_exact(SECTION_SIZE) {
+        if u32_at(rela, 4) != 4 {
+            continue;
+        }
+        let target = section(u32_at(rela, 44) as usize);
+        if u64_at(target, 8) & 2 == 0 {
+            continue;
+        }
+        if !matches!(u32_at(target, 4), 1 | 8) {
+            return Err(Error::RelocationTarget);
+        }
+        total = total
+            .checked_add(usize::try_from(u64_at(rela, 32) / 24).map_err(|_| Error::ResourceLimit)?)
+            .ok_or(Error::ResourceLimit)?;
+        if total > core::cmp::min(max_entries, 65_536) {
+            return Err(Error::ResourceLimit);
+        }
+    }
+    for rela in table.chunks_exact(SECTION_SIZE) {
+        if u32_at(rela, 4) != 4 {
+            continue;
+        }
+        let index = u32_at(rela, 44);
+        if u64_at(section(index as usize), 8) & 2 == 0 {
+            continue;
+        }
+        let placement = layout
+            .placements()
+            .iter()
+            .find(|p| u32::from(p.section_index) == index)
+            .ok_or(Error::RelocationTarget)?;
+        let symtab = u16::try_from(u32_at(rela, 40)).map_err(|_| Error::RelocationLink)?;
+        for entry in file_range(bytes, u64_at(rela, 24), u64_at(rela, 32))?.chunks_exact(24) {
+            let info = u64_at(entry, 8);
+            let kind = info as u32;
+            if kind == 0 {
+                continue;
+            }
+            let symbol = resolver.resolve(symtab, (info >> 32) as u32)?;
+            encode_resolved(
+                kind,
+                symbol,
+                u64_at(entry, 16) as i64,
+                placement.address,
+                u64_at(entry, 0),
+            )?;
+        }
+    }
+    Ok(total)
+}
+
+fn encode_resolved(
+    kind: u32,
+    symbol: u64,
+    addend: i64,
+    address: u64,
+    offset: u64,
+) -> Result<(usize, u64), Error> {
+    let mut value = i128::from(symbol) + i128::from(addend);
+    if matches!(kind, 2 | 4 | 24) {
+        value -= i128::from(address) + i128::from(offset);
+    }
+    encode_relocation(kind, value)
 }
 
 // The common x86-64 RELA arithmetic/width semantics used by both APIs.

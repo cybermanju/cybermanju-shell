@@ -1,6 +1,8 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Novo avanço: a preparação de ELF agora pode consumir a reserva real e entregar um único owner de frames, sem preparar primeiro em uma base sintética.** O ktest conferiu o conteúdo completo na base reservada e sete recusas com devolução da faixa virtual. Uma relocation absoluta de 32 bits passou na base baixa, mas foi corretamente recusada na VMALLOC alta; permitir truncação fez o controle negativo falhar. **Isso valida preparação de dados e recusa de overflow, não execução, ABI Linux ou placement adequado de drivers.**
+**Novo: PC32 e PLT32 agora têm preflight de resolução/alcance antes da cópia dos payloads.** Em QEMU, exports numéricos nos dois limites assinados de 32 bits passaram e seus bytes nos frames foram conferidos; um passo fora de cada limite foi recusado. Uma importação ausente e dois exports distantes também foram recusados. **Os exports são sintéticos: isso não resolve placement próximo ao texto do kernel nem comprova ABI ou execução de módulos.**
+
+**Etapa anterior: a preparação de ELF agora pode consumir a reserva real e entregar um único owner de frames, sem preparar primeiro em uma base sintética.** O ktest conferiu o conteúdo completo na base reservada e sete recusas com devolução da faixa virtual. Uma relocation absoluta de 32 bits passou na base baixa, mas foi corretamente recusada na VMALLOC alta; permitir truncação fez o controle negativo falhar. **Isso valida preparação de dados e recusa de overflow, não execução, ABI Linux ou placement adequado de drivers.**
 
 **Etapa anterior do TLB: oito bytes foram lidos no CPU remoto antes e depois da troca de um frame real.** A leitura passou, mas **omitir o shootdown também passou no TCG**: ainda não é uma prova causal de invalidação TLB ou autorização de mapping SMP. O controle de payload incorreto falhou como esperado.
 
@@ -30,7 +32,7 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 |---|---|---|
 | Asterinas do fork | `0.19.0`; protótipo ktest desenvolvido a partir de `9b31616` | Runtimes mínimos, não boot instalado desta revisão |
 | Toolchain do kernel | Pin `nightly-2026-07-21`; Rust `1.99.0-nightly (87e5904f5 2026-07-20)`; Cargo `1.99.0-nightly (3efb1f477 2026-07-17)` | Type-check normal e link/boot do harness ktest x86-64; host usa `1.97.1` |
-| `linux-module-elf` | **120 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
+| `linux-module-elf` | **123 testes Rust**, `no_std`, sem dependências externas, `forbid(unsafe_code)` | Preparação de dados no host e no ktest; sem syscalls/init |
 | **`linux-module-staging`** | **1 ktest** com transação reserva→preparo→frames, 7 rejeições transacionais, 3 casos de ciclo de vida anteriores e readback pela base real em 10 páginas temporárias | API de produção prepara apenas dados; mapping temporário somente ktest de uma CPU; sem syscalls ou init/exit |
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 7 cenários** bruto, incluindo owner, mapping temporário, colisão e tradução stale, mais o novo ktest com ELF e **15 testes host** | Mapping experimental só em ktest de uma CPU; sem execução, SMP ou W^X |
 | **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado, 7 readbacks, 2 estados PGE e 3 contextos IRQ em uma CPU | TCG não discrimina inclusive/exclusive; sem prova de coerência remota, benchmark ou hardware físico |
@@ -44,10 +46,27 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | Layout de páginas | Base alinhada, 4 KiB fixos, páginas ocupadas disjuntas; recusa WRITE+EXEC inclusive vazio | Apenas números e flags; não reserva frames nem altera tabelas de páginas |
 | Resolução + RELA | Planos compacto e paginado aceitos pelo resolvedor e pela transação completa | Exports reais, CRC/modversions e ABI não implementados |
 | **Alcance na base reservada** | Clone da fixture com um `R_X86_64_64` local convertido em `R_X86_64_32`: passa em `0x10000000`, falha com `RelocationOverflow` na VMALLOC real; controle com truncação falha | Apenas unsigned absoluto de 32 bits nessa fixture; não qualifica PC32/PLT32 com exports reais, trampolines ou arena próxima ao texto |
+| **PC32/PLT32 e imports numéricos** | Preflight antes do payload; 8 casos de borda dos tipos 2/4 com VA real, 1 import ausente e 2 exports distantes recusados; bytes i32 válidos lidos em frames | Clones instrumentados da fixture, exports sintéticos, addend zero; sem lookup de exports do kernel, PLT/trampolines, placement próximo, ABI ou execução |
 | **`cybermanju_fixture.ko` original** | kbuild/MODPOST/link Linux `6.8.0-147-generic`, x86-64; 44 seções ELF; preparação abaixo | Imports `__fentry__`/`__x86_return_thunk` ainda recebem apenas valores sintéticos nos testes |
 | **`cybermanju_noimports_fixture.ko` auxiliar** | Mesmo Linux/arquitetura, `nm -u` vazio; preparação com zero exports; copiada para 10 frames no ktest; init FUNC 4 bytes e exit FUNC 2 bytes identificados na inspeção compacta | Flags não padrão e objtool desviado nesse objeto; init/exit nunca chamados; segurança e ABI não demonstradas |
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
+
+## Preflight de alcance PC32/PLT32 antes de copiar payloads
+
+[`SymbolResolver::check_relocation_reach`](../asterinas/kernel/libs/linux-module-elf/src/resolve.rs) usa o layout validado para verificar resolução numérica e alcance de todos os RELA que atingem seções ALLOC. A preparação completa chama esse preflight **depois dos budgets de seções/payload e antes de criar vetores de payload/patches**. Conta inclusive NONE, limita o total a 65.536, ignora debug não ALLOC e recusa tabelas dirigidas a NOTE mesmo vazias. A aritmética `S + A - P` e o encoder são compartilhados com os dois caminhos de aplicação existentes, sem uma segunda fórmula independente.
+
+Isso é uma checagem de resolução/aritmética: sucesso isolado não certifica ranges de escrita ou overlaps, que continuam sendo validados na preparação completa. Não reserva outra arena nem cria mappings. A ausência de novos vetores nesse caminho é uma propriedade do código; não foi medida por contador de alocação ou benchmark, e o resolvedor já tem metadados alocados.
+
+O ktest clona a fixture auxiliar real, troca uma RELA local por PC32 (`2`) ou PLT32 (`4`) e transforma um símbolo global existente em import indefinido, mantendo o limite local/global da symtab. O layout usa uma **reserva VMALLOC real**, mas cada export é apenas um número calculado a partir do endereço P, não um símbolo exportado pelo kernel. Com addend zero, passaram os limites `i32::MIN` e `i32::MAX` dos dois tipos; os quatro valores válidos foram preparados/staged e seus quatro bytes lidos dos frames. Os dois limites mais um passo externo foram recusados em ambos os tipos: **8 casos de borda ao todo**. A faixa foi reutilizada após cada caso.
+
+Também foram recusados um import ausente (`MissingSymbol`) e o export numérico distante `0xffffffff80000000` para cada tipo (`RelocationOverflow`), tanto no preflight como na transação. PLT32 continua tratando o export como destino direto: **nenhuma PLT ou trampoline é sintetizada**. Isso evidencia um bloqueio de placement da arena atual, não compatibilidade com exports/ABI reais do Linux.
+
+**Controle negativo discriminante:** trocar temporariamente a conversão i32 verificada por cast truncante fez o preflight retornar `Ok(6)` onde o ktest exigia `RelocationOverflow`; a prova falhou antes do novo marcador. O fonte foi restaurado byte a byte e a repetição positiva passou. A alteração defeituosa não integra o commit. Evidência final em `artifacts/relative32-final/`, controle em `artifacts/relative32-truncated/`.
+
+Passaram **123 testes Rust e 183 regressões Python**, o ktest preparado ampliado (positivo antes e depois do controle), type-check de produção de `linux-module-staging` para `x86_64-unknown-none`, rustfmt e diff. Trata-se de um ktest com múltiplos cenários, não onze módulos executados. A ISO da base `cecd1ce` estava na etapa de boot instalado/hello na consulta deste ciclo: isso ainda não é resultado final nem aprovação da nova alteração.
+
+A prova usa a mesma arquitetura x86-64, fixture auxiliar Linux `6.8.0-147-generic`, Rust `nightly-2026-07-21` e QEMU 8.2.2/q35/TCG de uma CPU, BIOS/GRUB multiboot2. Não é a ISO instaladora. O gate exige um oitavo marcador único com as contagens exatas e mantém execução, init, W^X e mapping de produção false; declara explicitamente exports sintéticos. Evidência nativa em `artifacts/relative32-runtime/` e logs em `artifacts/cycle-0230/`. Não foi qualificada nova versão Linux, arquitetura, driver, GPUI ou hardware físico.
 
 ## Da reserva ao staging, sem preparar em uma base sintética
 

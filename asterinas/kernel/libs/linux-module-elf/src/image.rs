@@ -73,28 +73,7 @@ pub(super) fn prepare_module(
             return Err(Error::ResourceLimit);
         }
     }
-    let mut relocation_entries = 0usize;
-    for rela in table.chunks_exact(SECTION_SIZE) {
-        if u32_at(rela, 4) != 4 {
-            continue;
-        }
-        let target = section(u32_at(rela, 44) as usize);
-        if u64_at(target, 8) & 2 == 0 {
-            continue; // Debug/non-ALLOC relocation tables are not applied.
-        }
-        // NOTE is opaque metadata: copy it verbatim, but reject ANY table
-        // targeting it (including empty tables and NONE-only tables).
-        if !matches!(u32_at(target, 4), 1 | 8) {
-            return Err(Error::RelocationTarget);
-        }
-        let count = usize::try_from(u64_at(rela, 32) / 24).map_err(|_| Error::ResourceLimit)?;
-        relocation_entries = relocation_entries
-            .checked_add(count)
-            .ok_or(Error::ResourceLimit)?;
-        if relocation_entries > core::cmp::min(max_entries, 65_536) {
-            return Err(Error::ResourceLimit);
-        }
-    }
+    let relocation_entries = resolver.check_relocation_reach(max_entries)?;
     let mut sections = Vec::new();
     sections
         .try_reserve_exact(layout.placements().len())

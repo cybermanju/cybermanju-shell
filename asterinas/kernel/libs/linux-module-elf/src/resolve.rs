@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Numeric symbol resolution only. This makes no ABI, CRC, GPL, or W^X claim.
-use super::{Error, Layout, SECTION_SIZE, file_range, inspect, u16_at, u32_at, u64_at};
 use alloc::vec::Vec;
+
+use super::{Error, Layout, SECTION_SIZE, file_range, inspect, u16_at, u32_at, u64_at};
 
 const SYMBOL_SIZE: usize = 24;
 const SHT_SYMTAB: u32 = 2;
@@ -118,6 +119,16 @@ impl<'a> SymbolResolver<'a> {
         )
     }
 
+    /// Check numeric resolution and arithmetic reach before payload allocation.
+    /// Counts ALLOC-target RELA including NONE, with a hard cap of 65,536.
+    /// Debug/non-ALLOC targets are ignored; NOTE-target tables are rejected.
+    /// No payload or patch vector is allocated; resolver metadata already exists.
+    /// Not a full write-range/overlap, trust, ABI or permission check:
+    /// preparation is still required before staging any bytes.
+    pub fn check_relocation_reach(&self, max_entries: usize) -> Result<usize, Error> {
+        crate::apply::check_relocation_reach(self.bytes, self.layout, self, max_entries)
+    }
+
     pub fn resolve(&self, symtab_index: u16, symbol_index: u32) -> Result<u64, Error> {
         let section_offset = usize::from(symtab_index)
             .checked_mul(SECTION_SIZE)
@@ -211,9 +222,10 @@ impl<'a> SymbolResolver<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{vec, vec::Vec};
+
     use super::*;
     use crate::layout::plan_layout;
-    use std::{vec, vec::Vec};
 
     // Compact ELF fixture: null, allocatable data, string table, symbol table.
     fn fixture() -> Vec<u8> {

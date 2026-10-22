@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Multi-section data transactions, not executable module tests.
-use crate::{Error, Export, PreparedModule, SymbolResolver, plan_layout};
 use std::{vec, vec::Vec};
+
+use crate::{Error, Export, PreparedModule, SymbolResolver, plan_layout};
 
 const DATA: usize = 704;
 const STRINGS: usize = 724;
@@ -281,4 +282,93 @@ fn malformed_nonalloc_rela_is_still_structurally_rejected() {
     let before = b.clone();
     assert_eq!(run(&b, &[], 36, 1, 4), Err(Error::RelocationRange));
     assert_eq!(b, before);
+}
+
+#[test]
+fn reach_preflight_checks_relative32_edges_before_preparing_data() {
+    for kind in [2, 4] {
+        let mut b = fixture();
+        entry(&mut b, RELA2, 8, 2, kind, 0);
+        let before = b.clone();
+        let layout = plan_layout(&b, 0xffff_c000_0000_0000, 1024, 10).unwrap();
+        let place = layout
+            .placements()
+            .iter()
+            .find(|p| p.section_index == 2)
+            .unwrap()
+            .address
+            + 8;
+        for delta in [
+            i128::from(i32::MIN),
+            i128::from(i32::MAX),
+            i128::from(i32::MIN) - 1,
+            i128::from(i32::MAX) + 1,
+        ] {
+            let ex = [Export {
+                name: b"missing",
+                value: u64::try_from(i128::from(place) + delta).unwrap(),
+            }];
+            let resolver = SymbolResolver::new(&b, &layout, &ex).unwrap();
+            if let Ok(encoded) = i32::try_from(delta) {
+                assert_eq!(resolver.check_relocation_reach(2), Ok(2));
+                let image = resolver.prepare_module(36, 2, 4).unwrap();
+                assert_eq!(&image.sections()[1].bytes()[8..12], &encoded.to_le_bytes());
+            } else {
+                assert_eq!(
+                    resolver.check_relocation_reach(2),
+                    Err(Error::RelocationOverflow)
+                );
+                assert_eq!(
+                    resolver.prepare_module(36, 2, 4),
+                    Err(Error::RelocationOverflow)
+                );
+            }
+        }
+        assert_eq!(b, before);
+    }
+}
+
+#[test]
+fn reach_preflight_budgets_before_resolution_and_counts_none() {
+    let mut b = fixture();
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    assert_eq!(
+        resolver.check_relocation_reach(1),
+        Err(Error::ResourceLimit)
+    );
+    assert_eq!(
+        resolver.check_relocation_reach(2),
+        Err(Error::MissingSymbol)
+    );
+    entry(&mut b, RELA1, 0, 0, 0, 0);
+    entry(&mut b, RELA2, 0, 0, 0, 0);
+    let resolver = SymbolResolver::new(&b, &layout, &[]).unwrap();
+    assert_eq!(
+        resolver.check_relocation_reach(1),
+        Err(Error::ResourceLimit)
+    );
+    assert_eq!(resolver.check_relocation_reach(2), Ok(2));
+}
+
+#[test]
+fn reach_preflight_ignores_nonalloc_but_rejects_note_even_empty() {
+    let mut b = fixture();
+    p32(&mut b, h(8) + 44, 9);
+    entry(&mut b, RELA2, 0, 2, 10, 0);
+    let layout = plan_layout(&b, 0x1000, 1024, 10).unwrap();
+    assert_eq!(
+        SymbolResolver::new(&b, &layout, &[])
+            .unwrap()
+            .check_relocation_reach(1),
+        Ok(1)
+    );
+    p32(&mut b, h(8) + 44, 3);
+    p64(&mut b, h(8) + 32, 0);
+    assert_eq!(
+        SymbolResolver::new(&b, &layout, &[])
+            .unwrap()
+            .check_relocation_reach(2),
+        Err(Error::RelocationTarget)
+    );
 }
