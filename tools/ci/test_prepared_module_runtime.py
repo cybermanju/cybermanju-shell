@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_prepared_module_runtime import SCENARIOS, verify
+from verify_prepared_module_runtime import SCENARIOS, relative32_numeric_placement_window, verify
 
 
 class PreparedRuntimeEvidenceTests(unittest.TestCase):
@@ -24,6 +24,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2",
                     "CYBERMANJU_PREPARED_RUNTIME:reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2",
                     "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false",
+                    "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -56,6 +57,8 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertTrue(result["signed32_absolute_sign_extension_verified"])
         self.assertTrue(result["signed32_kernel_export_numeric_only"])
         self.assertFalse(result["module_execution_verified"])
+        self.assertTrue(result["relative32_numeric_placement_window_verified"])
+        self.assertFalse(result["near_text_allocation_available"])
         self.assertEqual(result["reserved_layout"]["base"], "0xffffc00000000000")
         self.assertNotIn("linux_modules_loaded", result)
         for field in ("sections", "span", "payload", "relocations", "pages"):
@@ -122,6 +125,21 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         for bad in variants:
             with self.subTest(log=bad[-120:]), self.assertRaises(ValueError):
                 verify(bad)
+
+    def test_relative32_placement_marker_is_exact_and_numeric_only(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false"
+        bad = [self.evidence().replace(marker + "\n", ""), self.evidence() + marker + "\n"]
+        for old, new in [("kinds=2", "kinds=1"), ("rejected_current_base=2", "rejected_current_base=1"), ("candidate_preflight=2", "candidate_preflight=1"), ("reserved_near_text=false", "reserved_near_text=true"), ("execution=false", "execution=true"), ("relative32_placement_window:PASS", "relative32_placement_window:FAIL")]:
+            bad.append(self.evidence().replace(old, new))
+        for text in bad:
+            with self.subTest(text=text[-140:]), self.assertRaises(ValueError):
+                verify(text)
+
+    def test_numeric_window_excludes_vmalloc(self):
+        low, high, candidate = relative32_numeric_placement_window(0xffff80007ffe2321)
+        self.assertLessEqual(low, candidate)
+        self.assertLessEqual(candidate, high)
+        self.assertFalse(0xffffc00000000000 <= candidate < 0xffffe00000000000)
 
     def test_each_missing_marker_is_rejected(self):
         for scenario in SCENARIOS:

@@ -490,6 +490,64 @@ fn cybermanju_prepared_module_runtime() {
             owner.prepare_and_stage(&bytes, &real, limits),
             Err(Error::Plan(ElfError::RelocationOverflow))
         ));
+        // The failed transaction consumed its owner. A fresh reservation is
+        // observed only; the numeric candidate is never reserved or mapped.
+        let owner =
+            ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();
+        let current_layout = owner.layout();
+        let current_placement = current_layout
+            .placements()
+            .iter()
+            .find(|p| p.section_index == target)
+            .unwrap();
+        let place_offset = current_placement
+            .address
+            .checked_sub(current_layout.base())
+            .unwrap()
+            .checked_add(offset)
+            .unwrap();
+        // relative_import_fixture preserves the original zero-addend RELA.
+        let window = linux_module_elf::relative32_base_window(
+            code_address,
+            0,
+            place_offset,
+            current_layout.span(),
+        )
+        .expect("a 32-bit reachability interval exists for the numeric import");
+        assert!(!window.contains(owner.range().start as u64));
+        assert_eq!(
+            SymbolResolver::new(&bytes, current_layout, &real)
+                .unwrap()
+                .check_relocation_reach(65_536),
+            Err(ElfError::RelocationOverflow)
+        );
+        let candidate = window
+            .first_aligned(PAGE_SIZE as u64)
+            .expect("reachable page-aligned numeric base");
+        assert!(window.contains(candidate));
+        let candidate_layout = plan_page_layout(&bytes, candidate, MAX_SPAN, MAX_SECTIONS).unwrap();
+        assert_eq!(
+            SymbolResolver::new(&bytes, &candidate_layout, &real)
+                .unwrap()
+                .check_relocation_reach(65_536)
+                .unwrap(),
+            real_prepared.relocation_entries()
+        );
+        let candidate_placement = candidate_layout
+            .placements()
+            .iter()
+            .find(|p| p.section_index == target)
+            .unwrap();
+        let candidate_place_offset = candidate_placement
+            .address
+            .checked_sub(candidate_layout.base())
+            .unwrap()
+            .checked_add(offset)
+            .unwrap();
+        let displacement =
+            i128::from(code_address) - i128::from(candidate) - i128::from(candidate_place_offset);
+        assert!(i32::try_from(displacement).is_ok());
+        drop(owner);
         if kind == 2 {
             let owner =
                 ReservedModuleLayout::new(&bytes, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
@@ -514,6 +572,9 @@ fn cybermanju_prepared_module_runtime() {
     }
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
+    );
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false"
     );
     let owner =
         ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS).unwrap();

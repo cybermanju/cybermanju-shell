@@ -14,6 +14,7 @@ extern crate alloc;
 mod apply;
 mod image;
 mod layout;
+mod placement;
 mod relocations;
 mod resolve;
 mod staging;
@@ -26,6 +27,8 @@ mod page_layout_bound_tests;
 #[cfg(test)]
 mod page_layout_tests;
 #[cfg(test)]
+mod placement_tests;
+#[cfg(test)]
 mod staging_tests;
 #[cfg(test)]
 mod target_tests;
@@ -33,6 +36,7 @@ mod target_tests;
 pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, page_layout_span_bound, plan_layout, plan_page_layout};
+pub use placement::{Relative32BaseWindow, relative32_base_window};
 pub use resolve::{Export, RelocationReachError, RelocationSite, SymbolResolver};
 pub use staging::{StagingChunk, StagingPlan};
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
@@ -14,6 +14,31 @@ PREPARED_TRANSACTION = PREFIX + "prepared_transaction:PASS rejection_cases=7 ran
 RELATIVE32_REACH = PREFIX + "relative32_reach:PASS types=2 boundary_cases=8 missing_exports=1 far_exports=2"
 REACH_DIAGNOSTICS = PREFIX + "reach_diagnostics:PASS overflow_sites=4 missing_sites=1 budget_no_site=1 real_code_exports=2"
 SIGNED32_ABSOLUTE = PREFIX + "signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false"
+RELATIVE32_PLACEMENT_WINDOW = PREFIX + "relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false"
+
+
+def relative32_numeric_placement_window(target: int, field_offset: int = 0) -> tuple[int, int, int]:
+    """Return an aligned numeric candidate interval for signed PC32/PLT32 only.
+
+    This is arithmetic evidence, not an allocation, mapping, loader or execution.
+    The VMALLOC numeric window is deliberately excluded.
+    """
+    signed_min, signed_max = -(1 << 31), (1 << 31) - 1
+    # Candidate placement base must be close enough to target+addend relative to P.
+    low = max(0xffff800000000000, target + field_offset - signed_max)
+    high = min(0xffffffffffff0000, target + field_offset - signed_min)
+    vmalloc_low, vmalloc_high = 0xffffc00000000000, 0xffffe00000000000
+    if low < vmalloc_high and high >= vmalloc_low:
+        if low >= vmalloc_low:
+            low = vmalloc_high
+        else:
+            high = vmalloc_low - 1
+    low = (low + 4095) & ~4095
+    high &= ~4095
+    if low > high:
+        raise ValueError("No non-VMALLOC numeric PC32 placement window")
+    candidate = min(max((target + 2048) & ~4095, low), high)
+    return low, high, candidate
 
 
 def _strip_terminal_controls(text: str) -> str:
@@ -42,7 +67,7 @@ def verify(text: str) -> dict:
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
     scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE}:
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -81,6 +106,8 @@ def verify(text: str) -> dict:
         "reach_diagnostics_verified": True,
         "signed32_absolute_sign_extension_verified": True,
         "signed32_kernel_export_numeric_only": True,
+        "relative32_numeric_placement_window_verified": True,
+        "near_text_allocation_available": False,
         "module_execution_verified": False,
         "real_code_addresses_tested": 2,
         "kernel_linux_export_lookup_available": False,
