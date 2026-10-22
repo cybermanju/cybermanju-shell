@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-//! Owned x86-64 VMALLOC reservation for future module placement.
+//! Owned x86-64 virtual reservations for future module placement.
 //!
 //! This holds virtual addresses only: no payload frames, page-table mappings,
 //! relocations, execution, permissions or TLB changes. The high base may not fit
@@ -15,6 +15,9 @@ use crate::{
     Error,
     mm::{PAGE_SIZE, Vaddr, kspace::kvirt_area::KVirtReservation},
 };
+
+mod near_text;
+pub use near_text::NearTextAddressReservation;
 
 #[cfg(ktest)]
 mod runtime_tests;

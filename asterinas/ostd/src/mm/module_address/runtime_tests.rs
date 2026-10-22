@@ -183,4 +183,109 @@ fn cybermanju_module_address_runtime() {
         "CYBERMANJU_MODULE_ADDRESS:requested_base:PASS start={:#x} end={:#x} pages=2 conflicts=2 releases=2 conventional_exclusion=1 unmapped=1",
         requested_range.start, requested_range.end
     );
+    near_text_reservation_runtime();
+}
+
+fn near_text_reservation_runtime() {
+    use super::NearTextAddressReservation;
+    use crate::{
+        boot::memory_region::MemoryRegionType,
+        mm::kspace::{FRAME_METADATA_RANGE, LINEAR_MAPPING_VADDR_RANGE},
+    };
+    let pool = NearTextAddressReservation::arena_range();
+    assert_disjoint(&pool, &VMALLOC_VADDR_RANGE);
+    assert_disjoint(&pool, &FRAME_METADATA_RANGE);
+    assert_disjoint(&pool, &LINEAR_MAPPING_VADDR_RANGE);
+    let code = crate::cpu::num_cpus as *const () as usize;
+    let offset = crate::mm::kspace::kernel_loaded_offset();
+    let regions = &crate::boot::EARLY_INFO.get().unwrap().memory_regions;
+    let mut kernel_start = usize::MAX;
+    let mut kernel_end = 0;
+    for region in regions
+        .iter()
+        .filter(|r| r.typ() == MemoryRegionType::Kernel)
+    {
+        let start = region.base().checked_add(offset).unwrap();
+        let end = start.checked_add(region.len()).unwrap();
+        assert!(start < end);
+        assert_disjoint(&pool, &(start..end));
+        kernel_start = kernel_start.min(start);
+        kernel_end = kernel_end.max(end);
+    }
+    assert!(kernel_start <= code && code < kernel_end);
+    let base = pool.end - 2 * PAGE_SIZE;
+    let first = NearTextAddressReservation::new_at(base, 2 * PAGE_SIZE, 2).unwrap();
+    let first_range = first.range();
+    assert_eq!(first_range, base..pool.end);
+    assert_eq!((first.span(), first.page_count()), (2 * PAGE_SIZE, 2));
+    let peer_base = base - 3 * PAGE_SIZE;
+    let peer = NearTextAddressReservation::new_at(peer_base, 3 * PAGE_SIZE, 3).unwrap();
+    let peer_range = peer.range();
+    assert_eq!(peer_range, peer_base..base);
+    assert_disjoint(&first_range, &peer_range);
+    let old = ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
+    assert_disjoint(&first_range, &old.range());
+    assert_disjoint(&peer_range, &old.range());
+    let invalid = [
+        (base, 0, 2),
+        (base, 1, 2),
+        (peer_base + 1, PAGE_SIZE, 1),
+        (base, PAGE_SIZE, 0),
+        (usize::MAX & !(PAGE_SIZE - 1), 2 * PAGE_SIZE, 2),
+        (pool.start - PAGE_SIZE, PAGE_SIZE, 1),
+        (pool.end - PAGE_SIZE, 2 * PAGE_SIZE, 2),
+        (pool.start, 1025 * PAGE_SIZE, 1025),
+        (old.range().start, PAGE_SIZE, 1),
+    ];
+    for (address, span, budget) in invalid {
+        assert!(matches!(
+            NearTextAddressReservation::new_at(address, span, budget),
+            Err(Error::InvalidArgs)
+        ));
+    }
+    assert!(matches!(
+        NearTextAddressReservation::new_at(base + PAGE_SIZE, PAGE_SIZE, 1),
+        Err(Error::NoMemory)
+    ));
+    assert!(matches!(
+        NearTextAddressReservation::new_at(peer_base, 3 * PAGE_SIZE, 3),
+        Err(Error::NoMemory)
+    ));
+    assert!(
+        matches!(
+            ModuleAddressReservation::new_at(base, 2 * PAGE_SIZE, 2),
+            Err(Error::InvalidArgs)
+        ),
+        "old VMALLOC owner must not admit the new arena"
+    );
+    for range in [&first_range, &peer_range] {
+        assert_unmapped(range);
+        assert!(
+            i32::try_from(code.checked_sub(range.start).unwrap()).is_ok(),
+            "real code address must be numerically PC32-near, not a callable export"
+        );
+    }
+    println!(
+        "CYBERMANJU_MODULE_ADDRESS:near_text_reserve:PASS start={:#x} end={:#x} peer_start={:#x} peer_end={:#x} pool_start={:#x} pool_end={:#x} kernel_start={:#x} kernel_end={:#x} code={:#x}",
+        first_range.start,
+        first_range.end,
+        peer_range.start,
+        peer_range.end,
+        pool.start,
+        pool.end,
+        kernel_start,
+        kernel_end,
+        code
+    );
+    drop(peer);
+    drop(first);
+    let first_again = NearTextAddressReservation::new_at(base, 2 * PAGE_SIZE, 2).unwrap();
+    let peer_again = NearTextAddressReservation::new_at(peer_base, 3 * PAGE_SIZE, 3).unwrap();
+    assert_eq!(first_again.range(), first_range);
+    assert_eq!(peer_again.range(), peer_range);
+    assert_unmapped(&first_again.range());
+    assert_unmapped(&peer_again.range());
+    println!(
+        "CYBERMANJU_MODULE_ADDRESS:near_text_checks:PASS invalid_cases=9 conflicts=2 unmapped_pages=5 reclaimed=2 old_pool_rejected=true mapping=false execution=false"
+    );
 }

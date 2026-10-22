@@ -110,19 +110,39 @@ class AddressReservationTests(unittest.TestCase):
             "CYBERMANJU_MODULE_ADDRESS:unmapped:PASS pages=6",
             f"CYBERMANJU_MODULE_ADDRESS:release:PASS start=0x{release[0]:x} end=0x{release[1]:x}",
             f"CYBERMANJU_MODULE_ADDRESS:requested_base:PASS start=0x{requested[0]:x} end=0x{requested[1]:x} pages={requested_counts[0]} conflicts={requested_counts[1]} releases={requested_counts[2]} conventional_exclusion={requested_counts[3]} unmapped={requested_counts[4]}",
+            "CYBERMANJU_MODULE_ADDRESS:near_text_reserve:PASS start=0xffffffff7ff00000 end=0xffffffff7ff02000 peer_start=0xffffffff7ff03000 peer_end=0xffffffff7ff06000 pool_start=0xffffffff40001000 pool_end=0xffffffff7ffff000 kernel_start=0xffffffff80000000 kernel_end=0xffffffff81000000 code=0xffffffff80001000",
+            "CYBERMANJU_MODULE_ADDRESS:near_text_checks:PASS invalid_cases=9 conflicts=2 unmapped_pages=5 reclaimed=2 old_pool_rejected=true mapping=false execution=false",
             "test result: ok. 1 passed; 0 failed; 7 filtered out.", ""])
 
     def test_complete_evidence_and_exact_scope(self):
         result = verify_address(self.evidence())
-        self.assertEqual((result["runtime_tests"], result["scenarios"], result["failed"]), (1, 4, 0))
+        self.assertEqual((result["runtime_tests"], result["scenarios"], result["failed"]), (1, 6, 0))
         self.assertFalse(result["pages_mapped"])
-        self.assertEqual(result["scope"], "vmalloc_reservation_only")
+        self.assertEqual(result["scope"], "va_reservations_only")
+        self.assertEqual(result["near_text_scope"], "typed_va_reservation_only")
+        self.assertTrue(result["near_text_va_reservation_verified"])
+        self.assertFalse(result["near_text_loader_integration_available"])
+        self.assertTrue(result["near_text_allocation_available"])
         self.assertTrue(result["requested_base_reservation_verified"])
-        for flag in ("linux_modules_executed", "frames_allocated", "pages_mapped", "mapping_available", "wx_verified", "module_execution_verified", "near_text_allocation_available"):
+        for flag in ("linux_modules_executed", "frames_allocated", "pages_mapped", "mapping_available", "wx_verified", "module_execution_verified"):
             self.assertFalse(result[flag])
+        self.assertTrue(result["near_text_allocation_available"])
         self.assertEqual(result["ranges"]["first"], {"start": hex(self.first[0]), "end": hex(self.first[1])})
         for value in result["ranges"].values():
             self.assertTrue(value["start"].startswith("0x") and value["end"].startswith("0x"))
+
+    def test_near_text_pool_overlap_and_peer_distance_are_independent_gates(self):
+        with self.assertRaisesRegex(ValueError, "pools overlap"):
+            verify_address(self.evidence(pool=(self.pool, 0xffffffff7ffff000)))
+        code = 0xffffffff80000000 + (3 << 29)
+        peer = 0xffffffff40001000
+        bad = self.evidence().replace(
+            "peer_start=0xffffffff7ff03000 peer_end=0xffffffff7ff06000",
+            f"peer_start={peer:#x} peer_end={peer + 3 * 4096:#x}")
+        bad = bad.replace("code=0xffffffff80001000", f"code={code:#x}")
+        bad = bad.replace("kernel_end=0xffffffff81000000", f"kernel_end={code + 4096:#x}")
+        with self.assertRaisesRegex(ValueError, "code geometry"):
+            verify_address(bad)
 
     def test_serial_ansi_cr_and_hex_normalization(self):
         evidence = "\x1b[32m" + self.evidence().replace("\n", "\r\n") + "\x1b[0m"
@@ -214,6 +234,22 @@ class AddressReservationTests(unittest.TestCase):
             self.assertEqual(config.read_text(), "keep me\n")
             self.assertEqual(json.loads((out / "result.json").read_text())["status"], "not_verified")
             self.assertFalse((out / "osdk-build.log").exists())
+
+    def test_near_text_markers_are_unique_exact_and_validated(self):
+        good = self.evidence()
+        reserve, checks = good.splitlines()[6:8]
+        for bad in [good.replace(reserve + "\n", ""), good + reserve + "\n",
+                    good.replace(checks + "\n", ""), good + checks + "\n",
+                    good.replace(reserve, "echo " + reserve),
+                    good.replace(checks, checks.replace("conflicts=2", "conflicts=3")),
+                    good.replace("peer_start=0xffffffff7ff03000", "peer_start=0xffffffff7ff01000"),
+                    good.replace("end=0xffffffff7ff02000", "end=0xffffffff5000000000000000"),
+                    good.replace("code=0xffffffff80001000", "code=0xffffffff81000000"),
+                    good.replace("pool_start=0xffffffff40001000", "pool_start=0xffffffff40000000"),
+                    good.replace("mapping=false", "mapping=true"),
+                    good.replace("invalid_cases=9", "invalid_cases=8")]:
+            with self.subTest(bad=bad[-250:]), self.assertRaises(ValueError):
+                verify_address(bad)
 
 
 if __name__ == "__main__":

@@ -14,7 +14,9 @@
 //! | |         For the kernel code, 1 GiB.
 //! +-+ <- 0xffff_ffff_8000_0000
 //! | |
-//! | |         Unused hole.
+//! | |         x86-64 only: dedicated near-text VA reservations in the
+//! | |         preceding 1 GiB, excluding one guard page at either end.
+//! | |         The remaining hole is unused. No module mapping is implied.
 //! +-+ <- 0xffff_e100_0000_0000
 //! | |         For frame metadata, 1 TiB.
 //! +-+ <- 0xffff_e000_0000_0000
@@ -108,6 +110,13 @@ pub(crate) fn kernel_loaded_offset() -> usize {
 
 #[cfg(target_arch = "x86_64")]
 const KERNEL_CODE_BASE_VADDR: usize = 0xffff_ffff_8000_0000;
+
+/// Exclusive near-text VA pool; not VMALLOC and not a mapping capability.
+/// Boot-image disjointness and absent PTEs are checked before returning an owner.
+#[cfg(target_arch = "x86_64")]
+pub(super) const MODULE_NEAR_TEXT_VADDR_RANGE: Range<Vaddr> =
+    (KERNEL_CODE_BASE_VADDR - (1 << 30) + PAGE_SIZE)..(KERNEL_CODE_BASE_VADDR - PAGE_SIZE);
+
 #[cfg(any(target_arch = "riscv64", target_arch = "aarch64"))]
 const KERNEL_CODE_BASE_VADDR: usize = 0xffff_ffff_0000_0000;
 #[cfg(target_arch = "loongarch64")]
