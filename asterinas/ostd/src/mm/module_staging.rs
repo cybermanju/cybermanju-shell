@@ -33,13 +33,23 @@ use crate::{
     mm::{Frame, FrameAllocOptions, VmIo},
 };
 
-struct OstdPage(Frame<()>);
+struct OstdPage(
+    Frame<()>,
+    #[cfg(all(ktest, target_arch = "x86_64"))] Option<fault_injection::ReleaseProbe>,
+);
 
 impl Page for OstdPage {
     const SIZE: usize = crate::mm::PAGE_SIZE;
 
     fn write(&mut self, offset: usize, bytes: &[u8]) -> Result<(), Error> {
-        self.0.write_bytes(offset, bytes)
+        let result = self.0.write_bytes(offset, bytes);
+        #[cfg(all(ktest, target_arch = "x86_64"))]
+        if result.is_ok()
+            && let Some(probe) = &self.1
+        {
+            probe.record_write();
+        }
+        result
     }
 
     fn read(&self, offset: usize, bytes: &mut [u8]) -> Result<(), Error> {
@@ -70,6 +80,8 @@ impl ModuleStaging {
         let pages = StagedPages::new(span, chunks, max_pages, max_chunks, || {
             Ok(OstdPage(
                 FrameAllocOptions::new().zeroed(true).alloc_frame()?,
+                #[cfg(all(ktest, target_arch = "x86_64"))]
+                None,
             ))
         })?;
         Ok(Self { pages })

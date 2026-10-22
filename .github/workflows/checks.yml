@@ -164,6 +164,8 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-smp-runtime --elf-lease-smp
       - name: Verify intended page-permission preflight without applying RX or physical W^X
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/permission-plan-runtime --permission-plan
+      - name: Verify consuming permission-preflight denial drops handles before VA reclaim (budget, not heap OOM)
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/permission-cleanup-runtime --permission-cleanup
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -194,6 +196,10 @@ jobs:
             artifacts/permission-plan-runtime/*.json
             artifacts/permission-plan-runtime/*.txt
             artifacts/permission-plan-runtime/harness-Cargo.*
+            artifacts/permission-cleanup-runtime/*.log
+            artifacts/permission-cleanup-runtime/*.json
+            artifacts/permission-cleanup-runtime/*.txt
+            artifacts/permission-cleanup-runtime/harness-Cargo.*
             artifacts/module-address-runtime/*.log
             artifacts/module-address-runtime/*.json
             artifacts/module-address-runtime/*.txt

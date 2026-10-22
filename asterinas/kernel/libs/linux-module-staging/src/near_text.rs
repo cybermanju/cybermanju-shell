@@ -7,12 +7,12 @@
 
 use core::ops::Range;
 
-use linux_module_elf::{page_layout_span_bound, plan_page_layout, Export, Layout, SymbolResolver};
+use linux_module_elf::{Export, Layout, SymbolResolver, page_layout_span_bound, plan_page_layout};
 use ostd::mm::{
-    module_address::NearTextAddressReservation, module_staging::ModuleStaging, Vaddr, PAGE_SIZE,
+    PAGE_SIZE, Vaddr, module_address::NearTextAddressReservation, module_staging::ModuleStaging,
 };
 
-use crate::{stage_prepared, Error, PreparationLimits};
+use crate::{Error, PreparationLimits, stage_prepared};
 
 /// Owns a near-kernel-text virtual reservation and the layout planned at its base.
 ///
@@ -240,6 +240,21 @@ impl PolicyNearTextModuleLayout {
     ) -> Result<PolicyNearTextPreparedModule, Error> {
         self.prepare_and_stage_with(bytes, limits, |module, layout, pages, chunks| {
             crate::stage_prepared_with_fault(module, layout, pages, chunks, mode, stats)
+        })
+    }
+}
+
+impl PolicyNearTextModuleLayout {
+    /// Observe successful staging frame-handle lifetimes for ktests without injecting faults.
+    #[cfg(ktest)]
+    pub(crate) fn prepare_and_stage_observed_for_test(
+        self,
+        bytes: &[u8],
+        limits: PreparationLimits,
+        stats: &alloc::sync::Arc<ostd::mm::module_staging::fault_injection::FaultStats>,
+    ) -> Result<PolicyNearTextPreparedModule, Error> {
+        self.prepare_and_stage_with(bytes, limits, |module, layout, pages, chunks| {
+            crate::stage_prepared_observed(module, layout, pages, chunks, stats)
         })
     }
 }
@@ -588,15 +603,43 @@ impl NearTextPreparedModule {
     /// this owner is consumed and its remaining layout metadata is dropped.
     #[cfg(target_arch = "x86_64")]
     pub fn into_signed32_rw_nx(self) -> Result<NearTextMappedModule, ostd::Error> {
+        let budget = self.page_count();
+        self.into_signed32_rw_nx_with_page_budget(budget)
+    }
+
+    /// Validate intended permission metadata against `max_pages`, then map all staged
+    /// pages RW/NX. A smaller budget does not avoid frames already acquired during staging;
+    /// this owner is consumed on failure, with frames dropped before the VA reservation.
+    #[cfg(target_arch = "x86_64")]
+    pub fn into_signed32_rw_nx_with_page_budget(
+        self,
+        max_pages: usize,
+    ) -> Result<NearTextMappedModule, ostd::Error> {
+        self.into_signed32_rw_nx_with(max_pages, |staging, reservation| {
+            staging.map_signed32_rw_nx(reservation)
+        })
+    }
+
+    fn into_signed32_rw_nx_with<F>(
+        self,
+        max_pages: usize,
+        map: F,
+    ) -> Result<NearTextMappedModule, ostd::Error>
+    where
+        F: FnOnce(
+            ModuleStaging,
+            NearTextAddressReservation,
+        ) -> Result<ostd::mm::module_staging::Signed32RwMapping, ostd::Error>,
+    {
         let permissions = self
-            .planned_permissions(self.page_count())
+            .planned_permissions(max_pages)
             .map_err(permission_plan_ostd_error)?;
         let Self {
             layout,
             staging,
             reservation,
         } = self;
-        let mapping = staging.map_signed32_rw_nx(reservation)?;
+        let mapping = map(staging, reservation)?;
         Ok(NearTextMappedModule {
             layout,
             mapping,
@@ -611,20 +654,22 @@ impl NearTextPreparedModule {
         after: usize,
         observed: &mut usize,
     ) -> Result<NearTextMappedModule, ostd::Error> {
-        let permissions = self
-            .planned_permissions(self.page_count())
-            .map_err(permission_plan_ostd_error)?;
-        let Self {
-            layout,
-            staging,
-            reservation,
-        } = self;
-        let mapping =
-            staging.map_signed32_rw_nx_with_fault_for_test(reservation, after, observed)?;
-        Ok(NearTextMappedModule {
-            layout,
-            mapping,
-            permissions,
+        let budget = self.page_count();
+        self.into_signed32_rw_nx_with(budget, |staging, reservation| {
+            staging.map_signed32_rw_nx_with_fault_for_test(reservation, after, observed)
+        })
+    }
+
+    /// Test-only probe confirms whether deterministic permission preflight reached the mapper.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(crate) fn into_signed32_rw_nx_with_budget_observed_for_test(
+        self,
+        max_pages: usize,
+        entries: &mut usize,
+    ) -> Result<NearTextMappedModule, ostd::Error> {
+        self.into_signed32_rw_nx_with(max_pages, |staging, reservation| {
+            *entries += 1;
+            staging.map_signed32_rw_nx(reservation)
         })
     }
 }
@@ -750,6 +795,16 @@ impl PolicyNearTextPreparedModule {
         Ok(PolicyNearTextMappedModule { inner })
     }
 
+    /// Consume staged data after validating a page budget; this cannot avoid frames already staged.
+    #[cfg(target_arch = "x86_64")]
+    pub fn into_signed32_rw_nx_with_page_budget(
+        self,
+        max_pages: usize,
+    ) -> Result<PolicyNearTextMappedModule, ostd::Error> {
+        let inner = self.inner.into_signed32_rw_nx_with_page_budget(max_pages)?;
+        Ok(PolicyNearTextMappedModule { inner })
+    }
+
     /// Test-only injected failure point for OSTD's mapping handoff.
     #[cfg(all(ktest, target_arch = "x86_64"))]
     pub(crate) fn into_signed32_rw_nx_with_fault_for_test(
@@ -760,6 +815,19 @@ impl PolicyNearTextPreparedModule {
         let inner = self
             .inner
             .into_signed32_rw_nx_with_fault_for_test(after, observed)?;
+        Ok(PolicyNearTextMappedModule { inner })
+    }
+
+    /// Test-only observed handoff through the real mapper.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(crate) fn into_signed32_rw_nx_with_budget_observed_for_test(
+        self,
+        max_pages: usize,
+        entries: &mut usize,
+    ) -> Result<PolicyNearTextMappedModule, ostd::Error> {
+        let inner = self
+            .inner
+            .into_signed32_rw_nx_with_budget_observed_for_test(max_pages, entries)?;
         Ok(PolicyNearTextMappedModule { inner })
     }
 }

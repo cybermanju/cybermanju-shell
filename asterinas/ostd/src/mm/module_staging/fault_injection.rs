@@ -8,6 +8,7 @@
 //! discarded and reported as `InvalidArgs`, because this backend exists only to
 //! exercise failure paths. If the configured failure point is not reached, the
 //! caller receives that sentinel error and can check `FaultStats::snapshot()`.
+//! `stage_observed` is a separate success path for observing real frame-handle releases.
 
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -70,6 +71,29 @@ impl FaultStats {
             writes: self.writes.load(Ordering::Relaxed),
             triggered: self.triggered.load(Ordering::Relaxed),
         }
+    }
+}
+
+/// Probe whose drop follows the original frame handle's drop by field order.
+pub(super) struct ReleaseProbe {
+    stats: Arc<FaultStats>,
+}
+
+impl ReleaseProbe {
+    pub(super) fn new(stats: &Arc<FaultStats>) -> Self {
+        Self {
+            stats: Arc::clone(stats),
+        }
+    }
+
+    pub(super) fn record_write(&self) {
+        self.stats.writes.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+impl Drop for ReleaseProbe {
+    fn drop(&mut self) {
+        self.stats.dropped.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -157,4 +181,34 @@ pub fn stage_with_fault(
     })?;
     drop(pages);
     Err(Error::InvalidArgs)
+}
+
+/// Stages real frames through production validation/copy logic without injecting
+/// failures. `stats` must be fresh (all counters zero and not triggered), else
+/// this returns `InvalidArgs`. Every call increments `entries`, including
+/// validation failures.
+pub fn stage_observed(
+    span: usize,
+    chunks: &[ModuleChunk<'_>],
+    max_pages: usize,
+    max_chunks: usize,
+    stats: &Arc<FaultStats>,
+) -> Result<ModuleStaging, Error> {
+    let prior_entries = stats.entries.fetch_add(1, Ordering::Relaxed);
+    let snapshot = stats.snapshot();
+    if prior_entries != 0
+        || snapshot.acquired != 0
+        || snapshot.dropped != 0
+        || snapshot.writes != 0
+        || snapshot.triggered
+    {
+        return Err(Error::InvalidArgs);
+    }
+
+    let pages = StagedPages::<super::OstdPage>::new(span, chunks, max_pages, max_chunks, || {
+        let frame = FrameAllocOptions::new().zeroed(true).alloc_frame()?;
+        stats.acquired.fetch_add(1, Ordering::Relaxed);
+        Ok(super::OstdPage(frame, Some(ReleaseProbe::new(stats))))
+    })?;
+    Ok(ModuleStaging { pages })
 }

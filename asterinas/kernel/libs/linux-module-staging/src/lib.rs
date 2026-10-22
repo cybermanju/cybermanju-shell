@@ -125,5 +125,41 @@ pub(crate) fn stage_prepared_with_fault(
     .map_err(Error::Frames)
 }
 
+/// Test-only successful staging adapter with per-handle lifetime observation.
+/// The descriptor bridge remains bounded; no allocation/copy failure is injected.
+#[cfg(all(ktest, target_arch = "x86_64"))]
+pub(crate) fn stage_prepared_observed(
+    module: &PreparedModule,
+    layout: &Layout,
+    max_pages: usize,
+    max_chunks: usize,
+    stats: &alloc::sync::Arc<ostd::mm::module_staging::fault_injection::FaultStats>,
+) -> Result<ModuleStaging, Error> {
+    if PAGE_SIZE != 4096 {
+        return Err(Error::UnsupportedPageSize);
+    }
+    let plan = module
+        .plan_staging(layout, max_pages, max_chunks)
+        .map_err(Error::Plan)?;
+    let mut chunks = Vec::new();
+    chunks
+        .try_reserve_exact(plan.chunks().len())
+        .map_err(|_| Error::Resources)?;
+    for chunk in plan.chunks() {
+        chunks.push(ModuleChunk {
+            offset: chunk.offset,
+            bytes: chunk.bytes,
+        });
+    }
+    ostd::mm::module_staging::fault_injection::stage_observed(
+        plan.span(),
+        &chunks,
+        max_pages,
+        max_chunks,
+        stats,
+    )
+    .map_err(Error::Frames)
+}
+
 #[cfg(all(ktest, target_arch = "x86_64"))]
 mod runtime_tests;
