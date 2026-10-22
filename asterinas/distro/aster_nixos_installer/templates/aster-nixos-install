@@ -9,6 +9,17 @@ CONFIG_PATH=""
 DISK=""
 FORCE_FORMAT_DISK=false
 
+# Select partition paths without touching the disk. NVMe, eMMC and NBD use
+# the same `p` separator as loop devices; SCSI/virtio/Xen disks do not.
+set_partition_devices() {
+    case "$DISK" in
+        /dev/loop*|/dev/nvme*n*|/dev/mmcblk*|/dev/nbd*) partition_separator=p ;;
+        *) partition_separator= ;;
+    esac
+    BOOT_DEVICE="${DISK}${partition_separator}1"
+    ROOT_DEVICE="${DISK}${partition_separator}2"
+}
+
 # Function to display help
 show_help() {
     cat << EOF
@@ -94,13 +105,7 @@ fi
 
 BUILD_DIR=$(mktemp -d -p /mnt)
 
-if [ "${DISK#/dev/loop}" != "$DISK" ]; then
-    BOOT_DEVICE="${DISK}p1"
-    ROOT_DEVICE="${DISK}p2"
-else
-    BOOT_DEVICE="${DISK}1"
-    ROOT_DEVICE="${DISK}2"
-fi
+set_partition_devices
 if [ ! -b "${BOOT_DEVICE}" ] && [ ! -b "${ROOT_DEVICE}" ]; then
     parted ${DISK} -- mklabel gpt
     parted ${DISK} -- mkpart ESP fat32 1MB 512MB
@@ -177,8 +182,10 @@ nixos-install --root ${BUILD_DIR} --no-root-passwd \
 
 # Retain only the current system generation. Reusing the disk image otherwise
 # preserves old system closures in its Nix store after every installation.
+echo "Pruning obsolete installed system generations..."
 nix-env --store "${BUILD_DIR}" \
     -p "${BUILD_DIR}/nix/var/nix/profiles/system" \
     --delete-generations old
+echo "Collecting unreachable paths from the installed Nix store..."
 nix-store --store "${BUILD_DIR}" --gc
 echo "Congratulations! Asterinas NixOS has been installed successfully!"
