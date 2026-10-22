@@ -14,6 +14,7 @@ extern crate alloc;
 mod apply;
 mod image;
 mod layout;
+mod permissions;
 mod placement;
 mod relocations;
 mod resolve;
@@ -27,6 +28,8 @@ mod page_layout_bound_tests;
 #[cfg(test)]
 mod page_layout_tests;
 #[cfg(test)]
+mod permissions_tests;
+#[cfg(test)]
 mod placement_tests;
 #[cfg(test)]
 mod staging_tests;
@@ -36,6 +39,7 @@ mod target_tests;
 pub use apply::relocate_section;
 pub use image::{PreparedModule, PreparedSection};
 pub use layout::{Layout, SectionPlacement, page_layout_span_bound, plan_layout, plan_page_layout};
+pub use permissions::{IntendedPagePermission, PagePermissionPlan, plan_page_permissions};
 pub use placement::{Relative32BaseWindow, relative32_base_window};
 pub use resolve::{
     Export, ExportProvider, Relative32ImportConstraints, Relative32PlacementConstraints,
@@ -87,6 +91,8 @@ pub enum Error {
     ExportNotAdmitted,
     PageAlignment,
     WritableExecutableSection,
+    WritableExecutablePage,
+    PermissionPageConflict,
 }
 
 /// An inspected object, not a loaded or trusted Linux module.

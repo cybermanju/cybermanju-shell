@@ -7,12 +7,12 @@
 
 use core::ops::Range;
 
-use linux_module_elf::{Export, Layout, SymbolResolver, page_layout_span_bound, plan_page_layout};
+use linux_module_elf::{page_layout_span_bound, plan_page_layout, Export, Layout, SymbolResolver};
 use ostd::mm::{
-    PAGE_SIZE, Vaddr, module_address::NearTextAddressReservation, module_staging::ModuleStaging,
+    module_address::NearTextAddressReservation, module_staging::ModuleStaging, Vaddr, PAGE_SIZE,
 };
 
-use crate::{Error, PreparationLimits, stage_prepared};
+use crate::{stage_prepared, Error, PreparationLimits};
 
 /// Owns a near-kernel-text virtual reservation and the layout planned at its base.
 ///
@@ -263,6 +263,14 @@ impl PolicyNearTextPreparedModule {
     /// Number of private staging pages.
     pub fn page_count(&self) -> usize {
         self.inner.page_count()
+    }
+
+    /// Intended per-page permissions derived from the fixed ELF layout.
+    pub fn planned_permissions(
+        &self,
+        max_pages: usize,
+    ) -> Result<linux_module_elf::PagePermissionPlan, linux_module_elf::Error> {
+        self.inner.planned_permissions(max_pages)
     }
 
     /// Read staged bytes without exposing a pointer or mapping.
@@ -546,6 +554,15 @@ impl NearTextPreparedModule {
         self.staging.page_count()
     }
 
+    /// Derive metadata-only intended permissions for the checked layout.
+    /// This does not map frames or apply page-table permissions.
+    pub fn planned_permissions(
+        &self,
+        max_pages: usize,
+    ) -> Result<linux_module_elf::PagePermissionPlan, linux_module_elf::Error> {
+        linux_module_elf::plan_page_permissions(&self.layout, max_pages)
+    }
+
     /// Read staged data without exposing a pointer or mapping.
     pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
         self.staging.read_bytes(offset, out)
@@ -571,13 +588,20 @@ impl NearTextPreparedModule {
     /// this owner is consumed and its remaining layout metadata is dropped.
     #[cfg(target_arch = "x86_64")]
     pub fn into_signed32_rw_nx(self) -> Result<NearTextMappedModule, ostd::Error> {
+        let permissions = self
+            .planned_permissions(self.page_count())
+            .map_err(permission_plan_ostd_error)?;
         let Self {
             layout,
             staging,
             reservation,
         } = self;
         let mapping = staging.map_signed32_rw_nx(reservation)?;
-        Ok(NearTextMappedModule { layout, mapping })
+        Ok(NearTextMappedModule {
+            layout,
+            mapping,
+            permissions,
+        })
     }
 
     /// Test-only injected failure point for OSTD's mapping handoff.
@@ -587,6 +611,9 @@ impl NearTextPreparedModule {
         after: usize,
         observed: &mut usize,
     ) -> Result<NearTextMappedModule, ostd::Error> {
+        let permissions = self
+            .planned_permissions(self.page_count())
+            .map_err(permission_plan_ostd_error)?;
         let Self {
             layout,
             staging,
@@ -594,7 +621,11 @@ impl NearTextPreparedModule {
         } = self;
         let mapping =
             staging.map_signed32_rw_nx_with_fault_for_test(reservation, after, observed)?;
-        Ok(NearTextMappedModule { layout, mapping })
+        Ok(NearTextMappedModule {
+            layout,
+            mapping,
+            permissions,
+        })
     }
 }
 
@@ -609,6 +640,7 @@ impl NearTextPreparedModule {
 pub struct NearTextMappedModule {
     layout: Layout,
     mapping: ostd::mm::module_staging::Signed32RwMapping,
+    permissions: linux_module_elf::PagePermissionPlan,
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -616,6 +648,11 @@ impl NearTextMappedModule {
     /// Layout metadata retained from the data-only ELF staging plan.
     pub fn layout(&self) -> &Layout {
         &self.layout
+    }
+
+    /// Intended ELF page permissions; actual mapped pages remain RW/NX.
+    pub fn permission_plan(&self) -> &linux_module_elf::PagePermissionPlan {
+        &self.permissions
     }
 
     /// Exact virtual interval owned by the persistent mapping.
@@ -647,6 +684,14 @@ impl NearTextMappedModule {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+fn permission_plan_ostd_error(error: linux_module_elf::Error) -> ostd::Error {
+    match error {
+        linux_module_elf::Error::ResourceLimit => ostd::Error::NoMemory,
+        _ => ostd::Error::InvalidArgs,
+    }
+}
+
 /// Fixed-policy counterpart of [`NearTextMappedModule`].
 #[cfg(target_arch = "x86_64")]
 pub struct PolicyNearTextMappedModule {
@@ -658,6 +703,11 @@ impl PolicyNearTextMappedModule {
     /// Retained layout metadata.
     pub fn layout(&self) -> &Layout {
         self.inner.layout()
+    }
+
+    /// Intended ELF page permissions; actual mapped pages remain RW/NX.
+    pub fn permission_plan(&self) -> &linux_module_elf::PagePermissionPlan {
+        self.inner.permission_plan()
     }
 
     /// Exact virtual interval owned by the persistent mapping.

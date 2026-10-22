@@ -162,6 +162,8 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-runtime --elf-lease
       - name: Verify ELF-to-persistent-lease handoff is denied on two CPUs
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-smp-runtime --elf-lease-smp
+      - name: Verify intended page-permission preflight without applying RX or physical W^X
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/permission-plan-runtime --permission-plan
       - name: Retain serial evidence and exact harness dependency resolution
         if: always()
         uses: actions/upload-artifact@v4
@@ -188,6 +190,10 @@ jobs:
             artifacts/elf-lease-smp-runtime/*.json
             artifacts/elf-lease-smp-runtime/*.txt
             artifacts/elf-lease-smp-runtime/harness-Cargo.*
+            artifacts/permission-plan-runtime/*.log
+            artifacts/permission-plan-runtime/*.json
+            artifacts/permission-plan-runtime/*.txt
+            artifacts/permission-plan-runtime/harness-Cargo.*
             artifacts/module-address-runtime/*.log
             artifacts/module-address-runtime/*.json
             artifacts/module-address-runtime/*.txt

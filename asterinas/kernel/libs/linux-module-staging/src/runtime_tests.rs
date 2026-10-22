@@ -1157,3 +1157,4 @@ mod signed32;
 mod signed32_search;
 
 mod elf_lease;
+mod permission_plan;
