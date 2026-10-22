@@ -27,6 +27,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false",
                     'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false',
                     "CYBERMANJU_PREPARED_RUNTIME:relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false",
+                    "CYBERMANJU_PREPARED_RUNTIME:requested_layout:PASS base=0xffffc00000010000 reserved=40960 span=36864 pages=9 invalid_cases=8 conflict_cases=2 rollback_cases=3 exact_reclaim=true mapping=false execution=false",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -100,6 +101,14 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertTrue(result["relative32_defined_symbol_constraints_verified"])
         self.assertFalse(result["near_text_allocation_available"])
         self.assertEqual(result["reserved_layout"]["base"], "0xffffc00000000000")
+        self.assertTrue(result["requested_base_layout_verified"])
+        self.assertEqual(result["requested_base_invalid_cases"], 8)
+        self.assertEqual(result["requested_base_conflict_cases"], 2)
+        self.assertEqual(result["requested_base_rollback_cases"], 3)
+        self.assertTrue(result["requested_base_exact_reclaim_verified"])
+        self.assertEqual(result["requested_base_layout"], {"base": "0xffffc00000010000", "reserved_bytes": 40960, "span": 36864, "pages": 9})
+        for flag in ("near_text_allocation_available", "module_execution_verified", "production_mapping_available"):
+            self.assertFalse(result[flag])
         self.assertNotIn("linux_modules_loaded", result)
         for field in ("sections", "span", "payload", "relocations", "pages"):
             self.assertIsInstance(result[field], int)
@@ -289,6 +298,45 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
             )
             with self.subTest(counts=counts), self.assertRaises(ValueError):
                 verify(text)
+
+
+    def test_requested_layout_range_counts_and_flags_are_strict(self):
+        good = self.evidence()
+        marker = next(line for line in good.splitlines() if "requested_layout:" in line)
+        substitutions = [
+            ("base=0xffffc00000010000", "base=0xffffe00000000000"),
+            ("base=0xffffc00000010000", "base=0xffffc00000010001"),
+            ("base=0xffffc00000010000", "base=0xfffffffffffff000"),
+            ("base=0xffffc00000010000", "base=0xffffbffffffffff0"),
+            ("reserved=40960", "reserved=36864"),
+            ("reserved=40960", f"reserved={4*1024*1024+4096}"),
+            ("span=36864", "span=0"), ("span=36864", "span=36865"),
+            ("pages=9", "pages=1025"), ("invalid_cases=8", "invalid_cases=7"),
+            ("conflict_cases=2", "conflict_cases=1"), ("rollback_cases=3", "rollback_cases=2"),
+            ("exact_reclaim=true", "exact_reclaim=false"),
+            ("mapping=false", "mapping=true"), ("execution=false", "execution=true"),
+        ]
+        bad = [good.replace(marker, marker.replace(a, b)) for a, b in substitutions]
+        bad.extend([good.replace(marker + "\n", ""), good + marker + "\n",
+                    good.replace(marker, "echo " + marker)])
+        for text in bad:
+            with self.subTest(text=text[-180:]), self.assertRaises(ValueError):
+                verify(text)
+
+    def test_requested_layout_end_and_span_boundaries(self):
+        good = self.evidence()
+        marker = next(line for line in good.splitlines() if "requested_layout:" in line)
+        pool_end = 0xffffe00000000000
+        exact_end = marker.replace("base=0xffffc00000010000", f"base={pool_end - 40960:#x}")
+        self.assertTrue(verify(good.replace(marker, exact_end))["requested_base_layout_verified"])
+        bad = [
+            marker.replace("base=0xffffc00000010000", f"base={pool_end - 4096:#x}"),
+            marker.replace("base=0xffffc00000010000", "base=0xffffbffffffff000"),
+            marker.replace("span=36864 pages=9", "span=45056 pages=11"),
+        ]
+        for changed in bad:
+            with self.subTest(marker=changed), self.assertRaises(ValueError):
+                verify(good.replace(marker, changed))
 
     def test_cli_writes_result_json_only_after_success(self):
         script = Path(__file__).with_name("verify_prepared_module_runtime.py")

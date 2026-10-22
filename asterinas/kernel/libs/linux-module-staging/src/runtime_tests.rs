@@ -807,6 +807,168 @@ fn cybermanju_prepared_module_runtime() {
     println!(
         "CYBERMANJU_PREPARED_RUNTIME:signed32_absolute:PASS accepted=2 rejected=3 kernel_export_numeric=true execution=false"
     );
+    requested_layout_runtime(envelope, limits);
     // No module bytes converted to function pointers and no ELF symbol called.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
+}
+
+// The candidate is deliberately not the allocator's ordinary choice. This
+// catches a constructor that silently falls back to automatic placement.
+fn requested_layout_runtime(envelope: usize, mut limits: PreparationLimits) {
+    use ostd::mm::module_address::ModuleAddressReservation;
+    let max_pages = MAX_SPAN as usize / PAGE_SIZE;
+    let automatic = ModuleAddressReservation::new(envelope, max_pages).unwrap();
+    let automatic_base = automatic.range().start;
+    drop(automatic);
+    let probe_span = envelope.checked_add(2 * PAGE_SIZE).unwrap();
+    let probe = ModuleAddressReservation::new(probe_span, max_pages).unwrap();
+    let base = probe.range().start;
+    drop(probe);
+    assert_ne!(
+        base, automatic_base,
+        "candidate must differ from automatic placement"
+    );
+    let requested_range = base..base.checked_add(envelope).unwrap();
+
+    // Independent numeric plan at the requested address, not the owner's layout.
+    let expected_layout = plan_page_layout(FIXTURE, base as u64, MAX_SPAN, MAX_SECTIONS).unwrap();
+    let expected_module = SymbolResolver::new(FIXTURE, &expected_layout, &[])
+        .unwrap()
+        .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
+        .unwrap();
+    let span = expected_layout.span() as usize;
+    let pages = span / PAGE_SIZE;
+    limits.max_pages = pages;
+    let mut expected = vec![0; span];
+    for section in expected_module.sections() {
+        let start = usize::try_from(section.placement().address - base as u64).unwrap();
+        expected[start..start + section.bytes().len()].copy_from_slice(section.bytes());
+    }
+    let owner = ReservedModuleLayout::new_at(FIXTURE, base, max_pages, MAX_SECTIONS).unwrap();
+    assert_eq!(
+        owner.range(),
+        requested_range,
+        "requested ELF plan must own the exact base"
+    );
+    assert_eq!(owner.layout().base(), base as u64);
+    assert_eq!(owner.layout().span(), expected_layout.span());
+    let staged = owner.prepare_and_stage(FIXTURE, &[], limits).unwrap();
+    assert_eq!(staged.reserved_range(), requested_range);
+    assert_eq!(staged.layout().base(), base as u64);
+    assert_eq!((staged.span(), staged.page_count()), (span, pages));
+    let mut actual = vec![0xff; span];
+    staged.read_bytes(0, &mut actual).unwrap();
+    assert_eq!(
+        actual, expected,
+        "all payload, relocation, gap and tail bytes at requested base"
+    );
+    assert!(
+        matches!(
+            ModuleAddressReservation::new_at(base, envelope, max_pages),
+            Err(ostd::Error::NoMemory)
+        ),
+        "staged owner must retain its exact reservation"
+    );
+    let other = ModuleAddressReservation::new(PAGE_SIZE, 1).unwrap();
+    assert!(
+        other.range().end <= requested_range.start || requested_range.end <= other.range().start
+    );
+    drop(other);
+    drop(staged);
+    let reclaim = ModuleAddressReservation::new_at(base, envelope, max_pages).unwrap();
+    assert_eq!(reclaim.range(), requested_range);
+    drop(reclaim);
+
+    // Eight invalid constructors: no owner is returned and the exact candidate
+    // remains reusable after each failure. Address validation is not ELF reach.
+    for case in 0..8 {
+        let result = match case {
+            0 => ReservedModuleLayout::new_at(FIXTURE, base, 0, MAX_SECTIONS),
+            1 => {
+                ReservedModuleLayout::new_at(FIXTURE, base, envelope / PAGE_SIZE - 1, MAX_SECTIONS)
+            }
+            2 => ReservedModuleLayout::new_at(FIXTURE, base, usize::MAX, MAX_SECTIONS),
+            3 => ReservedModuleLayout::new_at(FIXTURE, base, max_pages, 0),
+            4 => ReservedModuleLayout::new_at(&FIXTURE[..64], base, max_pages, MAX_SECTIONS),
+            5 => ReservedModuleLayout::new_at(FIXTURE, base + 1, max_pages, MAX_SECTIONS),
+            6 => ReservedModuleLayout::new_at(
+                FIXTURE,
+                ostd::cpu::num_cpus as *const () as usize,
+                max_pages,
+                MAX_SECTIONS,
+            ),
+            7 => ReservedModuleLayout::new_at(
+                FIXTURE,
+                usize::MAX & !(PAGE_SIZE - 1),
+                max_pages,
+                MAX_SECTIONS,
+            ),
+            _ => unreachable!(),
+        };
+        match case {
+            0..=3 => assert!(matches!(result, Err(Error::Plan(ElfError::ResourceLimit)))),
+            4 => assert!(matches!(result, Err(Error::Plan(_)))),
+            _ => assert!(matches!(
+                result,
+                Err(Error::AddressSpace(ostd::Error::InvalidArgs))
+            )),
+        }
+        let reclaim = ModuleAddressReservation::new_at(base, envelope, max_pages).unwrap();
+        assert_eq!(reclaim.range(), requested_range);
+        drop(reclaim);
+    }
+    // A single occupied interior page must prevent claiming the full envelope.
+    let occupied = ModuleAddressReservation::new_at(base + PAGE_SIZE, PAGE_SIZE, 1).unwrap();
+    assert!(matches!(
+        ReservedModuleLayout::new_at(FIXTURE, base, max_pages, MAX_SECTIONS),
+        Err(Error::AddressSpace(ostd::Error::NoMemory))
+    ));
+    assert_eq!(occupied.range(), base + PAGE_SIZE..base + 2 * PAGE_SIZE);
+    drop(occupied);
+    let occupied = ReservedModuleLayout::new_at(FIXTURE, base, max_pages, MAX_SECTIONS).unwrap();
+    assert!(matches!(
+        ReservedModuleLayout::new_at(FIXTURE, base, max_pages, MAX_SECTIONS),
+        Err(Error::AddressSpace(ostd::Error::NoMemory))
+    ));
+    assert_eq!(occupied.range(), requested_range);
+    drop(occupied);
+
+    // Both preparation and staging failures consume/release the exact owner.
+    // Narrowing a real absolute relocation is valid at BASE but not at VMALLOC.
+    let narrowed = fixture_with_u32_relocation();
+    for case in 0..3 {
+        let owner = ReservedModuleLayout::new_at(FIXTURE, base, max_pages, MAX_SECTIONS).unwrap();
+        assert_eq!(owner.range(), requested_range);
+        let mut limited = limits;
+        let bytes = if case == 0 {
+            narrowed.as_slice()
+        } else {
+            FIXTURE
+        };
+        match case {
+            1 => limited.max_payload_bytes = 0,
+            2 => limited.max_pages = 0,
+            _ => (),
+        }
+        let failed = owner.prepare_and_stage(bytes, &[], limited);
+        if case == 0 {
+            assert!(matches!(
+                failed,
+                Err(Error::Plan(ElfError::RelocationOverflow))
+            ));
+        } else {
+            assert!(matches!(failed, Err(Error::Plan(ElfError::ResourceLimit))));
+        }
+        let reclaim = ReservedModuleLayout::new_at(FIXTURE, base, max_pages, MAX_SECTIONS).unwrap();
+        assert_eq!(
+            reclaim.range(),
+            requested_range,
+            "failed exact-base transaction must release its reservation"
+        );
+        drop(reclaim);
+    }
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:requested_layout:PASS base={:#x} reserved={} span={} pages={} invalid_cases=8 conflict_cases=2 rollback_cases=3 exact_reclaim=true mapping=false execution=false",
+        base, envelope, span, pages
+    );
 }

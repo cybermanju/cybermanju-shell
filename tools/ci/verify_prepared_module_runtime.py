@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window", "relative32_import_collection", "relative32_defined_collection")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction", "relative32_reach", "reach_diagnostics", "signed32_absolute", "relative32_placement_window", "relative32_import_collection", "relative32_defined_collection", "requested_layout")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
@@ -17,6 +17,7 @@ SIGNED32_ABSOLUTE = PREFIX + "signed32_absolute:PASS accepted=2 rejected=3 kerne
 RELATIVE32_PLACEMENT_WINDOW = PREFIX + "relative32_placement_window:PASS kinds=2 rejected_current_base=2 candidate_preflight=2 reserved_near_text=false execution=false"
 RELATIVE32_IMPORT_COLLECTION = 'CYBERMANJU_PREPARED_RUNTIME:relative32_import_collection:PASS kinds=2 collected_imports=2 candidate_preflight=2 reserved_near_text=false execution=false'
 RELATIVE32_DEFINED_COLLECTION = PREFIX + "relative32_defined_collection:PASS types=2 section_relative=2 absolute=2 kernel_address_numeric=true reserved_near_text=false execution=false"
+REQUESTED_LAYOUT = re.compile(re.escape(PREFIX + "requested_layout:PASS ") + r"base=(0x[0-9a-fA-F]+) reserved=(\d+) span=(\d+) pages=(\d+) invalid_cases=(\d+) conflict_cases=(\d+) rollback_cases=(\d+) exact_reclaim=(true|false) mapping=(true|false) execution=(true|false)")
 
 
 def relative32_numeric_placement_window(target: int, field_offset: int = 0) -> tuple[int, int, int]:
@@ -69,7 +70,8 @@ def verify(text: str) -> dict:
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
     scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW, RELATIVE32_IMPORT_COLLECTION, RELATIVE32_DEFINED_COLLECTION}:
+    requested = [m for line in markers if (m := REQUESTED_LAYOUT.fullmatch(line))]
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or len(requested) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), requested[0].group(), PREPARED_TRANSACTION, RELATIVE32_REACH, REACH_DIAGNOSTICS, SIGNED32_ABSOLUTE, RELATIVE32_PLACEMENT_WINDOW, RELATIVE32_IMPORT_COLLECTION, RELATIVE32_DEFINED_COLLECTION}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -83,6 +85,20 @@ def verify(text: str) -> dict:
             and base % 4096 == 0 and envelope % 4096 == 0
             and 0 < actual_span <= envelope <= 4 * 1024 * 1024):
         raise ValueError("Invalid reserved canonical range or envelope")
+    req_base_text, req_reserved, req_span, req_pages, invalid_cases, conflict_cases, rollback_cases, exact_reclaim, req_mapping, req_execution = requested[0].groups()
+    req_base = int(req_base_text, 16)
+    req_reserved, req_span, req_pages, invalid_cases, conflict_cases, rollback_cases = map(int, (req_reserved, req_span, req_pages, invalid_cases, conflict_cases, rollback_cases))
+    vmalloc_low, vmalloc_high = 0xffffc00000000000, 0xffffe00000000000
+    req_end = req_base + req_reserved
+    if (req_base >= 1 << 64 or req_end > 1 << 64 or req_end <= req_base
+            or not (vmalloc_low <= req_base < req_end <= vmalloc_high)
+            or req_base % 4096 or req_reserved != envelope or req_reserved <= 0
+            or req_reserved > 4 * 1024 * 1024 or req_reserved % 4096
+            or req_span <= 0 or req_span > req_reserved or req_span % 4096
+            or req_pages != req_span // 4096 or req_pages > 1024
+            or (invalid_cases, conflict_cases, rollback_cases) != (8, 2, 3)
+            or exact_reclaim != "true" or req_mapping != "false" or req_execution != "false"):
+        raise ValueError("Invalid requested-base layout evidence or budgets")
     scoped_pages = int(scoped_matches[0].group(1))
     if scoped_pages > 1024 or scoped_pages != actual_pages:
         raise ValueError("Scoped mapping pages do not match the reserved layout")
@@ -96,6 +112,11 @@ def verify(text: str) -> dict:
     return {
         "status": "passed", "runtime_tests": 1,
         "scope": "prepared_module_scoped_rw_readback_only",
+        "requested_base_layout_verified": True,
+        "requested_base_invalid_cases": 8, "requested_base_conflict_cases": 2,
+        "requested_base_rollback_cases": 3, "requested_base_exact_reclaim_verified": True,
+        "requested_base_layout": {"base": hex(req_base), "reserved_bytes": req_reserved,
+                                  "span": req_span, "pages": req_pages},
         "joint_owner_lifecycle_verified": True, "owner_lifecycle_cases": 3,
         "reserved_prepare_transaction_verified": True,
         "transaction_rejection_cases": 7,

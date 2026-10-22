@@ -52,6 +52,35 @@ impl ReservedModuleLayout {
     /// Any replan error drops the reservation before returning; heap OOM in the
     /// existing VMALLOC bookkeeping is not recoverable through this Result.
     pub fn new(bytes: &[u8], max_pages: usize, max_sections: usize) -> Result<Self, Error> {
+        Self::new_with_reservation(bytes, max_pages, max_sections, |span, pages| {
+            ModuleAddressReservation::new(span, pages)
+        })
+    }
+
+    /// Validate and budget the conservative envelope before reserving at `base`.
+    ///
+    /// The layout is replanned at the exact requested base; there is no fallback
+    /// address. `max_pages` includes worst-case alignment gaps. No frames or
+    /// mappings are created. Invalid ELF/layout or budget inputs fail before the
+    /// address claim; a failed real-base replan drops the reservation. Existing
+    /// VMALLOC bookkeeping OOM remains outside this Result guarantee.
+    pub fn new_at(
+        bytes: &[u8],
+        base: Vaddr,
+        max_pages: usize,
+        max_sections: usize,
+    ) -> Result<Self, Error> {
+        Self::new_with_reservation(bytes, max_pages, max_sections, |span, pages| {
+            ModuleAddressReservation::new_at(base, span, pages)
+        })
+    }
+
+    fn new_with_reservation(
+        bytes: &[u8],
+        max_pages: usize,
+        max_sections: usize,
+        reserve: impl FnOnce(usize, usize) -> Result<ModuleAddressReservation, ostd::Error>,
+    ) -> Result<Self, Error> {
         if PAGE_SIZE != 4096 {
             return Err(Error::UnsupportedPageSize);
         }
@@ -65,8 +94,7 @@ impl ReservedModuleLayout {
         if span == 0 {
             return Err(Error::Plan(linux_module_elf::Error::ResourceLimit));
         }
-        let reservation =
-            ModuleAddressReservation::new(span, max_pages).map_err(Error::AddressSpace)?;
+        let reservation = reserve(span, max_pages).map_err(Error::AddressSpace)?;
         let layout = plan_page_layout(bytes, reservation.range().start as u64, bound, max_sections)
             .map_err(Error::Plan)?;
         if layout.span() == 0 {
