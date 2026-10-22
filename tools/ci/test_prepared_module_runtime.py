@@ -20,6 +20,7 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
                     "CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS",
                     "CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3",
                     "CYBERMANJU_PREPARED_RUNTIME:scoped_rw_mapping:PASS pages=10",
+                    "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true",
                     "test result: ok. 1 passed; 0 failed; 301 filtered out.",
                 ]
             )
@@ -33,6 +34,9 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
         self.assertEqual(result["scope"], "prepared_module_scoped_rw_readback_only")
         self.assertTrue(result["joint_owner_lifecycle_verified"])
         self.assertEqual(result["owner_lifecycle_cases"], 3)
+        self.assertTrue(result["reserved_prepare_transaction_verified"])
+        self.assertEqual(result["transaction_rejection_cases"], 7)
+        self.assertTrue(result["reserved_base_relocation_overflow_rejected"])
         self.assertTrue(result["fixture_staged"])
         self.assertFalse(result["linux_modules_executed"])
         self.assertFalse(result["init_called"])
@@ -56,6 +60,25 @@ class PreparedRuntimeEvidenceTests(unittest.TestCase):
             "ok.", "\x1b[32mok\x1b[0m."
         )
         self.assertEqual(verify(decorated)["status"], "passed")
+
+    def test_crlf_is_accepted_but_isolated_cr_is_rejected(self):
+        self.assertEqual(verify(self.evidence().replace("\n", "\r\n"))["status"], "passed")
+        with self.assertRaises(ValueError):
+            verify(self.evidence().replace("prepared_transaction", "prepared\r_transaction"))
+
+    def test_transaction_marker_is_exact_and_mandatory(self):
+        marker = "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true"
+        for bad in (
+            self.evidence().replace(marker + "\n", ""),
+            self.evidence().replace("rejection_cases=7", "rejection_cases=6"),
+            self.evidence().replace("range_overflow=true", "range_overflow=false"),
+            self.evidence().replace("reservation_released=true", "reservation_released=false"),
+            self.evidence() + "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true\n",
+            self.evidence() + "CYBERMANJU_PREPARED_RUNTIME:unknown:PASS\n",
+            self.evidence() + "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:FAIL rejection_cases=7 range_overflow=true reservation_released=true\n",
+        ):
+            with self.subTest(bad=bad[-110:]), self.assertRaises(ValueError):
+                verify(bad)
 
     def test_each_missing_marker_is_rejected(self):
         for scenario in SCENARIOS:

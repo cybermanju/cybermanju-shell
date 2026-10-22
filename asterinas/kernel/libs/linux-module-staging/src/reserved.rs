@@ -4,7 +4,9 @@
 
 use core::ops::Range;
 
-use linux_module_elf::{Layout, PreparedModule, page_layout_span_bound, plan_page_layout};
+use linux_module_elf::{
+    Export, Layout, PreparedModule, SymbolResolver, page_layout_span_bound, plan_page_layout,
+};
 use ostd::mm::{
     PAGE_SIZE, Vaddr, module_address::ModuleAddressReservation,
     module_staging::ReservedModuleStaging,
@@ -12,12 +14,30 @@ use ostd::mm::{
 
 use super::{Error, stage_prepared};
 
+/// Independent limits for preparation payload, RELA entries and frame staging.
+/// Payload excludes page padding; page budgets include gaps and page tails.
+/// These do not bound allocator bookkeeping or authenticate the input ELF.
+#[derive(Clone, Copy, Debug)]
+pub struct PreparationLimits {
+    /// Sum of ALLOC payload bytes, including NOBITS but excluding page padding.
+    pub max_payload_bytes: usize,
+    /// Aggregate ALLOC-target RELA entries, including NONE; hard ceiling 65,536.
+    pub max_relocation_entries: usize,
+    /// Prepared sections, including empty sections.
+    pub max_sections: usize,
+    /// Staging pages including alignment gaps and tails, not reservation slack.
+    pub max_pages: usize,
+    /// Staging descriptors, including empty sections.
+    pub max_chunks: usize,
+}
+
 /// Holds a real VMALLOC reservation together with a layout replanned at its base.
 ///
 /// The reservation may be larger than the layout because its alignment envelope
 /// is conservative. These addresses are NOT mapped to staging frames. Keep this
 /// owner alive when depending on them; cloned metadata does not retain ownership.
-/// This neither prepares relocations nor guarantees they fit the high base.
+/// Construction alone does not prepare relocations or guarantee high-base reach;
+/// [`Self::prepare_and_stage`] validates that reach before transferring ownership.
 pub struct ReservedModuleLayout {
     layout: Layout,
     reservation: ModuleAddressReservation,
@@ -66,6 +86,31 @@ impl ReservedModuleLayout {
     /// Entire owned virtual range, including conservative unused envelope space.
     pub fn range(&self) -> Range<Vaddr> {
         self.reservation.range()
+    }
+
+    /// Resolve and relocate at this reservation's actual base, then stage data.
+    ///
+    /// Consumes the owner even on error. A returned error releases its virtual
+    /// reservation and private temporary data; no partially staged owner escapes.
+    /// Relocation reach is checked before staging frames, not at a synthetic base.
+    /// ELF/layout matching remains structural, and exports are numeric values,
+    /// not an ABI certificate. Allocator bookkeeping OOM remains outside Result.
+    /// No mapping, executable permission or init/exit capability is created.
+    pub fn prepare_and_stage(
+        self,
+        bytes: &[u8],
+        exports: &[Export<'_>],
+        limits: PreparationLimits,
+    ) -> Result<ReservedPreparedModule, Error> {
+        let prepared = SymbolResolver::new(bytes, &self.layout, exports)
+            .map_err(Error::Plan)?
+            .prepare_module(
+                limits.max_payload_bytes,
+                limits.max_relocation_entries,
+                limits.max_sections,
+            )
+            .map_err(Error::Plan)?;
+        self.stage(&prepared, limits.max_pages, limits.max_chunks)
     }
 
     /// Copy prepared bytes and consume the reservation into one coupled owner.

@@ -21,12 +21,12 @@ use ostd::mm::{
 #[cfg(target_arch = "x86_64")]
 mod reserved;
 #[cfg(target_arch = "x86_64")]
-pub use reserved::{ReservedModuleLayout, ReservedPreparedModule};
+pub use reserved::{PreparationLimits, ReservedModuleLayout, ReservedPreparedModule};
 
 /// A failed transfer never returns a partially staged owner.
 #[derive(Debug)]
 pub enum Error {
-    /// Unsupported policy, mismatched placements or invalid/over-budget ranges.
+    /// ELF validation, numeric resolution, relocation or staging-plan failure.
     Plan(linux_module_elf::Error),
     /// This bridge currently accepts only 4 KiB OSTD pages.
     UnsupportedPageSize,

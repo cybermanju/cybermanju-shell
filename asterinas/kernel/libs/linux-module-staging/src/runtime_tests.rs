@@ -5,13 +5,74 @@ use alloc::{vec, vec::Vec};
 use linux_module_elf::{Error as ElfError, SymbolResolver, plan_layout, plan_page_layout};
 use ostd::{mm::PAGE_SIZE, prelude::*};
 
-use super::{Error, ReservedModuleLayout, stage_prepared};
+use super::{Error, PreparationLimits, ReservedModuleLayout, stage_prepared};
 
 // Only expanded for the selected kernel test; normal builds need no fixture.
 const FIXTURE: &[u8] = include_bytes!(env!("CYBERMANJU_STAGING_FIXTURE"));
 const BASE: u64 = 0x1000_0000; // Numeric relocation model, NOT a mapped address.
 const MAX_SPAN: u64 = 4 * 1024 * 1024;
 const MAX_SECTIONS: usize = 1024;
+
+// Trusted-fixture mutation only: select a local section R_X86_64_64 RELA
+// targeting ALLOC, with zero symbol value/addend, and narrow it to unsigned 32.
+// No fixed build-specific file offsets and no production parser/API changes.
+fn fixture_with_u32_relocation() -> Vec<u8> {
+    fn u32_at(b: &[u8], o: usize) -> u32 {
+        u32::from_le_bytes(b[o..o + 4].try_into().unwrap())
+    }
+    fn u64_at(b: &[u8], o: usize) -> u64 {
+        u64::from_le_bytes(b[o..o + 8].try_into().unwrap())
+    }
+    assert_eq!(&FIXTURE[..6], b"\x7fELF\x02\x01");
+    let table = usize::try_from(u64_at(FIXTURE, 40)).unwrap();
+    let count = u16::from_le_bytes(FIXTURE[60..62].try_into().unwrap()) as usize;
+    assert_eq!(u16::from_le_bytes(FIXTURE[58..60].try_into().unwrap()), 64);
+    for i in 0..count {
+        let sh = table + i * 64;
+        if u32_at(FIXTURE, sh + 4) != 4 {
+            continue;
+        } // SHT_RELA
+        assert_eq!(u64_at(FIXTURE, sh + 56), 24);
+        let target = u32_at(FIXTURE, sh + 44) as usize;
+        let symtab = u32_at(FIXTURE, sh + 40) as usize;
+        assert!(target < count && symtab < count);
+        if u64_at(FIXTURE, table + target * 64 + 8) & 2 == 0 {
+            continue;
+        }
+        let symsh = table + symtab * 64;
+        assert_eq!(u32_at(FIXTURE, symsh + 4), 2); // SHT_SYMTAB
+        assert_eq!(u64_at(FIXTURE, symsh + 56), 24);
+        let off = usize::try_from(u64_at(FIXTURE, sh + 24)).unwrap();
+        let size = usize::try_from(u64_at(FIXTURE, sh + 32)).unwrap();
+        assert_eq!(size % 24, 0);
+        for entry in (off..off + size).step_by(24) {
+            let info = u64_at(FIXTURE, entry + 8);
+            if info as u32 != 1 || u64_at(FIXTURE, entry + 16) != 0 {
+                continue;
+            }
+            let symbol_index = (info >> 32) as usize;
+            assert!(symbol_index < usize::try_from(u64_at(FIXTURE, symsh + 32)).unwrap() / 24);
+            let symbol = usize::try_from(u64_at(FIXTURE, symsh + 24)).unwrap() + symbol_index * 24;
+            if FIXTURE[symbol + 4] != 3 || u64_at(FIXTURE, symbol + 8) != 0 {
+                continue;
+            }
+            let section =
+                u16::from_le_bytes(FIXTURE[symbol + 6..symbol + 8].try_into().unwrap()) as usize;
+            if section == 0
+                || section >= count
+                || u64_at(FIXTURE, table + section * 64 + 8) & 2 == 0
+            {
+                continue;
+            }
+            let mut changed = FIXTURE.to_vec();
+            changed[entry + 8..entry + 12].copy_from_slice(&10u32.to_le_bytes());
+            assert_eq!(&changed[..entry + 8], &FIXTURE[..entry + 8]);
+            assert_eq!(&changed[entry + 12..], &FIXTURE[entry + 12..]);
+            return changed;
+        }
+    }
+    panic!("fixture needs a zero-addend local-section R_X86_64_64 in ALLOC");
+}
 
 #[ktest]
 fn cybermanju_prepared_module_runtime() {
@@ -134,9 +195,14 @@ fn cybermanju_prepared_module_runtime() {
     }
     drop(real_resolver);
     let reserved_range = owned.range();
-    let mut real_staged = owned
-        .stage(&real_prepared, actual_pages, real_prepared.sections().len())
-        .unwrap();
+    let limits = PreparationLimits {
+        max_payload_bytes: MAX_SPAN as usize,
+        max_relocation_entries: 65_536,
+        max_sections: MAX_SECTIONS,
+        max_pages: actual_pages,
+        max_chunks: real_prepared.sections().len(),
+    };
+    let mut real_staged = owned.prepare_and_stage(FIXTURE, &[], limits).unwrap();
     assert_eq!(real_staged.reserved_range(), reserved_range);
     assert_eq!(real_staged.layout().base(), base);
     assert_eq!(
@@ -208,6 +274,53 @@ fn cybermanju_prepared_module_runtime() {
         drop(probe);
     }
     println!("CYBERMANJU_PREPARED_RUNTIME:reserved_owner_lifecycle:PASS cases=3");
-    // No pointer conversion, function pointer, call to an ELF symbol or mapping.
+    let narrowed = fixture_with_u32_relocation();
+    let low_layout = plan_page_layout(&narrowed, BASE, MAX_SPAN, MAX_SECTIONS).unwrap();
+    SymbolResolver::new(&narrowed, &low_layout, &[])
+        .unwrap()
+        .prepare_module(MAX_SPAN as usize, 65_536, MAX_SECTIONS)
+        .unwrap();
+    for case in 0..7 {
+        let failed_owner =
+            ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+                .unwrap();
+        let failed_range = failed_owner.range();
+        assert!(failed_range.start as u64 > u32::MAX as u64);
+        let mut limited = limits;
+        match case {
+            1 => limited.max_payload_bytes = 0,
+            2 => limited.max_relocation_entries = 0,
+            3 => limited.max_sections = 0,
+            4 => limited.max_pages = 0,
+            5 => limited.max_chunks = 0,
+            _ => (),
+        }
+        let input = match case {
+            0 => &FIXTURE[..64],
+            6 => narrowed.as_slice(),
+            _ => FIXTURE,
+        };
+        let result = failed_owner.prepare_and_stage(input, &[], limited);
+        match case {
+            0 => assert!(matches!(result, Err(Error::Plan(_)))),
+            6 => assert!(matches!(
+                result,
+                Err(Error::Plan(ElfError::RelocationOverflow))
+            )),
+            _ => assert!(matches!(result, Err(Error::Plan(ElfError::ResourceLimit)))),
+        }
+        let probe = ReservedModuleLayout::new(FIXTURE, MAX_SPAN as usize / PAGE_SIZE, MAX_SECTIONS)
+            .unwrap();
+        assert_eq!(
+            probe.range(),
+            failed_range,
+            "failed transaction must release its consumed reservation"
+        );
+        drop(probe);
+    }
+    println!(
+        "CYBERMANJU_PREPARED_RUNTIME:prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true"
+    );
+    // No pointer conversion, function pointer or call to an ELF symbol.
     println!("CYBERMANJU_PREPARED_RUNTIME:no_init_or_exit_called:PASS");
 }

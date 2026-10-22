@@ -5,16 +5,20 @@ from pathlib import Path
 import re
 import sys
 
-SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping")
+SCENARIOS = ("roundtrip", "rejected_budgets_and_mismatched_layout", "reserved_layout", "no_init_or_exit_called", "reserved_owner_lifecycle", "scoped_rw_mapping", "prepared_transaction")
 PREFIX = "CYBERMANJU_PREPARED_RUNTIME:"
 COUNTS = r"sections=(\d+) span=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)"
 ROUNDTRIP = re.compile(re.escape(PREFIX + "roundtrip:PASS ") + COUNTS)
 RESERVED = re.compile(re.escape(PREFIX + "reserved_layout:PASS ") + r"base=(0x[0-9a-fA-F]+) reserved=(\d+) span=(\d+) sections=(\d+) payload=(\d+) relocations=(\d+) pages=(\d+)")
+PREPARED_TRANSACTION = PREFIX + "prepared_transaction:PASS rejection_cases=7 range_overflow=true reservation_released=true"
 
 
 def _strip_terminal_controls(text: str) -> str:
     text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
-    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text).replace("\r", "")
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+    if re.search(r"\r(?!\n)", text):
+        raise ValueError("Isolated carriage return in runtime log")
+    return text.replace("\r\n", "\n")
 
 
 def _counts_valid(sections, span, payload, relocations, pages):
@@ -35,7 +39,7 @@ def verify(text: str) -> dict:
     rounds = [m for line in markers if (m := ROUNDTRIP.fullmatch(line))]
     reserved = [m for line in markers if (m := RESERVED.fullmatch(line))]
     scoped_matches = [m for line in markers if (m := scoped.fullmatch(line))]
-    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group()}:
+    if len(rounds) != 1 or len(reserved) != 1 or len(scoped_matches) != 1 or set(markers) != simple | {owner_lifecycle, rounds[0].group(), reserved[0].group(), scoped_matches[0].group(), PREPARED_TRANSACTION}:
         raise ValueError("Expected exactly one complete marker for every scenario")
     sections, span, payload, relocations, pages = map(int, rounds[0].groups())
     if not _counts_valid(sections, span, payload, relocations, pages):
@@ -63,6 +67,9 @@ def verify(text: str) -> dict:
         "status": "passed", "runtime_tests": 1,
         "scope": "prepared_module_scoped_rw_readback_only",
         "joint_owner_lifecycle_verified": True, "owner_lifecycle_cases": 3,
+        "reserved_prepare_transaction_verified": True,
+        "transaction_rejection_cases": 7,
+        "reserved_base_relocation_overflow_rejected": True,
         "fixture_staged": True, "linux_modules_executed": False, "init_called": False,
         "pages_mapped": True, "wx_verified": False,
         "mapping_persists_after_read": False,
@@ -85,7 +92,7 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(f"Usage: {Path(sys.argv[0]).name} <runtime-log>")
     path = Path(sys.argv[1])
-    result = verify(path.read_text(errors="replace"))
+    result = verify(path.read_bytes().decode(errors="replace"))
     path.with_name("result.json").write_text(json.dumps(result, indent=2) + "\n")
     print("Verified scoped temporary RW mapping readback; mapping removed before return; no module execution.")
 
