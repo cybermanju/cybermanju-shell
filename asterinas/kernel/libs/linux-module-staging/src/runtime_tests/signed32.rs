@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Signed-32 relocation preparation coverage; never maps or executes.
+//! Signed-32 relocation preparation coverage; test-only temporary mappings never execute.
 use alloc::vec;
 
 use linux_module_elf::{Error as ElfError, Export, SymbolResolver, plan_page_layout};
@@ -13,7 +13,7 @@ use super::{
     FIXTURE, MAX_SECTIONS, MAX_SPAN, PreparationLimits, fixture_with_u32_relocation,
     relative_import_fixture,
 };
-use crate::{Error, NearTextModuleLayout};
+use crate::{Error, NearTextModuleLayout, PolicyNearTextModuleLayout};
 
 fn u32_at(b: &[u8], o: usize) -> u32 {
     u32::from_le_bytes(b[o..o + 4].try_into().unwrap())
@@ -90,6 +90,7 @@ fn cybermanju_signed32_prepared_runtime() {
     let mut rejected = 0usize;
     let mut reclaimed = 0usize;
     let mut staged_count = 0usize;
+    let mut mapped_compared = 0usize;
 
     for kind in [11u32, 2, 4] {
         let (bytes, exports, target, offset, symbol, self_defined) = if kind == 11 {
@@ -162,7 +163,7 @@ fn cybermanju_signed32_prepared_runtime() {
             expected_all[start..start + section.bytes().len()].copy_from_slice(section.bytes());
         }
         assert_eq!(&expected_all[relative..relative + 4], &expected);
-        let staged = plan
+        let mut staged = plan
             .prepare_and_stage(&bytes, &exports, limits(envelope / PAGE_SIZE))
             .unwrap();
         assert_eq!(
@@ -188,6 +189,38 @@ fn cybermanju_signed32_prepared_runtime() {
             "all prepared bytes including gaps and tails"
         );
         assert_eq!(&actual[relative..relative + 4], &expected);
+        let mut full = vec![0xff; span];
+        staged.read_signed32_mapped_for_test(0, &mut full).unwrap();
+        assert_eq!(
+            full, expected_all,
+            "signed32 VA bytes must match independent preparation"
+        );
+        let mut cross = [0xff; 8];
+        staged
+            .read_signed32_mapped_for_test(PAGE_SIZE - 3, &mut cross)
+            .unwrap();
+        assert_eq!(&cross[..], &expected_all[PAGE_SIZE - 3..PAGE_SIZE + 5]);
+        let mut tail = [0xff; 8];
+        staged
+            .read_signed32_mapped_for_test(span - 8, &mut tail)
+            .unwrap();
+        assert_eq!(&tail[..], &expected_all[span - 8..]);
+        mapped_compared += full.len() + cross.len() + tail.len();
+        let mut sentinel = [0xa5; 2];
+        assert!(matches!(
+            staged.read_signed32_mapped_for_test(usize::MAX, &mut sentinel),
+            Err(ostd::Error::Overflow)
+        ));
+        assert_eq!(sentinel, [0xa5; 2]);
+        let mut sentinel = [0xa5; 1];
+        assert!(matches!(
+            staged.read_signed32_mapped_for_test(span, &mut sentinel),
+            Err(ostd::Error::InvalidArgs)
+        ));
+        assert_eq!(sentinel, [0xa5; 1]);
+        let mut after = vec![0; span];
+        staged.read_bytes(0, &mut after).unwrap();
+        assert_eq!(after, expected_all);
         assert!(matches!(
             NearTextAddressReservation::new_signed32_at(
                 range.start,
@@ -224,6 +257,11 @@ fn cybermanju_signed32_prepared_runtime() {
         );
         staged_count += 1;
     }
+
+    println!(
+        "CYBERMANJU_SIGNED32_PREPARED:mapping:PASS full_span_cases=3 partial_cases=6 rejected=6 compared={} scopes_unmapped=9 pte_rw=true pte_supervisor=true pte_nonexec=true temporary=true production=false execution=false",
+        mapped_compared
+    );
 
     let bad_u32 = fixture_with_u32_relocation();
     assert!(
@@ -342,6 +380,55 @@ fn cybermanju_signed32_prepared_runtime() {
     rejected += 1;
     assert_eq!((staged_count, rejected, reclaimed), (3, 6, 9));
     println!(
-        "CYBERMANJU_SIGNED32_PREPARED:complete:PASS staged=3 rejected=6 reclaimed=9 compared_full_span=true old_arena_unchanged=true pages_mapped=false linux_export_lookup=false execution=false"
+        "CYBERMANJU_SIGNED32_PREPARED:complete:PASS staged=3 rejected=6 reclaimed=9 compared_full_span=true old_arena_unchanged=true pages_mapped=true temporary_mapping=true all_unmapped=true linux_export_lookup=false execution=false"
+    );
+}
+
+#[ktest]
+fn cybermanju_signed32_mapping_smp_rejection() {
+    println!("");
+    assert_eq!(cpu::num_cpus(), 2, "signed32 mapper must reject SMP");
+    println!("CYBERMANJU_SIGNED32_MAPPING_SMP:begin:PASS cpus=2");
+    let arena = NearTextAddressReservation::signed32_arena_range();
+    let base = arena.end - 64 * PAGE_SIZE;
+    let max_pages = MAX_SPAN as usize / PAGE_SIZE;
+    let limits = PreparationLimits {
+        max_payload_bytes: MAX_SPAN as usize,
+        max_relocation_entries: 65_536,
+        max_sections: MAX_SECTIONS,
+        max_pages,
+        max_chunks: MAX_SECTIONS,
+    };
+    let owner =
+        PolicyNearTextModuleLayout::new_signed32_at(FIXTURE, base, max_pages, MAX_SECTIONS, 65_536)
+            .unwrap();
+    let range = owner.range();
+    let span = owner.layout().span() as usize;
+    let mut staged = owner.prepare_and_stage(FIXTURE, limits).unwrap();
+    let mut before = vec![0; span];
+    staged.read_bytes(0, &mut before).unwrap();
+    let mut denied = 0;
+    for offset in [0, PAGE_SIZE - 3, span - 8] {
+        let mut out = [0xa5; 8];
+        assert!(
+            matches!(
+                staged.read_signed32_mapped_for_test(offset, &mut out),
+                Err(ostd::Error::AccessDenied)
+            ),
+            "signed32 mapper must reject SMP"
+        );
+        assert_eq!(out, [0xa5; 8]);
+        denied += 1;
+    }
+    let mut after = vec![0; span];
+    staged.read_bytes(0, &mut after).unwrap();
+    assert_eq!(after, before);
+    drop(staged);
+    let reclaimed =
+        NearTextAddressReservation::new_signed32_at(range.start, range.len(), max_pages).unwrap();
+    drop(reclaimed);
+    println!(
+        "CYBERMANJU_SIGNED32_MAPPING_SMP:complete:PASS denied={} buffers_preserved={} raw_compared={} reclaimed=1 pages_mapped=false production=false execution=false",
+        denied, denied, span
     );
 }

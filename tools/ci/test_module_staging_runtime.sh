@@ -37,6 +37,15 @@ case ${2:-} in
         VERIFY=verify_signed32_prepared_runtime.py
         [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
         ;;
+    --signed32-mapping-smp)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_signed32_mapping_smp_rejection
+        VERIFY=verify_signed32_mapping_smp_runtime.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
+        CPUS=2
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
     --signed32-search)
         CRATE=linux-module-staging
         CRATE_PATH=kernel/libs/linux-module-staging

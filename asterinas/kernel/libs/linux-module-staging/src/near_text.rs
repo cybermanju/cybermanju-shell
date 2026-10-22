@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //! Fixed-base planning and data-only staging in the x86 near-text address pool.
+//!
+//! Production APIs never map staged bytes; a temporary mapping exists only in
+//! the cfg(all(ktest, x86_64)) audit helper and is torn down before it returns.
 
 use core::ops::Range;
 
@@ -203,6 +206,16 @@ impl PolicyNearTextPreparedModule {
     /// Read staged bytes without exposing a pointer or mapping.
     pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
         self.inner.read_bytes(offset, out)
+    }
+
+    /// Temporarily map staged bytes into the reserved VA for mapper tests only.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(crate) fn read_signed32_mapped_for_test(
+        &mut self,
+        offset: usize,
+        out: &mut [u8],
+    ) -> Result<(), ostd::Error> {
+        self.inner.read_signed32_mapped_for_test(offset, out)
     }
 }
 
@@ -474,5 +487,16 @@ impl NearTextPreparedModule {
     /// Read staged data without exposing a pointer or mapping.
     pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
         self.staging.read_bytes(offset, out)
+    }
+
+    /// Temporarily map staged bytes into the reservation for ktest auditing only.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub(crate) fn read_signed32_mapped_for_test(
+        &mut self,
+        offset: usize,
+        out: &mut [u8],
+    ) -> Result<(), ostd::Error> {
+        self.staging
+            .read_signed32_mapped_for_test(&mut self.reservation, offset, out)
     }
 }

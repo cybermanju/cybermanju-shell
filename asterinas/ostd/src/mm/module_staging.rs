@@ -84,4 +84,21 @@ impl ModuleStaging {
     pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), Error> {
         self.pages.read_bytes(offset, out)
     }
+
+    /// Temporarily map the owned frames in the signed-32 arena for ktests only.
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    pub fn read_signed32_mapped_for_test(
+        &mut self,
+        reservation: &mut crate::mm::module_address::NearTextAddressReservation,
+        offset: usize,
+        out: &mut [u8],
+    ) -> Result<(), Error> {
+        crate::mm::kspace::module_signed32_map::read_scoped(
+            reservation,
+            self.pages.span(),
+            self.pages.iter().map(|page| page.0.clone()),
+            offset,
+            out,
+        )
+    }
 }

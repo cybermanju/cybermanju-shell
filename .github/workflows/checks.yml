@@ -140,8 +140,10 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
       - name: Prepare ELF at near-text base and retain frames without mapping or execution
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/near-text-prepared-runtime --near-text-prepared
-      - name: Prepare R32S and relative ELF in separate signed32 arena without execution
+      - name: Verify R32S and relative ELF through temporary RW non-executable signed32 mappings
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-prepared-runtime --signed32-prepared
+      - name: Verify signed32 temporary mapping is denied on two CPUs without altering buffers
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-mapping-smp-runtime --signed32-mapping-smp
       - name: Search bounded signed32 candidates and verify full staged bytes without execution
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/signed32-search-runtime --signed32-search
       - name: Verify fixed OSTD internal exports and complete staged bytes without Linux ABI
@@ -203,6 +205,10 @@ jobs:
             artifacts/signed32-prepared-runtime/*.json
             artifacts/signed32-prepared-runtime/*.txt
             artifacts/signed32-prepared-runtime/harness-Cargo.*
+            artifacts/signed32-mapping-smp-runtime/*.log
+            artifacts/signed32-mapping-smp-runtime/*.json
+            artifacts/signed32-mapping-smp-runtime/*.txt
+            artifacts/signed32-mapping-smp-runtime/harness-Cargo.*
             artifacts/signed32-prepared-runtime/fixture/
             artifacts/signed32-search-runtime/*.log
             artifacts/signed32-search-runtime/*.json
