@@ -132,6 +132,8 @@ jobs:
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-global-runtime --tlb-global
       - name: Verify remote TLB dispatch acknowledgements (two-CPU q35 TCG; no coherence claim)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-remote-runtime --tlb-remote
+      - name: Verify scoped remote TLB byte readback (two-CPU q35 TCG; no universal coherence claim)
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-remote-readback-runtime --tlb-remote-readback
       - name: Prepare real no-import .ko inside QEMU and verify all staged bytes (never call init)
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
       - name: Retain serial evidence and exact harness dependency resolution
@@ -160,6 +162,10 @@ jobs:
             artifacts/tlb-remote-runtime/*.json
             artifacts/tlb-remote-runtime/*.txt
             artifacts/tlb-remote-runtime/harness-Cargo.*
+            artifacts/tlb-remote-readback-runtime/*.log
+            artifacts/tlb-remote-readback-runtime/*.json
+            artifacts/tlb-remote-readback-runtime/*.txt
+            artifacts/tlb-remote-readback-runtime/harness-Cargo.*
           retention-days: 7
           if-no-files-found: warn
 

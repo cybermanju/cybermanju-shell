@@ -1,6 +1,8 @@
 # Módulos Linux: o que funciona e o que falta provar
 
-**Avanço mais recente: passou a prova de despacho e confirmação de pedidos TLB entre duas CPUs em QEMU.** Foram observados quatro lotes no CPU remoto e um no emissor, com dois lotes inclusivos GLOBAL no remoto. **Isso prova o caminho de pedidos/espera, não a coerência de traduções, liberação de frames ou suporte SMP do loader.**
+**Avanço mais recente: oito bytes foram lidos no CPU remoto antes e depois da troca de um frame real.** A leitura passou, mas **omitir o shootdown também passou no TCG**: ainda não é uma prova causal de invalidação TLB ou autorização de mapping SMP. O controle de payload incorreto falhou como esperado.
+
+**Etapa anterior:** passou a prova de despacho e confirmação de pedidos TLB entre duas CPUs em QEMU. Foram observados quatro lotes no CPU remoto e um no emissor, com dois lotes inclusivos GLOBAL no remoto. **Isso prova o caminho de pedidos/espera, não a coerência de traduções, liberação de frames ou suporte SMP do loader.**
 
 **Etapa anterior:** o flush GLOBAL x86 agora preserva PGE e o estado de IRQ de entrada. Um ktest reproduziu o efeito colateral anterior: PGE desabilitado voltava habilitado. Depois da correção passaram os dois estados de PGE e três contextos de verificação de IRQ, além das regressões de módulos e framebuffer. **Isso não habilita execução de módulos ou mapping SMP.**
 
@@ -29,9 +31,10 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | **OSTD `ModuleStaging`** | Backend real `Frame<()>`/`VmIo`; **1 ktest / 7 cenários** bruto, incluindo owner, mapping temporário, colisão e tradução stale, mais o novo ktest com ELF e **15 testes host** | Mapping experimental só em ktest de uma CPU; sem execução, SMP ou W^X |
 | **OSTD TLB GLOBAL** | Novo flush inclusivo e agregação preservada; 1 ktest com 4 casos de encoding, 8 grupos de estado, 7 readbacks, 2 estados PGE e 3 contextos IRQ em uma CPU | TCG não discrimina inclusive/exclusive; sem prova de coerência remota, benchmark ou hardware físico |
 | **OSTD TLB remoto: dispatch/ack** | 1 ktest em 2 CPUs; 4 casos, 4 lotes remotos + 1 local, 2 inclusivos GLOBAL; origem 0 → destino 1; 2 casos sem trabalho | Contadores pós-flush, sem aquecer/ler tradução remota; não prova coerência, reclaim, concorrência de emissores ou mapping SMP |
+| **Readback remoto isolado OSTD** | 1 ktest em 2 CPUs; CPU 1 lê 8 bytes `0xe1`, depois `0x42`; dois frames retidos, GLOBAL/PGE conferidos, unmap/slot/PGE ao fim | Sem shootdown também passa no TCG; não prova retenção da tradução entre IPIs, coerência, reclaim ou mapping SMP do loader |
 | **Recusa SMP do protótipo OSTD** | 1 ktest, topologia real reportada de 2 CPUs, 3 chamadas válidas recusadas, 3 páginas de VA sem PTEs e faixa reutilizada após Drop | Somente bloqueio; não testa acesso concorrente, shootdown remoto, W^X ou init |
 | **OSTD `ModuleAddressReservation`** | API x86-64; reserva RAII compartilhada com `KVirtArea`; **1 ktest / 4 cenários**, 2 e 3 páginas reservadas mais 1 página de controle | Primitiva sem frames/mapping; usada pela ponte de layout, sem garantia geral de alcance de relocations |
-| VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 GiB, BIOS/GRUB multiboot2; mapping positivo em 1 CPU e recusa em 2 CPUs | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
+| VM do runtime | QEMU `8.2.2`, q35, TCG, `-cpu max`, 1 GiB, BIOS/GRUB multiboot2; mapping do loader em 1 CPU, recusa em 2 e helper isolado de bytes em 2 | Não usa KVM, rootfs externo, disco do usuário ou a ISO instaladora |
 | Framebuffer, avanço posterior | x86-64, VGA virtual 1280×800×32; readback e **6 verificações de limites** no mesmo ktest; controle negativo falhou antes da correção | Superfície curta sintética sobre MMIO real; não executa `.ko`, não prova GPUI/scanout; [detalhes e estado da ISO](hardware-graphics-compatibility.md) |
 | Layout compacto anterior | `.ko` original: 16 seções / span 1.856 bytes; C: 6 / 320 bytes | Política antiga preservada; não garante isolamento de páginas |
 | Layout de páginas | Base alinhada, 4 KiB fixos, páginas ocupadas disjuntas; recusa WRITE+EXEC inclusive vazio | Apenas números e flags; não reserva frames nem altera tabelas de páginas |
@@ -40,6 +43,22 @@ Separadamente, a revisão anterior `47ee9b5` aprovou instalação e boot instala
 | **`cybermanju_noimports_fixture.ko` auxiliar** | Mesmo Linux/arquitetura, `nm -u` vazio; preparação com zero exports; copiada para 10 frames no ktest; init FUNC 4 bytes e exit FUNC 2 bytes identificados na inspeção compacta | Flags não padrão e objtool desviado nesse objeto; init/exit nunca chamados; segurança e ABI não demonstradas |
 | Outros módulos/versões/arquiteturas | Nenhum módulo qualificado | Sem promessa para GPU, NVIDIA, ARM64, RISC-V ou LoongArch |
 | NVIDIA NVport | Fonte `615.78.08`, pin `1a82fbfda8f321b056eb3568850f9316c5e465c5` previamente documentado | Ponte C/Rust por fontes, não `nvidia.ko`; sem nova validação de RM/GSP/GPU |
+
+## Bytes reais no outro CPU — com uma limitação importante
+
+O [helper novo](../asterinas/ostd/src/mm/kspace/module_tlb_readback.rs), privado e compilado somente em `ktest` x86-64, reserva uma página virtual e aloca **dois frames físicos distintos**. O CPU 0 publica o mapping do primeiro; o CPU 1 lê oito bytes `0xe1`. O PTE é substituído pelo segundo frame, preenchido com `0x42`, e o `TlbFlusher` real despacha/espera a invalidação antes da segunda leitura remota. Passaram ambos os padrões completos e a checagem de que os callbacks rodaram no CPU 1. São bytes reais, não apenas contadores de callbacks.
+
+PGE é habilitado explicitamente no CPU remoto e seu valor anterior fica salvo; o PTE supervisor GLOBAL é conferido e não recebe execução. Os dois frames **e os fragmentos removidos da tabela** ficam retidos durante a experiência. O teardown remove o PTE, solta cursor/IRQ guard antes de esperar IPIs em ambas as CPUs, restaura o PGE remoto, zera o slot compartilhado e confere PTE ausente. O guard mantém esse caminho ligado ao Drop; falhas fatais do callback/AP, NMI e hotplug não são qualificadas. Não há API pública, mudança de produção ou relaxamento da recusa SMP do `ModuleStaging`.
+
+**O controle decisivo não distinguiu o shootdown.** Retirar apenas o flush sob teste, mantendo o teardown, também retornou `0x42`. Isso se repetiu após reter os fragmentos até a confirmação; os hashes de ELF/ISO positivo e sem flush são diferentes, descartando reutilização da imagem positiva. A comparação dos bytes ocorre **antes** do flush de cleanup, portanto o cleanup posterior não explica essa leitura. Não foi demonstrado que a tradução antiga persistiu entre as duas IPIs nem identificado o mecanismo da observação; não atribuímos o resultado a idle/IRET/CR3 sem evidência. Não existe `/dev/kvm` neste Sandbox, e não foi usado outro backend ou hardware físico.
+
+Um segundo controle mudou somente o conteúdo do frame substituto para o padrão antigo. A leitura de oito bytes `0xe1` em vez de `0x42` fez o ktest falhar, mostrando que a prova detecta payload errado. Ambos os controles foram revertidos e o positivo definitivo repetido. O [gate](../tools/ci/verify_tlb_remote_readback.py) registra `remote_bytes_observed=true`, mas mantém **false** para `negative_control_discriminates`, `universal_coherence_verified`, `frames_reclaimed_verified`, `smp_mapping_supported`, `linux_modules_executed` e `init_called`. O estado false do primeiro campo é uma limitação constatada, não um teste de coerência pendente que já possa ser contado como sucesso.
+
+O gate exige três marcadores únicos completos, IDs distintos em `[0,2)` e um único resumo `1 passed; 0 failed`; rejeita contagens/flags falsas, echo, panic, marcadores extras e controles inesperados. Uma regressão reproduziu aceitação de `echo` separado por retorno de carro; corrigimos a normalização e preservamos os bytes de entrada da CLI, sem fabricar linhas válidas. O runner mantém proteção de configuração existente e invalidação de resultado antigo. CI ganhou etapa/artefatos de **readback apenas**, no job existente, mantendo sete jobs.
+
+Passaram **168 testes Python e seis ktests em VMs separadas**: readback, dispatch remoto, GLOBAL local, recusa SMP, staging bruto e fixture preparada. Type-check de produção de OSTD/ponte/framebuffer para `x86_64-unknown-none`, rustfmt, sintaxe e diff passaram. Prova principal em `artifacts/tlb-remote-readback/`; controle não discriminante em `artifacts/tlb-remote-readback-no-flush/`; payload errado em `artifacts/tlb-remote-readback-wrong-payload/`; regressões em `artifacts/{tlb-dispatch,smp-rejection,tlb-local,staging,prepared}-2130/`; logs em `artifacts/cycle-2130/`.
+
+**Próximo passo:** obter um cenário/backend em que omitir a invalidação preserve bytes antigos e faça a checagem falhar; só então qualificar coerência e liberação diferida. Mapping persistente, alias linear/W^X e init continuam bloqueados. Nenhum novo `.ko`, versão Linux ou arquitetura foi qualificado; não há nova prova de GPUI, hardware físico ou boot instalado.
 
 ## Pedidos TLB chegando ao outro CPU
 
@@ -53,7 +72,7 @@ O [gate serial](../tools/ci/verify_tlb_remote_runtime.py) exige três marcadores
 
 Passaram **160 testes Python e cinco ktests em VMs separadas**: remoto, GLOBAL local, recusa SMP, staging bruto e fixture preparada. Type-check de produção de OSTD/ponte/framebuffer para `x86_64-unknown-none`, rustfmt, sintaxe e diff passaram. Regressões nativas em `artifacts/tlb-local-2100/`, `artifacts/tlb-smp-rejection-2100/`, `artifacts/staging-2100/` e `artifacts/prepared-2100/`.
 
-Serial, JSON, dependências e hashes em `artifacts/tlb-remote-runtime/`; negativo em `artifacts/tlb-remote-drop-negative/`; logs em `artifacts/cycle-2100/`. **Próximo passo:** uma prova de bytes com tradução remota antiga aquecida, preservando os dois frames até a invalidação e confirmação; depois validar liberação diferida. O loader continua recusando mapping em duas CPUs. Lista de módulos, Linux `6.8.0-147-generic`, arquitetura x86-64 e limites W^X/alias/ABI permanecem inalterados. Não há nova validação de hardware físico, GPUI ou boot instalado.
+Serial, JSON, dependências e hashes em `artifacts/tlb-remote-runtime/`; negativo em `artifacts/tlb-remote-drop-negative/`; logs em `artifacts/cycle-2100/`. **Próximo passo dessa etapa:** a prova de bytes posterior foi implementada acima, mas seu controle sem flush ainda não discrimina coerência; liberação diferida continua pendente. O loader continua recusando mapping em duas CPUs. Lista de módulos, Linux `6.8.0-147-generic`, arquitetura x86-64 e limites W^X/alias/ABI permanecem inalterados. Não há nova validação de hardware físico, GPUI ou boot instalado.
 
 ## Flush GLOBAL sem alterar a configuração da CPU
 
@@ -235,6 +254,7 @@ bash tools/ci/test_module_staging_runtime.sh artifacts/module-address-runtime --
 bash tools/ci/test_module_staging_runtime.sh artifacts/module-smp-rejection-runtime --smp-rejection
 bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-global-runtime --tlb-global
 bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-remote-runtime --tlb-remote
+bash tools/ci/test_module_staging_runtime.sh artifacts/tlb-remote-readback --tlb-remote-readback
 bash tools/ci/test_prepared_module_runtime.sh artifacts/prepared-module-runtime
 (cd asterinas && cargo check --locked -p ostd -p linux-module-staging --target x86_64-unknown-none)
 bash tools/ci/test_linux_module_elf.sh
@@ -257,6 +277,8 @@ O [flusher atual](../asterinas/ostd/src/mm/tlb.rs) agora preserva pedidos GLOBAL
 Execução nativa arbitrária em ring 0 não pode virar API segura só porque o ELF passou. A fronteira de confiança e execução de baixo nível pertencem a **OSTD**; `kernel/` e esta biblioteca continuam sem `unsafe`. Permanecem pendentes ABI/modversions, assinatura/confiança, privilégios e ciclo de vida. A fixture auxiliar reduz uma dependência do primeiro protótipo, não implementa os exports da original nem certifica drivers Linux arbitrários.
 
 ## Evidência de CI e boot
+
+A [consulta da base `8e86637`, run 39698451069](https://github.com/cybermanju/cybermanju-shell/actions/runs/39698451069), retornou workflow `completed/success` e seis jobs com `success`, mas o endpoint de jobs ainda mostrava `ostd-check` em `in_progress`, sem conclusão. Não contamos esse job como aprovado nem tratamos a inconsistência como falha demonstrada. A ISO anterior `39694611455` continuava em execução na consulta inicial; não foi cancelada. O novo readback tem evidência local e aguarda seu próprio CI após publicação.
 
 O [CI da base `ea1243d`, run 39694611534](https://github.com/cybermanju/cybermanju-shell/actions/runs/39694611534), **passou nos sete jobs**. A [ISO dessa base, run 39694611455](https://github.com/cybermanju/cybermanju-shell/actions/runs/39694611455), estava **em andamento** na consulta inicial; não foi cancelada por esta rodada. A prova remota é posterior e aguarda seu próprio CI após publicação.
 

@@ -51,6 +51,14 @@ case ${2:-} in
         CONFIG_TEMPLATE="$ROOT/tools/ci/tlb-remote-runtime.OSDK.toml"
         CPUS=2
         ;;
+    --tlb-remote-readback)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_tlb_remote_readback_runtime
+        VERIFY=verify_tlb_remote_readback.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/tlb-remote-readback.OSDK.toml"
+        CPUS=2
+        ;;
     *) echo 'Unknown runtime mode' >&2; exit 2 ;;
 esac
 CONFIG="$ROOT/asterinas/$CRATE_PATH/OSDK.toml"
