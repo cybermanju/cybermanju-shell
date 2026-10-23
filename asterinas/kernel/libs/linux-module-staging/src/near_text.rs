@@ -3,7 +3,9 @@
 //! Fixed-base planning and data-only staging in the x86 near-text address pool.
 //!
 //! Preparation itself does not map staged bytes. Explicit experimental consuming
-//! owners can retain RW/NX or uniform RO/NX aliases on fixed single-CPU boots.
+//! owners can retain RW/NX, uniform RO/NX, or plan-projected selective RO/NX
+//! and RW/NX aliases on fixed single-CPU boots. Selective NX never grants X;
+//! inaccessible layout gaps are rejected rather than mapped.
 //! These normal-build APIs do not authorize execution or certify physical W^X,
 //! SMP coherence, or production readiness; scoped audit mappings remain ktest-only.
 
@@ -1051,5 +1053,250 @@ impl PolicyNearTextPreparedModule {
             .inner
             .into_signed32_rw_nx_with_budget_observed_for_test(max_pages, entries)?;
         Ok(PolicyNearTextMappedModule { inner })
+    }
+}
+
+/// Owned signed-32 data lease with plan-derived selective RO/NX and RW/NX pages.
+///
+/// The retained permission plan is intent only; `read_only_pages` describes the
+/// effective mapping: intended RO/RX are RO/NX and intended RW are RW/NX.
+/// Inaccessible pages (including gaps) are rejected before mapping. No page is
+/// executable; linear RW aliases remain, so this is not physical W^X or production.
+#[cfg(target_arch = "x86_64")]
+pub struct NearTextSelectiveNxModule {
+    layout: Layout,
+    mapping: ostd::mm::module_staging::Signed32SelectiveNxMapping,
+    permissions: linux_module_elf::PagePermissionPlan,
+}
+#[cfg(target_arch = "x86_64")]
+impl NearTextSelectiveNxModule {
+    pub fn layout(&self) -> &Layout {
+        &self.layout
+    }
+    /// Intended permissions, not permissions applied literally (RX becomes NX).
+    pub fn permission_plan(&self) -> &linux_module_elf::PagePermissionPlan {
+        &self.permissions
+    }
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.mapping.reserved_range()
+    }
+    pub fn span(&self) -> usize {
+        self.mapping.span()
+    }
+    pub fn page_count(&self) -> usize {
+        self.mapping.page_count()
+    }
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.mapping.read_bytes(offset, out)
+    }
+    /// Effective NX mapping projection: true means RO/NX, false means RW/NX.
+    pub fn read_only_pages(&self) -> &[bool] {
+        self.mapping.read_only_pages()
+    }
+    #[cfg(ktest)]
+    pub(crate) fn audit_for_test(
+        &self,
+    ) -> Result<ostd::mm::module_staging::Signed32LeaseAudit, ostd::Error> {
+        self.mapping.audit_for_test()
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+pub struct PolicyNearTextSelectiveNxModule {
+    inner: NearTextSelectiveNxModule,
+}
+#[cfg(target_arch = "x86_64")]
+impl PolicyNearTextSelectiveNxModule {
+    pub fn layout(&self) -> &Layout {
+        self.inner.layout()
+    }
+    pub fn permission_plan(&self) -> &linux_module_elf::PagePermissionPlan {
+        self.inner.permission_plan()
+    }
+    pub fn reserved_range(&self) -> Range<Vaddr> {
+        self.inner.reserved_range()
+    }
+    pub fn span(&self) -> usize {
+        self.inner.span()
+    }
+    pub fn page_count(&self) -> usize {
+        self.inner.page_count()
+    }
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), ostd::Error> {
+        self.inner.read_bytes(offset, out)
+    }
+    pub fn read_only_pages(&self) -> &[bool] {
+        self.inner.read_only_pages()
+    }
+    #[cfg(ktest)]
+    pub(crate) fn audit_for_test(
+        &self,
+    ) -> Result<ostd::mm::module_staging::Signed32LeaseAudit, ostd::Error> {
+        self.inner.audit_for_test()
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn selective_mask(
+    plan: &linux_module_elf::PagePermissionPlan,
+) -> Result<alloc::vec::Vec<bool>, ostd::Error> {
+    let mut mask = alloc::vec::Vec::new();
+    mask.try_reserve_exact(plan.page_count())
+        .map_err(|_| ostd::Error::NoMemory)?;
+    for permission in plan.pages() {
+        use linux_module_elf::IntendedPagePermission as P;
+        mask.push(match permission {
+            P::ReadOnly | P::ReadExecute => true,
+            P::ReadWrite => false,
+            P::Inaccessible => return Err(ostd::Error::AccessDenied),
+        });
+    }
+    Ok(mask)
+}
+
+#[cfg(target_arch = "x86_64")]
+impl NearTextPreparedModule {
+    /// Preflight the whole plan, then map and project to NX-only permissions.
+    pub fn into_signed32_selective_nx(self) -> Result<NearTextSelectiveNxModule, ostd::Error> {
+        let budget = self.page_count();
+        self.into_signed32_selective_nx_with_page_budget(budget)
+    }
+    pub fn into_signed32_selective_nx_with_page_budget(
+        self,
+        max_pages: usize,
+    ) -> Result<NearTextSelectiveNxModule, ostd::Error> {
+        let permissions = self
+            .planned_permissions(max_pages)
+            .map_err(permission_plan_ostd_error)?;
+        let mask = selective_mask(&permissions)?;
+        let Self {
+            layout,
+            staging,
+            reservation,
+        } = self;
+        let rw = staging.map_signed32_rw_nx(reservation)?;
+        let mapping = rw.into_selective_nx(&mask)?;
+        Ok(NearTextSelectiveNxModule {
+            layout,
+            mapping,
+            permissions,
+        })
+    }
+    #[cfg(ktest)]
+    pub(crate) fn into_signed32_selective_nx_with_fault_for_test(
+        self,
+        after: usize,
+        observed: &mut usize,
+    ) -> Result<NearTextSelectiveNxModule, ostd::Error> {
+        let permissions = self
+            .planned_permissions(self.page_count())
+            .map_err(permission_plan_ostd_error)?;
+        let mask = selective_mask(&permissions)?;
+        let Self {
+            layout,
+            staging,
+            reservation,
+        } = self;
+        let rw = staging.map_signed32_rw_nx(reservation)?;
+        let mapping = rw.into_selective_nx_with_fault_for_test(&mask, after, observed)?;
+        Ok(NearTextSelectiveNxModule {
+            layout,
+            mapping,
+            permissions,
+        })
+    }
+    #[cfg(ktest)]
+    pub(crate) fn into_signed32_selective_nx_with_budget_observed_for_test(
+        self,
+        max_pages: usize,
+        entries: &mut usize,
+    ) -> Result<NearTextSelectiveNxModule, ostd::Error> {
+        let permissions = self
+            .planned_permissions(max_pages)
+            .map_err(permission_plan_ostd_error)?;
+        let mask = selective_mask(&permissions)?;
+        let Self {
+            layout,
+            staging,
+            reservation,
+        } = self;
+        *entries += 1;
+        let rw = staging.map_signed32_rw_nx(reservation)?;
+        let mapping = rw.into_selective_nx(&mask)?;
+        Ok(NearTextSelectiveNxModule {
+            layout,
+            mapping,
+            permissions,
+        })
+    }
+}
+#[cfg(target_arch = "x86_64")]
+impl NearTextMappedModule {
+    /// Consume existing RW/NX lease; inaccessible pages are rejected before protection.
+    pub fn into_selective_nx(self) -> Result<NearTextSelectiveNxModule, ostd::Error> {
+        let mask = selective_mask(&self.permissions)?;
+        let Self {
+            layout,
+            mapping,
+            permissions,
+        } = self;
+        let mapping = mapping.into_selective_nx(&mask)?;
+        Ok(NearTextSelectiveNxModule {
+            layout,
+            mapping,
+            permissions,
+        })
+    }
+}
+#[cfg(target_arch = "x86_64")]
+impl PolicyNearTextPreparedModule {
+    pub fn into_signed32_selective_nx(
+        self,
+    ) -> Result<PolicyNearTextSelectiveNxModule, ostd::Error> {
+        Ok(PolicyNearTextSelectiveNxModule {
+            inner: self.inner.into_signed32_selective_nx()?,
+        })
+    }
+    pub fn into_signed32_selective_nx_with_page_budget(
+        self,
+        max_pages: usize,
+    ) -> Result<PolicyNearTextSelectiveNxModule, ostd::Error> {
+        Ok(PolicyNearTextSelectiveNxModule {
+            inner: self
+                .inner
+                .into_signed32_selective_nx_with_page_budget(max_pages)?,
+        })
+    }
+    #[cfg(ktest)]
+    pub(crate) fn into_signed32_selective_nx_with_fault_for_test(
+        self,
+        after: usize,
+        observed: &mut usize,
+    ) -> Result<PolicyNearTextSelectiveNxModule, ostd::Error> {
+        Ok(PolicyNearTextSelectiveNxModule {
+            inner: self
+                .inner
+                .into_signed32_selective_nx_with_fault_for_test(after, observed)?,
+        })
+    }
+    #[cfg(ktest)]
+    pub(crate) fn into_signed32_selective_nx_with_budget_observed_for_test(
+        self,
+        max_pages: usize,
+        entries: &mut usize,
+    ) -> Result<PolicyNearTextSelectiveNxModule, ostd::Error> {
+        Ok(PolicyNearTextSelectiveNxModule {
+            inner: self
+                .inner
+                .into_signed32_selective_nx_with_budget_observed_for_test(max_pages, entries)?,
+        })
+    }
+}
+#[cfg(target_arch = "x86_64")]
+impl PolicyNearTextMappedModule {
+    pub fn into_selective_nx(self) -> Result<PolicyNearTextSelectiveNxModule, ostd::Error> {
+        Ok(PolicyNearTextSelectiveNxModule {
+            inner: self.inner.into_selective_nx()?,
+        })
     }
 }

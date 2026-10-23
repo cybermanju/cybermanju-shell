@@ -174,6 +174,10 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-ro-lease-runtime --elf-ro-lease
       - name: Verify ELF-to-RO NX handoff is denied under two CPUs
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-ro-lease-smp-runtime --elf-ro-lease-smp
+      - name: Verify ELF selective RO/RW NX projection, rollback, budget/gap preflight and exact bytes (data only)
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-selective-nx-runtime --elf-selective-nx
+      - name: Verify prepared ELF selective factory is denied under two CPUs
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-selective-nx-smp-runtime --elf-selective-nx-smp
       - name: Verify intended page-permission preflight without applying RX or physical W^X
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/permission-plan-runtime --permission-plan
       - name: Verify consuming permission-preflight denial drops handles before VA reclaim (budget, not heap OOM)
@@ -214,6 +218,16 @@ jobs:
             artifacts/elf-ro-lease-smp-runtime/*.txt
             artifacts/elf-ro-lease-smp-runtime/harness-Cargo.*
             artifacts/elf-ro-lease-smp-runtime/fixture/
+            artifacts/elf-selective-nx-runtime/*.log
+            artifacts/elf-selective-nx-runtime/*.json
+            artifacts/elf-selective-nx-runtime/*.txt
+            artifacts/elf-selective-nx-runtime/harness-Cargo.*
+            artifacts/elf-selective-nx-runtime/fixture/
+            artifacts/elf-selective-nx-smp-runtime/*.log
+            artifacts/elf-selective-nx-smp-runtime/*.json
+            artifacts/elf-selective-nx-smp-runtime/*.txt
+            artifacts/elf-selective-nx-smp-runtime/harness-Cargo.*
+            artifacts/elf-selective-nx-smp-runtime/fixture/
             artifacts/permission-plan-runtime/*.log
             artifacts/permission-plan-runtime/*.json
             artifacts/permission-plan-runtime/*.txt

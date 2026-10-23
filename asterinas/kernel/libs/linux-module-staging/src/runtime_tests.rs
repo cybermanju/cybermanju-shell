@@ -1160,3 +1160,6 @@ mod elf_lease;
 mod elf_ro_lease;
 mod permission_cleanup;
 mod permission_plan;
+
+#[path = "runtime_tests/elf_selective_nx.rs"]
+mod elf_selective_nx;

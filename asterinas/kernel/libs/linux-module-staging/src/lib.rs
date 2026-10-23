@@ -5,6 +5,8 @@
 //! holds real but unmapped addresses, NOT the locations of staging frames.
 //! This API must never be used as authorization to call init/exit.
 //! It creates no executable mappings, removes no aliases and certifies no ABI.
+//! Selective-NX mappings project intended RO/RX pages to RO/NX and RW pages to
+//! RW/NX; inaccessible gaps are rejected, and no execution or ABI is implied.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -34,11 +36,12 @@ mod near_text;
 #[cfg(target_arch = "x86_64")]
 pub use near_text::{
     NearTextMappedModule, NearTextModuleLayout, NearTextPreparedModule, NearTextReadOnlyModule,
+    NearTextSelectiveNxModule,
 };
 #[cfg(target_arch = "x86_64")]
 pub use near_text::{
     PolicyNearTextMappedModule, PolicyNearTextModuleLayout, PolicyNearTextPreparedModule,
-    PolicyNearTextReadOnlyModule,
+    PolicyNearTextReadOnlyModule, PolicyNearTextSelectiveNxModule,
 };
 
 /// A failed transfer never returns a partially staged owner.
