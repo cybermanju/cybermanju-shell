@@ -18,10 +18,10 @@ class LinuxCAbiRuntimeTests(unittest.TestCase):
     def test_accepts_exact_evidence_and_reports_narrow_scope(self):
         result = verifier.verify(GOOD)
         self.assertEqual(result["status"], "passed")
-        self.assertEqual(result["scope"], "explicit_memcmp_c_abi_probe_only")
+        self.assertEqual(result["scope"], "explicit_memcmp_memcpy_c_abi_probes_only")
         self.assertEqual((result["runtime_tests"], result["failed"], result["cpus"]), (1, 0, 1))
-        self.assertEqual((result["c_cases"], result["c_calls"], result["rust_calls"]), (16, 16, 16))
-        self.assertTrue(result["buffers_preserved"])
+        self.assertEqual((result["c_cases"], result["c_calls"], result["rust_calls"]), (32, 32, 32))
+        self.assertTrue(result["memcmp_buffers_preserved"])
         self.assertEqual((result["explicit_c_shim_names"], result["rust_internal_exports_denied"], result["unknown_names_denied"]), (1, 1, 3))
         for key in ("c_abi_subset_verified",):
             self.assertTrue(result[key])
@@ -30,8 +30,22 @@ class LinuxCAbiRuntimeTests(unittest.TestCase):
                     "init_called", "wx_verified", "smp_mapping_verified"):
             self.assertFalse(result[key])
 
+    def test_memcpy_proof_is_distinct_from_elf_admission(self):
+        result = verifier.verify(GOOD)
+        self.assertEqual(result["c_primitives_tested"], 2)
+        self.assertEqual((result["memcmp_cases"], result["memcpy_cases"]), (16, 16))
+        self.assertFalse(result["memcpy_elf_admitted"])
+        for field in ("source_preserved", "guards_preserved", "returns_destination", "destination_verified"):
+            self.assertTrue(result["memcpy_" + field])
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                verifier.verify(GOOD.replace(field + "=true", field + "=false"))
+        with self.assertRaises(ValueError):
+            verifier.verify(GOOD.replace("elf_admitted=false", "elf_admitted=true"))
+        with self.assertRaises(ValueError):
+            verifier.verify(GOOD.replace(verifier.MARKERS[2] + "\n", ""))
+
     def test_strips_ansi_and_carriage_returns(self):
-        self.assertEqual(verifier.verify("\x1b[32m" + GOOD.replace("\n", "\r\n") + "\x1b[0m")["c_calls"], 16)
+        self.assertEqual(verifier.verify("\x1b[32m" + GOOD.replace("\n", "\r\n") + "\x1b[0m")["c_calls"], 32)
 
     def test_rejects_marker_mutation_duplicate_reorder_and_echo(self):
         variants = [

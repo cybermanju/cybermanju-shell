@@ -151,6 +151,45 @@ fn cybermanju_linux_c_abi_runtime() {
         probe.rust_calls,
         probe.buffers_preserved
     );
+    // This primitive is callable by trusted Rust/C test code only. The
+    // closed Linux registry above must still reject its ELF import name.
+    let copy = ostd::linux_abi::run_memcpy_c_probe_for_test();
+    assert_eq!(copy.c_calls, 16, "memcpy C callback count");
+    assert_eq!(copy.rust_calls, 16, "memcpy Rust callback count");
+    assert_eq!(
+        copy.passed_mask, 0xffff,
+        "memcpy must match independent C oracle"
+    );
+    assert!(
+        copy.source_preserved,
+        "memcpy must preserve all source bytes"
+    );
+    assert!(
+        copy.guards_preserved,
+        "memcpy must preserve destination guards"
+    );
+    assert!(
+        copy.returns_destination,
+        "memcpy must return the exact destination"
+    );
+    assert!(
+        copy.destination_verified,
+        "memcpy must change only the requested destination bytes"
+    );
+    assert_eq!(
+        registry.resolve_export(b"memcpy"),
+        Err(ElfError::MissingSymbol)
+    );
+    println!(
+        "CYBERMANJU_LINUX_C_ABI:memcpy:PASS cases={} c_calls={} rust_calls={} source_preserved={} guards_preserved={} returns_destination={} destination_verified={} elf_admitted=false",
+        copy.passed_mask.count_ones(),
+        copy.c_calls,
+        copy.rust_calls,
+        copy.source_preserved,
+        copy.guards_preserved,
+        copy.returns_destination,
+        copy.destination_verified
+    );
     println!(
         "CYBERMANJU_LINUX_C_ABI:policy:PASS admitted={} rust_denied={} unknown_denied={} signatures={}",
         exports.len(),
@@ -162,6 +201,6 @@ fn cybermanju_linux_c_abi_runtime() {
         (descriptor.signature() == ExportSignature::Memcmp) as usize
     );
     println!(
-        "CYBERMANJU_LINUX_C_ABI:complete:PASS c_to_rust=true elf_imports_verified=false modules_executed=0 production_mapping=false wx=false smp_mapping=false"
+        "CYBERMANJU_LINUX_C_ABI:complete:PASS c_to_rust=true memcpy_elf_admitted=false elf_imports_verified=false modules_executed=0 production_mapping=false wx=false smp_mapping=false"
     );
 }

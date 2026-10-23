@@ -80,3 +80,69 @@ void cybermanju_memcmp_c_probe(memcmp_fn callback, CReport *report) {
     h.data[256] ^= 1;
     RUN(15, g.data, h.data, 257);                /* difference only at the end */
 }
+
+typedef void *(*memcpy_fn)(void *, const void *, size_t);
+typedef struct {
+    uint32_t calls, passed_mask, source_preserved, guards_preserved;
+    uint32_t returns_destination, destination_verified;
+} MemcpyCReport;
+_Static_assert(sizeof(MemcpyCReport) == 24 && _Alignof(MemcpyCReport) == 4,
+               "memcpy report layout");
+
+typedef struct { uint8_t pre, data[260], post; } CopyBuf;
+_Static_assert(__builtin_offsetof(CopyBuf, data) == 1 && sizeof(CopyBuf) == 262,
+               "copy oracle byte layout");
+static void init_copy(CopyBuf *src, CopyBuf *dst, unsigned seed) {
+    src->pre = 0xA5; src->post = 0x5A;
+    dst->pre = 0x3C; dst->post = 0xC3;
+    for (size_t i = 0; i < 260; ++i) {
+        src->data[i] = (uint8_t)(i * 37u + seed);
+        dst->data[i] = (uint8_t)(0xE1u - i - seed);
+    }
+}
+
+/* Each call has private source/destination/snapshots; oracle precedes callback.
+ * Every positive-length pair is disjoint, including deliberately unaligned spans. */
+#define COPY_CASE(bit, length, so, doff, nullsrc, nulldst) do { \
+    CopyBuf srcbuf, dstbuf; init_copy(&srcbuf, &dstbuf, (bit) * 11u); \
+    uint8_t src_before[sizeof(srcbuf)], dst_before[sizeof(dstbuf)]; \
+    uint8_t expected[sizeof(dstbuf)]; \
+    for (size_t q = 0; q < sizeof(srcbuf); ++q) src_before[q] = ((uint8_t *)&srcbuf)[q]; \
+    for (size_t q = 0; q < sizeof(dstbuf); ++q) { dst_before[q] = ((uint8_t *)&dstbuf)[q]; expected[q] = dst_before[q]; } \
+    size_t n = (length); size_t sx = (so), dx = (doff); \
+    if (n) for (size_t q = 0; q < n; ++q) expected[1 + dx + q] = srcbuf.data[sx + q]; \
+    void *dest = (nulldst) ? (void *)0 : (void *)(dstbuf.data + dx); \
+    const void *source = (nullsrc) ? (const void *)0 : (const void *)(srcbuf.data + sx); \
+    void *got = callback(dest, source, n); ++report->calls; \
+    int source_ok = 1, guards_ok = srcbuf.pre == src_before[0] && srcbuf.post == src_before[sizeof(srcbuf)-1] && dstbuf.pre == dst_before[0] && dstbuf.post == dst_before[sizeof(dstbuf)-1]; \
+    for (size_t q = 0; q < sizeof(srcbuf); ++q) if (((uint8_t *)&srcbuf)[q] != src_before[q]) source_ok = 0; \
+    int dest_ok = 1; for (size_t q = 0; q < sizeof(dstbuf); ++q) if (((uint8_t *)&dstbuf)[q] != expected[q]) dest_ok = 0; \
+    int ret_ok = got == dest; \
+    if (!source_ok) report->source_preserved = 0; \
+    if (!guards_ok) report->guards_preserved = 0; \
+    if (!ret_ok) report->returns_destination = 0; \
+    if (!dest_ok) report->destination_verified = 0; \
+    if (source_ok && guards_ok && ret_ok && dest_ok) report->passed_mask |= (uint32_t)1u << (bit); \
+} while (0)
+
+void cybermanju_memcpy_c_probe(memcpy_fn callback, MemcpyCReport *report) {
+    report->calls = report->passed_mask = 0;
+    report->source_preserved = report->guards_preserved = 1;
+    report->returns_destination = report->destination_verified = 1;
+    COPY_CASE(0, 0, 0, 0, 1, 1);                 /* null/null zero */
+    COPY_CASE(1, 0, 0, 0, 1, 0);                 /* null source, valid destination */
+    COPY_CASE(2, 0, 0, 0, 0, 1);                 /* valid source, null destination */
+    COPY_CASE(3, 1, 0, 0, 0, 0);                  /* single byte */
+    COPY_CASE(4, 1, 1, 3, 0, 0);                  /* unaligned byte */
+    COPY_CASE(5, 2, 2, 5, 0, 0);
+    COPY_CASE(6, 7, 3, 1, 0, 0);
+    COPY_CASE(7, 8, 8, 9, 0, 0);
+    COPY_CASE(8, 15, 4, 17, 0, 0);
+    COPY_CASE(9, 16, 16, 3, 0, 0);
+    COPY_CASE(10, 31, 7, 5, 0, 0);
+    COPY_CASE(11, 32, 32, 11, 0, 0);
+    COPY_CASE(12, 255, 2, 1, 0, 0);
+    COPY_CASE(13, 257, 1, 2, 0, 0);
+    COPY_CASE(14, 260, 0, 0, 0, 0);              /* full boundaries */
+    COPY_CASE(15, 257, 2, 3, 0, 0);              /* final copied byte */
+}
