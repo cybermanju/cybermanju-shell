@@ -11,7 +11,7 @@ printf '{"status":"not_verified","linux_modules_executed":false}\n' > "$OUT/resu
 if (( $# > 2 )); then echo 'Runtime modes are mutually exclusive' >&2; exit 2; fi
 MODE=${2:---prepared-module}
 case "$MODE" in
-    --prepared-module|--near-text-prepared|--signed32-prepared|--signed32-mapping-smp|--signed32-search|--internal-exports|--linux-c-abi|--c-shim-import|--elf-lease|--elf-lease-smp|--permission-plan|--permission-cleanup) ;;
+    --prepared-module|--near-text-prepared|--signed32-prepared|--signed32-mapping-smp|--signed32-search|--internal-exports|--linux-c-abi|--c-shim-import|--elf-lease|--elf-lease-smp|--elf-ro-lease|--elf-ro-lease-smp|--permission-plan|--permission-cleanup) ;;
     *) echo 'Unknown prepared runtime mode' >&2; exit 2 ;;
 esac
 bash "$ROOT/tools/ci/test_linux_module_noimports.sh" "$OUT/fixture" > "$OUT/fixture-build.log" 2>&1

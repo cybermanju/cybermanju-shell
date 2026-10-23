@@ -1157,5 +1157,6 @@ mod signed32;
 mod signed32_search;
 
 mod elf_lease;
+mod elf_ro_lease;
 mod permission_cleanup;
 mod permission_plan;

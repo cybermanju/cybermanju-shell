@@ -166,6 +166,10 @@ jobs:
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-runtime --elf-lease
       - name: Verify ELF-to-persistent-lease handoff is denied on two CPUs
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-lease-smp-runtime --elf-lease-smp
+      - name: Verify consuming ELF-to-RO NX alias handoff, retained plan and cleanup (no module execution)
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-ro-lease-runtime --elf-ro-lease
+      - name: Verify ELF-to-RO NX handoff is denied under two CPUs
+        run: bash tools/ci/test_prepared_module_runtime.sh artifacts/elf-ro-lease-smp-runtime --elf-ro-lease-smp
       - name: Verify intended page-permission preflight without applying RX or physical W^X
         run: bash tools/ci/test_prepared_module_runtime.sh artifacts/permission-plan-runtime --permission-plan
       - name: Verify consuming permission-preflight denial drops handles before VA reclaim (budget, not heap OOM)
@@ -196,6 +200,16 @@ jobs:
             artifacts/elf-lease-smp-runtime/*.json
             artifacts/elf-lease-smp-runtime/*.txt
             artifacts/elf-lease-smp-runtime/harness-Cargo.*
+            artifacts/elf-ro-lease-runtime/*.log
+            artifacts/elf-ro-lease-runtime/*.json
+            artifacts/elf-ro-lease-runtime/*.txt
+            artifacts/elf-ro-lease-runtime/harness-Cargo.*
+            artifacts/elf-ro-lease-runtime/fixture/
+            artifacts/elf-ro-lease-smp-runtime/*.log
+            artifacts/elf-ro-lease-smp-runtime/*.json
+            artifacts/elf-ro-lease-smp-runtime/*.txt
+            artifacts/elf-ro-lease-smp-runtime/harness-Cargo.*
+            artifacts/elf-ro-lease-smp-runtime/fixture/
             artifacts/permission-plan-runtime/*.log
             artifacts/permission-plan-runtime/*.json
             artifacts/permission-plan-runtime/*.txt

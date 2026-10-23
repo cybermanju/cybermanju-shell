@@ -88,6 +88,22 @@ case ${2:-} in
         VERIFY=verify_permission_plan_runtime.py
         [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
         ;;
+    --elf-ro-lease)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_elf_ro_lease_runtime
+        VERIFY=verify_elf_ro_lease_runtime.py
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
+    --elf-ro-lease-smp)
+        CRATE=linux-module-staging
+        CRATE_PATH=kernel/libs/linux-module-staging
+        FILTER=cybermanju_elf_ro_lease_smp_runtime
+        VERIFY=verify_elf_ro_lease_smp_runtime.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
+        CPUS=2
+        [[ -s ${CYBERMANJU_STAGING_FIXTURE:-} ]] || { echo 'Missing prepared-module fixture' >&2; exit 2; }
+        ;;
     --elf-lease)
         CRATE=linux-module-staging
         CRATE_PATH=kernel/libs/linux-module-staging
