@@ -6,6 +6,7 @@ Asterinas. Installation is online and uses the configured Nix binary caches.
 """
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -34,6 +35,64 @@ def parse_installer_phase(line):
     return None
 
 
+OBSERVER_PREFIX = b"CYBERMANJU_INSTALL_OBSERVER:"
+DIAGNOSTIC_LINE_LIMIT = 128 * 1024
+
+
+def parse_installer_process_sample(line):
+    """Accept bounded explicit process observations, never Nix copy-path text."""
+    if not line.startswith(OBSERVER_PREFIX) or len(line) > DIAGNOSTIC_LINE_LIMIT:
+        return None
+    try:
+        sample = json.loads(line[len(OBSERVER_PREFIX):].decode("ascii"))
+        keys = {"version", "event", "phase", "parent_pid", "sample", "elapsed_seconds", "processes"}
+        if not isinstance(sample, dict) or set(sample) != keys:
+            return None
+        if type(sample["version"]) is not int or sample["version"] != 1 or sample["event"] != "sample" or sample["phase"] != "install-system":
+            return None
+        if type(sample["parent_pid"]) is not int or not 0 < sample["parent_pid"] < 2**31:
+            return None
+        if type(sample["sample"]) is not int or not 1 <= sample["sample"] <= 240:
+            return None
+        elapsed = sample["elapsed_seconds"]
+        if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
+            return None
+        processes = sample["processes"]
+        if not isinstance(processes, list) or not 1 <= len(processes) <= 12:
+            return None
+        process_keys = {"pid", "ppid", "comm", "state", "utime_ticks", "stime_ticks", "starttime", "argv", "argv_truncated", "wchan", "io", "unavailable"}
+        pids = set()
+        for process in processes:
+            if not isinstance(process, dict) or set(process) != process_keys:
+                return None
+            pid = process["pid"]
+            if type(pid) is not int or not 0 < pid < 2**31 or pid in pids:
+                return None
+            pids.add(pid)
+            for field in ("ppid", "utime_ticks", "stime_ticks", "starttime"):
+                value = process[field]
+                if value is not None and (type(value) is not int or not 0 <= value < 2**64):
+                    return None
+            for field, limit in (("comm", 256), ("state", 1), ("argv", 4096), ("wchan", 512)):
+                value = process[field]
+                if value is not None and (not isinstance(value, str) or len(value) > limit):
+                    return None
+            if type(process["argv_truncated"]) is not bool:
+                return None
+            unavailable = process["unavailable"]
+            if not isinstance(unavailable, list) or len(unavailable) > 4 or any(v not in ("stat", "cmdline", "wchan", "io", "identity_changed") for v in unavailable):
+                return None
+            io = process["io"]
+            if io is not None:
+                if not isinstance(io, dict) or not set(io) <= {"rchar", "wchar", "syscr", "syscw", "read_bytes", "write_bytes", "cancelled_write_bytes"}:
+                    return None
+                if any(v is not None and (type(v) is not int or not 0 <= v < 2**64) for v in io.values()):
+                    return None
+        return sample if sample["parent_pid"] in pids else None
+    except (ValueError, TypeError, OverflowError, RecursionError):
+        return None
+
+
 class Console:
     def __init__(self, process):
         self.process = process
@@ -44,6 +103,9 @@ class Console:
         self.phase_line_tail = b""
         self.last_installer_phase = None
         self.first_installer_failure = None
+        self.last_installer_process_sample = None
+        self.installer_process_samples_seen = 0
+        self.last_non_observer_line_at = None
         self.selector = selectors.DefaultSelector()
         self.selector.register(process.stdout, selectors.EVENT_READ)
 
@@ -84,9 +146,21 @@ class Console:
         # Keep structured phase evidence even when verbose Nix output evicts it
         # from the bounded console buffer. Parse complete visible lines only.
         phase_lines = (getattr(self, "phase_line_tail", b"") + visible).split(b"\n")
-        self.phase_line_tail = phase_lines.pop()[-256:]
-        for line in phase_lines:
-            phase = parse_installer_phase(line.rstrip(b"\r"))
+        tail = phase_lines.pop()
+        was_truncated = getattr(self, "phase_line_truncated", False)
+        self.phase_line_tail = tail[-DIAGNOSTIC_LINE_LIMIT:]
+        self.phase_line_truncated = len(tail) > DIAGNOSTIC_LINE_LIMIT or (was_truncated and not phase_lines)
+        for index, line in enumerate(phase_lines):
+            if index == 0 and was_truncated:
+                continue  # Lost line origin must not create an anchored marker.
+            line = line.rstrip(b"\r")
+            if line and not line.startswith(OBSERVER_PREFIX):
+                self.last_non_observer_line_at = time.monotonic()
+            observed = parse_installer_process_sample(line)
+            if observed is not None:
+                self.last_installer_process_sample = observed
+                self.installer_process_samples_seen = getattr(self, "installer_process_samples_seen", 0) + 1
+            phase = parse_installer_phase(line)
             if phase is not None:
                 self.last_installer_phase = phase
                 if phase["event"] == "end" and phase["exit_status"] != 0 and getattr(self, "first_installer_failure", None) is None:
@@ -117,6 +191,7 @@ class Console:
 
     def write_failure_snapshot(self, path, error):
         last_output = getattr(self, "last_output_at", None)
+        last_non_observer = getattr(self, "last_non_observer_line_at", None)
         payload = {
             "schema_version": 1,
             "status": "diagnostic_only",
@@ -127,6 +202,10 @@ class Console:
             "seconds_since_output": None if last_output is None else max(0, time.monotonic() - last_output),
             "last_observed_installer_phase": getattr(self, "last_installer_phase", None),
             "first_observed_installer_failure": getattr(self, "first_installer_failure", None),
+            "last_observed_installer_process_sample": getattr(self, "last_installer_process_sample", None),
+            "installer_process_samples_seen": getattr(self, "installer_process_samples_seen", 0),
+            "seconds_since_non_observer_line": None if last_non_observer is None else max(0, time.monotonic() - last_non_observer),
+            "process_observations_are_installation_success": False,
             "serial_tail": self.buffer[-8192:].decode("utf-8", errors="replace"),
             "installation_verified": False,
             "installed_boot_verified": False,
@@ -202,7 +281,7 @@ def run(phase):
             with timed_phase(artifacts, f"{phase}-install", acceleration):
                 try:
                     console.send(
-                        "aster-nixos-install --config /root/ci-configuration.nix "
+                        "CYBERMANJU_INSTALL_OBSERVER=1 aster-nixos-install --config /root/ci-configuration.nix "
                         "--disk /dev/vda --force-format-disk"
                     )
                     console.expect(

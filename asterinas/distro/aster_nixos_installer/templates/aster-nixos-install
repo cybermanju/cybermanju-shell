@@ -11,7 +11,31 @@ run_install_phase() {
     local status=0
     # Separate markers from prompts or progress that did not end with newline.
     printf '\nCYBERMANJU_INSTALL_PHASE:begin phase=%s\n' "$phase" >&2
+    local observer_dir="" observer_pid="" observer_parent="${BASHPID:-$$}"
+    # Observe the shell and its descendants, not a path mentioned in Nix output.
+    # Keep the real command foregrounded: backgrounding it would change stdin
+    # and signal behavior. Diagnostics never signal the installer or its children.
+    if [[ "$phase" == install-system && "${CYBERMANJU_INSTALL_OBSERVER:-0}" == 1 ]]; then
+        if observer_dir=$(mktemp -d "${TMPDIR:-/tmp}/cybermanju-install-observer.XXXXXXXX"); then
+            "@aster-observer-python@" "@aster-install-observer@" \
+                --parent "$observer_parent" --phase "$phase" \
+                --stop-file "$observer_dir/stop" \
+                --interval "${CYBERMANJU_INSTALL_OBSERVER_INTERVAL:-30}" \
+                --samples "${CYBERMANJU_INSTALL_OBSERVER_SAMPLES:-120}" \
+                </dev/null >/dev/null &
+            observer_pid=$!
+        fi
+    fi
     "$@" || status=$?
+    if [[ -n "$observer_pid" ]]; then
+        # The observer checks this private file within 0.2 s. No kill/ptrace,
+        # no new traps, and no observer failure can replace the command status.
+        if : > "$observer_dir/stop"; then
+            wait "$observer_pid" || true
+            rm -f -- "$observer_dir/stop" || true
+            rmdir -- "$observer_dir" || true
+        fi
+    fi
     printf '\nCYBERMANJU_INSTALL_PHASE:end phase=%s status=%s\n' "$phase" "$status" >&2
     return "$status"
 }

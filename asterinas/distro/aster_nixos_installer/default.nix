@@ -32,6 +32,11 @@ let
   aster_nixos_install = pkgs.replaceVarsWith {
     src = ./templates/aster-nixos-install;
     replacements = {
+      aster-observer-python = "${pkgs.python3}/bin/python3";
+      aster-install-observer = builtins.path {
+        name = "cybermanju-install-process-observer.py";
+        path = ./templates/install-process-observer.py;
+      };
       aster-configuration = aster_configuration;
       aster-etc-nixos = etc-nixos;
       aster-nixpkgs = builtins.storePath pkgs.path;
