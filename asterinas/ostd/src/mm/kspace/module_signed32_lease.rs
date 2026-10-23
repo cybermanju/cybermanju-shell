@@ -422,3 +422,6 @@ fn transition(
 
 #[cfg(ktest)]
 mod selective_runtime;
+
+#[cfg(ktest)]
+mod write_fault_runtime;

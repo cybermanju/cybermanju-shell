@@ -14,6 +14,8 @@
 //! [`FallibleVmWrite::write_fallible`]: super::FallibleVmWrite::write_fallible
 
 mod ex_table;
+#[cfg(all(ktest, target_arch = "x86_64"))]
+pub(crate) mod signed32_write_probe;
 
 use spin::Once;
 
@@ -57,6 +59,10 @@ pub(crate) fn handle_user_page_fault(
     exception: &CpuException,
     fault_addr: Vaddr,
 ) {
+    #[cfg(all(ktest, target_arch = "x86_64"))]
+    if signed32_write_probe::try_recover(f, exception, fault_addr) {
+        return;
+    }
     // The actual user space implementation should be responsible
     // for providing mechanism to treat the 0 virtual address.
     if !(0..MAX_USERSPACE_VADDR).contains(&fault_addr) {

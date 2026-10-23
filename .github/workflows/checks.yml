@@ -138,6 +138,8 @@ jobs:
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-ro-lease-runtime --signed32-ro-lease
       - name: Verify RO non-X mapping factory is denied under two-CPU topology
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-ro-lease-smp-runtime --signed32-ro-lease-smp
+      - name: Verify real supervisor RO byte-store faults with WP enabled and ktest-only exact-site recovery
+        run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-write-fault-runtime --signed32-write-fault
       - name: Verify selective signed32 RO/RW NX alias PTEs, exact bytes and transition-fault cleanup (no write-fault probe)
         run: bash tools/ci/test_module_staging_runtime.sh artifacts/signed32-selective-nx-runtime --signed32-selective-nx
       - name: Verify selective signed32 experiment is denied at RW factory under two-CPU topology (no selective transition)
@@ -264,6 +266,10 @@ jobs:
             artifacts/signed32-ro-lease-smp-runtime/*.json
             artifacts/signed32-ro-lease-smp-runtime/*.txt
             artifacts/signed32-ro-lease-smp-runtime/harness-Cargo.*
+            artifacts/signed32-write-fault-runtime/*.log
+            artifacts/signed32-write-fault-runtime/*.json
+            artifacts/signed32-write-fault-runtime/*.txt
+            artifacts/signed32-write-fault-runtime/harness-Cargo.*
             artifacts/signed32-selective-nx-runtime/*.log
             artifacts/signed32-selective-nx-runtime/*.json
             artifacts/signed32-selective-nx-runtime/*.txt

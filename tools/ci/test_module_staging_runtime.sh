@@ -162,6 +162,12 @@ case ${2:-} in
         CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
         CPUS=2
         ;;
+    --signed32-write-fault)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_signed32_write_fault_runtime
+        VERIFY=verify_signed32_write_fault_runtime.py
+        ;;
     --signed32-selective-nx)
         CRATE=ostd
         CRATE_PATH=ostd
