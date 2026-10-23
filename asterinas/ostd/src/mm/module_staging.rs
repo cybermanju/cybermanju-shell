@@ -26,6 +26,8 @@ pub use crate::mm::kspace::module_signed32_lease::Signed32RoMapping;
 #[cfg(target_arch = "x86_64")]
 pub use crate::mm::kspace::module_signed32_lease::Signed32RwMapping;
 #[cfg(target_arch = "x86_64")]
+pub use crate::mm::kspace::module_signed32_lease::Signed32SelectiveNxMapping;
+#[cfg(target_arch = "x86_64")]
 pub use reserved::ReservedModuleStaging;
 pub use storage::ModuleChunk;
 use storage::{Page, StagedPages};

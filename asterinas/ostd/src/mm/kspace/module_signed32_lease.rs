@@ -336,6 +336,10 @@ fn new_inner(
 mod readonly;
 #[cfg(target_arch = "x86_64")]
 pub use readonly::Signed32RoMapping;
+#[cfg(target_arch = "x86_64")]
+mod selective;
+#[cfg(target_arch = "x86_64")]
+pub use selective::Signed32SelectiveNxMapping;
 #[cfg(ktest)]
 mod readonly_runtime;
 #[cfg(ktest)]
@@ -415,3 +419,6 @@ fn transition(
     lease.audit_expected(&guard, true)?;
     Ok(readonly::wrap(lease))
 }
+
+#[cfg(ktest)]
+mod selective_runtime;

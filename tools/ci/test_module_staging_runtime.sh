@@ -146,6 +146,20 @@ case ${2:-} in
         CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
         CPUS=2
         ;;
+    --signed32-selective-nx)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_signed32_selective_nx_runtime
+        VERIFY=verify_signed32_selective_nx_runtime.py
+        ;;
+    --signed32-selective-nx-smp)
+        CRATE=ostd
+        CRATE_PATH=ostd
+        FILTER=cybermanju_signed32_selective_nx_smp_runtime
+        VERIFY=verify_signed32_selective_nx_smp_runtime.py
+        CONFIG_TEMPLATE="$ROOT/tools/ci/module-mapping-smp-rejection.OSDK.toml"
+        CPUS=2
+        ;;
     --signed32-lease)
         CRATE=ostd
         CRATE_PATH=ostd

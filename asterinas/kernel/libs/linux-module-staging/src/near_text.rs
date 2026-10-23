@@ -2,8 +2,10 @@
 
 //! Fixed-base planning and data-only staging in the x86 near-text address pool.
 //!
-//! Production APIs never map staged bytes; a temporary mapping exists only in
-//! the cfg(all(ktest, x86_64)) audit helper and is torn down before it returns.
+//! Preparation itself does not map staged bytes. Explicit experimental consuming
+//! owners can retain RW/NX or uniform RO/NX aliases on fixed single-CPU boots.
+//! These normal-build APIs do not authorize execution or certify physical W^X,
+//! SMP coherence, or production readiness; scoped audit mappings remain ktest-only.
 
 use core::ops::Range;
 
